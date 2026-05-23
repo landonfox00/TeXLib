@@ -1,0 +1,59 @@
+% bank.tex — sample problem bank for the autoexam template.
+%
+% A minimal, self-contained bank so template.tex compiles out of the box,
+% the same way every other TeXLib module template does. Replace these with
+% your own problems, or point \loadbank at a real bank file — see
+% Math 126EE/Bank/ for production examples (\byversion, cols, TikZ graphs).
+%
+% Format:
+%   \begin{problem}{id}[topic=..., section=..., source=...]
+%       <statement, optionally with \begin{parts}...\end{parts}>
+%   \solution
+%       <solution; rendered only in \ShowKey / \ShowSolutions builds>
+%   \end{problem}
+%
+% The template body retrieves these three by topic:
+%   \getproblem{topic=quad}   \getproblem{topic=ratineq}   \getproblem{topic=graph}
+
+% --- topic: quad ------------------------------------------------------------
+\begin{problem}{sample_quad_solve}[topic=quad, section=sample, source=template]
+	Solve the quadratic equation
+	\[ x^2 - 5x + 6 = 0. \]
+	\begin{parts}
+		\part[4] Find all real solutions.
+			\vspace{\stretch{2}}
+		\part[2] Verify one of your solutions by substitution.
+			\vspace{\stretch{1}}
+	\end{parts}
+	\solution
+	Factor: $(x - 2)(x - 3) = 0$, so $x = 2$ or $x = 3$.
+	Check $x = 2$: $\;4 - 10 + 6 = 0$, which is correct.
+\end{problem}
+
+% --- topic: ratineq ---------------------------------------------------------
+\begin{problem}{sample_ratineq}[topic=ratineq, section=sample, source=template]
+	Solve the rational inequality
+	\[ \frac{x - 1}{x + 2} \ge 0, \]
+	and write your answer in interval notation.
+	\vspace{\stretch{2}}
+	\solution
+	The expression is zero at $x = 1$ and undefined at $x = -2$. A sign
+	analysis on the intervals $(-\infty, -2)$, $(-2, 1)$, $(1, \infty)$
+	gives the solution $(-\infty, -2) \cup [1, \infty)$ — note $x = -2$
+	is excluded and $x = 1$ is included.
+\end{problem}
+
+% --- topic: graph -----------------------------------------------------------
+\begin{problem}{sample_graph_line}[topic=graph, section=sample, source=template]
+	Graph the linear function $y = 2x - 1$. Clearly mark at least two
+	points. You may assume grid lines are of unit length.
+	\begin{center}
+		\begin{tikzpicture}
+			\draw[help lines, color=black!30, dashed] (-2.9,-2.9) grid (2.9,2.9);
+			\draw[->, thick] (-3,0)--(3,0) node[right]{$x$};
+			\draw[->, thick] (0,-3)--(0,3) node[above]{$y$};
+		\end{tikzpicture}
+	\end{center}
+	\solution
+	A line through $(0, -1)$ and $(1, 1)$ with slope $2$.
+\end{problem}

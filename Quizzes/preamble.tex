@@ -1,0 +1,155 @@
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+
+\usepackage{xparse}
+\usepackage{ifthen}
+
+\usepackage{adjustbox}
+\usepackage{changepage}
+\usepackage{comment}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{lastpage}
+\usepackage{needspace}
+\usepackage{xcolor}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{siunitx}
+
+\usepackage{pdfpages}
+\usepackage{tocloft}
+
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+\usetikzlibrary{datavisualization, datavisualization.formats.functions}
+
+
+%%%%% Hyperlinks
+\usepackage{hyperref}
+\hypersetup{
+	colorlinks=true,
+	urlcolor=blue,
+	linkcolor=blue,
+	citecolor=red
+}
+
+%%%%% Math & Table Configuration
+\sisetup{
+	table-number-alignment=center,
+	mode=math
+}
+
+%%%%% Custom Math Commands
+\newcommand{\mbb}[1]{\mathbb{#1}}
+\newcommand{\mrm}[1]{\mathrm{#1}}
+\newcommand{\mcal}[1]{\mathcal{#1}}
+\newcommand{\msf}[1]{\mathsf{#1}}
+\newcommand{\mf}[1]{\mathfrak{#1}}
+\newcommand{\mscr}[1]{\mathscr{#1}}
+
+%%%%% Symbols
+\newcommand{\abs}[1]{\mathopen{}\lvert #1 \rvert\mathopen{}}
+\newcommand{\lrp}[1]{\mathopen{}\left(#1\right)\mathclose{}}
+\newcommand{\lrb}[1]{\mathopen{}\left[#1\right]\mathclose{}}
+\newcommand{\lrcb}[1]{\mathopen{}\left\{#1\right\}\mathopen{}}
+\newcommand{\lrsb}[1]{\mathopen{}\left[#1\right]\mathopen{}}
+\newcommand{\dd}{\mrm{d}}
+\NewDocumentCommand{\deriv}{O{} m m}{\frac{\dd^{#1} \IfValueTF{#2}{#2}{}}{\dd #3^{#1}}}
+\NewDocumentCommand{\inte}{O{} O{} m m}{\int_{#1}^{#2} #3\, \dd #4}
+\newcommand{\todo}{\textcolor{red}{TODO}}
+
+%%%%% Theorem Environments
+\newtheorem*{thm*}{Theorem}
+\newtheorem*{defn*}{Definition}
+\newtheorem*{cor*}{Corollary}
+\newtheorem*{prop*}{Proposition}
+\newtheorem*{lem*}{Lemma}
+\newtheorem*{conj*}{Conjecture}
+\newtheorem*{ques*}{Question}
+\newtheorem*{prob*}{Problem}
+\newtheorem*{exam*}{Example} 
+\newtheorem*{notn*}{Notation}
+\theoremstyle{remark}
+\newtheorem*{rmk*}{Remark}
+\newtheorem*{recall*}{Recall}
+\newtheorem*{case*}{Case}
+\newtheorem*{desiderata*}{Desiderata}
+
+%%%%% Multiple Choice
+\newlist{inlinechoices}{enumerate*}{1}
+\setlist[inlinechoices]{%
+	label=\textbf{\alph*.},
+	itemjoin={\hspace{6em}},
+	itemsep=0pt
+}
+
+%%%%% Roman Enumerate
+\setlist[enumerate]{label=\textbf{\roman*}.}
+
+%%%%% Figures
+\newcommand{\fig}[2][]{%
+	\begin{figure}[!h]
+		\centering
+		\includegraphics[width=0.5\textwidth, height=0.35\textwidth, keepaspectratio, #1]{Figures/#2.png}
+	\end{figure}
+}
+
+%%%%% Extra Credit
+\NewDocumentCommand{\extracredit}{o+m}{%
+	\stepcounter{question}%
+	\item[\textbf{\thequestion.}]%
+	\IfValueTF{#1}
+		{(\textbf{Extra Credit}, #1 points)~}
+		{(\textbf{Extra Credit})~}%
+	#2
+}
+
+%%%%% Question Relabeling
+\renewcommand{\questionlabel}{\textbf{\arabic{question}.}}
+\renewcommand{\partlabel}{\textbf{\alph{partno}.}}
+
+%%%%% Circle Letter
+\newcommand\encircle[1]{%
+	\tikz[baseline=(X.base)] 
+	\node (X) [draw, shape=circle, inner sep=0] {\strut #1};
+}
+
+%%%%% Document Metadata
+\usepackage{course-metadata} % Auto-loads coursemeta.tex from ancestor dirs
+
+% --- Document-specific: set via \renewcommand in each quiz .tex file ---
+\newcommand{\theQuizNumber}{\todo}
+\newcommand{\theTitle}{Quiz \theQuizNumber}
+
+% --- Course metadata: auto-populated from coursemeta.tex via course-metadata.sty ---
+% These \the* aliases preserve backward compatibility with existing documents
+% that use \renewcommand to override them; new documents need not touch them.
+\newcommand{\theCourseNumber}{\GetCourseNumber}
+\newcommand{\theCourseTitle}{\GetCourseTitle}
+\newcommand{\theCourse}{\GetCourseSubject\ \GetCourseNumber\ \GetCourseTitle}
+\newcommand{\theCourseSection}{\GetCourseSection}
+\newcommand{\theSeason}{\GetSeason}
+\newcommand{\theYear}{\GetYear}
+\newcommand{\theTerm}{\GetTerm}
+\newcommand{\theSchool}{\GetInstitution}
+
+%%%%% Title Information
+\title{\LARGE \theTitle}
+
+% Heading and Footer
+\pagestyle{headandfoot}
+\firstpageheader{\theCourse}{}{Name: \underline{\hspace{2.5in}}}
+\firstpageheadrule
+\firstpagefooter{Section \theCourseSection}{}{\theSchool}
+\firstpagefootrule
+\runningheader{\theCourse}{}{Name: \underline{\hspace{2.5in}}}
+\runningheadrule
+\runningfootrule
+\runningfooter{Section \theCourseSection}{}{\theSchool}

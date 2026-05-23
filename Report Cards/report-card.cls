@@ -1,0 +1,224 @@
+% report-card.cls
+% Per-Student Report Card Class — TeXLib unified style
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesClass{report-card}[2026/05/07 v1.0 Per-Student Report Cards (TeXLib)]
+
+% ==============================================================================
+% 0. OPTIONS
+% ==============================================================================
+\DeclareOption*{\PassOptionsToClass{\CurrentOption}{article}}
+\ProcessOptions\relax
+\LoadClass[11pt]{article}
+
+% ==============================================================================
+% 1. PACKAGES
+% ==============================================================================
+\RequirePackage[T1]{fontenc}
+\RequirePackage{lmodern}
+\RequirePackage[margin=1in]{geometry}
+\RequirePackage{xparse}
+\RequirePackage{expl3}
+\RequirePackage{etoolbox}
+\RequirePackage{basic-utilities}    % shared math macros, tikz config, tasks (grid layout)
+\RequirePackage{adjustbox, changepage, comment}
+\RequirePackage[skip=3pt]{caption}
+\RequirePackage[shortlabels]{enumitem}
+\RequirePackage{fancyhdr, lastpage}
+\RequirePackage{graphicx, needspace}
+\RequirePackage{xcolor}
+\RequirePackage{booktabs, colortbl, multirow, makecell}
+\RequirePackage{tikz}
+\RequirePackage{amsmath, amssymb, amsthm, mathtools}
+\RequirePackage{tocloft}
+\RequirePackage{hyperref}
+\hypersetup{colorlinks=true, urlcolor=blue, linkcolor=black, citecolor=black}
+
+\RequirePackage{course-metadata}
+
+% ==============================================================================
+% 2. BUILD FLAGS — UNIFIED TeXLib CLI
+% ==============================================================================
+\RequirePackage{texlib-build}
+
+
+% ==============================================================================
+% 3. CLASS-LOCAL METADATA KEYS
+% ==============================================================================
+\ExplSyntaxOn
+
+\tl_new:N \g__rc_report_date_tl
+\tl_new:N \g__rc_brand_color_tl
+\tl_new:N \g__rc_accent_color_tl
+\tl_new:N \g__rc_disclaimer_tl
+\tl_new:N \g__rc_signature_tl
+
+\tl_gset:Nn \g__rc_brand_color_tl  { 003366 }     % UNR navy by default
+\tl_gset:Nn \g__rc_accent_color_tl { 808080 }     % silver
+\tl_gset:Nn \g__rc_disclaimer_tl {
+	\textit{Disclaimer:~ This~document~is~an~estimate~based~on~current~records.~
+	Official~grades~are~determined~by~the~specific~policies~in~the~syllabus.~
+	I~also~make~mistakes,~please~keep~that~in~mind.}
+}
+
+\keys_define:nn { meta } {
+	report-date    .tl_gset:N = \g__rc_report_date_tl,
+	brand-color    .tl_gset:N = \g__rc_brand_color_tl,
+	accent-color   .tl_gset:N = \g__rc_accent_color_tl,
+	rc-disclaimer  .tl_gset:N = \g__rc_disclaimer_tl,
+	rc-signature   .tl_gset:N = \g__rc_signature_tl,
+	% Backward-compat aliases
+	disclaimer     .tl_gset:N = \g__rc_disclaimer_tl,
+	signature      .tl_gset:N = \g__rc_signature_tl,
+}
+
+\NewExpandableDocumentCommand{\GetReportDate} {}{ \tl_use:N \g__rc_report_date_tl }
+\NewExpandableDocumentCommand{\GetDisclaimer} {}{ \tl_use:N \g__rc_disclaimer_tl }
+\NewExpandableDocumentCommand{\GetSignature}  {}{
+	\tl_if_empty:NTF \g__rc_signature_tl
+		{ \GetInstructor }
+		{ \tl_use:N \g__rc_signature_tl }
+}
+
+\AtBeginDocument{
+	\exp_args:Nx \definecolor { rc@brand  } { HTML } { \tl_use:N \g__rc_brand_color_tl  }
+	\exp_args:Nx \definecolor { rc@accent } { HTML } { \tl_use:N \g__rc_accent_color_tl }
+}
+
+\ExplSyntaxOff
+
+% ==============================================================================
+% 4. PAGE LAYOUT
+% ==============================================================================
+\setlength{\headheight}{14pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\GetCourseShort\ \GetCourseTitle}
+\fancyhead[R]{Report~Card,~\GetReportDate}
+\fancyfoot[L]{Section\ \GetCourseSection}
+\fancyfoot[R]{\GetInstitution}
+\fancyfoot[C]{\thepage\ of \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% ==============================================================================
+% 5. TITLE BLOCKS
+% ==============================================================================
+% \maketitle: course-level cover page (no student name).
+% \studenttitle{Name}: per-student cover (called via the reportcard env).
+\renewcommand{\maketitle}{%
+	\begin{center}
+		{\huge \GetCourseShort\ \GetCourseTitle\ Report Cards} \\
+		\vspace{8pt}
+		{\Large \GetReportDate}
+	\end{center}
+	\newpage
+}
+\NewDocumentCommand{\studenttitle}{ m }{%
+	\begin{center}
+		{\huge #1 Report Card} \\
+		\vspace{8pt}
+		{\LARGE \GetCourseShort\ \GetCourseTitle} \\
+		\vspace{8pt}
+		{\Large \GetReportDate}
+	\end{center}
+	\newpage
+	\null
+	\newpage
+}
+
+% \begin{reportcard}{Student Name} ... \end{reportcard}
+%   Wraps each student section: emits the title page, the boilerplate
+%   disclaimer, and a trailing \newpage when closed.
+\NewDocumentEnvironment{reportcard}{ m }
+{%
+	\studenttitle{#1}
+	\GetDisclaimer\par\medskip
+}
+{%
+	\newpage
+}
+
+% ==============================================================================
+% 6. GRADE-BREAKDOWN TABLE
+% ==============================================================================
+% \gradebreakdown{ rows in tabular form using & and \\ }{total-row}
+%
+% Example:
+%   \gradebreakdown{
+%       Homework Avg. & 15\% & 92.1\% & +13.8 \\
+%       Quiz Avg.     & 10\% & 67.5\% & +6.8  \\
+%       \midrule
+%       Exam 1        & 10\% & 31\%   & +3.1  \\
+%   }{75\% (+15\% E.C.) & \fbox{\textbf{59.4\%}} & 44.5}
+\NewDocumentCommand{\gradebreakdown}{ +m m }{%
+	\begin{center}
+		\renewcommand{\arraystretch}{1.25}
+		\arrayrulecolor{rc@brand}
+		\begin{tabular}{l c c r}
+			\toprule
+			\textbf{Category} & \textbf{Weight} & \textbf{Your Score} & \textbf{Points Earned} \\
+			\midrule\midrule
+			#1
+			\midrule\midrule
+			\rowcolor{rc@brand!10} \textbf{Current Total} & #2 \\
+			\bottomrule
+		\end{tabular}
+	\end{center}%
+}
+
+% ==============================================================================
+% 7. STANDING BAR — visual progress indicator
+% ==============================================================================
+% \standingbar{current-points}{passing-grade-x-coord}{c-grade}{b-grade}{a-grade}
+% Coordinates: 0..12.5 representing 0%..100%; current-points is in the same scale.
+\NewDocumentCommand{\standingbar}{ m m m m m }{%
+	\begin{center}
+		\begin{tikzpicture}
+			% Light fill to indicate full available range
+			\fill[fill=rc@brand!30, rounded corners] (0,0) rectangle (12.5,1.5);
+			% Current standing (solid)
+			\fill[fill=rc@brand, rounded corners] (0,0) rectangle (#1,1.5);
+			% Tick marks every 10%
+			\foreach \x in {1.25,2.5,3.75,5.0,6.25,7.5,8.75,10,11.25}{%
+				\draw[thin,white] (\x, 0) -- (\x, 0.2);%
+			}%
+			% Grade thresholds
+			\draw[thick, black] (#2, 1.5) -- (#2, -0.5) node[below] {D (60)};
+			\draw[thick, black] (#3, 1.5) -- (#3, -0.5) node[below] {C (70)};
+			\draw[thick, black] (#4, 1.5) -- (#4, -0.5) node[below] {B (80)};
+			\draw[thick, black] (#5, 1.5) -- (#5, -0.5) node[below] {A (90)};
+			% Frame
+			\draw[thick, black, rounded corners] (0,0) rectangle (12.5,1.5);
+		\end{tikzpicture}
+	\end{center}%
+}
+
+% ==============================================================================
+% 8. SCENARIOS TABLE — "What you need on the final"
+% ==============================================================================
+% \scenarios{ rows: outcome & letter & required-final \\ ... }
+\NewDocumentCommand{\scenarios}{ +m }{%
+	\begin{center}
+		\renewcommand{\arraystretch}{1.25}
+		\arrayrulecolor{rc@brand}
+		\begin{tabular}{l c c}
+			\toprule
+			\textbf{Outcome} & \textbf{Required Letter Grade} &
+			\textbf{Your Required Final Exam Score} \\
+			\midrule\midrule
+			#1
+			\bottomrule
+		\end{tabular}
+	\end{center}%
+}
+
+% ==============================================================================
+% 9. SIGN-OFF
+% ==============================================================================
+\NewDocumentCommand{\signoff}{ +m }{%
+	#1\par\medskip
+	\noindent Sincerely, \\
+	\GetSignature
+}
+
+\endinput

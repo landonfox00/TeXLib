@@ -1,0 +1,65 @@
+% =============================================================================
+% autoexam template — randomized, multi-version exam with key
+% =============================================================================
+%
+% Build instructor copy (single version):
+%   lualatex \def\Version{A}\input{template.tex}
+%
+% Build full collated multi-version PDF (no \Version):
+%   lualatex template.tex
+%
+% Build answer key:
+%   lualatex \def\ShowKey{}\input{template.tex}
+%
+% Build with rubric overlays:
+%   lualatex \def\ShowRubric{}\input{template.tex}
+
+\documentclass{autoexam}
+
+% -- Versions ------------------------------------------------------------------
+% Declare the per-exam letter labels. The Python builder (if used) parses
+% this line via regex to discover versions.
+\versions{A, B, C}
+
+% -- Per-exam metadata ---------------------------------------------------------
+\examsetup{
+	number = 5,
+	date   = {May 2, 2026},
+	ps     = {Good luck!},
+}
+
+% -- Problem bank --------------------------------------------------------------
+% \loadbank pulls in problem definitions; alternatively, you can put
+% \newproblem{...} or \begin{problem}{id} ... \end{problem} blocks here.
+\loadbank{bank.tex}
+
+\begin{document}
+
+% -- Body ----------------------------------------------------------------------
+% Problems are grouped via \begin{problems} ... \end{problems}, which
+% performs the smart two-column layout based on per-problem hints.
+\begin{problems}
+
+	% Inside \begin{problems}, use \problem{...} -- it emits the \question
+	% wrapper that a problem's \begin{parts} needs. (\getproblem emits only
+	% the bare problem body and is meant to follow an explicit \question,
+	% e.g. in the quiz template.) The argument is a bank id or a key=value
+	% filter; an optional [p1,p2,...] distributes points to \ppart calls.
+	\problem{topic=quad}
+	\problem{topic=ratineq}
+	\problem{topic=graph}
+
+	% An inline (one-off) problem can be placed right here:
+	%
+	% \begin{problem}{linear_eq}[topic=algebra, diff=easy]
+	%     Solve $2x + 5 = 11$ for $x$.
+	%     \solution
+	%     $x = 3$.
+	% \end{problem}
+
+\end{problems}
+
+% Optional: a final scoring grid for the front desk
+% \scorepage[20]
+
+\end{document}

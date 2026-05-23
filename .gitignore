@@ -1,13 +1,3 @@
-# Course materials (kept local only)
-Bingo/
-Exams/
-Notes/
-Problem Sets/
-Quizzes/
-Report Cards/
-Schedule/
-Syllabi/
-
 # Sublime workspace + project state (per-machine)
 *.sublime-workspace
 *.sublime-project

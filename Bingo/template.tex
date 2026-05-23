@@ -1,0 +1,36 @@
+% =============================================================================
+% bingo template — a single math-bingo card
+% =============================================================================
+%
+% Compile with:
+%   lualatex template.tex
+
+\documentclass{bingo}
+
+\begin{document}
+
+\begin{bingocard}
+	\bcell{B}{1}{\beta}     \bcell{I}{1}{\pm}      \bcell{N}{1}{\Omega}        \bcell{G}{1}{\mu}     \bcell{O}{1}{\mathbb{R}}
+	\bcell{B}{2}{\to}       \bcell{I}{2}{\int}     \bcell{N}{2}{\neq}          \bcell{G}{2}{\notin}  \bcell{O}{2}{\psi}
+	\bcell{B}{3}{\exists}   \bcell{I}{3}{\forall}                              \bcell{G}{3}{\frac{d}{dx}} \bcell{O}{3}{\sqrt{x}}
+	\bcell{B}{4}{\theta}    \bcell{I}{4}{\circ}    \bcell{N}{4}{\pi}           \bcell{G}{4}{\prod}   \bcell{O}{4}{\gamma}
+	\bcell{B}{5}{\alpha}    \bcell{I}{5}{\infty}   \bcell{N}{5}{\sigma}        \bcell{G}{5}{\sum}    \bcell{O}{5}{\Delta}
+\end{bingocard}
+
+\newpage
+
+% Labeled card + legend (exam-bingo style)
+
+\begin{bingocard}
+	\labelcells
+\end{bingocard}
+
+\bingolegend{
+	$\text{B}1$ : $\displaystyle xe^{-x}$        & $\text{I}1$ : $\displaystyle \pi$         & $\text{N}1$ : $\displaystyle \alpha$       & $\text{G}1$ : $\displaystyle 24x - 12$    & $\text{O}1$ : $\displaystyle e^x$ \\
+	$\text{B}2$ : $\displaystyle \tfrac{5x}{e^{5x}}$ & $\text{I}2$ : $\displaystyle 4\sqrt{5}$ & $\text{N}2$ : $\displaystyle \tfrac{1}{e^{5x}}$ & $\text{G}2$ : $\displaystyle x \ln x$ & $\text{O}2$ : $\displaystyle \beta$ \\
+	$\text{B}3$ : $\displaystyle 7xe^x(2+x)$    & $\text{I}3$ : $\displaystyle \sin x$      & $\text{N}3$ : $\displaystyle x + \tfrac{7500}{x}$ & $\text{G}3$ : $\displaystyle \tfrac{\ln(3x)}{x^2}$ & $\text{O}3$ : $\displaystyle \gamma$ \\
+	$\text{B}4$ : $\displaystyle x^3$           & $\text{I}4$ : $\displaystyle \delta$      & $\text{N}4$ : $\displaystyle \tfrac{e^2 - 1}{2}$ & $\text{G}4$ : $\displaystyle \tfrac{e^x + 1}{e^x + x}$ & $\text{O}4$ : $\displaystyle \tfrac{1}{x}$ \\
+	$\text{B}5$ : Free                          & $\text{I}5$ : $\displaystyle \tfrac{x^2}{\sin(2x)}$ & $\text{N}5$ : $\displaystyle e^{x}$ & $\text{G}5$ : $\displaystyle \tfrac{18}{\sqrt[3]{9}}$  & $\text{O}5$ : $\displaystyle \tfrac{\ln(e^x + x)}{x}$ \\
+}
+
+\end{document}

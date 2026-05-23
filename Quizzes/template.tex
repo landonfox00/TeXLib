@@ -1,0 +1,64 @@
+% =============================================================================
+% quiz template — single in-class quiz with optional bank workflow
+% =============================================================================
+%
+% Compile with:
+%   lualatex template.tex
+%
+% This template demonstrates BOTH styles in one file:
+%   1. Inline \question text (the original quiz pattern)
+%   2. \getproblem retrieval from a problem bank
+%
+% Keep whichever you prefer; mix and match if useful.
+
+\documentclass{quiz}
+
+\meta{
+	quiz-number = 1,
+
+	% Optional: replace boxed instructions with a separate file, e.g.
+	%   quiz-instructions-file = group-quiz-instructions
+	% (filename without .tex; \input'd at \maketitle.)
+}
+
+% ---- Inline bank entries (or move into a separate `quiz_bank.tex` and
+% ---- \loadbank{quiz_bank} below) -------------------------------------
+\newproblem{eval-poly}{topic=eval, diff=easy}{
+	Evaluate $3 \cdot (-2)^2 + 5 \cdot 4 - 3 \cdot 3^2$.
+}[$5$]
+
+\newproblem{linear-eq}{topic=algebra, diff=easy}{
+	Solve $2x + 5 = 11$ for $x$.
+}[$x = 3$]
+
+% Alternatively, keep the bank in its own file:
+% \loadbank{quiz_bank.tex}
+
+\begin{document}
+\maketitle
+
+\begin{questions}
+
+% --- (a) Bank-backed: pulled from \newproblem above -------------------
+\question \getproblem{eval-poly}
+	\begin{parts}
+		\part[3] (Show your arithmetic.)
+			\vspace{\stretch{1}}
+		\part[2] State the order of operations rules you used.
+			\vspace{\stretch{1}}
+	\end{parts}
+
+% --- (b) Bank-backed: random match from a key=value query -------------
+\question \getproblem{topic=algebra, diff=easy}
+	\vspace{\stretch{1}}
+
+% --- (c) Inline (original quiz style — still works) -------------------
+\question Solve the inequality $|x - 2| < 5$.
+	\vspace{\stretch{1}}
+
+\extracredit[2]{Find a real number $x$ such that $x^x = 1/4$.}
+	\vspace{\stretch{1}}
+
+\end{questions}
+
+\end{document}

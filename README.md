@@ -1,8 +1,6 @@
 # TeXLib
 
-A personal LaTeX library for math teaching at the University of Nevada, Reno: shared `.sty` packages, a LuaLaTeX engine for randomized exams, a Sublime Text build system, and a smoke-test harness that builds every module after refactors.
-
-This repository tracks only the reusable library. Course-specific materials (exams, quizzes, notes, schedules, syllabi) live alongside it locally but are intentionally gitignored.
+A personal LaTeX library for math teaching at the University of Nevada, Reno: shared `.sty` packages, a set of document-class modules (exams, quizzes, lecture notes, problem sets, schedules, syllabi, report cards, bingo cards), a LuaLaTeX engine for randomized exams, a Sublime Text build system, and a smoke-test harness that builds every module after refactors.
 
 ## What's in here
 
@@ -36,6 +34,21 @@ This repository tracks only the reusable library. Course-specific materials (exa
 
 - [`Sublime/`](Sublime/) — Sublime Text build system + LaTeXTools settings + custom builder (`texlib_builder.py`) that handles engine selection, rerun loops, and PDF splitting. See [Sublime/README.md](Sublime/README.md) for deploy instructions.
 
+### Modules
+
+Each module is a document class plus a canonical `template.tex` and a README. `smoke_test.py` builds every module's `template.tex` to catch regressions in the shared `.sty` files.
+
+| Module | Class | Purpose |
+|---|---|---|
+| [`Bingo/`](Bingo/) | `bingo.cls` | 5×5 math-symbol bingo cards. Supports a standard layout (math expression per cell) and a labeled layout with separate `\bingolegend{...}` table, used for exam-review bingo. |
+| [`Exams/`](Exams/) | `autoexam.cls` | Randomized-exam class. Paired with [`autoexam_engine.lua`](autoexam_engine.lua) and a problem `bank.tex`; emits multiple shuffled versions per build. |
+| [`Notes/`](Notes/) | `didactic.cls` | Lecture-notes class with section-numbered theorems and a large theorem taxonomy (theorem, lemma, corollary, proposition, definition, procedure, example, question, note, ...). |
+| [`Problem Sets/`](Problem%20Sets/) | `pset.cls` | Problem-set class with flat theorem numbering and a smaller taxonomy. |
+| [`Quizzes/`](Quizzes/) | `quiz.cls` | Short-form quiz class. |
+| [`Report Cards/`](Report%20Cards/) | `report-card.cls` | Per-section report-card class for end-of-term grade summaries. |
+| [`Schedule/`](Schedule/) | `schedule.cls` | Course-schedule / calendar class. Uses `calendar.lua`, `date.lua`, and `schedule.lua` for date math. |
+| [`Syllabi/`](Syllabi/) | `syllabus.cls` | Course-syllabus class. `Syllabus_Template.tex` is the canonical filled-in example; `template.tex` is the minimal smoke-test variant. |
+
 ## Build modes
 
 Every TeXLib document class loads `texlib-build.sty`, so they all respond to the same flags:
@@ -58,12 +71,21 @@ The Sublime build system surfaces these as palette entries; `smoke_test.py` inje
 ├── *.sty                  # shared packages
 ├── autoexam_engine.lua    # LuaLaTeX engine for randomized exams
 ├── smoke_test.py          # build-everything safety net
+├── Bingo/                 # bingo.cls + template
+├── Exams/                 # autoexam.cls + bank + template
+├── Notes/                 # didactic.cls + template
+├── Problem Sets/          # pset.cls + template
+├── Quizzes/               # quiz.cls + preamble + template
+├── Report Cards/          # report-card.cls + template
+├── Schedule/              # schedule.cls + lua helpers + template
+├── Syllabi/               # syllabus.cls + Syllabus_Template + template
 ├── Sublime/               # editor build system + settings
+├── TODO.md
 ├── LICENSE
 └── README.md
 ```
 
-Course-material directories (`Bingo/`, `Exams/`, `Notes/`, `Problem Sets/`, `Quizzes/`, `Report Cards/`, `Schedule/`, `Syllabi/`) live alongside this tree locally but are gitignored.
+Build artifacts (`*.pdf`, `*.aux`, `*.log`, `*.out`, `*.toc`, `*.synctex.gz`, ...) and per-machine state (`*.sublime-workspace`, `*.sublime-project`) are gitignored, including those inside the module directories.
 
 ## License
 

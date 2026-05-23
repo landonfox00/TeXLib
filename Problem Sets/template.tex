@@ -1,0 +1,75 @@
+% =============================================================================
+% pset template — single-source assignment / student worksheet / answer key
+% =============================================================================
+%
+% Build hand-out (clean problem set):
+%   lualatex template.tex
+%
+% Build student worksheet (blank boxes for handwriting):
+%   lualatex \def\StudentMode{}\input{template.tex}
+%
+% Build answer key:
+%   lualatex \def\ShowKey{}\input{template.tex}
+
+\documentclass{pset}
+
+\meta{
+	pset-number = 3,
+	pset-due    = {Friday, May 15, 2026},
+}
+
+\begin{document}
+
+\maketitle
+
+% --- Embedded definition ------------------------------------------------------
+\begin{definition}[Continuity]
+	A function $f$ is continuous at $a$ if
+	$\lim_{x \to a} f(x) = f(a)$.
+\end{definition}
+
+% --- Problem 1: parts ---------------------------------------------------------
+\begin{problem}[10]
+	Determine whether each function is continuous at the given point.
+	\begin{parts}
+		\part $f(x) = x^2$ at $a = 1$.
+		\part $g(x) = 1/x$ at $a = 0$.
+	\end{parts}
+\end{problem}
+
+\begin{solution}[3in]
+	(a) Continuous: $\lim_{x \to 1} x^2 = 1 = f(1)$.\\
+	(b) Not continuous: $g$ is undefined at $0$.
+\end{solution}
+
+% --- Problem 2: with a hint ---------------------------------------------------
+\begin{problem}[15]
+	Use the definition of derivative to compute $f'(x)$ for $f(x) = x^3$.
+\end{problem}
+
+\begin{hint}
+	Recall the binomial expansion of $(x+h)^3 = x^3 + 3x^2 h + 3xh^2 + h^3$.
+\end{hint}
+
+\begin{solution}[4in]
+	\[
+		f'(x)
+		= \lim_{h \to 0} \frac{(x+h)^3 - x^3}{h}
+		= \lim_{h \to 0} \frac{3x^2 h + 3xh^2 + h^3}{h}
+		= 3x^2.
+	\]
+\end{solution}
+
+% --- Problem 3: pure-math, no hint -------------------------------------------
+\begin{problem}[20]
+	Prove that $\sqrt{2}$ is irrational.
+\end{problem}
+
+\begin{solution}[5in]
+	Assume for contradiction $\sqrt{2} = p/q$ in lowest terms.
+	Then $2q^2 = p^2$, so $p^2$ is even, hence $p$ is even, say $p = 2k$.
+	Then $2q^2 = 4k^2$, so $q^2 = 2k^2$, making $q$ even too.
+	Contradiction with $p/q$ in lowest terms.
+\end{solution}
+
+\end{document}

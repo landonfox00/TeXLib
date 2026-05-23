@@ -1,0 +1,54 @@
+% =============================================================================
+% schedule template — semester schedule grid
+% =============================================================================
+%
+% Compile with:
+%   lualatex template.tex
+%
+% Requires coursemeta.tex at an ancestor directory providing:
+%   institution, course-subject, course-number, course-title, course-section,
+%   season, year, start-date, end-date, final-date, final-time, lecture-days.
+
+\documentclass{schedule}
+
+\meta{
+	landscape    = true,
+	lecture-caps = {1.0, 1.0},   % equal weight for each lecture-days bucket
+	quiz-days    = T,             % weekly Tuesday quiz
+}
+
+\begin{document}
+\begin{schedule}
+
+	% --- Holidays -----------------------------------------------------
+	\holiday{1-19}{MLK Jr. Day}
+	\holiday{2-16}{President's Day}
+	\holiday{3-23}[3-27]{Spring Break}
+	\holiday{5-6}{Prep Day}
+
+	% --- Quiz overrides ----------------------------------------------
+	\noquiz{1-20}
+	\quiz[date=1-21]
+
+	% --- Unit 1 -------------------------------------------------------
+	\syllabus
+	\section{R.1}
+	\section{R.2}
+	\section{R.3}
+	\section[2]{R.4}
+	\examreview
+	\exam[noquiz]
+
+	% --- Unit 2 -------------------------------------------------------
+	\section{2.1}
+	\section[2]{2.2}
+	\examreview
+	\exam
+
+	% --- Final week ---------------------------------------------------
+	\finalreview
+	\finalsweek[5-7][5]
+	\winterbreak
+
+\end{schedule}
+\end{document}
