@@ -1,5 +1,18 @@
 -- date.lua
--- Date Class: Handles timestamp math, comparisons, and formatting
+--
+-- Date class for the `schedule` engine. Wraps os.time / os.date with
+-- forgiving construction (accepts ISO `YYYY-MM-DD`, slash-separated
+-- `YYYY/MM/DD`, or year-implied `MM-DD` / `MM/DD`; copy-construct from
+-- another Date or from a raw timestamp). Provides:
+--
+--   * day arithmetic that returns NEW objects (no in-place mutation)
+--   * comparisons (==, <, <=) via metamethods
+--   * weekday queries and formatted output
+--
+-- Zero LaTeX/lua-tex dependencies — this file is pure Lua and is the
+-- foundation that calendar.lua and schedule.lua both build on.
+-- Year defaults to the current calendar year unless overridden in
+-- Date.new(arg, year_override).
 
 Date = {}
 Date.__index = Date

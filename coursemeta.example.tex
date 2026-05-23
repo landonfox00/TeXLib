@@ -1,0 +1,30 @@
+% coursemeta.example.tex
+%
+% Example course-metadata file. Copy to `coursemeta.tex` in your course
+% directory (or any ancestor up to three levels above the document) and
+% course-metadata.sty will auto-load it. Every TeXLib document class picks
+% the values up via \GetCourse, \GetInstructor, \GetTerm, etc.
+%
+% All keys are optional — define only what your documents reference. Any
+% key you set becomes accessible as \Get<TitleCasedKey> (e.g. start-date
+% becomes \GetStartDate). The schedule class is the strictest consumer:
+% it requires lecture-days, start-date, end-date.
+
+\metasetup{
+	institution     = {University of Nevada, Reno},
+	instructor      = {Your Name},
+	season          = Fall,
+	year            = 2026,
+	course-subject  = Math,
+	course-number   = 181,
+	course-title    = {Calculus I},
+	course-section  = 1001,
+	course-room     = {DMSC 100},
+	lecture-days    = MWF,
+	lecture-times   = {9:00-9:50am},
+	start-date      = 8-24,
+	end-date        = 12-8,
+	final-date      = 12-15,
+	final-time      = {9:45-11:45am},
+	bank-path       = {../Bank/bank.tex},
+}

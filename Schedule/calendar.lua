@@ -1,5 +1,19 @@
 -- calendar.lua
--- Storage Engine: Manages Cells, Flags, and Layers
+--
+-- Storage engine for the `schedule` class. Defines:
+--
+--   Cell        - one day. Carries a Date, a week number, a numeric
+--                 capacity (used by schedule.lua's auto-fill loop to track
+--                 how much content the day can hold), a set of boolean
+--                 flags (lecture/recitation/holiday/canceled/exam/quiz/...),
+--                 and three rendering layers (top/middle/bottom) that
+--                 accumulate "slice" tables emitted by schedule.lua.
+--   CalendarMgr - per-month / per-week grid of Cells, plus lookups by
+--                 date. Owns the iteration order used during rendering.
+--
+-- This file is purely a data layer — it does NOT touch tex.print or parse
+-- user directives. schedule.lua is the consumer; date.lua is the dependency
+-- (Cells store Date objects, not raw timestamps).
 
 -- ============================================================================
 -- CELL CLASS

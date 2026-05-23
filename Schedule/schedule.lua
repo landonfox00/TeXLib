@@ -1,4 +1,22 @@
 -- schedule.lua
+--
+-- Top-level Lua engine for the TeXLib `schedule` document class. Reads
+-- per-event directives from the .tex source (lectures, quizzes, exams,
+-- holidays, recitations), resolves them against the academic calendar
+-- built by calendar.lua, and emits the typeset schedule.
+--
+-- Module relationships:
+--   date.lua      -> low-level Date class (timestamp math, parsing).
+--   calendar.lua  -> Cell / CalendarMgr: stores per-day state and layers.
+--   schedule.lua  -> THIS FILE: directive parser, event dispatcher,
+--                    auto-numbering for lectures/quizzes/exams, and the
+--                    render loop that talks back to LaTeX via tex.print.
+--
+-- Loaded from schedule.cls via \directlua{dofile(...)}. Requires LuaLaTeX.
+-- Globals declared here (calendar_mgr, cursor_date, day_capacity_map, ...)
+-- persist for the lifetime of one compilation; multi-document builds
+-- should re-source these files between runs.
+
 -- GLOBAL STATE
 calendar_mgr = nil     
 cursor_date = nil      

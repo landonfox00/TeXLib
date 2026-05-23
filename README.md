@@ -2,6 +2,54 @@
 
 A personal LaTeX library for math teaching at the University of Nevada, Reno: shared `.sty` packages, a set of document-class modules (exams, quizzes, lecture notes, problem sets, schedules, syllabi, report cards, bingo cards), a LuaLaTeX engine for randomized exams, a Sublime Text build system, and a smoke-test harness that builds every module after refactors.
 
+## Quickstart
+
+Setting up TeXLib on a new machine or for a new course.
+
+### One-time setup (per machine)
+
+1. **Install a recent TeX Live** (2023 or later — needs `lualatex`, `expl3`, `tcolorbox`, `pgfplots`, `siunitx`, `mathrsfs`, `tikz-cd`, `spath3`). On Windows the easiest path is TeX Live full; on macOS use MacTeX; on Linux `texlive-full` from your package manager.
+2. **Clone this repo:**
+   ```
+   git clone https://github.com/landonfox00/TeXLib.git
+   cd TeXLib
+   ```
+3. **Tell `kpathsea` where to find the shared `.sty` files.** Add the absolute path to the TeXLib root to your `TEXINPUTS`:
+   ```
+   # bash/zsh
+   export TEXINPUTS=".:/abs/path/to/TeXLib:$TEXINPUTS"
+   # PowerShell
+   $env:TEXINPUTS = ".;C:\path\to\TeXLib;$env:TEXINPUTS"
+   ```
+   Make the change permanent in your shell rc / Windows environment variables. **Watch out for commas** in any path component — `kpathsea` cannot resolve `TEXINPUTS` entries containing commas. On Windows that means OneDrive paths like `OneDrive - University of Nevada, Reno` need a junction (e.g. `OneDriveUNR`); see [Sublime/README.md](Sublime/README.md) for the workaround used in the Sublime build system.
+4. **(Optional) Run the smoke test** to confirm everything builds:
+   ```
+   python smoke_test.py
+   ```
+   Exit code 0 means every module's `template.tex` built cleanly.
+
+### Per-course setup
+
+1. **Make a course directory** anywhere on disk (it doesn't need to be inside TeXLib). E.g.:
+   ```
+   ~/Courses/Math181-Fall2026/
+   ```
+2. **Drop in a `coursemeta.tex`** with the institution / instructor / course / term values. Copy [`coursemeta.example.tex`](coursemeta.example.tex) and edit. `course-metadata.sty` auto-discovers this file from the document directory or any of three ancestors, so a single `coursemeta.tex` at the course root applies to every document underneath it.
+3. **Pick a document class** from the [Modules](#modules) table below and start a new `.tex`:
+   ```latex
+   \documentclass{didactic}        % lecture notes
+   % or {pset}, {quiz}, {autoexam}, {schedule}, {syllabus}, {report-card}, {bingo}
+   \begin{document}
+     ...
+   \end{document}
+   ```
+4. **Build.** From Sublime Text (with the build system from `Sublime/` installed) it's `Ctrl+B`. From the command line:
+   ```
+   lualatex yourfile.tex          # for autoexam / quiz / schedule
+   pdflatex yourfile.tex          # for everything else
+   ```
+   To switch build modes (solutions, answer key, rubric, draft, student-vs-instructor copy) see [Build modes](#build-modes) below.
+
 ## What's in here
 
 ### Core packages (`.sty`)
