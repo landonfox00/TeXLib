@@ -1,5 +1,26 @@
 -- autoexam_engine.lua
--- Complete Lua engine extracted from autoexam.cls for test-environment use.
+--
+-- LuaLaTeX engine for the TeXLib `autoexam` document class. Handles the bits
+-- of randomized-exam generation that LaTeX-level macros can't do cleanly:
+--
+--   * Problem-bank loading via \loadbank, with a sanitized id space.
+--   * Per-version selection, shuffling, and deterministic seeding (set_exam_seed).
+--   * Multi-version emission driven by \versions{A,B,C,...} in the document
+--     preamble; the builder loops the engine once per version.
+--   * Per-problem temp-file redirection so SyncTeX/inverse-search lands in the
+--     originating bank file at the correct line, instead of the raw \directlua
+--     call site. See the SOURCE TRACKING block below for the mechanism.
+--   * Per-part point and stretch injection (\partpoints, \partstretch).
+--   * Page-shuffle (\shufflepages) coordinated with first-on-page detection so
+--     problem separators don't appear at the top of a new page.
+--
+-- This file is loaded by autoexam.cls via \directlua{dofile(...)}; it is not
+-- meant to be required directly from a document. The class also writes a
+-- <jobname>.srcmap after the version loop so the TeXLib Sublime builder can
+-- post-process SyncTeX files for line-accurate inverse search.
+--
+-- Requires LuaLaTeX (texconfig, lua callbacks). Will not work under pdflatex
+-- or xelatex.
 
 -- Raise LuaTeX's text_input_levels limit early.  The default is 15 (TeX82),
 -- which can be exhausted when autoexam repeatedly calls \input{bank_file.tex}
