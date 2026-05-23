@@ -1,0 +1,39 @@
+% Quiz 01 — example quiz document.
+%
+% Build:  lualatex quiz-01.tex
+% Build answer key:  lualatex "\def\ShowKey{}\input{quiz-01.tex}"
+
+\documentclass{quiz}
+
+\meta{
+	quiz-number = 1,
+}
+
+\newproblem{limit-poly}{topic=limits, diff=easy}{
+	Evaluate $\displaystyle \lim_{x \to 2} (3x^2 - x + 4)$.
+}[$14$]
+
+\newproblem{linear-eq}{topic=algebra, diff=easy}{
+	Solve $2x + 5 = 11$ for $x$.
+}[$x = 3$]
+
+\begin{document}
+\maketitle
+
+\begin{questions}
+
+\question \getproblem{limit-poly}
+	\vspace{\stretch{1}}
+
+\question \getproblem{linear-eq}
+	\vspace{\stretch{1}}
+
+\question Solve the inequality $|x - 2| < 5$.
+	\vspace{\stretch{1}}
+
+\extracredit[2]{Find a real number $x$ such that $x^x = 1/4$.}
+	\vspace{\stretch{1}}
+
+\end{questions}
+
+\end{document}

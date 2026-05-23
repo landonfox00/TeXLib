@@ -1,0 +1,56 @@
+% Lecture 01 — Limits, an example didactic document.
+%
+% Build:  lualatex lecture-01-limits.tex
+% Picks up coursemeta.tex from this directory automatically.
+
+\documentclass{didactic}
+
+\meta{
+	unit     = Lecture,
+	number   = 1,
+	title    = {Limits and Continuity},
+	overview = {%
+		Intuitive definition of the limit, one-sided limits, and a
+		first look at continuity via the Intermediate Value Theorem.
+	},
+}
+
+\begin{document}
+
+\maketitle
+
+\section{Limits}
+
+\begin{definition}[Limit]
+	We write $\lim_{x \to a} f(x) = L$ to mean that $f(x)$ can be
+	made arbitrarily close to $L$ by taking $x$ sufficiently close
+	to (but not equal to) $a$.
+\end{definition}
+
+\begin{example}
+	$\displaystyle \lim_{x \to 3} (2x + 1) = 7$.
+\end{example}
+
+\section{Continuity}
+
+\begin{definition}[Continuity at a point]
+	A function $f$ is continuous at $a$ if
+	$\lim_{x \to a} f(x) = f(a)$.
+\end{definition}
+
+\begin{theorem}[Intermediate Value]
+	If $f$ is continuous on $[a, b]$ and $N$ lies between $f(a)$
+	and $f(b)$, then there exists $c \in (a, b)$ with $f(c) = N$.
+\end{theorem}
+
+\begin{exercise}
+	Show that $x^3 - x - 1 = 0$ has a solution in $(1, 2)$.
+\end{exercise}
+
+\begin{solution}[2in]
+	Let $f(x) = x^3 - x - 1$. Then $f(1) = -1 < 0$ and
+	$f(2) = 5 > 0$. Since $f$ is continuous, the IVT gives a root
+	in $(1, 2)$.
+\end{solution}
+
+\end{document}

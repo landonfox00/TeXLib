@@ -36,7 +36,7 @@ Setting up TeXLib on a new machine or for a new course.
    ```
    ~/Courses/Math181-Fall2026/
    ```
-2. **Drop in a `coursemeta.tex`** with the institution / instructor / course / term values. Copy [`coursemeta.example.tex`](coursemeta.example.tex) and edit. `course-metadata.sty` auto-discovers this file from the document directory or any of three ancestors, so a single `coursemeta.tex` at the course root applies to every document underneath it.
+2. **Drop in a `coursemeta.tex`** with the institution / instructor / course / term values. Copy [`coursemeta.example.tex`](coursemeta.example.tex) and edit, or look at [`examples/Math181-Fall2026/`](examples/Math181-Fall2026/) for a working end-to-end course folder. `course-metadata.sty` auto-discovers this file from the document directory or any of three ancestors, so a single `coursemeta.tex` at the course root applies to every document underneath it.
 3. **Pick a document class** from the [Modules](#modules) table below and start a new `.tex`:
    ```latex
    \documentclass{didactic}        % lecture notes
@@ -130,6 +130,9 @@ The Sublime build system surfaces these as palette entries; `smoke_test.py` inje
 ├── Schedule/              # schedule.cls + lua helpers + template
 ├── Syllabi/               # syllabus.cls + Syllabus_Template + template
 ├── Sublime/               # editor build system + settings
+├── examples/              # end-to-end course examples (Math181-Fall2026, ...)
+├── coursemeta.example.tex # copy-paste starter for per-course metadata
+├── CHANGELOG.md
 ├── TODO.md
 ├── LICENSE
 └── README.md
