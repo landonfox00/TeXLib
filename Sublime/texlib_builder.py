@@ -33,14 +33,28 @@
 #     "split_page=N", the resulting <base>.pdf is split into <base>_Exam.pdf
 #     and <base>_Solutions.pdf (the autoexam key-build workflow).
 #
+#   * aux_directory routing -- honors LaTeXTools' aux_directory setting
+#     (typically "<<temp>>"). On TeX Live there is no separate -aux-directory
+#     flag, so the builder routes EVERYTHING via -output-directory and then,
+#     in _postprocess, copies the PDF / .synctex.gz / .spl back next to the
+#     source so PDF viewing and SyncTeX keep working. Aux files (.aux/.log/
+#     .out/.toc/.bcf/.bbl/.fls/.fdb_latexmk) stay in the aux dir, keeping
+#     the source dir clean and reducing OneDrive sync churn. biber runs are
+#     redirected to the aux dir via --input-directory / --output-directory
+#     so biblatex cross-references resolve correctly.
+#
 #   * Tidy -- on Windows, hides the <base>.synctex.gz build artifact.
 #
 # Requires a LaTeXTools with the PdfBuilder API. The import below tries the
 # modern location (plugins/builder/) first, then the legacy one (builders/).
 # ============================================================================
 
+import glob
+import hashlib
 import os
 import re
+import shutil
+import tempfile
 
 # Note on the brief Windows console flash during builds: LaTeXTools' build
 # path runs lualatex through `subprocess.Popen` (via its own external_command
@@ -130,9 +144,18 @@ class TexlibBuilder(PdfBuilder):
         mode, engine_options = self._extract_mode(self.options or [])
         engine = self._select_engine(src)
 
+        # Resolve LaTeXTools' aux_directory setting (typically <<temp>>) and
+        # add -output-directory if needed. On TeX Live there's no separate
+        # -aux-directory flag, so aux + PDF both land in this dir; _postprocess
+        # then copies the PDF / .synctex.gz / .spl back next to the source so
+        # the PDF viewer and SyncTeX both keep working.
+        tex_dir = self._tex_dir()
+        self._aux_target = self._resolve_aux_directory(tex_dir)
         base = [engine, "-interaction=nonstopmode", "-synctex=1"]
         if engine in ("lualatex", "xelatex"):
             base.append("-shell-escape")
+        if self._aux_target and self._aux_target != tex_dir:
+            base.append(f"-output-directory={self._aux_target}")
         base += engine_options
 
         if mode == MODE_ALLVERSIONS:
@@ -225,7 +248,7 @@ class TexlibBuilder(PdfBuilder):
         # biblatex: if the first pass produced a .bcf, run biber and force
         # one additional engine pass so the freshly written .bbl is read in.
         if self._biber_needed(self.base_name):
-            yield (["biber", self.base_name], "biber...")
+            yield (self._biber_command(self.base_name), "biber...")
             run += 1
             yield (cmd, f"{label} rerun {run} (post-biber)...")
 
@@ -245,7 +268,7 @@ class TexlibBuilder(PdfBuilder):
 
         # biblatex: same .bcf detection, scoped to the version's jobname.
         if self._biber_needed(jobname):
-            yield (["biber", jobname], f"biber [{version}]...")
+            yield (self._biber_command(jobname), f"biber [{version}]...")
             run += 1
             yield (cmd, f"version {version} rerun {run} (post-biber)...")
 
@@ -253,12 +276,80 @@ class TexlibBuilder(PdfBuilder):
             run += 1
             yield (cmd, f"version {version} rerun {run}...")
 
-    def _biber_needed(self, jobname):
-        """True if biblatex wrote a .bcf for `jobname` next to the root doc."""
-        tex_dir = getattr(self, "tex_dir", None) or os.path.dirname(
+    def _tex_dir(self):
+        """The directory containing the root .tex file."""
+        return getattr(self, "tex_dir", None) or os.path.dirname(
             getattr(self, "tex_root", "") or ""
         )
-        return os.path.exists(os.path.join(tex_dir, jobname + ".bcf"))
+
+    def _resolve_aux_directory(self, tex_dir):
+        """Resolve LaTeXTools' aux_directory setting to an absolute path.
+
+        Returns the resolved path or None if aux routing is disabled.
+
+        Supported values:
+          - ""             -> aux routing disabled (return None).
+          - "<<temp>>"     -> per-document subdirectory under the system temp
+                              dir, keyed by a hash of the tex root. Persistent
+                              across builds so .aux / .bcf cross-references
+                              survive.
+          - "<<root>>"     -> the tex root directory (same as disabled, in
+                              effect, but explicit).
+          - absolute path  -> used as-is.
+          - relative path  -> resolved relative to the tex root directory.
+
+        Note: TeX Live engines accept only -output-directory, not the
+        MiKTeX-specific -aux-directory. So routing here moves the PDF + .log
+        + .aux + .synctex.gz all together; _postprocess copies the PDF and
+        .synctex.gz back to the tex_dir so the viewer + SyncTeX still work.
+        """
+        raw = getattr(self, "aux_directory", "") or ""
+        s = str(raw).strip()
+        if not s or s == "<<root>>":
+            return None
+        if s == "<<temp>>":
+            key = hashlib.md5(
+                (getattr(self, "tex_root", "") or "").encode("utf-8")
+            ).hexdigest()[:12]
+            target = os.path.join(tempfile.gettempdir(), "texlib-aux", key)
+            try:
+                os.makedirs(target, exist_ok=True)
+            except OSError as exc:
+                self.display(
+                    f"TeXLib: could not create aux directory {target}: {exc}; "
+                    "falling back to building in source dir.\n"
+                )
+                return None
+            return target
+        if os.path.isabs(s):
+            return s
+        return os.path.normpath(os.path.join(tex_dir, s))
+
+    def _biber_needed(self, jobname):
+        """True if biblatex wrote a .bcf for `jobname`.
+
+        Looks in the aux directory if one is active, else the tex directory.
+        """
+        search_dir = getattr(self, "_aux_target", None) or self._tex_dir()
+        return os.path.exists(os.path.join(search_dir, jobname + ".bcf"))
+
+    def _biber_command(self, jobname):
+        """Build the biber command line, redirecting I/O to the aux dir if set.
+
+        biber's default working layout assumes the .bcf and .bbl live next to
+        the document, but with -output-directory routing the .bcf is in the
+        aux dir. --input-directory + --output-directory tell biber where to
+        look for and write the .bcf / .bbl.
+        """
+        cmd = ["biber"]
+        aux = getattr(self, "_aux_target", None)
+        if aux and aux != self._tex_dir():
+            cmd += [
+                f"--input-directory={aux}",
+                f"--output-directory={aux}",
+            ]
+        cmd.append(jobname)
+        return cmd
 
     def _needs_another_run(self):
         """Check for a standard cross-ref rerun OR a biblatex rerun signal."""
@@ -273,10 +364,14 @@ class TexlibBuilder(PdfBuilder):
     # Post-processing
     # ------------------------------------------------------------------ #
     def _postprocess(self):
-        tex_dir = getattr(self, "tex_dir", None) or os.path.dirname(
-            getattr(self, "tex_root", "") or ""
-        )
+        tex_dir = self._tex_dir()
         base_path = os.path.join(tex_dir, self.base_name)
+
+        # If we built into a separate aux dir (via -output-directory), copy
+        # the PDF, SyncTeX file, and any .spl signal back next to the source.
+        # Aux files (.aux/.log/.out/.toc/.bcf/.bbl/.fls/.fdb_latexmk/...) stay
+        # in the aux dir for cross-reference resolution across builds.
+        self._copy_back_from_aux(tex_dir)
 
         self._split_pdf_if_signaled(base_path)
 
@@ -289,6 +384,32 @@ class TexlibBuilder(PdfBuilder):
                     os.system(f'attrib +h "{synctex}"')
                 except Exception:
                     pass
+
+    def _copy_back_from_aux(self, tex_dir):
+        """If aux routing is active, copy viewer-facing artifacts back.
+
+        We copy <base>*.pdf, <base>*.synctex.gz, and <base>*.spl. The glob
+        catches per-version outputs too (e.g. template_A.pdf for autoexam).
+        Aux/log/etc. stay in the aux dir.
+        """
+        aux_target = getattr(self, "_aux_target", None)
+        if not aux_target or aux_target == tex_dir or not os.path.isdir(aux_target):
+            return
+        patterns = (
+            f"{self.base_name}*.pdf",
+            f"{self.base_name}*.synctex.gz",
+            f"{self.base_name}*.spl",
+        )
+        for pat in patterns:
+            for src in glob.glob(os.path.join(aux_target, pat)):
+                dst = os.path.join(tex_dir, os.path.basename(src))
+                try:
+                    shutil.copy2(src, dst)
+                except Exception as exc:  # noqa: BLE001 - best-effort copy
+                    self.display(
+                        f"TeXLib: could not copy {os.path.basename(src)} "
+                        f"back to source: {exc}\n"
+                    )
 
     def _split_pdf_if_signaled(self, base_path):
         """Honor a <base>.spl 'split_page=N' signal: split the PDF in two."""
