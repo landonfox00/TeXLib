@@ -1,0 +1,83 @@
+% texlib-theorems.sty
+% Shared theorem-box styling for the TeXLib teaching library.
+%
+% Provides the tcolorbox STYLES only — not the \newtheorem declarations.
+% Each class keeps its own theorem environment set and numbering scheme
+% (didactic numbers Theorem by section and carries a large taxonomy;
+% pset numbers flat and carries a smaller one), but both bind their
+% environments to these shared styles via \tcolorboxenvironment.
+%
+% The look is the "colored thin left rule + ~2% background tint"
+% aesthetic that originated in didactic.cls. During the May 2026
+% consolidation pass this was chosen as the canonical TeXLib theorem
+% look; pset.cls's older sharp-black-frame `psetstyle` is retired.
+%
+% Styles exposed (all built on `texlibbase`):
+%   texlibtheorem      red     — Theorem / Lemma / Corollary / Conjecture
+%   texlibproposition  violet  — Proposition
+%   texlibdefinition   blue    — Definition / Convention
+%   texlibprocedure    teal    — Procedure
+%   texlibexample      black   — Example / Exercise (plain rule, no tint)
+%   texlibquestion     orange  — Question / Challenge
+%   texlibnote         gray    — Note / Notation / Recall
+%
+% A class applies them like:
+%   \tcolorboxenvironment{theorem}{texlibtheorem}
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-theorems}[2026/05/13 v1.0 TeXLib shared theorem styling]
+
+\RequirePackage[many]{tcolorbox}
+\RequirePackage{amsthm}
+
+% Shared base: breakable, no full frame, gentle asymmetric padding
+% (extra left padding leaves room for the colored rule).
+\tcbset{
+	texlibbase/.style={
+		enhanced jigsaw, breakable,
+		sharp corners, frame hidden,
+		boxrule=0pt,
+		left=8pt, right=4pt, top=4pt, bottom=4pt,
+		before skip=10pt, after skip=10pt,
+	},
+}
+
+% Per-family overlays. Each: a colored left rule + ~2% background tint.
+\tcbset{
+	texlibtheorem/.style={
+		texlibbase,
+		colback=red!2!white,
+		borderline west={1.5pt}{0pt}{red!60!black},
+	},
+	texlibproposition/.style={
+		texlibbase,
+		colback=violet!2!white,
+		borderline west={1.5pt}{0pt}{violet!60!black},
+	},
+	texlibdefinition/.style={
+		texlibbase,
+		colback=blue!2!white,
+		borderline west={1.5pt}{0pt}{blue!60!black},
+	},
+	texlibprocedure/.style={
+		texlibbase,
+		colback=teal!2!white,
+		borderline west={1.5pt}{0pt}{teal!60!black},
+	},
+	texlibexample/.style={
+		texlibbase,
+		colback=white,
+		borderline west={1pt}{0pt}{black},
+	},
+	texlibquestion/.style={
+		texlibbase,
+		colback=orange!3!white,
+		borderline west={1.5pt}{0pt}{orange!60!black},
+	},
+	texlibnote/.style={
+		texlibbase,
+		colback=gray!4!white,
+		borderline west={1.5pt}{0pt}{gray!50!black},
+	},
+}
+
+\endinput

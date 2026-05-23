@@ -1,0 +1,66 @@
+{
+	// TeXLib.sublime-build -- build system for the TeXLib library.
+	//
+	// Deploy to Packages/User/. Then in Sublime: Tools > Build System > TeXLib.
+	//   Ctrl+B         -- build in the default mode (no \Show... flag)
+	//   Ctrl+Shift+B   -- pick a mode: Answer Key, Solutions, Student, ...
+	// The "TeXLib: Build ..." entries in the command palette do the same.
+	//
+	// Each variant passes --texlib-mode=<mode> through LaTeXTools' documented
+	// `options` channel; texlib_builder.py pops that token out of self.options
+	// and injects the matching TeXLib flag (\def\ShowKey{}, \def\StudentMode{},
+	// ...). The remaining options, if any, go to the engine unchanged.
+
+	// LaTeXTools' build target. The "Unable to find target command:
+	// latextools_make_pdf" warning sometimes shown in the console at
+	// startup is a false alarm -- Sublime validates .sublime-build files
+	// before all plugins finish loading, but the command IS registered by
+	// the time a build actually runs.
+	"target": "latextools_make_pdf",
+	"cancel": {"kill": true},
+	"selector": "text.tex.latex",
+	"builder": "texlib",
+
+	"windows": {
+		"file_regex": "^((?:.:)?[^:\\n\\r]*):([0-9]+):?([0-9]+)?:? (.*)$"
+	},
+	"linux": {
+		"file_regex": "^(...*?):([0-9]+): ([0-9]*)([^\\.]+)"
+	},
+	"osx": {
+		"file_regex": "^(...*?):([0-9]+): ([0-9]*)([^\\.]+)"
+	},
+
+	"variants": [
+		{
+			"name": "Answer Key",
+			"builder": "texlib",
+			"options": ["--texlib-mode=key"]
+		},
+		{
+			"name": "Solutions",
+			"builder": "texlib",
+			"options": ["--texlib-mode=solutions"]
+		},
+		{
+			"name": "Student Copy",
+			"builder": "texlib",
+			"options": ["--texlib-mode=student"]
+		},
+		{
+			"name": "Rubric",
+			"builder": "texlib",
+			"options": ["--texlib-mode=rubric"]
+		},
+		{
+			"name": "Draft",
+			"builder": "texlib",
+			"options": ["--texlib-mode=draft"]
+		},
+		{
+			"name": "All Versions (separate PDFs)",
+			"builder": "texlib",
+			"options": ["--texlib-mode=allversions"]
+		}
+	]
+}

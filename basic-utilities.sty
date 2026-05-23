@@ -1,0 +1,94 @@
+% basic-utilities.sty
+% Common utilities for Math, Figures, and Automations
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{basic-utilities}[2025/01/17 v1.0 Basic Utilities]
+
+% -- Dependencies --
+\RequirePackage{expl3}
+\RequirePackage{xparse}
+\RequirePackage{xcolor}
+\RequirePackage{amsmath}
+\RequirePackage{amssymb}
+\RequirePackage{amsthm}
+\RequirePackage{mathtools}
+\RequirePackage{siunitx}
+\RequirePackage{texlib-mathutils}  % \mbb, \abs, \lrp, \dd, \deriv, \inte, \todo, ...
+\RequirePackage{graphicx}
+\RequirePackage{caption}
+\RequirePackage{tikz}
+\RequirePackage{pgfplots}
+\RequirePackage{tasks}        % grid layout for exercise parts:  \begin{tasks}(N) \task ... \end{tasks}
+
+% -- TikZ Config --
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{
+	arrows.meta, positioning, shapes.geometric,
+	datavisualization, fit, calc, backgrounds
+}
+
+% -- tasks defaults: bold lowercase letter + period, e.g. "a." --
+\settasks{
+	label        = \textbf{\alph*.},
+	label-align  = right,
+	label-width  = 1.5em,
+	item-indent  = 2.5em,
+	column-sep   = 1em,
+	after-item-skip = 6pt plus 2pt minus 2pt,
+}
+
+% -- parts: dedicated env for vertical exercise parts (no shortlabel needed) --
+% Usage:  \begin{parts} \item ... \item ... \end{parts}
+% Renders bold a., b., c., ...   General \begin{enumerate} is unaffected.
+\RequirePackage[shortlabels]{enumitem}
+\newlist{parts}{enumerate}{4}
+\setlist[parts]{
+	label    = \textbf{\alph*.},
+	labelsep = 0.5em,
+	leftmargin = *,
+	itemsep  = 2pt,
+	topsep   = 4pt,
+}
+
+% =========================================================
+% 1. MATH MACROS
+% =========================================================
+% Math macros (\mbb, \abs, \lrp, \lrb, \lrcb, \lrsb, \dd, \deriv, \inte,
+% \todo, ...) now live in texlib-mathutils.sty, loaded above. Only the
+% siunitx table/mode configuration remains here, since it depends on the
+% siunitx package that basic-utilities pulls in.
+\sisetup{table-number-alignment=center, mode=math}
+
+% =========================================================
+% 2. AUTOMATION HELPERS
+% =========================================================
+\ExplSyntaxOn
+
+	\cs_new_protected:Nn \cn_auto_label:nn {
+		\tl_set:Nn \l_tmpa_tl { #2 }
+		\tl_set:Nx \l_tmpa_tl { \str_lowercase:f { \l_tmpa_tl } }
+		\regex_replace_all:nnN { [^a-z0-9\ ] } { } \l_tmpa_tl
+		\regex_replace_all:nnN { \s+ } { - } \l_tmpa_tl
+		\regex_replace_all:nnN { ^-|-$ } { } \l_tmpa_tl
+		\label{#1:\l_tmpa_tl}
+	}
+	\NewDocumentCommand{\AutoLabel}{ m m }{ \cn_auto_label:nn {#1} {#2} }
+
+\ExplSyntaxOff
+
+% -- Figure Wrapper --
+\NewDocumentCommand{\fig}{ s O{} O{} m }{%
+	\begin{figure}[!ht] 
+	\IfBooleanTF{#1}{\raggedleft}{\centering}
+	\if\relax\detokenize{#3}\relax
+		\includegraphics[width=0.5\textwidth,height=0.35\textwidth,keepaspectratio]{Figures/#4}
+	\else
+		\includegraphics[#3]{Figures/#4}
+	\fi
+	\if\relax\detokenize{#2}\relax
+		\AutoLabel{fig}{#4}
+	\else
+		\caption{#2}
+		\AutoLabel{fig}{#2}
+	\fi
+	\end{figure}%
+}

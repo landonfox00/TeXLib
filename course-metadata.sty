@@ -1,0 +1,126 @@
+% course-metadata.sty
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{course-metadata}[2026/05/07 v8.1 Layered Metadata Engine]
+
+\RequirePackage{expl3}
+\RequirePackage{xparse}
+
+\ExplSyntaxOn
+
+\cs_new_protected:Npn \meta_create_var:nn #1 #2 {
+	\tl_new:c { g__meta_#1_tl }
+	\cs_if_exist:cF { Get#2 } {
+		\exp_args:Nc \NewExpandableDocumentCommand { Get#2 } { } {
+			\tl_use:c { g__meta_#1_tl }
+		}
+	}
+}
+
+\NewExpandableDocumentCommand{\GetTerm}{ } {
+	\tl_if_empty:cTF { g__meta_term_tl }
+		{ \GetSeason \space \GetYear }
+		{ \tl_use:c { g__meta_term_tl } }
+}
+
+\meta_create_var:nn { institution }    { Institution }
+\meta_create_var:nn { instructor }     { Instructor }
+\meta_create_var:nn { term }           { Term }
+\meta_create_var:nn { year }           { Year }
+\meta_create_var:nn { season }         { Season }
+\meta_create_var:nn { course-subject } { CourseSubject }
+\meta_create_var:nn { course-number }  { CourseNumber }
+\meta_create_var:nn { course-title }   { CourseTitle }
+\meta_create_var:nn { course-section } { CourseSection }
+\meta_create_var:nn { course-room }    { CourseRoom }
+\meta_create_var:nn { lecture-days }   { LectureDays }
+\meta_create_var:nn { lecture-times }  { LectureTimes }
+\meta_create_var:nn { start-date }     { StartDate }
+\meta_create_var:nn { end-date }       { EndDate }
+\meta_create_var:nn { final-date }     { FinalDate }
+\meta_create_var:nn { final-time }     { FinalTime }
+\meta_create_var:nn { bank-path }      { BankPath }
+
+\keys_define:nn { meta } {
+	institution     .tl_gset:c = { g__meta_institution_tl },
+	instructor      .tl_gset:c = { g__meta_instructor_tl },
+	term            .tl_gset:c = { g__meta_term_tl },
+	year            .tl_gset:c = { g__meta_year_tl },
+	season          .tl_gset:c = { g__meta_season_tl },
+	course-subject  .tl_gset:c = { g__meta_course-subject_tl },
+	course-number   .tl_gset:c = { g__meta_course-number_tl },
+	course-title    .tl_gset:c = { g__meta_course-title_tl },
+	course-section  .tl_gset:c = { g__meta_course-section_tl },
+	course-room     .tl_gset:c = { g__meta_course-room_tl },
+	lecture-days    .tl_gset:c = { g__meta_lecture-days_tl },
+	lecture-times   .tl_gset:c = { g__meta_lecture-times_tl },
+	start-date      .tl_gset:c = { g__meta_start-date_tl },
+	end-date        .tl_gset:c = { g__meta_end-date_tl },
+	final-date      .tl_gset:c = { g__meta_final-date_tl },
+	final-time      .tl_gset:c = { g__meta_final-time_tl },
+	bank-path       .tl_gset:c = { g__meta_bank-path_tl },
+}
+
+\keys_define:nn { meta } {
+	.unknown .code:n = {
+		\tl_if_exist:cF { g__meta_ \l_keys_key_tl _tl } {
+			\tl_new:c { g__meta_ \l_keys_key_tl _tl }
+		}
+		\tl_gset:cn { g__meta_ \l_keys_key_tl _tl } { #1 }
+		\tl_set:Nn \l_tmpa_tl { \l_keys_key_tl }
+		\regex_replace_all:nnN { - } { \  } \l_tmpa_tl
+		\tl_set:Nf \l_tmpb_tl { \text_titlecase_all:n { \l_tmpa_tl } }
+		\regex_replace_all:nnN { \s } { } \l_tmpb_tl
+		\cs_if_exist:cF { Get \l_tmpb_tl } {
+			\exp_args:Nc \NewExpandableDocumentCommand { Get \l_tmpb_tl } { } {
+				\tl_use:c { g__meta_ \l_keys_key_tl _tl }
+			}
+		}
+	}
+}
+
+\NewDocumentCommand{\metasetup}{ +m } {
+	\tl_set:Nn \l_tmpa_tl { #1 }
+	\regex_replace_all:nnN { \c{par} } { } \l_tmpa_tl
+	\keys_set:nV { meta } \l_tmpa_tl
+}
+
+\cs_if_exist:NF \meta {
+	\cs_new_protected:Npn \meta #1 {
+		\tl_set:Nn \l_tmpa_tl { #1 }
+		\regex_replace_all:nnN { \c{par} } { } \l_tmpa_tl
+		\keys_set:nV { meta } \l_tmpa_tl
+	}
+}
+
+\NewExpandableDocumentCommand{\GetCourse}{ } {
+	\cs_if_exist:NT \GetCourseSubject { \GetCourseSubject \space }
+	\cs_if_exist:NT \GetCourseNumber  { \GetCourseNumber :~ }
+	\cs_if_exist:NT \GetCourseTitle   { \GetCourseTitle }
+}
+
+\NewExpandableDocumentCommand{\GetCourseShort}{ } {
+	\cs_if_exist:NT \GetCourseSubject { \GetCourseSubject \space }
+	\cs_if_exist:NT \GetCourseNumber  { \GetCourseNumber }
+}
+
+\NewDocumentCommand{\IfMetaSet}{ m +m +m } {
+	\tl_if_exist:cTF { g__meta_#1_tl }
+		{ \tl_if_empty:cTF { g__meta_#1_tl } { #3 } { #2 } }
+		{ #3 }
+}
+
+\bool_new:N \g__meta_found_bool
+\tl_new:N   \g__meta_path_tl
+\clist_map_inline:nn { ., .., ../.., ../../.. } {
+	\file_if_exist:nT { #1/coursemeta.tex } {
+		\tl_gset:Nn \g__meta_path_tl { #1/coursemeta.tex }
+		\bool_gset_true:N \g__meta_found_bool
+		\clist_map_break:
+	}
+}
+\NewDocumentCommand{\LoadCourseMeta}{}{
+	\bool_if:NT \g__meta_found_bool { \input{ \g__meta_path_tl } }
+}
+
+\ExplSyntaxOff
+\LoadCourseMeta

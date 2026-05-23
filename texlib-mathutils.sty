@@ -1,0 +1,67 @@
+% texlib-mathutils.sty
+% Shared math macros for the TeXLib teaching library.
+%
+% Loaded directly by classes that don't pull in basic-utilities.sty
+% (autoexam, quiz); loaded transitively via basic-utilities for classes
+% that want the full utility kit (didactic, pset, report-card).
+%
+% Conventions chosen during the May 2026 consolidation pass:
+%
+%   - Delimiter macros use \left ... \right (auto-sizing). The earlier
+%     \mathopen{}...\mathclose{} wrappers in basic-utilities had typos
+%     (\mathopen{} at BOTH ends instead of \mathopen{}/\mathclose{}) and
+%     produced subtly wrong spacing for \abs, \lrcb, and \lrsb. Plain
+%     \left\right is simpler, correct, and matches the didactic/pset
+%     definitions that were already in use.
+%
+%   - All macros use \providecommand / \ProvideDocumentCommand so a
+%     downstream document can \renewcommand them without erroring.
+%
+%   - \deriv uses the simpler didactic signature: the function argument
+%     is mandatory, so \IfValueTF was a no-op in the older basic-utilities
+%     version.
+%
+%   - \todo defaults to bold red "TODO" (the 3-of-5 majority across the
+%     pre-consolidation copies). autoexam's plain-red \todo and
+%     basic-utilities' lowercase "todo." are both retired.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-mathutils}[2026/05/13 v1.0 TeXLib shared math utilities]
+
+\RequirePackage{amsmath}
+\RequirePackage{amssymb}
+\RequirePackage{mathtools}
+\RequirePackage{xcolor}
+\RequirePackage{xparse}
+\RequirePackage{mathrsfs}  % provides \mathscr, used by \mscr below.
+                           % Previously \mscr was defined in several classes
+                           % but mathrsfs was never loaded, so \mscr errored
+                           % the moment it was used in a document body.
+
+% --- Math-font shortcuts ----------------------------------------------------
+\providecommand{\mbb}[1]{\mathbb{#1}}
+\providecommand{\mrm}[1]{\mathrm{#1}}
+\providecommand{\mcal}[1]{\mathcal{#1}}
+\providecommand{\msf}[1]{\mathsf{#1}}
+\providecommand{\mf}[1]{\mathfrak{#1}}
+\providecommand{\mscr}[1]{\mathscr{#1}}
+
+% --- Auto-sizing delimiters -------------------------------------------------
+\providecommand{\abs}[1]{\left\lvert #1 \right\rvert}
+\providecommand{\lrp}[1]{\left( #1 \right)}
+\providecommand{\lrb}[1]{\left[ #1 \right]}
+\providecommand{\lrsb}[1]{\left[ #1 \right]}   % alias of \lrb (kept for back-compat)
+\providecommand{\lrcb}[1]{\left\{ #1 \right\}}
+
+% --- Differential calculus --------------------------------------------------
+\providecommand{\dd}{\mathrm{d}}
+\ProvideDocumentCommand{\deriv}{ O{} m m }{%
+	\frac{\dd^{#1} #2}{\dd #3^{#1}}%
+}
+\ProvideDocumentCommand{\inte}{ O{} O{} m m }{%
+	\int_{#1}^{#2} #3\, \dd #4%
+}
+
+% --- Editorial --------------------------------------------------------------
+\providecommand{\todo}{\textcolor{red}{\textbf{TODO}}}
+
+\endinput

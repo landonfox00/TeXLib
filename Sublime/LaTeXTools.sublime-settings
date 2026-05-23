@@ -1,0 +1,50 @@
+{
+	// LaTeXTools.sublime-settings -- TeXLib machine config.
+	// Deploy to Packages/User/ as LaTeXTools.sublime-settings (no hash suffix).
+	// Merged from the existing Packages/User/ copy; only the `builder` field
+	// changed -- everything else was already correct.
+
+	"windows" : {
+		"texpath" : "C:\\TexLive\\2025\\bin\\windows;C:\\TexLive\\2025\\tlpkg\\tlperl\\bin;$PATH",
+		"distro" : "texlive"
+	},
+
+	// Use the TeXLib custom builder (texlib_builder.py, deployed alongside
+	// this file). It handles engine selection, build modes, autoexam
+	// versions, the rerun loop, and the .spl PDF split. The line below is
+	// kept for reference -- script_commands is unused while builder = texlib,
+	// but if you ever fall back to the legacy script builder, the path is
+	// still right.
+	"builder" : "texlib",
+	// "builder" : "basic",
+	// "builder" : "script",
+	"builder_settings" : {
+		"windows" : {
+			"script_commands": [
+				"cmd /c python -u \"C:\\Users\\Landon\\OneDriveUNR\\Documents\\TeXLib\\Sublime\\onetex_build.py\" \"$file\""
+			],
+			// kpathsea CANNOT resolve a TEXINPUTS entry that contains a comma.
+			// The real OneDrive folder name has one ("...Nevada, Reno..."), so
+			// we route via OneDriveUNR -- a comma-free directory junction to
+			// the same folder. Trailing // means "and all subdirs".
+			"env" : {
+				"TEXINPUTS" : ".;C:\\Users\\Landon\\OneDriveUNR\\Documents\\TeXLib//;",
+			}
+		}
+	},
+
+	"viewer" : "sumatra",
+	"open_pdf_on_build" : true,
+	"forward_sync" : false,
+	"keep_focus" : true,
+
+	"preview_math_mode" : "none",
+
+	"build_panel_word_wrap" : true,
+	"show_panel_on_build" : "errors",
+
+	"aux_directory" : "<<temp>>",
+	"output_directory" : "",
+
+	"additional_bibliography_file" : ""
+}

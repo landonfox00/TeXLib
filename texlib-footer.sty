@@ -1,0 +1,42 @@
+% texlib-footer.sty
+% Shared footer module for TeXLib document classes (didactic, pset, ...).
+%
+% Provides the unified bottom-of-page layout:
+%
+%     [ \GetCourse ]   [ page X of Y ]   [ \GetInstitution ]
+%
+% Headers are intentionally NOT touched here -- those remain class-specific
+% (lecture notes use unit/instructor/section; exams use exam number/version;
+% etc.).  Classes opt in by:
+%
+%     \RequirePackage{texlib-footer}    % once, in the class preamble
+%     ...
+%     \pagestyle{fancy}                 % the class sets up fancy + headers
+%     \SetTeXLibFooter                  % installs the shared footer
+%
+% \SetTeXLibFooter may also be called inside a \fancypagestyle{<name>}{...}
+% block to apply the same footer to a custom page style (e.g. a title page
+% style that suppresses the header but keeps the footer):
+%
+%     \fancypagestyle{titlepage}{%
+%         \fancyhf{}%
+%         \SetTeXLibFooter
+%         \renewcommand{\headrulewidth}{0pt}%
+%     }
+%
+% course-metadata.sty must be loaded before \SetTeXLibFooter is invoked,
+% so that \GetCourse and \GetInstitution are defined.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-footer}[2026/05/10 v1.0 Shared TeXLib footer]
+
+\RequirePackage{fancyhdr}
+\RequirePackage{lastpage}
+
+\newcommand{\SetTeXLibFooter}{%
+	\fancyfoot[L]{\GetCourse}%
+	\fancyfoot[C]{\thepage\ of \pageref{LastPage}}%
+	\fancyfoot[R]{\GetInstitution}%
+	\renewcommand{\footrulewidth}{0.4pt}%
+}
+
+\endinput

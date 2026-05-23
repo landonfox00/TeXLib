@@ -1,0 +1,42 @@
+# Course materials (kept local only)
+Bingo/
+Exams/
+Notes/
+Problem Sets/
+Quizzes/
+Report Cards/
+Schedule/
+Syllabi/
+
+# Sublime workspace state (per-machine)
+*.sublime-workspace
+
+# Old / superseded files
+course-metadata_old.sty
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg
+*.nav
+*.snm
+*.vrb
+*.dvi
+*.pdf
+
+# Python build artifacts
+__pycache__/
+*.pyc
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+.#*

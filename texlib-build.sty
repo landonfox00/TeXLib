@@ -1,0 +1,41 @@
+% texlib-build.sty
+% Unified TeXLib build-flag CLI. Loaded by every TeXLib class so that all
+% documents respond to the same compile-time / source-level toggles.
+%
+% Compile-time (passed via lualatex \def\Show…{}\input{file.tex}):
+%   \ShowSolutions  \ShowKey  \ShowRubric  \ShowDraft
+%   \StudentMode    \InstructorMode
+%
+% Source-level (placed in the document preamble):
+%   \solutions  \keys  \rubrics  \drafts  \studentmode  \instructormode
+%
+% Conditionals exposed to class authors and downstream documents:
+%   \ifsolutions  \ifkey  \ifrubric  \ifdraft  \ifstudent  \ifinstructor
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-build}[2026/05/08 v1.0 TeXLib unified build flags]
+
+% Conditionals
+\newif\ifsolutions
+\newif\ifkey
+\newif\ifrubric
+\newif\ifdraft
+\newif\ifstudent
+\newif\ifinstructor
+
+% Compile-time toggles
+\ifdefined\ShowSolutions   \solutionstrue   \fi
+\ifdefined\ShowKey         \keytrue         \fi
+\ifdefined\ShowRubric      \rubrictrue      \fi
+\ifdefined\ShowDraft       \drafttrue       \fi
+\ifdefined\StudentMode     \studenttrue     \fi
+\ifdefined\InstructorMode  \instructortrue  \fi
+
+% Source-level toggles
+\newcommand{\solutions}{\solutionstrue}
+\newcommand{\keys}{\keytrue}
+\newcommand{\rubrics}{\rubrictrue}
+\newcommand{\drafts}{\drafttrue}
+\newcommand{\studentmode}{\studenttrue\instructorfalse}
+\newcommand{\instructormode}{\instructortrue\studentfalse}
+
+\endinput

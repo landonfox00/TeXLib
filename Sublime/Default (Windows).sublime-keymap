@@ -1,0 +1,55 @@
+[
+	// Default (Windows).sublime-keymap -- live copy from Packages/User/.
+	// Deploy to Packages/User/.
+	//
+	// All entries are currently commented out. Two experimental patterns kept
+	// here for reference: a "quiet build" that hides the output panel on
+	// Ctrl+B, and a "noisy build" that builds + jumps to the PDF on
+	// Ctrl+Shift+B. Uncomment + adapt as needed.
+
+	// // quiet build
+	// { "keys": ["ctrl+b"], "command": "build",
+	// 	"context": [
+	// 		{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" },
+	// 		{ "key": "overlay_has_focus", "operator": "equal", "operand": false },
+	// 	]
+	// },
+
+	// { "keys": ["ctrl+b"], "command": "chain",
+	// 	"args": {
+	// 		"commands": [
+	// 			{ "command": "hide_panel", "args": { "panel": "output.exec" } },
+	// 			{ "command": "build" }
+	// 		]
+	// 	}, "context": [
+	// 		{ "key": "panel_has_focus", "operator": "equal", "operand": true },
+	// 		{ "key": "panel", "operand": "output.exec" }
+	// 	]
+	// },
+
+	// // noisy build
+	// { "keys": ["ctrl+shift+b"], "command": "chain",
+	// 	"args": {
+	// 		"commands": [
+	// 			{ "command": "build" },
+	// 			{ "command": "latextools_jumpto_pdf" }
+	// 		]
+	// 	}, "context": [
+	// 		{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" },
+	// 		{ "key": "overlay_has_focus", "operator": "equal", "operand": false }
+	// 	]
+	// },
+
+	// { "keys": ["ctrl+shift+b"], "command": "chain",
+	// 	"args": {
+	// 		"commands": [
+	// 			{ "command": "hide_panel", "args": { "panel": "output.exec" } },
+	// 			{ "command": "hide_panel", "args": { "panel": "output.LaTeXTools" } },
+	// 			{ "command": "build" },
+	// 			{ "command": "latextools_jumpto_pdf" }
+	// 		]
+	// 	}, "context": [
+	// 		{ "key": "panel_has_focus", "operator": "equal", "operand": true }
+	// 	]
+	// }
+]
