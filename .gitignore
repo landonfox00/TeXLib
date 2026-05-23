@@ -8,8 +8,9 @@ Report Cards/
 Schedule/
 Syllabi/
 
-# Sublime workspace state (per-machine)
+# Sublime workspace + project state (per-machine)
 *.sublime-workspace
+*.sublime-project
 
 # Old / superseded files
 course-metadata_old.sty
