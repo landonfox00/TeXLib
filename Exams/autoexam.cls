@@ -822,6 +822,14 @@
 \renewcommand{\questionlabel}{\textbf{Problem \thequestion.}}
 \renewcommand{\partlabel}{\textbf{\thequestion\thepartno.}}
 
+% Top-level enumerate: bold lowercase-roman labels (i., ii., iii., ...).
+% enumitem is intentionally NOT loaded in this class (see section 1 — it
+% patches \list and breaks exam.cls's questions/parts), so we set the kernel
+% label and counter macros directly.  \theenumi is switched to roman too, so
+% any \ref to an enumerate item matches the printed label.
+\renewcommand{\theenumi}{\roman{enumi}}
+\renewcommand{\labelenumi}{\textbf{\theenumi.}}
+
 % Custom Macros
 % Math macros (\mbb, \mrm, \dd, \todo, plus \abs, \lrp, \deriv, \inte, ...)
 % are provided by texlib-mathutils.sty, loaded in section 1 above.

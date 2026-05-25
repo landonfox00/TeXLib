@@ -155,6 +155,15 @@
 		\vspace{1em}
 	\fi
 	\thispagestyle{titlepage}
+	% Section number = unit number, so the lecture's \subsection headings render
+	% as N.1, N.2, ... and the [section]-numbered theorems as N.1, N.2, ...
+	% (lecture notes use \subsection throughout and never call \section). This
+	% replaces the per-file "\setcounter{section}{\GetUnitNumber}" that used to
+	% sit just after \maketitle. Guarded so a note with no unit-number key (an
+	% empty \GetUnitNumber) does not trip "missing number" in \setcounter.
+	\tl_if_empty:NF \g__didactic_unit_number_tl {
+		\setcounter{section}{\GetUnitNumber}
+	}
 }
 \ExplSyntaxOff
 
@@ -212,6 +221,86 @@
 \tcolorboxenvironment{question}   {texlibquestion}
 \tcolorboxenvironment{recall}     {texlibnote}
 % (remark deliberately left as plain inline, no rule/tint)
+
+% Unnumbered (starred) twins of every environment above. Same headings, same
+% theorem styles, and the same tcolorbox styling (remark* left plain, like
+% remark). Use \begin{theorem*} ... \end{theorem*} for a result that consumes
+% no number; the starred forms take no shared-counter argument.
+\theoremstyle{plain}
+\newtheorem*{theorem*}{Theorem}
+\newtheorem*{corollary*}{Corollary}
+\newtheorem*{lemma*}{Lemma}
+\newtheorem*{conjecture*}{Conjecture}
+\newtheorem*{proposition*}{Proposition}
+
+\theoremstyle{definition}
+\newtheorem*{definition*}{Definition}
+\newtheorem*{convention*}{Convention}
+\newtheorem*{procedure*}{Procedure}
+\newtheorem*{challenge*}{Challenge}
+\newtheorem*{exercise*}{Exercise}
+\newtheorem*{example*}{Example}
+\newtheorem*{notation*}{Notation}
+
+\theoremstyle{remark}
+\newtheorem*{remark*}{Remark}
+\newtheorem*{question*}{Question}
+\newtheorem*{recall*}{Recall}
+
+\tcolorboxenvironment{theorem*}    {texlibtheorem}
+\tcolorboxenvironment{lemma*}      {texlibtheorem}
+\tcolorboxenvironment{corollary*}  {texlibtheorem}
+\tcolorboxenvironment{conjecture*} {texlibtheorem}
+\tcolorboxenvironment{proposition*}{texlibproposition}
+\tcolorboxenvironment{definition*} {texlibdefinition}
+\tcolorboxenvironment{convention*} {texlibdefinition}
+\tcolorboxenvironment{procedure*}  {texlibprocedure}
+\tcolorboxenvironment{challenge*}  {texlibquestion}
+\tcolorboxenvironment{exercise*} {texlibexample}
+\tcolorboxenvironment{example*}  {texlibexample}
+\tcolorboxenvironment{notation*} {texlibnote}
+\tcolorboxenvironment{question*}   {texlibquestion}
+\tcolorboxenvironment{recall*}     {texlibnote}
+% (remark* deliberately left as plain inline, no rule/tint)
+
+% ==============================================================================
+% 6b. CONTEXT-SENSITIVE ENUMERATE LABELS
+% ==============================================================================
+% Top-level enumerate uses bold roman numerals (i., ii., ...) inside the
+% bold-titled theorem environments, and emphasised (italic) roman numerals
+% everywhere else -- ordinary body text plus the remark-style environments
+% (remark / question / recall), whose titles are not bold.
+%
+% A boolean is raised at the start of each bold-titled environment via
+% etoolbox's \AtBeginEnvironment.  Because a LaTeX environment forms a group,
+% the flag reverts automatically at \end{...}, so a list sitting outside the
+% box falls back to the \emph branch.  The flag is read when each label is
+% typeset, so one bare \begin{enumerate} adapts to its surrounding context.
+%
+% The four-letter aliases (defn, conv, exer, exam, notn, chal, ...) call the
+% real environments internally, so hooking the real names below is sufficient.
+\newif\if@didactic@thmenum
+\@didactic@thmenumfalse
+\setlist[enumerate,1]{%
+	label = {\if@didactic@thmenum\textbf{\roman*.}\else\emph{\roman*.}\fi},
+	ref   = \roman*,
+}
+\newcommand{\@didactic@enumbold}[1]{\AtBeginEnvironment{#1}{\@didactic@thmenumtrue}}
+% amsthm plain style (theorem family):
+\@didactic@enumbold{theorem}
+\@didactic@enumbold{corollary}
+\@didactic@enumbold{lemma}
+\@didactic@enumbold{conjecture}
+\@didactic@enumbold{proposition}
+% amsthm definition style (definition family):
+\@didactic@enumbold{definition}
+\@didactic@enumbold{convention}
+\@didactic@enumbold{procedure}
+\@didactic@enumbold{challenge}
+\@didactic@enumbold{exercise}
+\@didactic@enumbold{example}
+\@didactic@enumbold{notation}
+% remark, question, recall intentionally excluded -- they keep \emph labels.
 
 % ==============================================================================
 % 7. SOLUTION ENVIRONMENT  (minimal style: matches the colored-rule aesthetic)
@@ -292,6 +381,31 @@
 \NewDocumentEnvironment{chal}{o}
   {\IfNoValueTF{#1}{\begin{challenge}}{\begin{challenge}[#1]}}
   {\end{challenge}}
+% Starred (unnumbered) synonyms, mirroring the starred theorem environments in
+% section 6 -- same \begin{<real>*} indirection so the tcolorbox hooks fire, and
+% the same passthrough of the optional [<note>] argument. (No \soln*: the
+% solution box has no unnumbered variant.)
+\NewDocumentEnvironment{defn*}{o}
+  {\IfNoValueTF{#1}{\begin{definition*}}{\begin{definition*}[#1]}}
+  {\end{definition*}}
+\NewDocumentEnvironment{conv*}{o}
+  {\IfNoValueTF{#1}{\begin{convention*}}{\begin{convention*}[#1]}}
+  {\end{convention*}}
+\NewDocumentEnvironment{ques*}{o}
+  {\IfNoValueTF{#1}{\begin{question*}}{\begin{question*}[#1]}}
+  {\end{question*}}
+\NewDocumentEnvironment{exer*}{o}
+  {\IfNoValueTF{#1}{\begin{exercise*}}{\begin{exercise*}[#1]}}
+  {\end{exercise*}}
+\NewDocumentEnvironment{exam*}{o}
+  {\IfNoValueTF{#1}{\begin{example*}}{\begin{example*}[#1]}}
+  {\end{example*}}
+\NewDocumentEnvironment{notn*}{o}
+  {\IfNoValueTF{#1}{\begin{notation*}}{\begin{notation*}[#1]}}
+  {\end{notation*}}
+\NewDocumentEnvironment{chal*}{o}
+  {\IfNoValueTF{#1}{\begin{challenge*}}{\begin{challenge*}[#1]}}
+  {\end{challenge*}}
 % \solution is built with \NewTColorBox (not \tcolorboxenvironment), so the
 % box machinery lives directly inside the \solution / \endsolution macros and
 % a \let-alias would in principle work.  We use the same wrapper pattern for

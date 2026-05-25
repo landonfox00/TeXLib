@@ -4,6 +4,13 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- **Starred (unnumbered) theorem environments in `didactic` and `pset`.** Every theorem-family environment gets a `*` twin (`theorem*`, `lemma*`, `definition*`, `proposition*`, `corollary*`, etc.) plus, in didactic, the short-alias starred forms (`defn*`, `conv*`, `ques*`, `exer*`, `exam*`, `notn*`, `chal*`). Same tcolorbox styling as the numbered versions; consume no counter. Use for one-off results you don't want to clutter the numbering with.
+- **Context-sensitive top-level `enumerate` labels in `didactic`.** Inside bold-titled theorem/definition environments, top-level enumerate items render as bold roman (`i.`, `ii.`, `iii.`); everywhere else (body text, remark/question/recall boxes), they render as italic roman. Implemented via `\AtBeginEnvironment` raising a boolean that's read at label-typesetting time, so a bare `\begin{enumerate}` adapts to its surroundings with no per-list configuration.
+- **Bold roman top-level `enumerate` labels in `pset` and `autoexam`.** Matches didactic's bold-roman-in-theorem-environment look, applied unconditionally since neither class has a mixed-context need. `\ref` to enumerate items prints `i`, `ii`, ... consistent with the visible label.
+- **`didactic` auto-sets the section counter to `\GetUnitNumber` in `\maketitle`.** Subsections now render as `N.1`, `N.2`, ...  and section-numbered theorems pick up the unit prefix without the per-file `\setcounter{section}{...}` boilerplate. Guarded against documents that omit the unit-number metadata key.
+
 ### Fixed
 
 - **`Sublime/texlib_builder.py` now honors the LaTeXTools `aux_directory` setting** (the template ships with `"<<temp>>"`, which was previously ignored). The builder routes the engine via `-output-directory` to a stable per-document temp dir under `%TEMP%\texlib-aux\<hash>\`, then copies the PDF, `.synctex.gz`, and any `.spl` signal back next to the source. Net effect: `.aux/.log/.out/.toc/.bcf/.bbl/.fls/.fdb_latexmk` stop accumulating in source directories and OneDrive doesn't see them as changes on every Ctrl+B. biber invocations now use `--input-directory` / `--output-directory` so biblatex cross-references still resolve when aux routing is active. Set `aux_directory` to `""` or `"<<root>>"` in `LaTeXTools.sublime-settings` to opt out and restore the old in-source behavior.

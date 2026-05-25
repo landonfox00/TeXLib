@@ -208,6 +208,12 @@
 		\let\part\item}
 	{\end{enumerate}}
 
+% Top-level enumerate: bold lowercase-roman labels (i., ii., iii., ...).
+% The `parts` environment above sets its own inline label, so it is
+% unaffected; only a bare \begin{enumerate} picks this up.  ref=\roman*
+% keeps \cref output (e.g. "item ii") consistent with the printed label.
+\setlist[enumerate,1]{label=\textbf{\roman*.}, ref=\roman*}
+
 % ==============================================================================
 % 7. THEOREM-LIKE ENVIRONMENTS (boxed via tcolorbox, shared TeXLib styling)
 % ==============================================================================
@@ -238,6 +244,32 @@
 \tcolorboxenvironment{proposition}{texlibproposition}
 \tcolorboxenvironment{lemma}{texlibtheorem}
 \tcolorboxenvironment{example}{texlibexample}
+
+% Unnumbered (starred) twins of every environment above. Same headings, styles,
+% and tcolorbox styling (remark*/note*/recall* left plain, like their numbered
+% counterparts). Use e.g. \begin{theorem*} ... \end{theorem*}; the starred forms
+% take no shared-counter argument. (note* is also defined, guarded, in the
+% Category Theory preamble; its \ifcsname check skips that copy when this one is
+% already present, so there is no double-definition.)
+\theoremstyle{plain}
+\newtheorem*{theorem*}{Theorem}
+\newtheorem*{definition*}{Definition}
+\newtheorem*{corollary*}{Corollary}
+\newtheorem*{proposition*}{Proposition}
+\newtheorem*{lemma*}{Lemma}
+
+\theoremstyle{remark}
+\newtheorem*{example*}{Example}
+\newtheorem*{remark*}{Remark}
+\newtheorem*{note*}{Note}
+\newtheorem*{recall*}{Recall}
+
+\tcolorboxenvironment{theorem*}{texlibtheorem}
+\tcolorboxenvironment{definition*}{texlibdefinition}
+\tcolorboxenvironment{corollary*}{texlibtheorem}
+\tcolorboxenvironment{proposition*}{texlibproposition}
+\tcolorboxenvironment{lemma*}{texlibtheorem}
+\tcolorboxenvironment{example*}{texlibexample}
 
 % ==============================================================================
 % 8. SOLUTION ENVIRONMENT — gated on \ShowKey/\ShowSolutions/\StudentMode
