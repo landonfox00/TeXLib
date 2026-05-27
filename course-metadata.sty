@@ -111,12 +111,22 @@
 
 \bool_new:N \g__meta_found_bool
 \tl_new:N   \g__meta_path_tl
+\tl_new:N   \g__meta_dir_tl
 \clist_map_inline:nn { ., .., ../.., ../../.. } {
 	\file_if_exist:nT { #1/coursemeta.tex } {
 		\tl_gset:Nn \g__meta_path_tl { #1/coursemeta.tex }
+		\tl_gset:Nn \g__meta_dir_tl  { #1/ }
 		\bool_gset_true:N \g__meta_found_bool
 		\clist_map_break:
 	}
+}
+% \GetCourseMetaDir returns the prefix walked to find coursemeta.tex,
+% with a trailing slash (e.g. "./", "../", "../../").  Consumers prepend
+% this to coursemeta-relative paths (such as bank-path) so the same
+% canonical string resolves correctly regardless of how deep the
+% compiling document lives below coursemeta.
+\NewExpandableDocumentCommand{\GetCourseMetaDir}{ } {
+	\tl_use:N \g__meta_dir_tl
 }
 \NewDocumentCommand{\LoadCourseMeta}{}{
 	\bool_if:NT \g__meta_found_bool { \input{ \g__meta_path_tl } }

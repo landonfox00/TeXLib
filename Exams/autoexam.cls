@@ -221,10 +221,30 @@
 \AtBeginDocument{%
 	\directlua{set_exam_seed('\theExamVersion')}%
 	% Auto-load bank declared in coursemeta.tex (bank-path key).
+	% Resolution order:
+	%   1. literal \GetBankPath as-is (document-relative — back-compat with
+	%      legacy bank-path values authored for a specific document depth);
+	%   2. \GetCourseMetaDir\GetBankPath (coursemeta-relative — the
+	%      preferred convention, depth-agnostic);
+	%   3. fall through to \loadbank{\GetBankPath} so \input raises the
+	%      familiar "I can't find file" error if neither resolves.
 	\@ifundefined{GetBankPath}{}{%
 		\edef\@tmpbankpath{\GetBankPath}%
 		\ifx\@tmpbankpath\empty\else
-			\loadbank{\@tmpbankpath}%
+			\IfFileExists{\@tmpbankpath}{%
+				\loadbank{\@tmpbankpath}%
+			}{%
+				\@ifundefined{GetCourseMetaDir}{%
+					\loadbank{\@tmpbankpath}%
+				}{%
+					\edef\@tmpbankresolved{\GetCourseMetaDir\@tmpbankpath}%
+					\IfFileExists{\@tmpbankresolved}{%
+						\loadbank{\@tmpbankresolved}%
+					}{%
+						\loadbank{\@tmpbankpath}%
+					}%
+				}%
+			}%
 		\fi
 	}%
 	% Auto-load bank.tex from the document's own directory, if present.
