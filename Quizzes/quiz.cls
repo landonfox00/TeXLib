@@ -90,7 +90,27 @@
 
 % \loadbank is provided by texlib-problembank.sty (the redirect activates
 % automatically; quizzes are always single-version so pbank_suppress_redirect
-% never trips).
+% never trips).  A coursemeta bank-path (exposed as \GetBankPath) is
+% auto-loaded at \AtBeginDocument, and a sibling bank.tex is picked up as a
+% fallback — so per-quiz \loadbank calls are usually unnecessary.  Unlike
+% autoexam.cls, no RNG seed is set (quizzes are single-version by design;
+% see section 4 above) and the bank-path branch is wrapped in
+% \IfFileExists: bank-path strings are resolved relative to the document's
+% directory, and a course's bank-path is often authored for exam depth
+% (e.g. ../../Bank/bank.tex), which won't resolve from a one-level-deep
+% quiz.  Defensive skip lets the auto-load no-op cleanly when the relative
+% path doesn't reach; an explicit \loadbank in the quiz still works.
+\AtBeginDocument{%
+	% Auto-load bank declared in coursemeta.tex (bank-path key).
+	\@ifundefined{GetBankPath}{}{%
+		\edef\@tmpbankpath{\GetBankPath}%
+		\ifx\@tmpbankpath\empty\else
+			\IfFileExists{\@tmpbankpath}{\loadbank{\@tmpbankpath}}{}%
+		\fi
+	}%
+	% Auto-load bank.tex from the document's own directory, if present.
+	\IfFileExists{bank.tex}{\loadbank{bank.tex}}{}%
+}
 
 \newenvironment{problems}{%
 	\directlua{pbank_first_on_page = true}%
