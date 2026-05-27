@@ -39,7 +39,30 @@ function sanitize(str)
 end
 
 function NewEvent(type_str, name_str, length_val, id_val)
-	return { type = type_str, name = name_str, length = length_val or 0, id = id_val or 0, meta = {} }
+	return {
+		type   = type_str,
+		name   = name_str,
+		length = length_val or 0,
+		id     = id_val or 0,
+		meta   = {},
+		-- source_line: set by each L_* directive to tex.inputlineno at the
+		-- time of the directive call so render_grid can attribute the
+		-- typeset row back to the user's .tex source via SyncTeX redirect.
+		-- 0 means "no source attribution" (auto-generated events use 0).
+		source_line = 0,
+	}
+end
+
+-- Tag a cell with the source line of a directive that touched it.  Keeps the
+-- MINIMUM line across multiple directives so render_grid attributes each row
+-- to its earliest contributing directive — the same convention as the bank's
+-- per-problem SyncTeX redirect (first \begin{problem} line).
+function tag_cell_source(cell, line)
+	line = line or tex.inputlineno
+	if line <= 0 then return end
+	if not cell.source_line or line < cell.source_line then
+		cell.source_line = line
+	end
 end
 
 function parse_csv(str)
@@ -221,6 +244,8 @@ end
 -- FINALS WEEK (Safety Checks Added)
 -- ============================================================================
 function L_finals_week(start_str, final_date_str, time_str, duration_in)
+	local src_line = tex.inputlineno
+
 	-- 1. Determine Start
 	local ptr
 	if start_str and start_str ~= "" then
@@ -229,7 +254,7 @@ function L_finals_week(start_str, final_date_str, time_str, duration_in)
 		if not cursor_date then return end
 		ptr = Date.new(cursor_date)
 	end
-	
+
 	-- CHECK: If parsing failed (ptr is nil), STOP. Don't crash.
 	if not ptr then
 		L_warn("Skipping Finals Week: Invalid start date or year not set.")
@@ -242,21 +267,21 @@ function L_finals_week(start_str, final_date_str, time_str, duration_in)
 	-- 2. Loop
 	local day_count = 1
 	local safety = 0
-	
+
 	while day_count <= duration do
 		safety = safety + 1; if safety > 20 then break end
-		
+
 		local wd = ptr:weekday()
 		if wd <= 5 then
 			local cap = L_get_cap(ptr)
 			local cell = calendar_mgr:get_cell(ptr, (cap > 0 and cap or 1.0))
-			
-			cell.flags.holiday = true 
+
+			cell.flags.holiday = true
 			cell.flags.lecture = false
 			cell.flags.quiz = false
 			cell.flags.exam = false
 			cell.flags.canceled = true
-			
+
 			if final_day and ptr:to_key() == final_day:to_key() then
 				cell.color = "\\cellcolor{red!15}"
 				cell:append("\\textbf{Final Exam}", "top")
@@ -267,6 +292,7 @@ function L_finals_week(start_str, final_date_str, time_str, duration_in)
 				cell:append("\\textbf{Finals Week}", "top")
 				cell:append("\\textbf{Day " .. day_count .. " of " .. duration .. "}", "top")
 			end
+			tag_cell_source(cell, src_line)
 			day_count = day_count + 1
 		end
 		ptr = ptr + 1
@@ -337,6 +363,7 @@ function L_warn(msg) tex.print("\\PackageWarning{schedule}{" .. msg .. "}") end
 function L_topic(date_in, name, length_in)
 	local len = tonumber(length_in) or 0
 	local evt = NewEvent("Lecture", name, len)
+	evt.source_line = tex.inputlineno
 
 	if date_in and date_in ~= "" then
 		cursor_date = Date.new(date_in)
@@ -348,7 +375,7 @@ function L_topic(date_in, name, length_in)
 		local safety = 0
 		while rem > 0.01 do
 			safety = safety + 1; if safety > 100 then L_warn("Loop: "..name) break end
-			
+
 			local cap = L_get_cap(cursor_date)
 			local cell = nil
 			if cap > 0 then cell = calendar_mgr:get_cell(cursor_date, cap) end
@@ -368,13 +395,15 @@ function L_topic(date_in, name, length_in)
 				cell.capacity_cur = cell.capacity_cur - fit
 				rem = rem - fit
 				first = false
+				tag_cell_source(cell, evt.source_line)
 			end
 		end
 	else
 		local cap = L_get_cap(cursor_date)
-		if cap == 0 then cap = 1.0 end 
+		if cap == 0 then cap = 1.0 end
 		local cell = calendar_mgr:get_cell(cursor_date, cap)
 		cell:append({ event_ref = evt, duration = 0, is_cont = false }, "middle")
+		tag_cell_source(cell, evt.source_line)
 	end
 end
 
@@ -397,23 +426,25 @@ function L_holiday(date_in, date_end, name)
 	end
 
 	if not date_in or date_in == "" then return end
+	local src_line = tex.inputlineno
 	local ptr = Date.new(date_in)
 	local d_end = (date_end and date_end~="") and Date.new(date_end) or ptr
-	
+
 	while ptr <= d_end do
 		local cap = L_get_cap(ptr)
 		local cell = calendar_mgr:get_cell(ptr, (cap > 0 and cap or 1.0))
 		if #cell.layers.middle > 0 then L_warn("Holiday overwrite: " .. ptr:to_key()) end
-		
+
 		-- Explicitly disable flags so Quizzes/Lectures don't spawn here
 		cell.flags.holiday = true
-		cell.flags.lecture = false 
+		cell.flags.lecture = false
 		cell.flags.exam = false
 		cell.flags.quiz = false -- Stop auto-quiz
-		
+
 		cell:append("\\textbf{" .. sanitize(name) .. "}", "top")
 		cell:append("\\textbf{No Classes}", "top")
 		cell.color = "\\cellcolor{black!10}"
+		tag_cell_source(cell, src_line)
 		ptr = ptr + 1
 	end
 end
@@ -432,6 +463,7 @@ function L_skip_quiz(date_str)
 
 	-- This flag prevents the auto-scheduler from adding a quiz here
 	cell.flags.no_auto_quiz = true
+	tag_cell_source(cell, tex.inputlineno)
 end
 
 -- ============================================================================
@@ -453,14 +485,15 @@ function L_quiz(options_in)
 
 	-- Create Event
 	local evt = NewEvent("Quiz", "Quiz " .. id, 0, id)
+	evt.source_line = tex.inputlineno
 
 	-- Determine Target Date
 	local target = cursor_date
 	if opts.date then
 			target = L_parse_smart_date(opts.date)
 	end
-	
-	if not target then return end 
+
+	if not target then return end
 
 	-- Get Cell and Apply
 	local cap = L_get_cap(target); if cap==0 then cap=1.0 end
@@ -468,9 +501,10 @@ function L_quiz(options_in)
 
 	cell.flags.quiz = true
 	cell.color = "\\cellcolor{orange!15}"
-	
+
 	-- Append manually
 	cell:append({ event_ref = evt, duration = 0 }, "top")
+	tag_cell_source(cell, evt.source_line)
 end
 
 -- ============================================================================
@@ -485,7 +519,8 @@ function L_exam(options_in)
 	
 	cnt_exam = cnt_exam + 1
 	local evt = NewEvent("Exam", "Exam " .. cnt_exam, len, cnt_exam)
-	
+	evt.source_line = tex.inputlineno
+
 	-- 2. Find Date
 	local target = L_find_next_class()
 	if not target then return end
@@ -524,10 +559,12 @@ function L_exam(options_in)
 	cell.capacity_cur = cell.capacity_cur - len
 	cell.color = "\\cellcolor{red!15}"
 	cell:append({ event_ref = evt, duration = len }, "top")
+	tag_cell_source(cell, evt.source_line)
 end
 
 function L_meta(text, date_in, layer_in, color_in)
 	local evt = NewEvent("Meta", text, 0)
+	evt.source_line = tex.inputlineno
 	local target = cursor_date
 	if date_in and date_in ~= "" then target = Date.new(date_in) end
 	local cap = L_get_cap(target); if cap==0 then cap=1.0 end
@@ -535,6 +572,7 @@ function L_meta(text, date_in, layer_in, color_in)
 	if color_in and color_in ~= "" then cell.color = "\\cellcolor{" .. sanitize(color_in) .. "}" end
 	local layer = (layer_in and layer_in~="") and layer_in or "bottom"
 	cell:append({ event_ref = evt, duration = 0 }, layer)
+	tag_cell_source(cell, evt.source_line)
 end
 
 function L_homework(text, date_in)
@@ -557,10 +595,29 @@ end
 -- ============================================================================
 -- RENDER GRID (Crash Proof)
 -- ============================================================================
+--
+-- SyncTeX inverse-search strategy
+-- -------------------------------
+-- Every L_* directive tags the cells it touches with its tex.inputlineno via
+-- tag_cell_source().  Here we build each week's row, take the minimum tagged
+-- line across the row's cells, and stash the row string into a sparse table
+-- keyed by that line.  Then we stage the redirect via texlib_synctex_stage
+-- and \@@input the user's source file (tex.jobname .. ".tex"):
+-- texlib_synctex.lua intercepts the \@@input, writes a temp file padded with
+-- blank lines so row content sits on the source line that produced it, and
+-- LuaTeX records the user's source file as the SyncTeX attribution for those
+-- nodes.  Click a calendar row in the PDF -> jump to the directive line in
+-- the source.
+--
+-- V1 limitation: assumes all directives live in the main .tex file.  If the
+-- user splits the schedule body into a separate \input'd file, source lines
+-- still get recorded but they index into the main file, not the included
+-- one.  A follow-up could group rows by source-file (using status.filename
+-- per directive) and stage one redirect per file.
 function render_grid()
-	if not start_date or not start_date.time then 
+	if not start_date or not start_date.time then
 		tex.print("\\textbf{ERROR: 'start-date' is missing.}")
-		return 
+		return
 	end
 
 	tex.print("\\renewcommand\\tabularxcolumn[1]{p{#1}}")
@@ -573,38 +630,42 @@ function render_grid()
 		header = header .. "& \\centering \\textbf{" .. day_names[idx] .. "} "
 		col_def = col_def .. " X |"
 	end
-	
+
+	-- Table open + header go through tex.print (they're just class boilerplate;
+	-- nobody is going to inverse-search the header).
 	tex.print("\\begin{xltabular}{\\textwidth}{" .. col_def .. "}")
 	tex.print("\\hline " .. header .. "\\tabularnewline \\hline\\noalign{\\vskip 2pt}\\hline \\endhead")
 
+	-- Build all rows into a sparse table keyed by source line.
+	local sparse_lines  = {}
+	local fallback_line = 1   -- used for rows with no tagged directive
 	local week_num = 1
 	local row_ptr = Date.new(start_date)
 	local start_wd = row_ptr:weekday()
 	row_ptr = row_ptr:add_days(-(start_wd - 1))
-	
+
 	local safety = 0
 	local last_seen_month = nil
 
-	-- LOOP CHECK: Ensure row_ptr is valid before comparing
 	while row_ptr and row_ptr.time and row_ptr <= cursor_date do
 		safety = safety + 1; if safety > 100 then break end
-		
+
 		local row_str = "\\centering \\raisebox{0.95em}{\\parbox[t][4.75em][c]{1.5em}{\\centering\\textbf{" .. week_num .. "}}} "
-		
+		local row_source = nil
+
 		for _, day_idx in ipairs(active_indices) do
 			local cell_date = row_ptr:add_days(day_idx - 1)
 			local cap = day_capacity_map[day_idx] or 1.0
 			if cap == 0 then cap = 1.0 end
-			
+
 			local cell = calendar_mgr:get_cell(cell_date, cap)
-			
-			if quiz_idx_map[day_idx] then 
+
+			if quiz_idx_map[day_idx] then
 				local is_after_end = false
 				if course_end_date and course_end_date.time then
 					if cell_date:to_key() > course_end_date:to_key() then is_after_end = true end
 				end
 
-				-- UPDATE THIS LINE: Added "not cell.flags.no_auto_quiz"
 				if not is_after_end and not cell.flags.holiday and not cell.flags.canceled and not cell.flags.no_auto_quiz then
 					local manual_exists = false
 					for _, layer in pairs(cell.layers) do
@@ -629,21 +690,73 @@ function render_grid()
 			local date_display = cell_date:fmt_display()
 			if cell.flags.month_start then date_display = "\\fbox{" .. date_display .. "}" end
 			local cell_content = "\\textbf{\\scriptsize " .. date_display .. "}"
-			
+
 			if cell.flags.lecture and not cell.flags.holiday then
 					cnt_lecture = cnt_lecture + 1
 					cell_content = cell_content .. " \\hfill \\textbf{\\scriptsize Lect. " .. cnt_lecture .. "}"
 			end
-			
+
 			local body = cell:get_render_text(sanitize)
 			if body ~= "" then cell_content = cell_content .. "\\par\\vspace{0.3em}\\centering " .. body end
 			row_str = row_str .. "& " .. cell.color .. " " .. cell_content .. " "
+
+			-- Collect the minimum source line across the row's cells.
+			if cell.source_line and cell.source_line > 0 then
+				if not row_source or cell.source_line < row_source then
+					row_source = cell.source_line
+				end
+			end
 		end
-		tex.print(row_str .. "\\tabularnewline \\hline")
+
+		-- Assign the row to its tagged source line, or fall back to the most
+		-- recent line we've seen (rows generated purely by auto-quiz logic
+		-- inherit the previous explicit directive's attribution).
+		local target = row_source or fallback_line
+		if row_source then fallback_line = row_source end
+		sparse_lines[target] = (sparse_lines[target] or "") ..
+		                        row_str .. "\\tabularnewline \\hline\n"
+
 		row_ptr = row_ptr + 7
 		week_num = week_num + 1
 		if week_num > 52 then break end
 	end
+
+	-- Hand the buffered rows off to a real on-disk file so SyncTeX records a
+	-- per-line attribution: line N in this file corresponds to source line N
+	-- of the directive that produced that row.  Inverse search from the PDF
+	-- lands in <jobname>_schedule_grid.tex at the line matching the user's
+	-- directive in their .tex source — close enough to "click cell, see what
+	-- generated it" without the gymnastics of trying to redirect SyncTeX into
+	-- the main job file itself (which double-opens and errors on
+	-- \documentclass; see the v1 notes in the commit message).
+	--
+	-- The file is written into the build's working directory.  Builders that
+	-- route aux output (e.g. Sublime's `aux_directory`) will get this file in
+	-- the aux dir, which is fine — TeX opens it from there for the \input.
+	local target_file = tex.jobname .. '_schedule_grid.tex'
+	local fout = io.open(target_file, 'w')
+	if fout then
+		local maxline = 0
+		for k in pairs(sparse_lines) do
+			if type(k) == 'number' and k > maxline then maxline = k end
+		end
+		for i = 1, maxline do
+			fout:write((sparse_lines[i] or '') .. '\n')
+		end
+		fout:close()
+		tex.print('\\input{' .. target_file .. '}')
+	else
+		-- Filesystem issue: fall back to emitting rows in source-line order
+		-- directly.  Inverse search will jump to wherever the directlua call
+		-- lives — same behaviour as before this feature.
+		local ordered = {}
+		for line in pairs(sparse_lines) do table.insert(ordered, line) end
+		table.sort(ordered)
+		for _, line in ipairs(ordered) do
+			tex.print(sparse_lines[line])
+		end
+	end
+
 	tex.print("\\end{xltabular}")
 end
 

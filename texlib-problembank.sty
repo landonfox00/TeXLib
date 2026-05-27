@@ -45,10 +45,15 @@
 % ==============================================================================
 % Lua engine loader
 % ==============================================================================
-% Locates problem_engine.lua across three possible layouts:
+% Locates problem_engine.lua and its texlib_synctex.lua dependency across
+% three possible layouts:
 %   (1) installed in a TEXMF tree              → kpse with the "lua" format
 %   (2) sitting next to texlib-problembank.sty → current canonical layout
 %   (3) sitting in the cwd                     → standalone test layout
+%
+% texlib_synctex.lua MUST load before problem_engine.lua: the engine's
+% bank-file SyncTeX redirect path calls texlib_synctex_stage at typeset
+% time, so the helper must already be defined.
 %
 % The .sty file is the anchor (rather than the calling .cls) because both
 % autoexam.cls and quiz.cls now reach the engine through this package; the
@@ -67,6 +72,7 @@
 		if lfs.attributes(path) then dofile(path) return end
 		dofile(name)
 	end
+	load_engine("texlib_synctex.lua")
 	load_engine("problem_engine.lua")
 }%
 

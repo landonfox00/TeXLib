@@ -60,7 +60,10 @@
 		local path = kpse.find_file(name, "lua")
 		if not path then
 			path = base_dir .. name
-			if not lfs.attributes(path) then path = name end
+			if not lfs.attributes(path) then
+				path = base_dir .. "../" .. name
+				if not lfs.attributes(path) then path = name end
+			end
 		end
 		dofile(path)
 	end

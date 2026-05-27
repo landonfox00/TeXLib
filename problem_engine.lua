@@ -91,7 +91,6 @@ autoexam_versions = {}
 local current_bank_file = nil
 local source_map = {}           -- id -> {file=, line=, tmpfile=}
 pbank_problem_start_line = 0  -- set by \begin{problem} before \Collect@Body
-local synctex_redirect_active = false  -- guard: register callback only once
 -- pbank_suppress_redirect: when true, typeset_problem skips the bank-file
 -- SyncTeX redirect even if it would otherwise apply.  autoexam_run_versions
 -- sets this before iterating versions because each version body re-\inputs
@@ -101,24 +100,16 @@ local synctex_redirect_active = false  -- guard: register callback only once
 -- and SyncTeX inverse search lands in the bank file.
 pbank_suppress_redirect = false
 
--- pbank_pending_redirect:
---   Set by typeset_problem() immediately before tex.print("\\input{bank_path}").
---   The open_read_file callback consumes it on the very next \input{} call,
---   serving the problem content instead of the real bank file.  Because the
---   \input argument IS the bank file name, SyncTeX naturally records the bank
---   file + correct line number — no post-processing required.
-local pbank_pending_redirect = nil
-
 -- Called from \loadbank before \input{bankfile}.
 --
--- Records the bank-file path AND lazily activates the SyncTeX redirect
--- callback so inverse search from the PDF lands in the bank file at the
--- problem's actual line.  setup_synctex_redirect() is idempotent — the first
--- call registers the LuaTeX `open_read_file` callback and sets
--- `synctex_redirect_active = true`; subsequent calls return immediately.
+-- Records the bank-file path AND lazily activates the generic SyncTeX
+-- redirect helper (texlib_synctex_setup is idempotent — the first call
+-- registers the LuaTeX `open_read_file` callback, later ones are no-ops).
+-- typeset_problem() stages the per-problem redirect via texlib_synctex_stage
+-- immediately before \@@input-ing the bank file.
 function pbank_set_bankfile(name)
 	current_bank_file = name
-	setup_synctex_redirect()
+	texlib_synctex_setup()
 end
 
 -- Sanitise a problem id for use as a filename component.
@@ -365,29 +356,21 @@ local function typeset_problem(p, stretch)
 	-- matching \begin{problem} block in the bank file, not to a per-problem
 	-- temp file or to the body-version temp file.
 	--
-	-- Approach: use the open_read_file callback to intercept
-	--   \@@input final_bank.tex
-	-- Because \@@input final_bank.tex is the \input argument, LuaTeX records
-	-- "final_bank.tex" as the SyncTeX source file for every node typeset from
-	-- that input.  The callback writes a small per-problem temp file whose
-	-- first sm.line lines are blank (so content line N in the temp file
-	-- corresponds to line N in the real bank file) and then serves that temp
-	-- file through a real io.open handle.  A real io.open handle is required:
-	-- LuaTeX only emits proper SyncTeX file-tracking records (the {N / }N
-	-- begin/end markers) when the reader is backed by a genuine file
-	-- descriptor; a purely virtual Lua-string reader is transparent to SyncTeX.
+	-- Approach: stage the bank-file content via texlib_synctex_stage, then
+	-- \@@input the bank file's name.  texlib_synctex.lua intercepts that
+	-- \@@input via the open_read_file callback and serves the staged content
+	-- through a real io.open handle (which LuaTeX requires for SyncTeX file
+	-- tracking to emit { / } markers — a pure Lua-string reader is
+	-- transparent to SyncTeX).  Because the \@@input argument IS the bank
+	-- file name, LuaTeX naturally attributes typeset nodes to that file.
 	--
-	-- The pending-redirect mechanism lets the callback know which problem's
-	-- content to write.  It is staged here (in the same \directlua that queues
-	-- the \@@input tokens) so that no intervening TeX processing can overwrite
-	-- it before the \@@input fires.  Mismatching open_read_file calls (for
-	-- font .fd files, etc.) leave the redirect intact; only the exact bank-file
-	-- basename consumes it.
-	--
-	-- Fallback (no source info or callback not active): write a plain temp file
-	-- and \input it; SyncTeX will point to the temp file instead.
+	-- Fallback (no source info, helper inactive, or suppress flag set):
+	-- write a plain temp file and \input it; SyncTeX will point to the
+	-- temp file instead.  autoexam_run_versions sets pbank_suppress_redirect
+	-- so the multi-version loop avoids the bank-file \@@input that would
+	-- otherwise overflow the input stack.
 	if sm and sm.file and sm.file ~= '' and sm.line and sm.line > 0
-			and synctex_redirect_active and not pbank_suppress_redirect then
+			and texlib_synctex_is_active() and not pbank_suppress_redirect then
 		local bank_path = sm.file
 		if not bank_path:match('%.%a+$') then bank_path = bank_path .. '.tex' end
 
@@ -404,12 +387,16 @@ local function typeset_problem(p, stretch)
 			end
 		end
 
-		-- Stage the pending redirect.
-		pbank_pending_redirect = {
-			bank_path  = bank_path,
-			lines      = content_lines,
-			start_line = sm.line,
-			pid        = pid,
+		-- Build a sparse line-indexed table: content_lines[1] should appear
+		-- on bank-file line sm.line+1 (the line AFTER \begin{problem}).
+		local sparse = {}
+		for i, ln in ipairs(content_lines) do
+			sparse[sm.line + i] = ln
+		end
+		texlib_synctex_stage{
+			target_file = bank_path,
+			lines       = sparse,
+			id          = pid,
 		}
 		tex.print("\\begingroup")
 		-- \csname @@input\endcsname is the primitive \input renamed by LaTeX.
@@ -881,128 +868,11 @@ function autoexam_write_srcmap()
 	f:close()
 end
 
--- setup_synctex_redirect()
---   Registers an open_read_file callback that enables true bank-file SyncTeX.
---
---   Why the 'filename' field does NOT work:
---   LuaTeX records the filename given to the \input primitive in SyncTeX, not
---   the 'filename' field of the open_read_file return table (that field only
---   affects error messages).  So to get SyncTeX to point to the bank file, the
---   \input argument itself must BE the bank file.
---
---   Strategy:
---   typeset_problem() calls \input{final_bank.tex} (the real bank file name)
---   and stages a pending redirect in pbank_pending_redirect.  This callback
---   intercepts that \input call, serves the problem content with a blank-line
---   prefix so line N in the virtual stream = line N in the bank file, and
---   returns.  SyncTeX naturally records the bank file + correct line numbers.
---
---   All other \input calls are forwarded manually (io.open + kpse) because
---   luatexbase's exclusive callback registration replaces LuaTeX's built-in
---   opener and nil returns no longer trigger the built-in kpse search.
---
---   Must be called before the version loop begins.
--- Note: not `local` because pbank_set_bankfile (defined earlier in this
--- chunk) calls into it.  Lua local scope only extends forward from the
--- declaration, so a chunk-local here would be invisible from earlier code.
-function setup_synctex_redirect()
-	if synctex_redirect_active then return end
-
-	local function orf_handler(filename)
-		-- Check whether this \input matches the pending bank-file redirect.
-		-- We do NOT clear the pending redirect on a mismatch: other files
-		-- (font definitions, .fd files, etc.) may be opened between when
-		-- typeset_problem() stages the redirect and when the \@@input for
-		-- the bank file actually fires.  Leaving the redirect in place
-		-- means those intervening opens are handled normally and the redirect
-		-- is still there when the bank file open arrives.
-		local pending = pbank_pending_redirect
-		if pending then
-			local bn_actual   = tostring(filename):match('[^/\\]+$') or filename
-			local bn_expected = pending.bank_path:match('[^/\\]+$')  or pending.bank_path
-			if bn_actual == bn_expected then
-				pbank_pending_redirect = nil   -- consumed
-				local prefix = pending.start_line
-				local clines = pending.lines
-				local pid    = pending.pid or 'unknown'
-
-				-- Write a per-problem temp file with blank-line prefix.
-				-- The first `prefix` lines are blank so that line N in the
-				-- file = line N in the real bank file.  Then the content
-				-- lines follow verbatim.
-				--
-				-- CRITICAL: we serve this via a real io.open file handle,
-				-- NOT a virtual Lua-string reader.  LuaTeX only emits
-				-- SyncTeX file-tracking records ({N / }N begin/end markers
-				-- and per-node x records) when the reader is backed by a
-				-- genuine file descriptor.  A purely virtual reader is
-				-- transparent to SyncTeX — no records are emitted and
-				-- inverse search won't point to this file.
-				--
-				-- Because the \@@input argument is the real bank file name,
-				-- SyncTeX records that name as the source file.  The temp
-				-- file content — with its blank-line prefix — ensures that
-				-- the line numbers SyncTeX records match the line numbers
-				-- in the actual bank file, giving line-accurate navigation.
-				local tmpfile = tex.jobname .. '_stmp_' .. sanitize_id(pid) .. '.tex'
-				local fout = io.open(tmpfile, 'w')
-				if fout then
-					for _ = 1, prefix do fout:write('\n') end
-					for _, ln in ipairs(clines) do fout:write(ln .. '\n') end
-					fout:close()
-				end
-				local f = io.open(tmpfile, 'r')
-				if not f then return nil end
-				return {
-					reader = function()
-						local line = f:read('*l')
-						if not line then f:close(); return nil end
-						return line
-					end,
-				}
-			end
-			-- Mismatch: leave pending redirect intact and fall through to
-			-- normal open for this non-bank file.
-		end
-
-		-- Normal file open: io.open first (CWD / absolute), then kpse lookup.
-		-- Required because luatexbase's exclusive callback replaces LuaTeX's
-		-- built-in opener; nil here means file-not-found, not "use default".
-		local f = io.open(filename, 'r')
-		if not f then
-			local real = kpse.find_file(filename, 'tex', true)
-			if real then f = io.open(real, 'r') end
-		end
-		if not f then return nil end
-		return {
-			reader = function()
-				if not f then return nil end
-				local line = f:read('*l')
-				if not line then f:close(); f = nil end
-				return line
-			end,
-		}
-	end
-
-	-- Use luatexbase.add_to_callback in LuaLaTeX (raw callback.register is blocked).
-	local ok, err
-	if luatexbase and luatexbase.add_to_callback then
-		ok, err = pcall(luatexbase.add_to_callback,
-						'open_read_file', orf_handler, 'pbank_synctex_redirect')
-	else
-		ok, err = pcall(callback.register, 'open_read_file', orf_handler)
-	end
-
-	if not ok then
-		texio.write_nl('AutoExam WARNING: could not register open_read_file: ' ..
-						tostring(err))
-		texio.write_nl('AutoExam: inverse search will use per-problem temp files.')
-		return
-	end
-
-	synctex_redirect_active = true
-	texio.write_nl('AutoExam: bank-file SyncTeX redirect active.')
-end
+-- The bank-file SyncTeX redirect mechanism formerly defined here as
+-- setup_synctex_redirect() lives in texlib_synctex.lua (loaded by
+-- texlib-problembank.sty before this engine).  pbank_set_bankfile() above
+-- calls texlib_synctex_setup() lazily; typeset_problem() stages each
+-- problem's redirect via texlib_synctex_stage().
 
 function autoexam_run_versions()
 	if #autoexam_versions == 0 then return end
