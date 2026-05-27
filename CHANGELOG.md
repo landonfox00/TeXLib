@@ -4,7 +4,18 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
-A consolidation pass: a new user-facing feature on `\problem`, four new shared `.sty` files that retire duplicated machinery between `autoexam` and `quiz`, a Lua engine rename, and the test harness extended to cover the new feature.
+A consolidation pass: a new user-facing feature on `\problem`, four new shared `.sty` files that retire duplicated machinery between `autoexam` and `quiz`, a Lua engine rename, the test harness extended to cover the new feature, and partial SyncTeX inverse-search support for the `schedule` class.
+
+### Added (this pass)
+
+- **`texlib_synctex.lua` — generic SyncTeX source-file redirect.** Extracted from the bank-specific path in `problem_engine.lua`. API: `texlib_synctex_setup()` / `texlib_synctex_stage{target_file, lines, id}` / `texlib_synctex_is_active()`. Stages a pending redirect; the registered `open_read_file` callback intercepts the next matching `\@@input`, writes a temp file padded to align source lines, and serves it through a real `io.open` handle (required for LuaTeX to emit the SyncTeX `{N`/`}N` file-tracking records). Both bank- and schedule-flavoured consumers now share this helper.
+- **Per-directive source-line tagging in `schedule.lua`.** Each `L_*` directive (`L_topic`, `L_holiday`, `L_quiz`, `L_exam`, `L_finals_week`, `L_meta`, `L_skip_quiz`, …) records `tex.inputlineno` on the cells it touches via a new `tag_cell_source` helper. `render_grid` reads the per-cell tags to determine each row's "primary directive" line.
+- **`<jobname>_schedule_grid.tex` — schedule SyncTeX target.** `render_grid` now writes the calendar's rendered rows into this file with blank-line padding so row N sits on the source line of the directive that produced it. The file is `\input`-ed in place of `tex.print`-ing rows directly, so SyncTeX records per-row line attributions. Clicking a calendar cell in the PDF opens this generated file at the matching line — a real improvement over the previous behaviour of landing at `\end{schedule}` for every click.
+
+### Limitations (schedule SyncTeX v1)
+
+- **Inverse search lands in the generated `_schedule_grid.tex` file, not the user's `template.tex`.** Attempting to redirect via the main job file itself triggers a double-open in LuaTeX/LaTeX that re-reads `\documentclass` mid-document and errors. A proper user-source redirect needs the Sublime builder to post-process `synctex.gz` (read a per-row `.srcmap`-equivalent and rewrite temp-file references to the user's source); that path is open as a follow-up.
+- **Multi-week clustering under one source line.** Weeks without an explicit directive inherit the most recent directive's line via fallback propagation, so several consecutive weeks may share one attribution (e.g. all weeks between two `\holiday` calls map to the earlier one). Acceptable v1 trade-off; finer per-cell attribution can come later.
 
 ### Added
 
