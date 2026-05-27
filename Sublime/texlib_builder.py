@@ -370,10 +370,13 @@ class TexlibBuilder(PdfBuilder):
 
         # The schedule class emits a <base>.schedmap sidecar.  Rewrite the
         # build's .synctex.gz BEFORE copy-back so the user-visible file
-        # already has the right line attributions.
+        # already has the right line attributions.  schedmap is written by
+        # Lua to CWD (source dir); synctex.gz lands wherever -output-directory
+        # routes — pass BOTH dirs so the rewriter can find each file
+        # independently.
         build_dir = getattr(self, "_aux_target", None) or tex_dir
         if build_dir and os.path.isdir(build_dir):
-            self._rewrite_synctex_for_schedmap(build_dir, self.base_name)
+            self._rewrite_synctex_for_schedmap(build_dir, tex_dir, self.base_name)
 
         # If we built into a separate aux dir (via -output-directory), copy
         # the PDF, SyncTeX file, and any .spl signal back next to the source.
@@ -419,7 +422,18 @@ class TexlibBuilder(PdfBuilder):
                         f"back to source: {exc}\n"
                     )
 
-    def _rewrite_synctex_for_schedmap(self, build_dir, base_name):
+    @staticmethod
+    def _find_in_dirs(name, dirs):
+        """Return the first existing path for `name` across the candidate dirs."""
+        for d in dirs:
+            if not d:
+                continue
+            candidate = os.path.join(d, name)
+            if os.path.exists(candidate):
+                return candidate
+        return None
+
+    def _rewrite_synctex_for_schedmap(self, build_dir, tex_dir, base_name):
         """Rewrite synctex.gz to remap schedule grid-file refs at user-source lines.
 
         The schedule class writes each calendar row into <base>_schedule_grid.tex
@@ -440,13 +454,19 @@ class TexlibBuilder(PdfBuilder):
         in the schedmap (rare, but they remain attributable to the grid file),
         and file-scope markers ({N / }N) which only carry IDs, not lines.
 
+        Path discovery: with -output-directory routing (LaTeXTools' default
+        aux_directory=<<temp>>), .schedmap is written by Lua to the source
+        dir (lualatex's CWD) while .synctex.gz lands in build_dir.  Without
+        routing the two coincide.  We check both dirs for each file so the
+        rewrite works in either configuration.
+
         No-op if there's no .schedmap, no .synctex.gz, no matching Input
         record, or no matching <base>.tex Input to confirm the source file
         exists in the stream.
         """
-        schedmap = os.path.join(build_dir, base_name + ".schedmap")
-        synctex  = os.path.join(build_dir, base_name + ".synctex.gz")
-        if not (os.path.exists(schedmap) and os.path.exists(synctex)):
+        schedmap = self._find_in_dirs(base_name + ".schedmap", [tex_dir, build_dir])
+        synctex  = self._find_in_dirs(base_name + ".synctex.gz", [build_dir, tex_dir])
+        if not (schedmap and synctex):
             return
 
         # Parse .schedmap (lines of "grid_line|user_source_line"; '#'-comments skipped)

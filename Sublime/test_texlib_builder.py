@@ -237,7 +237,7 @@ def main():
         fh.write("3|38\n")
 
     b = TexlibBuilder()
-    b._rewrite_synctex_for_schedmap(tmp, base)
+    b._rewrite_synctex_for_schedmap(tmp, tmp, base)
 
     with gzip.open(os.path.join(tmp, base + ".synctex.gz"), "rt", encoding="utf-8") as fh:
         out = fh.read()
@@ -256,11 +256,40 @@ def main():
     check("schedmap rewrite: no orphan references to grid_lines remain",
           "(7,1:" not in out and "(7,2:" not in out and "h8,3:" not in out, out)
 
+    # (l-pre) rewrite finds schedmap in source dir + synctex in separate aux dir
+    src_dir = tempfile.mkdtemp(prefix="texlib_bt_synctex_src_")
+    aux_dir = tempfile.mkdtemp(prefix="texlib_bt_synctex_aux_")
+    src_path = os.path.join(src_dir, "doc.tex").replace("\\", "/")
+    grid_path = os.path.join(src_dir, "doc_schedule_grid.tex").replace("\\", "/")
+    fake = (
+        f"SyncTeX Version:1\n"
+        f"Input:1:{src_path}\n"
+        f"Input:7:{grid_path}\n"
+        f"!17\n"
+        f"{{0\n"
+        f"(7,1:1000,2000:5000,500,100\n"
+        f"}}0\n"
+        f"Postamble:\n"
+    )
+    # schedmap lands in source dir (lualatex's CWD)
+    with open(os.path.join(src_dir, "doc.schedmap"), "w", encoding="utf-8") as fh:
+        fh.write("1|34\n")
+    # synctex.gz lands in aux dir (-output-directory route)
+    with gzip.open(os.path.join(aux_dir, "doc.synctex.gz"), "wt", encoding="utf-8") as fh:
+        fh.write(fake)
+    b = TexlibBuilder()
+    b._rewrite_synctex_for_schedmap(aux_dir, src_dir, "doc")
+    with gzip.open(os.path.join(aux_dir, "doc.synctex.gz"), "rt", encoding="utf-8") as fh:
+        split_out = fh.read()
+    check("schedmap rewrite: handles schedmap-in-src + synctex-in-aux split",
+          "(7,34:" in split_out and f"Input:7:{src_path}" in split_out,
+          split_out)
+
     # (l) rewrite no-op when schedmap is missing
     tmp2 = tempfile.mkdtemp(prefix="texlib_bt_synctex_noop_")
     with gzip.open(os.path.join(tmp2, base + ".synctex.gz"), "wt", encoding="utf-8") as fh:
         fh.write(fake_synctex)
-    b._rewrite_synctex_for_schedmap(tmp2, base)
+    b._rewrite_synctex_for_schedmap(tmp2, tmp2, base)
     with gzip.open(os.path.join(tmp2, base + ".synctex.gz"), "rt", encoding="utf-8") as fh:
         unchanged = fh.read()
     check("schedmap rewrite: no-op when .schedmap is missing",

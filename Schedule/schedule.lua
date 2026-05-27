@@ -635,6 +635,11 @@ function render_grid()
 	-- nobody is going to inverse-search the header).
 	tex.print("\\begin{xltabular}{\\textwidth}{" .. col_def .. "}")
 	tex.print("\\hline " .. header .. "\\tabularnewline \\hline\\noalign{\\vskip 2pt}\\hline \\endhead")
+	-- Bottom rule is supplied by \endlastfoot rather than by the last row's
+	-- trailing \hline.  This avoids a longtable/xltabular quirk where a
+	-- trailing `\tabularnewline \hline` causes the engine to prepare for
+	-- another row and emit a stub of column rules below the table.
+	tex.print("\\hline \\endlastfoot")
 
 	-- Build rows in week order, recording each row's first contributing
 	-- directive's source line alongside.  We emit the rows sequentially
@@ -714,7 +719,7 @@ function render_grid()
 			end
 		end
 
-		table.insert(rows, row_str .. "\\tabularnewline \\hline")
+		table.insert(rows, row_str)  -- terminator added below per-position
 		-- For the srcmap: prefer the row's explicit directive line, fall back
 		-- to the previous explicit directive (auto-only weeks inherit).
 		if row_source then fallback_src = row_source end
@@ -727,11 +732,23 @@ function render_grid()
 
 	-- Write the grid file with one row per line, in week order.  The PDF
 	-- renders rows in the order the file is read — matching calendar order.
+	--
+	-- Row terminator: every row except the LAST ends with `\tabularnewline
+	-- \hline` (closes the row + draws the inter-row rule).  The LAST row
+	-- ends with `\tabularnewline` only — no trailing `\hline`.  The table's
+	-- bottom rule is drawn by `\endlastfoot` (declared above), which longtable
+	-- emits exactly once after the last body row without spawning a phantom
+	-- row stub the way a trailing inter-row `\hline` would.
 	local target_file = tex.jobname .. '_schedule_grid.tex'
 	local fout = io.open(target_file, 'w')
+	local n = #rows
+	local function row_terminator(i)
+		if i < n then return " \\tabularnewline \\hline" end
+		return " \\tabularnewline"
+	end
 	if fout then
-		for _, row in ipairs(rows) do
-			fout:write(row .. '\n')
+		for i, row in ipairs(rows) do
+			fout:write(row .. row_terminator(i) .. '\n')
 		end
 		fout:close()
 		tex.print('\\input{' .. target_file .. '}')
@@ -739,8 +756,8 @@ function render_grid()
 		-- Filesystem issue: emit rows directly via tex.print.  Inverse search
 		-- attributes everything to the \directlua call site (the old
 		-- behaviour); rows still render in week order.
-		for _, row in ipairs(rows) do
-			tex.print(row)
+		for i, row in ipairs(rows) do
+			tex.print(row .. row_terminator(i))
 		end
 	end
 
