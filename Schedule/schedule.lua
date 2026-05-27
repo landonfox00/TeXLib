@@ -636,9 +636,15 @@ function render_grid()
 	tex.print("\\begin{xltabular}{\\textwidth}{" .. col_def .. "}")
 	tex.print("\\hline " .. header .. "\\tabularnewline \\hline\\noalign{\\vskip 2pt}\\hline \\endhead")
 
-	-- Build all rows into a sparse table keyed by source line.
-	local sparse_lines  = {}
-	local fallback_line = 1   -- used for rows with no tagged directive
+	-- Build rows in week order, recording each row's first contributing
+	-- directive's source line alongside.  We emit the rows sequentially
+	-- (preserving calendar order) and write a separate sidecar `.schedmap`
+	-- that records grid_line -> user_source_line so a builder-side step can
+	-- post-process synctex.gz to redirect inverse search at the user's
+	-- template.tex.
+	local rows         = {}   -- ordered array of full row strings (no trailing newline)
+	local row_sources  = {}   -- parallel array; row_sources[i] is the first directive's source line for rows[i], or nil
+	local fallback_src = 0    -- used for "click anywhere in this auto-only week" via fallback propagation
 	local week_num = 1
 	local row_ptr = Date.new(start_date)
 	local start_wd = row_ptr:weekday()
@@ -708,53 +714,57 @@ function render_grid()
 			end
 		end
 
-		-- Assign the row to its tagged source line, or fall back to the most
-		-- recent line we've seen (rows generated purely by auto-quiz logic
-		-- inherit the previous explicit directive's attribution).
-		local target = row_source or fallback_line
-		if row_source then fallback_line = row_source end
-		sparse_lines[target] = (sparse_lines[target] or "") ..
-		                        row_str .. "\\tabularnewline \\hline\n"
+		table.insert(rows, row_str .. "\\tabularnewline \\hline")
+		-- For the srcmap: prefer the row's explicit directive line, fall back
+		-- to the previous explicit directive (auto-only weeks inherit).
+		if row_source then fallback_src = row_source end
+		table.insert(row_sources, row_source or (fallback_src > 0 and fallback_src or nil))
 
 		row_ptr = row_ptr + 7
 		week_num = week_num + 1
 		if week_num > 52 then break end
 	end
 
-	-- Hand the buffered rows off to a real on-disk file so SyncTeX records a
-	-- per-line attribution: line N in this file corresponds to source line N
-	-- of the directive that produced that row.  Inverse search from the PDF
-	-- lands in <jobname>_schedule_grid.tex at the line matching the user's
-	-- directive in their .tex source — close enough to "click cell, see what
-	-- generated it" without the gymnastics of trying to redirect SyncTeX into
-	-- the main job file itself (which double-opens and errors on
-	-- \documentclass; see the v1 notes in the commit message).
-	--
-	-- The file is written into the build's working directory.  Builders that
-	-- route aux output (e.g. Sublime's `aux_directory`) will get this file in
-	-- the aux dir, which is fine — TeX opens it from there for the \input.
+	-- Write the grid file with one row per line, in week order.  The PDF
+	-- renders rows in the order the file is read — matching calendar order.
 	local target_file = tex.jobname .. '_schedule_grid.tex'
 	local fout = io.open(target_file, 'w')
 	if fout then
-		local maxline = 0
-		for k in pairs(sparse_lines) do
-			if type(k) == 'number' and k > maxline then maxline = k end
-		end
-		for i = 1, maxline do
-			fout:write((sparse_lines[i] or '') .. '\n')
+		for _, row in ipairs(rows) do
+			fout:write(row .. '\n')
 		end
 		fout:close()
 		tex.print('\\input{' .. target_file .. '}')
 	else
-		-- Filesystem issue: fall back to emitting rows in source-line order
-		-- directly.  Inverse search will jump to wherever the directlua call
-		-- lives — same behaviour as before this feature.
-		local ordered = {}
-		for line in pairs(sparse_lines) do table.insert(ordered, line) end
-		table.sort(ordered)
-		for _, line in ipairs(ordered) do
-			tex.print(sparse_lines[line])
+		-- Filesystem issue: emit rows directly via tex.print.  Inverse search
+		-- attributes everything to the \directlua call site (the old
+		-- behaviour); rows still render in week order.
+		for _, row in ipairs(rows) do
+			tex.print(row)
 		end
+	end
+
+	-- Write the sidecar source-line map.  Format (one entry per row):
+	--     grid_line|user_source_line
+	-- The Sublime builder reads this after compilation and rewrites
+	-- synctex.gz so inverse search from the PDF lands in template.tex at the
+	-- recorded source line.  Without that rewrite step (e.g. command-line
+	-- builds), inverse search still works — it just lands in the
+	-- _schedule_grid.tex file at the corresponding line, where the user can
+	-- see the row content and identify the directive manually.
+	local map_file = tex.jobname .. '.schedmap'
+	local mout = io.open(map_file, 'w')
+	if mout then
+		mout:write('# schedule source map v1\n')
+		mout:write('# grid_line|user_source_line\n')
+		mout:write('# grid file: ' .. target_file .. '\n')
+		mout:write('# job file:  ' .. tex.jobname .. '.tex\n')
+		for i, src in ipairs(row_sources) do
+			if src then
+				mout:write(i .. '|' .. src .. '\n')
+			end
+		end
+		mout:close()
 	end
 
 	tex.print("\\end{xltabular}")
