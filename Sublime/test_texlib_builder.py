@@ -201,6 +201,71 @@ def main():
           bool(cmds) and cmds[0][0][-1] == "doc.tex", cmds)
     check("unknown mode -> warning shown", "unknown build mode" in disp, repr(disp))
 
+    # (k) schedule .schedmap -> synctex.gz rewrite
+    import gzip
+    tmp = tempfile.mkdtemp(prefix="texlib_bt_synctex_")
+    base = "doc"
+    src_path = os.path.join(tmp, "doc.tex").replace("\\", "/")
+    grid_path = os.path.join(tmp, "doc_schedule_grid.tex").replace("\\", "/")
+
+    # Fake synctex stream: one source-file Input + two grid-file Inputs
+    # (LuaTeX usually emits >1 due to its kpse lookup pass), plus typeset
+    # records referencing the grid IDs at various grid_lines.
+    fake_synctex = (
+        f"SyncTeX Version:1\n"
+        f"Input:1:{src_path}\n"
+        f"Input:7:{grid_path}\n"
+        f"Input:8:{grid_path}\n"
+        f"!17\n"
+        f"{{0\n"
+        f"(7,1:1000,2000:5000,500,100\n"
+        f"h7,1:1500,2200:3000,400,80\n"
+        f"x7,1:1700,2200\n"
+        f"(7,2:1000,5000:5000,500,100\n"
+        f"h8,3:2000,8000:3000,400,80\n"
+        f"(1,12:500,600:9000,500,0\n"           # NOT a grid record; leave alone
+        f"}}0\n"
+        f"Postamble:\n"
+    )
+    with gzip.open(os.path.join(tmp, base + ".synctex.gz"), "wt", encoding="utf-8") as fh:
+        fh.write(fake_synctex)
+    with open(os.path.join(tmp, base + ".schedmap"), "w", encoding="utf-8") as fh:
+        fh.write("# schedule source map v1\n")
+        fh.write("# grid_line|user_source_line\n")
+        fh.write("1|34\n")
+        fh.write("2|24\n")
+        fh.write("3|38\n")
+
+    b = TexlibBuilder()
+    b._rewrite_synctex_for_schedmap(tmp, base)
+
+    with gzip.open(os.path.join(tmp, base + ".synctex.gz"), "rt", encoding="utf-8") as fh:
+        out = fh.read()
+
+    check("schedmap rewrite: grid Input records repointed to source",
+          out.count(f"Input:7:{src_path}") == 1 and out.count(f"Input:8:{src_path}") == 1,
+          out)
+    check("schedmap rewrite: grid_line 1 -> source line 34",
+          "(7,34:1000,2000:" in out, out)
+    check("schedmap rewrite: grid_line 2 -> source line 24",
+          "(7,24:1000,5000:" in out, out)
+    check("schedmap rewrite: cross-ID grid_line 3 -> source line 38",
+          "h8,38:2000,8000:" in out, out)
+    check("schedmap rewrite: non-grid record (1,12) left alone",
+          "(1,12:500,600:" in out, out)
+    check("schedmap rewrite: no orphan references to grid_lines remain",
+          "(7,1:" not in out and "(7,2:" not in out and "h8,3:" not in out, out)
+
+    # (l) rewrite no-op when schedmap is missing
+    tmp2 = tempfile.mkdtemp(prefix="texlib_bt_synctex_noop_")
+    with gzip.open(os.path.join(tmp2, base + ".synctex.gz"), "wt", encoding="utf-8") as fh:
+        fh.write(fake_synctex)
+    b._rewrite_synctex_for_schedmap(tmp2, base)
+    with gzip.open(os.path.join(tmp2, base + ".synctex.gz"), "rt", encoding="utf-8") as fh:
+        unchanged = fh.read()
+    check("schedmap rewrite: no-op when .schedmap is missing",
+          unchanged == fake_synctex, "stream changed despite missing schedmap")
+
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL
 

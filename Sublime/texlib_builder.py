@@ -50,6 +50,7 @@
 # ============================================================================
 
 import glob
+import gzip
 import hashlib
 import os
 import re
@@ -367,6 +368,13 @@ class TexlibBuilder(PdfBuilder):
         tex_dir = self._tex_dir()
         base_path = os.path.join(tex_dir, self.base_name)
 
+        # The schedule class emits a <base>.schedmap sidecar.  Rewrite the
+        # build's .synctex.gz BEFORE copy-back so the user-visible file
+        # already has the right line attributions.
+        build_dir = getattr(self, "_aux_target", None) or tex_dir
+        if build_dir and os.path.isdir(build_dir):
+            self._rewrite_synctex_for_schedmap(build_dir, self.base_name)
+
         # If we built into a separate aux dir (via -output-directory), copy
         # the PDF, SyncTeX file, and any .spl signal back next to the source.
         # Aux files (.aux/.log/.out/.toc/.bcf/.bbl/.fls/.fdb_latexmk/...) stay
@@ -410,6 +418,127 @@ class TexlibBuilder(PdfBuilder):
                         f"TeXLib: could not copy {os.path.basename(src)} "
                         f"back to source: {exc}\n"
                     )
+
+    def _rewrite_synctex_for_schedmap(self, build_dir, base_name):
+        """Rewrite synctex.gz to remap schedule grid-file refs at user-source lines.
+
+        The schedule class writes each calendar row into <base>_schedule_grid.tex
+        in week order and `\\input`s that file, so without intervention SyncTeX
+        records typeset nodes as coming from the grid file.  At render time the
+        class also writes <base>.schedmap, recording the user-source line that
+        each grid_line was generated from (the line of the first contributing
+        \\section / \\holiday / etc. directive).
+
+        Here we read .schedmap, locate the grid-file Input records in the
+        SyncTeX stream by basename, and:
+          1) Rewrite those Input records to point at <base>.tex instead, so the
+             editor opens the user's source file on inverse search.
+          2) Remap the line component of every typeset record that references a
+             grid-file ID, swapping the grid_line for the user-source line.
+
+        Records left untouched: typeset records that reference grid_lines NOT
+        in the schedmap (rare, but they remain attributable to the grid file),
+        and file-scope markers ({N / }N) which only carry IDs, not lines.
+
+        No-op if there's no .schedmap, no .synctex.gz, no matching Input
+        record, or no matching <base>.tex Input to confirm the source file
+        exists in the stream.
+        """
+        schedmap = os.path.join(build_dir, base_name + ".schedmap")
+        synctex  = os.path.join(build_dir, base_name + ".synctex.gz")
+        if not (os.path.exists(schedmap) and os.path.exists(synctex)):
+            return
+
+        # Parse .schedmap (lines of "grid_line|user_source_line"; '#'-comments skipped)
+        line_map = {}
+        try:
+            with open(schedmap, "r", encoding="utf-8", errors="replace") as fh:
+                for raw in fh:
+                    s = raw.strip()
+                    if not s or s.startswith("#"):
+                        continue
+                    parts = s.split("|", 1)
+                    if len(parts) != 2:
+                        continue
+                    try:
+                        line_map[int(parts[0])] = int(parts[1])
+                    except ValueError:
+                        continue
+        except OSError:
+            return
+        if not line_map:
+            return
+
+        # Load synctex.gz
+        try:
+            with gzip.open(synctex, "rt", encoding="utf-8", errors="replace") as fh:
+                content = fh.read()
+        except OSError:
+            return
+
+        # Locate file IDs for the grid file (multiple Input records possible —
+        # LuaTeX often emits one per open + kpse-lookup pass) and the source.
+        grid_basename = base_name + "_schedule_grid.tex"
+        src_basename  = base_name + ".tex"
+
+        grid_ids = set()
+        src_path = None
+        for m in re.finditer(r"^Input:(\d+):(.+)$", content, re.MULTILINE):
+            fid = int(m.group(1))
+            path = m.group(2).rstrip()
+            bn = os.path.basename(path.replace("\\", "/"))
+            if bn == grid_basename:
+                grid_ids.add(fid)
+            elif bn == src_basename and src_path is None:
+                src_path = path
+
+        if not grid_ids or src_path is None:
+            return
+
+        # 1) Rewrite each grid-file Input record to point at the user source.
+        def _rewrite_input(match):
+            fid = int(match.group(1))
+            if fid in grid_ids:
+                return "Input:%d:%s" % (fid, src_path)
+            return match.group(0)
+        content = re.sub(r"^Input:(\d+):.+$", _rewrite_input,
+                         content, flags=re.MULTILINE)
+
+        # 2) Remap line numbers in typeset records that reference the grid IDs.
+        #    Record prefix is one of: ( [ h v x g k r $  (boxes, nodes, math).
+        #    Format: "<prefix><fileID>,<line>:..."
+        #    File-scope markers ({N / }N) carry no line so they're untouched.
+        record_re = re.compile(r"([(\[hvxgkr$])(\d+),(\d+):")
+
+        rewrites = 0
+        def _rewrite_record(match):
+            nonlocal rewrites
+            fid  = int(match.group(2))
+            line = int(match.group(3))
+            if fid in grid_ids and line in line_map:
+                rewrites += 1
+                return "%s%d,%d:" % (match.group(1), fid, line_map[line])
+            return match.group(0)
+        content = record_re.sub(_rewrite_record, content)
+
+        if rewrites == 0:
+            return
+
+        # Write back.  Re-gzip to keep the file format unchanged.
+        try:
+            with gzip.open(synctex, "wt", encoding="utf-8") as fh:
+                fh.write(content)
+        except OSError as exc:
+            self.display(
+                "TeXLib: schedule SyncTeX rewrite couldn't write %s: %s\n"
+                % (os.path.basename(synctex), exc)
+            )
+            return
+
+        self.display(
+            "TeXLib: rewrote %d schedule SyncTeX records "
+            "(%d row(s) mapped to user source).\n" % (rewrites, len(line_map))
+        )
 
     def _split_pdf_if_signaled(self, base_path):
         """Honor a <base>.spl 'split_page=N' signal: split the PDF in two."""
