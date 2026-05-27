@@ -24,7 +24,9 @@ jobs:
         with:
           scheme: full
           run: |
+            set -e
             apk add --no-cache python3
+            texlua Schedule/test_schedule_synctex.lua
             python3 smoke_test.py -v
 
       - name: Upload failed-build logs
