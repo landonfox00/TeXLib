@@ -120,7 +120,14 @@
 		\fi
 	}%
 	% Auto-load bank.tex from the document's own directory, if present.
-	\IfFileExists{bank.tex}{\loadbank{bank.tex}}{}%
+	% \IfFileExists consults TEXINPUTS, so a recursive TeXLib// entry can
+	% match a stray sample bank shipped with the library and silently load
+	% the wrong file.  Probe the literal CWD via LuaFileSystem instead.
+	\directlua{%
+		if lfs.attributes('bank.tex', 'mode') == 'file' then
+			tex.print('\string\\loadbank{bank.tex}')
+		end
+	}%
 }
 
 \newenvironment{problems}{%
