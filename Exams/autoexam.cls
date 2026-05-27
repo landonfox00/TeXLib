@@ -11,45 +11,38 @@
 % ==============================================================================
 % 1. PACKAGES
 % ==============================================================================
-\RequirePackage[T1]{fontenc}
-\RequirePackage{lmodern}
-\RequirePackage[margin=1in]{geometry}
-\RequirePackage{xparse}
-\RequirePackage{ifthen}
+% Core bundle: fontenc/lmodern/geometry, expl3/xparse/ifthen/etoolbox, xcolor,
+% amsmath/amssymb/amsthm/mathtools, texlib-mathutils, graphicx, tikz/pgfplots
+% (with compat=1.18 + arrows.meta/positioning/shapes.geometric libraries),
+% hyperref + canonical hypersetup.  Shared with quiz, didactic, pset, ...
+\RequirePackage{texlib-corepkg}
+
+% Class-specific packages
 \RequirePackage[export]{adjustbox}
 \RequirePackage{changepage}
 \RequirePackage{comment}
 % enumitem removed — known incompatibility with exam.cls (exam.cls defines
 % questions/parts as list environments; enumitem patches \list and breaks them)
-\RequirePackage{graphicx}
 \RequirePackage{lastpage}
 \RequirePackage{needspace}
 \RequirePackage{subfigure}
-\RequirePackage{xcolor}
-\RequirePackage{amsmath, amssymb, amsthm, mathtools}
 \RequirePackage{cancel}           % \cancel{} for crossing out terms in solutions
 % \RequirePackage{siunitx}  % unavailable on test server
 \RequirePackage{pdfpages}
 \RequirePackage[subfigure]{tocloft}
-\RequirePackage{tikz, pgfplots}
-\RequirePackage{hyperref}
 % \RequirePackage{luacode} % Essential for the engine  % replaced by dofile in test env
 \RequirePackage{array}
 \RequirePackage{multirow}
 \RequirePackage{multicol}
-\RequirePackage{etoolbox}
 \RequirePackage[many]{tcolorbox}    % minimal-style solution box (matches didactic)
 \RequirePackage{environ} % For capturing solution bodies
-\RequirePackage{texlib-mathutils}  % \mbb, \abs, \lrp, \dd, \deriv, \inte, \todo, ...
 \RequirePackage{course-metadata} % Auto-loads coursemeta.tex from ancestor dirs
 
 % ==============================================================================
 % 2. CONFIGURATION & SETUP
 % ==============================================================================
 
-% TikZ & PGFPlots
-\pgfplotsset{compat=1.18}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+% Extra TikZ libraries (corepkg already loads arrows.meta/positioning/shapes.geometric)
 \usetikzlibrary{datavisualization, datavisualization.formats.functions}
 
 % In multi-version documents the exam class defines question@N / part@N@M labels
@@ -65,13 +58,7 @@
 % cross-reference change-detection provided by \@testdef is meaningless here.
 \def\@testdef#1#2#3{}
 
-% Hyperref Setup
-\hypersetup{
-	colorlinks=true,
-	urlcolor=blue,    % URLs stay blue (useful in syllabi, course sheets, etc.)
-	linkcolor=black,  % internal cross-references: invisible in print, still clickable
-	citecolor=black   % citations likewise
-}
+% Hyperref setup is provided by texlib-corepkg.sty.
 
 % SIUnitX Setup (only when package is available)
 \ifdefined\sisetup
@@ -127,239 +114,16 @@
 % \instructormode are provided by texlib-build (loaded above).
 
 % ==============================================================================
-% 4. LUA ENGINE (Randomization, Math, Scopes)
+% 4. PROBLEM-BANK ENGINE (shared with quiz.cls)
 % ==============================================================================
-% Locates autoexam_engine.lua across three possible layouts:
-%   (1) installed in a TEXMF tree              → kpse with the "lua" format
-%   (2) sitting next to autoexam.cls           → legacy per-module copy
-%   (3) at the TeXLib root, one level up       → current canonical layout
-% The cwd fallback covers the edge case where the engine sits next to the
-% .tex file being built (e.g. a standalone test).
-% NOTE: no Lua `--` line comments inside this \directlua block. TeX collapses
-% the newlines into spaces before Lua sees the chunk, so a `--` comment would
-% swallow the rest of the code. Keep explanations in TeX `%` comments above.
-\directlua{
-	local function load_engine(name)
-		local cls_path = kpse.find_file("autoexam.cls")
-		local base_dir = cls_path and cls_path:match("(.*[/\\])") or ""
-		local path = kpse.find_file(name, "lua")
-		if not path or not lfs.attributes(path) then
-			path = base_dir .. name
-			if not lfs.attributes(path) then
-				path = base_dir .. "../" .. name
-				if not lfs.attributes(path) then
-					path = name
-				end
-			end
-		end
-		dofile(path)
-	end
-	load_engine("autoexam_engine.lua")
-}%
-
-% ==============================================================================
-% LaTeX Interfaces for Lua
-% ==============================================================================
-
-% --- Variable Management ---
-
-% \setvar{name}{value}  — store a named value
-\newcommand{\setvar}[2]{\directlua{set_var('#1', #2)}}
-
-% \setrng{name}{min}{max}  — store a single random integer in [min, max]
-\newcommand{\setrng}[3]{\directlua{set_rng('#1', #2, #3)}}
-
-% \calcvar{name}{lua-expr}  — compute an expression using stored vars
-\newcommand{\calcvar}[2]{\directlua{calc_var('#1', '#2')}}
-
-% \get{name}  — retrieve and typeset a stored value
-\newcommand{\get}[1]{\directlua{get_var('#1')}}
-
-% --- Randomization: Pick from List ---
-
-% \picklist{name}{n}{a, b, c, ...}  — pick n items WITHOUT replacement
-% NOTE: list items must not contain commas themselves.
-\NewDocumentCommand{\picklist}{m m m}{%
-	\directlua{pick_from_list('\luaescapestring{#1}', #2, '\luaescapestring{#3}')}%
-}
-
-% \picklistr{name}{n}{a, b, c, ...}  — pick n items WITH replacement
-\NewDocumentCommand{\picklistr}{m m m}{%
-	\directlua{pick_from_list_r('\luaescapestring{#1}', #2, '\luaescapestring{#3}')}%
-}
-
-% --- Randomization: Pick from Range ---
-
-% \pickrange{name}{n}{min}{max}  — pick n distinct integers from [min, max]
-\NewDocumentCommand{\pickrange}{m m m m}{%
-	\directlua{pick_from_range('\luaescapestring{#1}', #2, #3, #4)}%
-}
-
-% \pickranger{name}{n}{min}{max}  — pick n integers from [min, max] with replacement
-\NewDocumentCommand{\pickranger}{m m m m}{%
-	\directlua{pick_from_range_r('\luaescapestring{#1}', #2, #3, #4)}%
-}
-
-% --- Retrieval Helpers ---
-
-% \getlist{name}  — typeset all picked values, comma-separated
-\NewDocumentCommand{\getlist}{m}{%
-	\directlua{get_list('\luaescapestring{#1}')}%
-}
-
-% \geti{name}{i}  — typeset the i-th picked value (1-indexed)
-\NewDocumentCommand{\geti}{m m}{%
-	\directlua{get_var('\luaescapestring{#1}_' .. #2)}%
-}
-
-% \foreachpick[sep]{name}{code}  — iterate over picked values;
-%   \currentpick is set to each value before {code} is executed.
-%   Optional [sep] is inserted between items (default: comma-space).
-\NewDocumentCommand{\foreachpick}{O{,\space} m +m}{%
-	\directlua{
-		local count = tonumber(tostring(vars['\luaescapestring{#2}_count'])) or 0
-		for i = 1, count do
-			local v = vars['\luaescapestring{#2}_' .. i]
-			if v ~= nil then
-				tex.sprint('\\def\\currentpick{' .. tostring(v) .. '}')
-				tex.sprint('\luaescapestring{\unexpanded{#3}}')
-				if i < count then
-					tex.sprint('\luaescapestring{\unexpanded{#1}}')
-				end
-			end
-		end
-	}%
-}
-
-% --- Problem Bank ---
-
-% \newproblem{id}{meta}{content}[solution]
-%   Define a problem in the database. The solution argument is optional;
-%   if omitted, the problem has no solution shown in key/solution builds.
-%   May be called in the document preamble, inside a bank file, or in the
-%   document body. Redefining an existing ID overwrites it with a warning.
-\NewDocumentCommand{\newproblem}{m m +m +o}{%
-	\IfNoValueTF{#4}{%
-		\directlua{define_problem(
-			'\luaescapestring{#1}',
-			'\luaescapestring{#2}',
-			'\luaescapestring{\unexpanded{#3}}',
-			''
-		)}%
-	}{%
-		\directlua{define_problem(
-			'\luaescapestring{#1}',
-			'\luaescapestring{#2}',
-			'\luaescapestring{\unexpanded{#3}}',
-			'\luaescapestring{\unexpanded{#4}}'
-		)}%
-	}%
-}
-
-% \dupproblem — deprecated alias for \newproblem (four mandatory args)
-\NewDocumentCommand{\dupproblem}{m m +m +m}{%
-	\directlua{define_problem(
-		'\luaescapestring{#1}',
-		'\luaescapestring{#2}',
-		'\luaescapestring{\unexpanded{#3}}',
-		'\luaescapestring{\unexpanded{#4}}'
-	)}%
-}
-
-% \getproblem{query}  — unified retrieve/query command.
-%   Plain id:      \getproblem{linear_eq}
-%   Key=val query: \getproblem{topic=algebra, diff=hard}
-%   If no '=' is found the whole string is treated as a problem id.
-%   Multiple key=value pairs are ANDed; one random match is typeset.
-%   On no match: emits a visible placeholder and a log warning.
-\NewDocumentCommand{\getproblem}{m}{%
-	\directlua{get_problem('\luaescapestring{#1}')}%
-}
-
-% Backward-compat aliases
-\let\useproblem\getproblem
-\NewDocumentCommand{\reqproblem}{m}{\getproblem{#1}}
-
-% \begin{problem}{id}[key=val, key=val, ...]
-%   Define a problem in the bank.  Produces no output at definition time.
-%   Everything before the first \solution token in the body is the problem
-%   content; everything after is the solution.  Void setup commands
-%   (\setrng, \calcvar, etc.) may appear anywhere in the body.
-%
-%   Implementation notes:
-%     - \Collect@Body (from environ) intercepts the body without opening a
-%       nested environment, avoiding LaTeX's env-stack mismatch error.
-%     - \unexpanded{#1} prevents expansion of \solution and setup commands
-%       when the body is passed to \luaescapestring for Lua storage.
-%     - define_problem_from_env() splits the resulting string on \solution.
-
-% Internal callback: receives the full collected body as #1.
-\long\def\@problem@collect@done#1{%
-	\directlua{define_problem_from_env(
-		'\luaescapestring{\@problem@id}',
-		'\luaescapestring{\@problem@meta}',
-		'\luaescapestring{\unexpanded{#1}}'
-	)}%
-}
-
-% Scan the optional [meta] argument then start body collection.
-\def\@problem@scan{%
-	\@ifnextchar[%
-		{\@problem@getmeta}%
-		{\def\@problem@meta{}\Collect@Body\@problem@collect@done}%
-}
-\def\@problem@getmeta[#1]{%
-	\def\@problem@meta{#1}%
-	\Collect@Body\@problem@collect@done
-}
-
-% Public environment: \begin{problem}{id}[meta] ... \end{problem}
-\newenvironment{problem}[1]{%
-	\def\@problem@id{#1}%
-	% Record the bank-file line number NOW (before \Collect@Body reads ahead to
-	% \end{problem}).  By the time define_problem_from_env() runs, \inputlineno
-	% has advanced to the \end{problem} line, so we snapshot it here instead.
-	\directlua{autoexam_problem_start_line = tex.inputlineno}%
-	\@problem@scan
-}{%
-	% End-code is empty; \Collect@Body handles everything at \end{problem}.
-}
-
-% --- problems environment + \problem item command ---
-%
-% LaTeX naming note: \begin{problem} (definition environment) uses \problem
-% as its begin-code, so a global \problem item command would shadow it.
-% Solution: define the item command once under \@problem@item, then let
-% \begin{problems} locally swap \problem <-> \@problem@item and restore on exit.
-%   - \begin{problem}{id}[meta] works everywhere OUTSIDE {problems}
-%   - \problem[pts][stretch]{filter} works INSIDE {problems}
-
-% \ppart — problem-part item for use inside \begin{problem} bodies.
-%   Always delegates to exam class's \part (the list-item command inside
-%   \begin{parts}).  When the enclosing \problem item carries per-part
-%   point values (e.g. \problem[2,3]{id}), each \ppart call automatically
-%   injects the corresponding point annotation via the Lua part-index state.
-\NewDocumentCommand{\ppart}{}{\directlua{autoexam_inject_part()}}
-
-% \@problem@item[points][stretch]{filter}
-%   The actual item command implementation — defined once at class load.
-%   #1 = points  (optional, default empty = no point label)
-%             Single value: annotates the \question (e.g. \problem[5]{id})
-%             Comma-sep:    distributed to \ppart calls (e.g. \problem[2,3]{id})
-%   #2 = stretch (optional, default 1 = \vspace{\stretch{1}} after body)
-%             Per-part stretch is not yet supported; first value is used.
-%   #3 = filter  (mandatory, forwarded verbatim to get_problem)
-%
-%   All token output (\question, problem content, stretch) is generated inside
-%   Lua via tex.print, avoiding pre-tokenized-token interactions with the
-%   comment package's \excludecomment catcode scanner.
-\NewDocumentCommand{\@problem@item}{O{} O{1} m}{%
-	\directlua{autoexam_problem_item(
-		'\luaescapestring{#1}',
-		'\luaescapestring{#2}',
-		'\luaescapestring{#3}'
-	)}%
-}
+% texlib-problembank.sty loads problem_engine.lua and defines the shared
+% machinery: \setvar/\setrng/\calcvar/\get, \pick* commands, \getlist/\geti/
+% \foreachpick, \newproblem/\dupproblem, \begin{problem} environment,
+% \getproblem (+ aliases), \ppart, \@problem@item, \importproblem, and
+% \providecommand defaults for \workbox and \autoexam@problem@sep.  Quiz.cls
+% requires the same package; keeping the LaTeX glue in one place ensures the
+% two classes can't drift.  See texlib-problembank.sty for the full API.
+\RequirePackage{texlib-problembank}
 
 % \begin{problems} ... \end{problems}
 %   Drop-in replacement for {questions} that accepts \problem items.
@@ -403,12 +167,12 @@
 	}%
 	% ---- inter-problem separator ---------------------------------------------
 	% First problem on each page gets no rule; subsequent problems get a rule above.
-	\directlua{autoexam_first_on_page = true}%
+	\directlua{pbank_first_on_page = true}%
 	% Patch \newpage so crossing a page boundary resets the "first on page" flag.
 	\let\@problems@saved@newpage\newpage
 	\renewcommand{\newpage}{%
 		\@problems@saved@newpage
-		\directlua{autoexam_first_on_page = true}%
+		\directlua{pbank_first_on_page = true}%
 	}%
 	% ---- start questions list -----------------------------------------------
 	\begin{questions}%
@@ -423,33 +187,9 @@
 	\label{@lastqpage}%
 }
 
-% \loadbank{path}  — explicitly load a problem bank file.
-%
-% Implementation note (2026-05): the engine ships an optional bank-file
-% SyncTeX-redirect path (typeset_problem → \csname @@input\endcsname bank.tex
-% per problem, intercepted by an open_read_file callback so SyncTeX
-% attributes typeset nodes to the bank file directly).  That path is gated
-% on source_map[id].file being non-empty, which previously was set by
-% \loadbank calling autoexam_set_bankfile() before \input.
-%
-% In multi-version mode this redirect interacts badly with LuaTeX's input
-% stack: each problem typeset performs its own \@@input of the bank file,
-% and after ~15 problems the run aborts with a "TeX capacity exceeded"
-% error.  The engine's own attempt to raise the limit
-% (texconfig.max_in_open = 127 at the top of autoexam_engine.lua) is a no-op
-% because texconfig is only consulted during LuaTeX initialisation, well
-% before \directlua{dofile(...)} fires at class load.
-%
-% Workaround: do not record the bank-file path here.  source_map[id].file
-% stays empty for every problem defined inside the bank file, so
-% typeset_problem() always uses the per-problem-tempfile fallback (jobname
-% _prob_<id>.tex), which has none of the input-stack problems.  SyncTeX
-% inverse search then lands on the per-problem temp file rather than the
-% bank file itself — acceptable for normal authoring workflows, and the
-% .srcmap mechanism remains available for future builder-side fix-ups.
-\NewDocumentCommand{\loadbank}{m}{%
-	\input{#1}%
-}
+% \loadbank is provided by texlib-problembank.sty.  Multi-version mode is
+% handled by the engine's pbank_suppress_redirect flag, set by
+% autoexam_run_versions before the version loop iterates.
 
 % \shufflepages
 %   Declared in the PREAMBLE alongside \examversions.  When present, the Lua
@@ -473,26 +213,7 @@
 	\csname @byv@\theExamVersion\endcsname{#1}{#2}{#3}%
 }
 
-% \importproblem{path}{overrides}  — import a standalone problem file with
-%   Lua variable overrides (e.g. {a=5, b=10}) in an isolated scope.
-\newcommand{\importproblem}[2]{%
-	\begingroup
-	\directlua{push_scope()}
-	\directlua{
-		for pair in string.gmatch("#2", "([^,]+)") do
-			local key, val = string.match(pair, "([^=]+)=(.+)")
-			if key and val then
-				key = key:gsub("^%s*(.-)%s*$", "%1")
-				val = val:gsub("^%s*(.-)%s*$", "%1")
-				if tonumber(val) then set_var(key, tonumber(val))
-				else set_var(key, val) end
-			end
-		end
-	}
-	\input{#1}
-	\directlua{pop_scope()}
-	\endgroup
-}
+% \importproblem is provided by texlib-problembank.sty.
 
 % --- Initialization ---
 
@@ -596,7 +317,7 @@
 %   colour-stack inconsistencies across the vbox boundary.
 %
 %   The {solution} wrapper is only emitted by the Lua engine when
-%   p.solution contains non-whitespace content (see autoexam_engine.lua),
+%   p.solution contains non-whitespace content (see problem_engine.lua),
 %   so the header never appears for multi-part problems whose bank entry
 %   ends with a bare \solution marker.
 \let\solution\relax
@@ -809,15 +530,9 @@
 \newcommand{\theExamDate}{\todo}
 \newcommand{\thePS}{}              % Optional postscript shown on title page
 
-% --- Course metadata: auto-populated from coursemeta.tex via course-metadata.sty ---
-% These \the* aliases preserve backward compatibility with existing documents
-% that use \renewcommand to override them; new documents need not touch them.
-\newcommand{\theCourseNumber}{\GetCourseNumber}
-\newcommand{\theCourseTitle}{\GetCourseTitle}
-\newcommand{\theCourseSection}{\GetCourseSection}
-\newcommand{\theSeason}{\GetSeason}
-\newcommand{\theYear}{\GetYear}
-\newcommand{\theSchool}{\GetInstitution}
+% Course-metadata aliases (\theCourseNumber, \theCourseTitle, \theCourseSection,
+% \theSeason, \theYear, \theSchool, ...) are provided by course-metadata.sty
+% as \providecommand's, so individual documents may \renewcommand them.
 
 \renewcommand{\questionlabel}{\textbf{Problem \thequestion.}}
 \renewcommand{\partlabel}{\textbf{\thequestion\thepartno.}}
@@ -832,14 +547,12 @@
 
 % Custom Macros
 % Math macros (\mbb, \mrm, \dd, \todo, plus \abs, \lrp, \deriv, \inte, ...)
-% are provided by texlib-mathutils.sty, loaded in section 1 above.
-\newcommand\encircle[1]{\tikz[baseline=(X.base)] \node (X) [draw, shape=circle, inner sep=0] {\strut #1};}
+% are provided by texlib-mathutils.sty (transitively via texlib-corepkg).
+% \encircle (and \extracredit, available if needed) come from texlib-itemfmt.
+\RequirePackage{texlib-itemfmt}
 
-% Theorem Environments
-\newtheorem*{thm*}{Theorem}
-\newtheorem*{defn*}{Definition}
-\newtheorem*{ex*}{Example}
-% (Added generic ones, add others as needed)
+% Theorem environments come from texlib-thmenv.sty (shared with quiz.cls).
+\RequirePackage{texlib-thmenv}
 
 % ==============================================================================
 % 7b. EXAM SETUP INTERFACE
@@ -880,7 +593,9 @@
 %   within a page group (i.e., problems not separated by \newpage).
 %   Emitted automatically by \problem via the Lua engine for all but the first
 %   problem on each page.  Redefine to change the separator style.
-\newcommand{\autoexam@problem@sep}{%
+% Override the default \par\medskip from texlib-problembank.sty with a
+% full-width rule between consecutive problems on the same page.
+\renewcommand{\autoexam@problem@sep}{%
 	\par\vspace{1em}%
 	\noindent\hspace*{-\@totalleftmargin}\rule{\linewidth}{0.4pt}%
 	\par\vspace{1em}%
@@ -986,7 +701,9 @@
 %     \workbox{3}
 %     \rubric{5}{convert $81=3^4$}
 %     \rubric{5}{solve $x=2$}
-\NewDocumentCommand{\workbox}{m}{%
+% Override the always-on default from texlib-problembank.sty so a solution
+% (key) build does not pad each problem with stretchy answer space.
+\RenewDocumentCommand{\workbox}{m}{%
 	\ifsolutions\else
 		\vspace{\stretch{#1}}%
 	\fi
@@ -1076,12 +793,13 @@
 % ==============================================================================
 % 8. PAGE LAYOUT & TITLE PAGE (Your Original Logic)
 % ==============================================================================
-\pagestyle{headandfoot}
-\firstpagefootrule
+% texlib-pagestyle.sty bundles \pagestyle{headandfoot} + first-page-footer
+% rule + running head/foot rules into one call.  Identical boilerplate is
+% used by quiz.cls.
+\RequirePackage{texlib-pagestyle}
+\SetTeXLibExamRules
 \firstpagefooter{Section \theCourseSection}{}{\theSchool}
 \runningheader{Math \theCourseNumber\ \theCourseTitle}{}{Exam \theExamNumber}
-\runningheadrule
-\runningfootrule
 % Center footer shows "X of N" where N = last problem page via \label{@lastqpage}
 % (placed by \blankpage on first call).  Falls back to \numpages until that label
 % exists, and for exams without \blankpage at the end.

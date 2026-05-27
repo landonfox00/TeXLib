@@ -123,4 +123,27 @@
 }
 
 \ExplSyntaxOff
+
+% ==============================================================================
+% Backward-compat \the* aliases
+% ==============================================================================
+% Several TeXLib document classes (autoexam, quiz, didactic, pset, ...) and
+% documents written against them refer to course fields as \theCourseNumber,
+% \theCourseTitle, etc. — a habit that pre-dates the v8.1 \Get* API.  We
+% expose the aliases here as \providecommand so any class or document that
+% \renewcommand's them keeps working, and classes never collide by trying to
+% \newcommand a name that another class also wanted.
+\providecommand{\theCourseSubject}{\GetCourseSubject}
+\providecommand{\theCourseNumber}{\GetCourseNumber}
+\providecommand{\theCourseTitle}{\GetCourseTitle}
+\providecommand{\theCourseSection}{\GetCourseSection}
+\providecommand{\theCourseRoom}{\GetCourseRoom}
+\providecommand{\theCourse}{\GetCourse}
+\providecommand{\theInstructor}{\GetInstructor}
+\providecommand{\theInstitution}{\GetInstitution}
+\providecommand{\theSchool}{\GetInstitution}      % UNR-friendly alias
+\providecommand{\theSeason}{\GetSeason}
+\providecommand{\theYear}{\GetYear}
+\providecommand{\theTerm}{\GetTerm}
+
 \LoadCourseMeta

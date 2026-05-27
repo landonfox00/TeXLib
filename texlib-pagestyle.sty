@@ -1,0 +1,49 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-pagestyle}[2026/05/26 v1.0 TeXLib exam-class page-style helpers]
+
+% ==============================================================================
+% texlib-pagestyle.sty — shared page-style scaffolding for TeXLib classes that
+% build on the `exam` document class (autoexam, quiz)
+% ==============================================================================
+%
+% The `exam` class ships with the `headandfoot` page style plus separate hooks
+% for first-page and running-page rules.  autoexam.cls and quiz.cls both wire
+% the same 4-call bundle:
+%
+%     \pagestyle{headandfoot}
+%     \firstpagefootrule
+%     \runningheadrule
+%     \runningfootrule
+%
+% This file packages that boilerplate behind \SetTeXLibExamRules so the two
+% classes stay in lock-step.  Headers and footers themselves (the strings in
+% \firstpageheader / \runningfooter / etc.) remain class-specific — exam title
+% block vs. quiz name-field is a design decision per class, not a candidate
+% for extraction.  This file is the sibling of texlib-footer.sty, which
+% serves the fancyhdr-based classes (didactic, pset) the same way.
+%
+% Usage:
+%     \RequirePackage{texlib-pagestyle}    % once, in the class preamble
+%     ...
+%     \SetTeXLibExamRules                  % install pagestyle + running rules
+%     % then set per-class header / footer content
+%     \firstpagefooter{...}{...}{...}
+%     \runningheader{...}{...}{...}
+%     \runningfooter{...}{...}{...}
+%
+% Classes that also want a first-page header rule (e.g. quiz's name field)
+% add \firstpageheadrule after the helper:
+%     \SetTeXLibExamRules
+%     \firstpageheadrule
+
+% \SetTeXLibExamRules — activate the exam-class `headandfoot` style and the
+%   conventional rule set (first-page footer + running head + running foot).
+%   Idempotent; safe to call from inside \AtBeginDocument or at class load.
+\providecommand{\SetTeXLibExamRules}{%
+	\pagestyle{headandfoot}%
+	\firstpagefootrule
+	\runningheadrule
+	\runningfootrule
+}
+
+\endinput

@@ -1,0 +1,25 @@
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=99, date={Smoke Test}}
+\loadbank{fix-bank.tex}
+
+\begin{document}
+\begin{problems}
+	% Case 1: fully random (legacy).
+	\problem{quadratic}
+
+	% Case 2: partial fix - only a=1; b and c stay random.
+	\problem{quadratic}[a=1]
+
+	% Case 3: full fix - all three locked, deterministic.
+	\problem{quadratic}[a=1, b=2, c=3]
+
+	% Case 4: legacy pts spec still works with new trailing fix bracket.
+	\problem[5]{quadratic}[a=4, b=5, c=6]
+
+	% Case 5: pick whose list name is fixed -> pick is skipped (lst_count
+	% stays unset, so \getlist prints '?? ' for each slot). Shows the
+	% picks-are-not-overridable-by-data-but-protected-from-overwrite branch.
+	\problem{picky}[lst=locked]
+\end{problems}
+\end{document}

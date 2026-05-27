@@ -1,12 +1,17 @@
--- autoexam_engine.lua
+-- problem_engine.lua
 --
--- LuaLaTeX engine for the TeXLib `autoexam` document class. Handles the bits
--- of randomized-exam generation that LaTeX-level macros can't do cleanly:
+-- LuaLaTeX engine driving the TeXLib problem-bank workflow.  Loaded by both
+-- the `autoexam` and `quiz` document classes (which subclass exam.cls
+-- independently but share this engine to avoid re-implementing randomisation
+-- and bank lookup).  Handles the bits that LaTeX-level macros can't do
+-- cleanly:
 --
 --   * Problem-bank loading via \loadbank, with a sanitized id space.
 --   * Per-version selection, shuffling, and deterministic seeding (set_exam_seed).
 --   * Multi-version emission driven by \versions{A,B,C,...} in the document
---     preamble; the builder loops the engine once per version.
+--     preamble; the builder loops the engine once per version.  Used by
+--     autoexam only — quizzes have no versioning but still benefit from the
+--     randomisation helpers (\setrng, \pick*, \calcvar).
 --   * Per-problem temp-file redirection so SyncTeX/inverse-search lands in the
 --     originating bank file at the correct line, instead of the raw \directlua
 --     call site. See the SOURCE TRACKING block below for the mechanism.
@@ -14,10 +19,25 @@
 --   * Page-shuffle (\shufflepages) coordinated with first-on-page detection so
 --     problem separators don't appear at the top of a new page.
 --
--- This file is loaded by autoexam.cls via \directlua{dofile(...)}; it is not
--- meant to be required directly from a document. The class also writes a
--- <jobname>.srcmap after the version loop so the TeXLib Sublime builder can
--- post-process SyncTeX files for line-accurate inverse search.
+-- Loaded by autoexam.cls / quiz.cls via \directlua{dofile(...)}; it is not
+-- meant to be required directly from a document. autoexam.cls additionally
+-- writes a <jobname>.srcmap after the version loop so the TeXLib Sublime
+-- builder can post-process SyncTeX files for line-accurate inverse search.
+--
+-- Function naming:
+--   `pbank_*`     — general problem-bank machinery (pbank_problem_item,
+--                   pbank_apply_fix, pbank_set_bankfile, pbank_inject_part,
+--                   pbank_first_on_page, pbank_part_*, pbank_stretch_list,
+--                   pbank_pending_*, pbank_suppress_redirect, …).  Used by
+--                   both autoexam.cls (via texlib-problembank.sty) and
+--                   quiz.cls.
+--   `autoexam_*`  — autoexam-only features that live in this engine because
+--                   the multi-version loop needs intimate knowledge of the
+--                   problem bank: autoexam_run_versions, autoexam_versions,
+--                   autoexam_shuffle_pages, autoexam_write_srcmap,
+--                   autoexam_read_body, autoexam_scorepage,
+--                   autoexam_gradingrow.  These would only ever be called
+--                   by autoexam.cls; quiz.cls leaves them dormant.
 --
 -- Requires LuaLaTeX (texconfig, lua callbacks). Will not work under pdflatex
 -- or xelatex.
@@ -32,13 +52,25 @@ end
 
 vars = {}
 vars_stack = {}
+-- fixed[name] = true marks a variable as user-locked for the current problem.
+-- set_var/set_rng/calc_var/pick_* refuse to overwrite a fixed variable so that
+-- `\problem{id}[a=1,b=2]` overrides from the document survive the bank body's
+-- own randomisation calls.  push_scope/pop_scope save and restore this table
+-- alongside vars so each problem starts with a clean fixed set.
+fixed = {}
+fixed_stack = {}
+-- Set by pbank_problem_item before queueing the \directlua that calls
+-- pbank_apply_pending_fix.  Using a global stash (rather than embedding the
+-- fix string into the queued \directlua source) sidesteps Lua-string quoting
+-- inside a TeX-tokenised \directlua argument.
+pbank_pending_fix = nil
 problem_db = {}
 autoexam_versions = {}
 
 -- ============================================================
 -- SOURCE TRACKING (for SyncTeX / inverse search)
 -- ============================================================
--- current_bank_file: set by autoexam_set_bankfile() (called from \loadbank)
+-- current_bank_file: set by pbank_set_bankfile() (called from \loadbank)
 --   before each \input of a bank file.  Captures the filename as given to
 --   \loadbank so that source-map entries know which bank each problem came from.
 --
@@ -58,20 +90,35 @@ autoexam_versions = {}
 
 local current_bank_file = nil
 local source_map = {}           -- id -> {file=, line=, tmpfile=}
-autoexam_problem_start_line = 0  -- set by \begin{problem} before \Collect@Body
+pbank_problem_start_line = 0  -- set by \begin{problem} before \Collect@Body
 local synctex_redirect_active = false  -- guard: register callback only once
+-- pbank_suppress_redirect: when true, typeset_problem skips the bank-file
+-- SyncTeX redirect even if it would otherwise apply.  autoexam_run_versions
+-- sets this before iterating versions because each version body re-\inputs
+-- every problem and the cumulative bank-file \@@input opens overflow LuaTeX's
+-- input stack after ~15 problems ("TeX capacity exceeded").  Single-version
+-- builds (quiz, edit-mode autoexam) leave it false so the redirect activates
+-- and SyncTeX inverse search lands in the bank file.
+pbank_suppress_redirect = false
 
--- autoexam_pending_redirect:
+-- pbank_pending_redirect:
 --   Set by typeset_problem() immediately before tex.print("\\input{bank_path}").
 --   The open_read_file callback consumes it on the very next \input{} call,
 --   serving the problem content instead of the real bank file.  Because the
 --   \input argument IS the bank file name, SyncTeX naturally records the bank
 --   file + correct line number — no post-processing required.
-local autoexam_pending_redirect = nil
+local pbank_pending_redirect = nil
 
 -- Called from \loadbank before \input{bankfile}.
-function autoexam_set_bankfile(name)
+--
+-- Records the bank-file path AND lazily activates the SyncTeX redirect
+-- callback so inverse search from the PDF lands in the bank file at the
+-- problem's actual line.  setup_synctex_redirect() is idempotent — the first
+-- call registers the LuaTeX `open_read_file` callback and sets
+-- `synctex_redirect_active = true`; subsequent calls return immediately.
+function pbank_set_bankfile(name)
 	current_bank_file = name
+	setup_synctex_redirect()
 end
 
 -- Sanitise a problem id for use as a filename component.
@@ -81,18 +128,18 @@ local function sanitize_id(id)
 end
 
 autoexam_shuffle_pages = false  -- set true by \shufflepages in the preamble
-autoexam_first_on_page = true   -- reset by \begin{problems} and patched \newpage;
-								-- read by autoexam_problem_item to decide separator
+pbank_first_on_page = true   -- reset by \begin{problems} and patched \newpage;
+								-- read by pbank_problem_item to decide separator
 
 -- Per-part point/stretch injection state
--- autoexam_stretch_list: set by autoexam_problem_item before calling get_problem.
+-- pbank_stretch_list: set by pbank_problem_item before calling get_problem.
 --   get_problem reads it, then resets it to {} so stale values never bleed across calls.
--- autoexam_part_stretch: nil  → no inter-part vspace
+-- pbank_part_stretch: nil  → no inter-part vspace
 --                        table → per-part stretch values; inject_part indexes into it
-autoexam_part_points  = nil  -- list of point strings, or nil
-autoexam_part_idx     = 0    -- current index into the above lists
-autoexam_part_stretch = nil  -- nil or table of stretch values (one per part gap)
-autoexam_stretch_list = {}   -- full stretch list passed in from autoexam_problem_item
+pbank_part_points  = nil  -- list of point strings, or nil
+pbank_part_idx     = 0    -- current index into the above lists
+pbank_part_stretch = nil  -- nil or table of stretch values (one per part gap)
+pbank_stretch_list = {}   -- full stretch list passed in from pbank_problem_item
 
 -- ============================================================
 -- SEEDING
@@ -112,16 +159,23 @@ end
 -- ============================================================
 -- VARIABLE MANAGEMENT
 -- ============================================================
-function set_var(name, val) vars[name] = val end
+function set_var(name, val)
+	if fixed[name] then return end
+	vars[name] = val
+end
 
 function get_var(name)
 	local val = vars[name]
 	if val == nil then tex.print("\\textbf{??}") else tex.print(tostring(val)) end
 end
 
-function set_rng(name, min, max) vars[name] = math.random(min, max) end
+function set_rng(name, min, max)
+	if fixed[name] then return end
+	vars[name] = math.random(min, max)
+end
 
 function calc_var(name, expr)
+	if fixed[name] then return end
 	local env = {math = math}
 	for k, v in pairs(vars) do env[k] = v end
 	local chunk, err = load("return " .. expr, "calc", "t", env)
@@ -133,11 +187,43 @@ function push_scope()
 	local saved = {}
 	for k, v in pairs(vars) do saved[k] = v end
 	table.insert(vars_stack, saved)
+	local saved_fixed = {}
+	for k, v in pairs(fixed) do saved_fixed[k] = v end
+	table.insert(fixed_stack, saved_fixed)
 end
 
 function pop_scope()
 	local restored = table.remove(vars_stack)
 	if restored then vars = restored end
+	local restored_fixed = table.remove(fixed_stack)
+	if restored_fixed then fixed = restored_fixed end
+end
+
+-- Parse "a=1, b=2, name=value" and store each pair as a fixed variable.
+-- Numeric values go through tonumber; everything else is stored as the
+-- trimmed string.  Unparseable fragments (no '=') are silently skipped.
+function pbank_apply_fix(fix_str)
+	for pair in fix_str:gmatch("[^,]+") do
+		local key, val = pair:match("([^=]+)=(.+)")
+		if key and val then
+			key = key:gsub("^%s*(.-)%s*$", "%1")
+			val = val:gsub("^%s*(.-)%s*$", "%1")
+			local num = tonumber(val)
+			vars[key]  = num or val
+			fixed[key] = true
+		end
+	end
+end
+
+-- Bridge for tokens queued by pbank_problem_item: reads the global
+-- pbank_pending_fix, applies it, and clears the stash.  Lets us avoid
+-- embedding the fix string into a queued \directlua source (which would
+-- require fragile re-quoting).
+function pbank_apply_pending_fix()
+	if pbank_pending_fix then
+		pbank_apply_fix(pbank_pending_fix)
+		pbank_pending_fix = nil
+	end
 end
 
 -- ============================================================
@@ -158,6 +244,7 @@ function store_picks(name, picked)
 end
 
 function pick_from_list(name, n, str)
+	if fixed[name] then return end
 	local pool = split_csv(str)
 	n = math.min(n, #pool)
 	local picked = {}
@@ -170,6 +257,7 @@ function pick_from_list(name, n, str)
 end
 
 function pick_from_list_r(name, n, str)
+	if fixed[name] then return end
 	local items = split_csv(str)
 	local picked = {}
 	for i = 1, n do table.insert(picked, items[math.random(1, #items)]) end
@@ -177,6 +265,7 @@ function pick_from_list_r(name, n, str)
 end
 
 function pick_from_range(name, n, lo, hi)
+	if fixed[name] then return end
 	local pool = {}
 	for i = lo, hi do table.insert(pool, i) end
 	n = math.min(n, #pool)
@@ -190,6 +279,7 @@ function pick_from_range(name, n, lo, hi)
 end
 
 function pick_from_range_r(name, n, lo, hi)
+	if fixed[name] then return end
 	local picked = {}
 	for i = 1, n do table.insert(picked, math.random(lo, hi)) end
 	store_picks(name, picked)
@@ -297,7 +387,7 @@ local function typeset_problem(p, stretch)
 	-- Fallback (no source info or callback not active): write a plain temp file
 	-- and \input it; SyncTeX will point to the temp file instead.
 	if sm and sm.file and sm.file ~= '' and sm.line and sm.line > 0
-			and synctex_redirect_active then
+			and synctex_redirect_active and not pbank_suppress_redirect then
 		local bank_path = sm.file
 		if not bank_path:match('%.%a+$') then bank_path = bank_path .. '.tex' end
 
@@ -315,7 +405,7 @@ local function typeset_problem(p, stretch)
 		end
 
 		-- Stage the pending redirect.
-		autoexam_pending_redirect = {
+		pbank_pending_redirect = {
 			bank_path  = bank_path,
 			lines      = content_lines,
 			start_line = sm.line,
@@ -403,11 +493,11 @@ function define_problem_from_env(id, meta_str, body_str)
 	end
 
 	-- Capture source location.
-	-- autoexam_problem_start_line is set by \begin{problem} in autoexam.cls
+	-- pbank_problem_start_line is set by \begin{problem} in autoexam.cls
 	-- BEFORE \Collect@Body reads ahead to \end{problem}, so it is the true
 	-- \begin{problem} line in the bank file.  tex.inputlineno here would be
 	-- the \end{problem} line (too far ahead).  current_bank_file is set by \loadbank.
-	local src_line = autoexam_problem_start_line or tex.inputlineno or 0
+	local src_line = pbank_problem_start_line or tex.inputlineno or 0
 	local src_file = current_bank_file or ''
 
 	problem_db[id] = { meta = meta, content = content, solution = solution,
@@ -422,18 +512,18 @@ end
 -- query_str: plain id OR comma-separated key=value filters (AND logic).
 -- pts_list:  nil = no per-part annotation; list of strings = per-part points.
 --
--- Stretch is NOT a direct parameter.  autoexam_problem_item stores the full
--- parsed stretch list in autoexam_stretch_list before calling this function.
+-- Stretch is NOT a direct parameter.  pbank_problem_item stores the full
+-- parsed stretch list in pbank_stretch_list before calling this function.
 -- get_problem reads it (and immediately clears it), then uses part_count from
 -- the resolved record to determine trailing vs per-part stretch behaviour.
--- Callers that bypass autoexam_problem_item (\getproblem, use_problem, etc.)
--- see autoexam_stretch_list={} and therefore get no stretch — correct.
+-- Callers that bypass pbank_problem_item (\getproblem, use_problem, etc.)
+-- see pbank_stretch_list={} and therefore get no stretch — correct.
 function get_problem(query_str, pts_list)
 	query_str = query_str:match("^%s*(.-)%s*$")
 
 	-- Read and immediately reset the stretch list.
-	local sl = autoexam_stretch_list or {}
-	autoexam_stretch_list = {}
+	local sl = pbank_stretch_list or {}
+	pbank_stretch_list = {}
 
 	-- Resolve the problem record.
 	local match
@@ -473,36 +563,36 @@ function get_problem(query_str, pts_list)
 	local k = match.part_count or 0
 	local trailing = 0
 	if #sl == 0 then
-		autoexam_part_stretch = nil
+		pbank_part_stretch = nil
 	elseif #sl == 1 then
-		autoexam_part_stretch = nil
+		pbank_part_stretch = nil
 		trailing = tonumber(sl[1]) or 0
 	else
-		autoexam_part_stretch = sl          -- inject_part indexes into this table
+		pbank_part_stretch = sl          -- inject_part indexes into this table
 		trailing = tonumber(sl[k]) or 0    -- stretch after the last part
 	end
 
-	autoexam_part_points = pts_list
-	autoexam_part_idx    = 0
+	pbank_part_points = pts_list
+	pbank_part_idx    = 0
 
 	typeset_problem(match, trailing)
 end
 
 -- ---- \ppart callback ----
 -- Sprints the appropriate \part command (with optional point annotation).
--- When autoexam_part_stretch is a table (|s|>1 mode), emits
+-- When pbank_part_stretch is a table (|s|>1 mode), emits
 -- \vspace{\stretch{s[n-1]}} before each non-first part so the preceding
 -- part has blank answer space below it.
-function autoexam_inject_part()
-	autoexam_part_idx = autoexam_part_idx + 1
+function pbank_inject_part()
+	pbank_part_idx = pbank_part_idx + 1
 	-- Emit trailing space for the PREVIOUS part (between parts, not before first).
-	if autoexam_part_idx > 1 and type(autoexam_part_stretch) == "table" then
-		local s = tonumber(autoexam_part_stretch[autoexam_part_idx - 1])
+	if pbank_part_idx > 1 and type(pbank_part_stretch) == "table" then
+		local s = tonumber(pbank_part_stretch[pbank_part_idx - 1])
 		if s and s ~= 0 then
 			tex.print("\\workbox{" .. tostring(s) .. "}")
 		end
 	end
-	local pts = autoexam_part_points and autoexam_part_points[autoexam_part_idx]
+	local pts = pbank_part_points and pbank_part_points[pbank_part_idx]
 	if pts then
 		tex.print("\\part[" .. tostring(pts) .. "]")
 	else
@@ -523,14 +613,23 @@ end
 --   |s| = 0  → no stretch
 --   |s| = 1  → single trailing stretch after entire problem
 --   |s| > 1  → per-part: s[i] below part i, s[k] after last part
-function autoexam_problem_item(pts_str, stretch_str, query)
+--
+-- Fix string (fix_str):
+--   Empty string → randomised problem (legacy behaviour).
+--   "a=1, b=2"   → before the body is typeset, push_scope() runs and the
+--                  listed variables are stashed in vars[] AND marked fixed[],
+--                  so the body's own \setrng/\setvar/\calcvar/\pick* calls on
+--                  those names become no-ops.  pop_scope() runs after the body
+--                  (and any \begin{solution}…\end{solution} block) so the next
+--                  problem starts with a clean state.
+function pbank_problem_item(pts_str, stretch_str, query, fix_str)
 	-- Emit inter-problem separator rule for all but the first problem on a page.
 	-- Use \csname...\endcsname to avoid catcode issues with @ in the name when
 	-- sprinting from Lua (@ is catcode 12 in the document body).
-	if not autoexam_first_on_page then
+	if not pbank_first_on_page then
 		tex.print("\\csname autoexam@problem@sep\\endcsname")
 	end
-	autoexam_first_on_page = false
+	pbank_first_on_page = false
 
 	-- Parse points list.
 	local pts_list = {}
@@ -558,14 +657,27 @@ function autoexam_problem_item(pts_str, stretch_str, query)
 
 	-- Pass stretch list to get_problem via global channel (get_problem needs
 	-- part_count from the resolved record to finalize stretch behaviour).
-	autoexam_stretch_list = stretch_list
+	pbank_stretch_list = stretch_list
+
+	-- If the caller supplied [a=1, …] overrides, bracket the body with
+	-- push_scope+apply_fix and pop_scope.  Stash fix_str in a global so the
+	-- queued \directlua does not have to re-escape user content.
+	local has_fix = fix_str and fix_str ~= ""
+	if has_fix then
+		pbank_pending_fix = fix_str
+		tex.print("\\directlua{push_scope() pbank_apply_pending_fix()}")
+	end
 
 	get_problem(query:match("^%s*(.-)%s*$"), is_multi and pts_list or nil)
+
+	if has_fix then
+		tex.print("\\directlua{pop_scope()}")
+	end
 end
 
--- Backward-compat wrappers (autoexam_stretch_list already {} after reset)
-function use_problem(id)   autoexam_stretch_list = {}; get_problem(id) end
-function random_problem(f) autoexam_stretch_list = {}; get_problem(f)  end
+-- Backward-compat wrappers (pbank_stretch_list already {} after reset)
+function use_problem(id)   pbank_stretch_list = {}; get_problem(id) end
+function random_problem(f) pbank_stretch_list = {}; get_problem(f)  end
 
 -- ============================================================
 -- MULTI-VERSION BODY READER
@@ -780,7 +892,7 @@ end
 --
 --   Strategy:
 --   typeset_problem() calls \input{final_bank.tex} (the real bank file name)
---   and stages a pending redirect in autoexam_pending_redirect.  This callback
+--   and stages a pending redirect in pbank_pending_redirect.  This callback
 --   intercepts that \input call, serves the problem content with a blank-line
 --   prefix so line N in the virtual stream = line N in the bank file, and
 --   returns.  SyncTeX naturally records the bank file + correct line numbers.
@@ -790,7 +902,10 @@ end
 --   opener and nil returns no longer trigger the built-in kpse search.
 --
 --   Must be called before the version loop begins.
-local function setup_synctex_redirect()
+-- Note: not `local` because pbank_set_bankfile (defined earlier in this
+-- chunk) calls into it.  Lua local scope only extends forward from the
+-- declaration, so a chunk-local here would be invisible from earlier code.
+function setup_synctex_redirect()
 	if synctex_redirect_active then return end
 
 	local function orf_handler(filename)
@@ -801,12 +916,12 @@ local function setup_synctex_redirect()
 		-- the bank file actually fires.  Leaving the redirect in place
 		-- means those intervening opens are handled normally and the redirect
 		-- is still there when the bank file open arrives.
-		local pending = autoexam_pending_redirect
+		local pending = pbank_pending_redirect
 		if pending then
 			local bn_actual   = tostring(filename):match('[^/\\]+$') or filename
 			local bn_expected = pending.bank_path:match('[^/\\]+$')  or pending.bank_path
 			if bn_actual == bn_expected then
-				autoexam_pending_redirect = nil   -- consumed
+				pbank_pending_redirect = nil   -- consumed
 				local prefix = pending.start_line
 				local clines = pending.lines
 				local pid    = pending.pid or 'unknown'
@@ -873,7 +988,7 @@ local function setup_synctex_redirect()
 	local ok, err
 	if luatexbase and luatexbase.add_to_callback then
 		ok, err = pcall(luatexbase.add_to_callback,
-						'open_read_file', orf_handler, 'autoexam_synctex_redirect')
+						'open_read_file', orf_handler, 'pbank_synctex_redirect')
 	else
 		ok, err = pcall(callback.register, 'open_read_file', orf_handler)
 	end
@@ -899,10 +1014,14 @@ function autoexam_run_versions()
 	-- at the END of the run via a second write — see below).
 	autoexam_write_srcmap()
 
-	-- Register the open_read_file callback that redirects per-problem temp-file
-	-- \input calls to serve bank-file content with bank-file SyncTeX attribution.
-	-- This must happen before any version body is \input-ed.
-	setup_synctex_redirect()
+	-- Suppress the bank-file SyncTeX redirect for the duration of the version
+	-- loop.  Each version body re-\inputs every problem and the cumulative
+	-- bank-file \@@input calls overflow LuaTeX's input stack after ~15
+	-- problems.  Per-problem temp files (the fallback path in typeset_problem)
+	-- have none of those input-stack issues, so the loop falls back to them.
+	-- Single-version builds (quiz, edit-mode autoexam) leave this flag false
+	-- so the redirect activates as set up at \loadbank time.
+	pbank_suppress_redirect = true
 
 	local builder_ver = token.get_macro("Version")
 	local versions_to_run = autoexam_versions

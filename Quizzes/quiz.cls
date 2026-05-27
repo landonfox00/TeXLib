@@ -13,33 +13,21 @@
 % ==============================================================================
 % 1. PACKAGES
 % ==============================================================================
-\RequirePackage[T1]{fontenc}
-\RequirePackage{lmodern}
-\RequirePackage[margin=1in]{geometry}
-\RequirePackage{xparse}
-\RequirePackage{expl3}
-\RequirePackage{ifthen}
-\RequirePackage{etoolbox}
+% Core bundle: fontenc/lmodern/geometry, expl3/xparse/ifthen/etoolbox, xcolor,
+% amsmath/amssymb/amsthm/mathtools, texlib-mathutils, graphicx, tikz/pgfplots
+% (with compat=1.18 + standard library set), hyperref + canonical hypersetup.
+\RequirePackage{texlib-corepkg}
+
+% Class-specific packages
 \RequirePackage{adjustbox, changepage, comment}
 % NOTE: enumitem is intentionally NOT loaded at the top level — it is known to
 % conflict with exam.cls's redefinition of \list (used by `questions`/`parts`).
 % Quizzes that need enumitem-style lists may load it locally.
-\RequirePackage{graphicx}
 \RequirePackage{lastpage}
 \RequirePackage{needspace}
-\RequirePackage{xcolor}
-\RequirePackage{amsmath, amssymb, amsthm, mathtools}
-\RequirePackage{texlib-mathutils}  % \mbb, \abs, \lrp, \dd, \deriv, \inte, \todo, ...
 \RequirePackage{cancel}
 \RequirePackage{pdfpages}
 \RequirePackage{tocloft}
-\RequirePackage{tikz, pgfplots}
-\pgfplotsset{compat=1.18}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
-
-\RequirePackage{hyperref}
-\hypersetup{colorlinks=true, urlcolor=blue, linkcolor=black, citecolor=black}
-
 \RequirePackage{course-metadata}
 
 % ==============================================================================
@@ -89,166 +77,27 @@
 \ExplSyntaxOff
 
 % ==============================================================================
-% 4. PROBLEM BANK & LUA ENGINE (shared with autoexam)
+% 4. PROBLEM-BANK ENGINE (shared with autoexam.cls)
 % ==============================================================================
-% Loads autoexam_engine.lua so quizzes can use the same problem-bank workflow
-% as exams: define problems with \newproblem / \begin{problem}, store them
-% in a file loaded via \loadbank, then retrieve them inside the questions
-% environment with \getproblem{id} or \getproblem{key=val, ...}.
-%
-% Randomization helpers (\setrng, \picklist, \pickrange, ...) are also
-% available even though quizzes don't have versioning. Use them to vary
-% numerical values across reuses of the same quiz.
-%
-% Locates autoexam_engine.lua across three possible layouts (mirrors the
-% loader in autoexam.cls so both classes resolve the same canonical file):
-%   (1) installed in a TEXMF tree              → kpse with the "lua" format
-%   (2) sitting next to quiz.cls               → legacy per-module copy
-%   (3) at the TeXLib root, one level up       → current canonical layout
-% The cwd fallback covers standalone test layouts.
-% NOTE: no Lua `--` line comments inside this \directlua block. TeX collapses
-% the newlines into spaces before Lua sees the chunk, so a `--` comment would
-% swallow the rest of the code. Keep explanations in TeX `%` comments above.
-\directlua{
-	local function load_engine(name)
-		local cls_path = kpse.find_file("quiz.cls")
-		local base_dir = cls_path and cls_path:match("(.*[/\\\\])") or ""
-		local path = kpse.find_file(name, "lua")
-		if not path or not lfs.attributes(path) then
-			path = base_dir .. name
-			if not lfs.attributes(path) then
-				path = base_dir .. "../" .. name
-				if not lfs.attributes(path) then
-					path = name
-				end
-			end
-		end
-		dofile(path)
-	end
-	load_engine("autoexam_engine.lua")
-}
+% texlib-problembank.sty loads problem_engine.lua and defines the shared
+% problem-bank LaTeX glue (\setvar, \setrng, \pick*, \getproblem,
+% \begin{problem}, \ppart, \@problem@item, \importproblem, ...).  Quizzes
+% have no versioning, so the engine's set_exam_seed() is never called and
+% math.random falls back to its default seed — fine for in-class quizzes
+% that don't need reproducible per-version values.  See
+% texlib-problembank.sty for the full API.
+\RequirePackage{texlib-problembank}
 
-% --- Variable management ---
-\newcommand{\setvar}[2]{\directlua{set_var('#1', #2)}}
-\newcommand{\setrng}[3]{\directlua{set_rng('#1', #2, #3)}}
-\newcommand{\calcvar}[2]{\directlua{calc_var('#1', '#2')}}
-\newcommand{\get}[1]{\directlua{get_var('#1')}}
-
-% --- Pick from list / range ---
-\NewDocumentCommand{\picklist}{m m m}{%
-	\directlua{pick_from_list('\luaescapestring{#1}', #2, '\luaescapestring{#3}')}%
-}
-\NewDocumentCommand{\picklistr}{m m m}{%
-	\directlua{pick_from_list_r('\luaescapestring{#1}', #2, '\luaescapestring{#3}')}%
-}
-\NewDocumentCommand{\pickrange}{m m m m}{%
-	\directlua{pick_from_range('\luaescapestring{#1}', #2, #3, #4)}%
-}
-\NewDocumentCommand{\pickranger}{m m m m}{%
-	\directlua{pick_from_range_r('\luaescapestring{#1}', #2, #3, #4)}%
-}
-
-% --- Retrieval helpers ---
-\NewDocumentCommand{\getlist}{m}{\directlua{get_list('\luaescapestring{#1}')}}
-\NewDocumentCommand{\geti}{m m}{\directlua{get_var('\luaescapestring{#1}_' .. #2)}}
-
-% --- Bank: define problems ---
-% \newproblem{id}{meta}{content}[solution]
-\NewDocumentCommand{\newproblem}{m m +m +o}{%
-	\IfNoValueTF{#4}{%
-		\directlua{define_problem(
-			'\luaescapestring{#1}',
-			'\luaescapestring{#2}',
-			'\luaescapestring{\unexpanded{#3}}',
-			''
-		)}%
-	}{%
-		\directlua{define_problem(
-			'\luaescapestring{#1}',
-			'\luaescapestring{#2}',
-			'\luaescapestring{\unexpanded{#3}}',
-			'\luaescapestring{\unexpanded{#4}}'
-		)}%
-	}%
-}
-
-% \begin{problem}{id}[meta] ... \solution ... \end{problem}
-\RequirePackage{environ}
-\long\def\@problem@collect@done#1{%
-	\directlua{define_problem_from_env(
-		'\luaescapestring{\@problem@id}',
-		'\luaescapestring{\@problem@meta}',
-		'\luaescapestring{\unexpanded{#1}}'
-	)}%
-}
-\def\@problem@scan{%
-	\@ifnextchar[%
-		{\@problem@getmeta}%
-		{\def\@problem@meta{}\Collect@Body\@problem@collect@done}%
-}
-\def\@problem@getmeta[#1]{%
-	\def\@problem@meta{#1}%
-	\Collect@Body\@problem@collect@done
-}
-\newenvironment{problem}[1]{%
-	\def\@problem@id{#1}%
-	\directlua{autoexam_problem_start_line = tex.inputlineno}%
-	\@problem@scan
-}{}
-
-% --- Bank: retrieve problems ---
-% \getproblem{query} — id or key=val, key=val
-\NewDocumentCommand{\getproblem}{m}{%
-	\directlua{get_problem('\luaescapestring{#1}')}%
-}
-\let\useproblem\getproblem
-\NewDocumentCommand{\reqproblem}{m}{\getproblem{#1}}
-
-% --- Bank: load bank file ---
-\NewDocumentCommand{\loadbank}{m}{%
-	\directlua{autoexam_set_bankfile('\luaescapestring{#1}')}%
-	\input{#1}%
-}
-
-% --- Bank: smart-columns problems environment + \problem item command ---
-% Adapted from autoexam.cls.  Inside \begin{problems}...\end{problems},
-% \problem[points][stretch]{filter} retrieves a problem from the bank and
-% typesets it as a numbered \question. Without the points argument, no
-% point label is added to the heading.
-%
-%   \problem{id}                 — retrieve by id
-%   \problem[5]{id}              — with 5-point heading
-%   \problem[2,3]{id}            — distributed to \ppart calls
-%   \problem{topic=algebra}      — random key=value match
-%
-% \ppart — part item for use inside problem bodies.  Auto-injects
-% per-part points when the enclosing \problem carries a comma-separated
-% list (e.g., \problem[2,3]{id}).
-\NewDocumentCommand{\ppart}{}{\directlua{autoexam_inject_part()}}
-
-\NewDocumentCommand{\@problem@item}{O{} O{1} m}{%
-	\directlua{autoexam_problem_item(
-		'\luaescapestring{#1}',
-		'\luaescapestring{#2}',
-		'\luaescapestring{#3}'
-	)}%
-}
-
-% \workbox{n}: reserved blank space below a problem (engine emits this).
-% In quiz, this is the natural \vspace{\stretch{n}} stretchy spacing.
-\providecommand{\workbox}[1]{\vspace{\stretch{#1}}}
-
-% \autoexam@problem@sep: separator between consecutive problems on the
-% same page (engine emits this for problems 2+ on each page). For quiz,
-% a \par with light vertical space is plenty.
-\providecommand{\autoexam@problem@sep}{\par\medskip}
+% \loadbank is provided by texlib-problembank.sty (the redirect activates
+% automatically; quizzes are always single-version so pbank_suppress_redirect
+% never trips).
 
 \newenvironment{problems}{%
-	\directlua{autoexam_first_on_page = true}%
+	\directlua{pbank_first_on_page = true}%
 	\let\@problems@saved@newpage\newpage
 	\renewcommand{\newpage}{%
 		\@problems@saved@newpage
-		\directlua{autoexam_first_on_page = true}%
+		\directlua{pbank_first_on_page = true}%
 	}%
 	\begin{questions}%
 	\let\@saved@problem\problem
@@ -268,21 +117,8 @@
 % ==============================================================================
 % 6. UNSTARRED THEOREM-LIKE ENVIRONMENTS
 % ==============================================================================
-\newtheorem*{thm*}{Theorem}
-\newtheorem*{defn*}{Definition}
-\newtheorem*{cor*}{Corollary}
-\newtheorem*{prop*}{Proposition}
-\newtheorem*{lem*}{Lemma}
-\newtheorem*{conj*}{Conjecture}
-\newtheorem*{ques*}{Question}
-\newtheorem*{prob*}{Problem}
-\newtheorem*{exam*}{Example}
-\newtheorem*{notn*}{Notation}
-\theoremstyle{remark}
-\newtheorem*{rmk*}{Remark}
-\newtheorem*{recall*}{Recall}
-\newtheorem*{case*}{Case}
-\newtheorem*{desiderata*}{Desiderata}
+% Theorem environments come from texlib-thmenv.sty (shared with autoexam.cls).
+\RequirePackage{texlib-thmenv}
 
 % ==============================================================================
 % 7. ANSWER FORMATTING
@@ -290,19 +126,8 @@
 \renewcommand{\questionlabel}{\textbf{\arabic{question}.}}
 \renewcommand{\partlabel}{\textbf{\alph{partno}.}}
 
-\newcommand\encircle[1]{%
-	\tikz[baseline=(X.base)]
-	\node (X) [draw, shape=circle, inner sep=0] {\strut #1};%
-}
-
-\NewDocumentCommand{\extracredit}{ o +m }{%
-	\stepcounter{question}%
-	\item[\textbf{\thequestion.}]%
-	\IfValueTF{#1}
-		{(\textbf{Extra Credit}, #1 points)~}
-		{(\textbf{Extra Credit})~}%
-	#2
-}
+% \encircle and \extracredit come from texlib-itemfmt.sty.
+\RequirePackage{texlib-itemfmt}
 
 % ==============================================================================
 % 8. FIGURE WRAPPER
@@ -318,17 +143,18 @@
 % ==============================================================================
 % 9. HEADER / FOOTER
 % ==============================================================================
+% texlib-pagestyle.sty bundles \pagestyle{headandfoot} + first-page-footer
+% rule + running head/foot rules into \SetTeXLibExamRules.  Quiz adds the
+% first-page header rule on top (its title page carries a name field).
+\RequirePackage{texlib-pagestyle}
 % \title is auto-derived from metadata.
 \AtBeginDocument{%
 	\title{\LARGE \GetQuizTitle}%
-	\pagestyle{headandfoot}%
-	\firstpageheader{\GetCourse}{}{Name:\ \underline{\hspace{2.5in}}}%
+	\SetTeXLibExamRules
 	\firstpageheadrule
+	\firstpageheader{\GetCourse}{}{Name:\ \underline{\hspace{2.5in}}}%
 	\firstpagefooter{Section\ \GetCourseSection}{}{\GetInstitution}%
-	\firstpagefootrule
 	\runningheader{\GetCourse}{}{Name:\ \underline{\hspace{2.5in}}}%
-	\runningheadrule
-	\runningfootrule
 	\runningfooter{Section\ \GetCourseSection}{}{\GetInstitution}%
 }
 
@@ -358,19 +184,12 @@
 }
 
 % ==============================================================================
-% 11. BACKWARD-COMPAT \the* ALIASES
+% 11. BACKWARD-COMPAT \the* ALIASES (quiz-specific only)
 % ==============================================================================
-% Existing quiz files use \theQuizNumber, \theCourseTitle, etc. via \renewcommand.
-% Provide them as aliases over the metadata getters.
+% Course-metadata aliases (\theCourse, \theCourseNumber, \theCourseTitle,
+% \theCourseSection, \theSeason, \theYear, \theTerm, \theSchool, ...) are
+% provided by course-metadata.sty.  Quiz-specific aliases stay here.
 \providecommand{\theQuizNumber}{\GetQuizNumber}
 \providecommand{\theTitle}{\GetQuizTitle}
-\providecommand{\theCourseNumber}{\GetCourseNumber}
-\providecommand{\theCourseTitle}{\GetCourseTitle}
-\providecommand{\theCourse}{\GetCourse}
-\providecommand{\theCourseSection}{\GetCourseSection}
-\providecommand{\theSeason}{\GetSeason}
-\providecommand{\theYear}{\GetYear}
-\providecommand{\theTerm}{\GetTerm}
-\providecommand{\theSchool}{\GetInstitution}
 
 \endinput

@@ -1,0 +1,47 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-itemfmt}[2026/05/26 v1.0 TeXLib item-formatting macros]
+
+% ==============================================================================
+% texlib-itemfmt.sty — small item / answer-formatting helpers shared by the
+% exam-class-based TeXLib classes (autoexam, quiz)
+% ==============================================================================
+%
+% Scope note: this file is intentionally slim.  exam.cls already provides
+% \questionlabel and \partlabel hooks that each class \renewcommands to its
+% own taste (autoexam: "Problem N."; quiz: "1." then "a."), so there's no
+% useful default to centralise for those — putting a \providecommand here
+% would be a no-op against exam.cls's existing definitions.
+%
+% What lives here is the set of item-format helpers that DO repeat verbatim
+% across classes: a circled-token decoration (\encircle) and the
+% extra-credit \question variant (\extracredit).
+%
+% Required: tikz must be loaded before \encircle is used; texlib-corepkg
+% provides it, and both autoexam and quiz load corepkg before this file.
+
+% \encircle{token}
+%   Render `token` inside a thin circular node, baseline-aligned with the
+%   surrounding text.  Used for version markers ("Version (A)"), Likert
+%   scales, and answer-bubble labels.
+\providecommand{\encircle}[1]{%
+	\tikz[baseline=(X.base)]
+		\node (X) [draw, shape=circle, inner sep=0] {\strut #1};%
+}
+
+% \extracredit[points]{body}
+%   Inserts a new \question slot tagged as extra credit, optionally with a
+%   point label.  Use inside the exam-class {questions} environment:
+%       \extracredit[2]{Find the limit of ...}
+%       \extracredit{Bonus: prove that ...}
+%   Without the optional argument, the heading reads "(Extra Credit)";
+%   with it, "(Extra Credit, N points)".
+\NewDocumentCommand{\extracredit}{ o +m }{%
+	\stepcounter{question}%
+	\item[\textbf{\thequestion.}]%
+	\IfValueTF{#1}
+		{(\textbf{Extra Credit}, #1 points)~}
+		{(\textbf{Extra Credit})~}%
+	#2%
+}
+
+\endinput

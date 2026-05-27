@@ -26,29 +26,19 @@
 % ==============================================================================
 % 1. PACKAGES
 % ==============================================================================
-\RequirePackage[T1]{fontenc}
-\RequirePackage{lmodern}
-\RequirePackage[margin=1in]{geometry}
-\RequirePackage{xparse}
-\RequirePackage{expl3}
-\RequirePackage{etoolbox}
-\RequirePackage{basic-utilities}    % shared math macros, tikz config, tasks (grid layout)
+% basic-utilities transitively loads texlib-corepkg (fontenc/lmodern/geometry,
+% expl3/xparse/ifthen/etoolbox, xcolor, amsmath/amssymb/amsthm/mathtools,
+% texlib-mathutils, graphicx, tikz/pgfplots + standard libraries,
+% hyperref + canonical hypersetup) plus the heavy-class extras (siunitx,
+% caption, tasks, extra tikz libraries).
+\RequirePackage{basic-utilities}
 \RequirePackage{calc, adjustbox, changepage, needspace}
 \RequirePackage[shortlabels]{enumitem}
 \RequirePackage{fancyhdr, lastpage}
 \RequirePackage{tocloft, multirow}
 \RequirePackage[many]{tcolorbox}
-\RequirePackage{amsmath, amssymb, amsthm, mathtools}
 \RequirePackage{cancel}
-\RequirePackage{graphicx}
-\RequirePackage{tikz, pgfplots}
-\pgfplotsset{compat=1.18}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric,
-				datavisualization, fit, calc, backgrounds}
-\RequirePackage{hyperref}
-\hypersetup{colorlinks=true, urlcolor=blue, linkcolor=black, citecolor=black}
 \RequirePackage[capitalise,nameinlink]{cleveref}
-
 \RequirePackage{xstring}            % for \IfInteger in problem's optional arg
 \RequirePackage{course-metadata}
 

@@ -13,26 +13,18 @@
 % ==============================================================================
 % 1. PACKAGES
 % ==============================================================================
-\RequirePackage[T1]{fontenc}
-\RequirePackage{lmodern}
-\RequirePackage[margin=1in]{geometry}
-\RequirePackage{xparse}
-\RequirePackage{expl3}
-\RequirePackage{etoolbox}
-\RequirePackage{basic-utilities}    % shared math macros, tikz config, tasks (grid layout)
+% basic-utilities transitively loads texlib-corepkg (fontenc/lmodern/geometry,
+% expl3/xparse/ifthen/etoolbox, xcolor, amsmath/amssymb/amsthm/mathtools,
+% texlib-mathutils, graphicx, tikz/pgfplots, hyperref + canonical hypersetup)
+% plus heavy-class extras (siunitx, caption, tasks, extra tikz libraries).
+\RequirePackage{basic-utilities}
+\captionsetup{skip=3pt}  % runtime override of caption's default vskip
 \RequirePackage{adjustbox, changepage, comment}
-\RequirePackage[skip=3pt]{caption}
 \RequirePackage[shortlabels]{enumitem}
 \RequirePackage{fancyhdr, lastpage}
-\RequirePackage{graphicx, needspace}
-\RequirePackage{xcolor}
+\RequirePackage{needspace}
 \RequirePackage{booktabs, colortbl, multirow, makecell}
-\RequirePackage{tikz}
-\RequirePackage{amsmath, amssymb, amsthm, mathtools}
 \RequirePackage{tocloft}
-\RequirePackage{hyperref}
-\hypersetup{colorlinks=true, urlcolor=blue, linkcolor=black, citecolor=black}
-
 \RequirePackage{course-metadata}
 
 % ==============================================================================

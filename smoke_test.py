@@ -50,6 +50,11 @@ MODULES = [
     ("Schedule",     "template.tex"),
     ("Syllabi",      "template.tex"),
     ("Problem Sets", "template.tex"),
+    # Feature-test entries (live under Test/<Module>/). Each is a self-contained
+    # .tex that exercises something the canonical template doesn't — e.g. the
+    # fix-overrides syntax \problem{id}[a=1,b=2]. Treated like any other module
+    # by build_one (it copies siblings + collects root + module .cls files).
+    ("Test/Exams",   "fix-test.tex"),
 ]
 
 # Classes that require lualatex (use \directlua, luaotfload, or sibling .lua files).
@@ -160,7 +165,8 @@ def build_one(
     # Build in a temp dir so we don't pollute the real module folder with
     # .aux/.log/.synctex.gz etc. Copy the module's local files (.cls/.lua/.tex
     # siblings of template.tex) over so they're discoverable as ./ files.
-    tmp = tempfile.mkdtemp(prefix=f"texlib_smoke_{module.replace(' ', '_')}_")
+    safe_module = re.sub(r"[^\w.-]+", "_", module)
+    tmp = tempfile.mkdtemp(prefix=f"texlib_smoke_{safe_module}_")
     try:
         for entry in os.listdir(module_dir):
             src = os.path.join(module_dir, entry)
@@ -170,7 +176,7 @@ def build_one(
         # Also copy the TeXLib-root shared files (course-metadata.sty,
         # texlib-build.sty, basic-utilities.sty, texlib-mathutils.sty,
         # texlib-theorems.sty, texlib-footer.sty, quiver.sty,
-        # autoexam_engine.lua, ...) into the build dir so they resolve via
+        # problem_engine.lua, ...) into the build dir so they resolve via
         # the cwd. This sidesteps a hard kpathsea limitation: a TEXINPUTS
         # entry containing a COMMA is silently unsearchable, and the TeXLib
         # root can easily live under one (e.g. a OneDrive folder named
@@ -183,6 +189,21 @@ def build_one(
                 dest = os.path.join(tmp, entry)
                 if not os.path.exists(dest):
                     shutil.copy2(src, dest)
+
+        # Also collect .cls files from each module subdirectory. Without this,
+        # tests living under Test/<Module>/ that do \documentclass{<sibling>}
+        # cannot find the sibling module's class file (the cwd-copy trick
+        # above only covers root-level files). Module .cls files have unique
+        # names so name-clash is not a concern.
+        for entry in os.listdir(TEXLIB_ROOT):
+            sub = os.path.join(TEXLIB_ROOT, entry)
+            if not os.path.isdir(sub):
+                continue
+            for f in os.listdir(sub):
+                if f.lower().endswith(".cls"):
+                    dest = os.path.join(tmp, f)
+                    if not os.path.exists(dest):
+                        shutil.copy2(os.path.join(sub, f), dest)
 
         # Drop in a stub coursemeta.tex unless the module already ships one.
         # course-metadata.sty auto-loads it from the cwd; without it, any

@@ -1,0 +1,349 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-problembank}[2026/05/26 v1.0 TeXLib shared problem-bank
+	machinery (engine loader, randomisation, bank queries, item command).]
+
+% ==============================================================================
+% texlib-problembank.sty — shared by autoexam.cls and quiz.cls
+% ==============================================================================
+%
+% Provides the problem-bank LaTeX interface and loads the Lua engine that
+% backs it.  Both `autoexam` (randomised, multi-version exams) and `quiz`
+% (single-version in-class quizzes) build on the same problem-bank workflow,
+% so every macro defined here is identical between the two classes.  Keep
+% this file the single source of truth; classes only \RequirePackage it and
+% then layer their own \begin{problems} environment, \loadbank, and any
+% versioning machinery on top.
+%
+% Loaded automatically by both classes; not intended for direct \usepackage
+% by user documents (the document classes already pull it in).
+%
+% Macros provided:
+%   Variable management . . .  \setvar, \setrng, \calcvar, \get
+%   Randomisation . . . . . .  \picklist, \picklistr, \pickrange, \pickranger
+%   Retrieval . . . . . . . .  \getlist, \geti, \foreachpick
+%   Bank: define problems . .  \newproblem, \dupproblem, \begin{problem}
+%   Bank: retrieve problems .  \getproblem (= \useproblem, \reqproblem)
+%   Problems environment . .   \ppart, \@problem@item (\problem item command —
+%                              \begin{problems} in each class swaps it in)
+%   Standalone import . . . .  \importproblem
+%   Hooks (overridable) . . .  \workbox, \autoexam@problem@sep
+%
+% Not provided (kept per-class because the semantics differ):
+%   \loadbank . . . . . . . .  autoexam.cls deliberately omits
+%                              pbank_set_bankfile() to dodge a multi-version
+%                              \@@input-stack overflow; quiz.cls calls it for
+%                              SyncTeX inverse-search inside the bank file.
+%   \begin{problems} . . . .   autoexam has page-counter reset, @lastqpage label,
+%                              and elaborate header/footer machinery; quiz
+%                              ships a minimal version.
+%   Versioning, scorepage, etc. autoexam-only.
+% ==============================================================================
+
+\RequirePackage{xparse}
+\RequirePackage{environ}  % \Collect@Body for the {problem} environment
+
+% ==============================================================================
+% Lua engine loader
+% ==============================================================================
+% Locates problem_engine.lua across three possible layouts:
+%   (1) installed in a TEXMF tree              → kpse with the "lua" format
+%   (2) sitting next to texlib-problembank.sty → current canonical layout
+%   (3) sitting in the cwd                     → standalone test layout
+%
+% The .sty file is the anchor (rather than the calling .cls) because both
+% autoexam.cls and quiz.cls now reach the engine through this package; the
+% engine and the .sty travel together at the TeXLib root.
+%
+% NOTE: no Lua `--` line comments inside this \directlua block. TeX collapses
+% the newlines into spaces before Lua sees the chunk, so a `--` comment would
+% swallow the rest of the code. Keep explanations in TeX `%` comments above.
+\directlua{
+	local function load_engine(name)
+		local path = kpse.find_file(name, "lua")
+		if path and lfs.attributes(path) then dofile(path) return end
+		local sty_path = kpse.find_file("texlib-problembank.sty")
+		local base_dir = sty_path and sty_path:match("(.*[/\\])") or ""
+		path = base_dir .. name
+		if lfs.attributes(path) then dofile(path) return end
+		dofile(name)
+	end
+	load_engine("problem_engine.lua")
+}%
+
+% ==============================================================================
+% Variable management
+% ==============================================================================
+
+% \setvar{name}{value}  — store a named value
+\newcommand{\setvar}[2]{\directlua{set_var('#1', #2)}}
+
+% \setrng{name}{min}{max}  — store a single random integer in [min, max]
+\newcommand{\setrng}[3]{\directlua{set_rng('#1', #2, #3)}}
+
+% \calcvar{name}{lua-expr}  — compute an expression using stored vars
+\newcommand{\calcvar}[2]{\directlua{calc_var('#1', '#2')}}
+
+% \get{name}  — retrieve and typeset a stored value
+\newcommand{\get}[1]{\directlua{get_var('#1')}}
+
+% ==============================================================================
+% Randomisation: pick from list / range
+% ==============================================================================
+
+% \picklist{name}{n}{a, b, c, ...}  — pick n items WITHOUT replacement
+% NOTE: list items must not contain commas themselves.
+\NewDocumentCommand{\picklist}{m m m}{%
+	\directlua{pick_from_list('\luaescapestring{#1}', #2, '\luaescapestring{#3}')}%
+}
+
+% \picklistr{name}{n}{a, b, c, ...}  — pick n items WITH replacement
+\NewDocumentCommand{\picklistr}{m m m}{%
+	\directlua{pick_from_list_r('\luaescapestring{#1}', #2, '\luaescapestring{#3}')}%
+}
+
+% \pickrange{name}{n}{min}{max}  — pick n distinct integers from [min, max]
+\NewDocumentCommand{\pickrange}{m m m m}{%
+	\directlua{pick_from_range('\luaescapestring{#1}', #2, #3, #4)}%
+}
+
+% \pickranger{name}{n}{min}{max}  — pick n integers from [min, max] with replacement
+\NewDocumentCommand{\pickranger}{m m m m}{%
+	\directlua{pick_from_range_r('\luaescapestring{#1}', #2, #3, #4)}%
+}
+
+% ==============================================================================
+% Retrieval helpers
+% ==============================================================================
+
+% \getlist{name}  — typeset all picked values, comma-separated
+\NewDocumentCommand{\getlist}{m}{%
+	\directlua{get_list('\luaescapestring{#1}')}%
+}
+
+% \geti{name}{i}  — typeset the i-th picked value (1-indexed)
+\NewDocumentCommand{\geti}{m m}{%
+	\directlua{get_var('\luaescapestring{#1}_' .. #2)}%
+}
+
+% \foreachpick[sep]{name}{code}  — iterate over picked values;
+%   \currentpick is set to each value before {code} is executed.
+%   Optional [sep] is inserted between items (default: comma-space).
+\NewDocumentCommand{\foreachpick}{O{,\space} m +m}{%
+	\directlua{
+		local count = tonumber(tostring(vars['\luaescapestring{#2}_count'])) or 0
+		for i = 1, count do
+			local v = vars['\luaescapestring{#2}_' .. i]
+			if v ~= nil then
+				tex.sprint('\\def\\currentpick{' .. tostring(v) .. '}')
+				tex.sprint('\luaescapestring{\unexpanded{#3}}')
+				if i < count then
+					tex.sprint('\luaescapestring{\unexpanded{#1}}')
+				end
+			end
+		end
+	}%
+}
+
+% ==============================================================================
+% Problem bank: define
+% ==============================================================================
+
+% \newproblem{id}{meta}{content}[solution]
+%   Define a problem in the database. The solution argument is optional;
+%   if omitted, the problem has no solution shown in key/solution builds.
+%   May be called in the document preamble, inside a bank file, or in the
+%   document body. Redefining an existing ID overwrites it with a warning.
+\NewDocumentCommand{\newproblem}{m m +m +o}{%
+	\IfNoValueTF{#4}{%
+		\directlua{define_problem(
+			'\luaescapestring{#1}',
+			'\luaescapestring{#2}',
+			'\luaescapestring{\unexpanded{#3}}',
+			''
+		)}%
+	}{%
+		\directlua{define_problem(
+			'\luaescapestring{#1}',
+			'\luaescapestring{#2}',
+			'\luaescapestring{\unexpanded{#3}}',
+			'\luaescapestring{\unexpanded{#4}}'
+		)}%
+	}%
+}
+
+% \dupproblem — deprecated alias for \newproblem (four mandatory args)
+\NewDocumentCommand{\dupproblem}{m m +m +m}{%
+	\directlua{define_problem(
+		'\luaescapestring{#1}',
+		'\luaescapestring{#2}',
+		'\luaescapestring{\unexpanded{#3}}',
+		'\luaescapestring{\unexpanded{#4}}'
+	)}%
+}
+
+% \begin{problem}{id}[key=val, key=val, ...]
+%   Define a problem in the bank.  Produces no output at definition time.
+%   Everything before the first \solution token in the body is the problem
+%   content; everything after is the solution.  Void setup commands
+%   (\setrng, \calcvar, etc.) may appear anywhere in the body.
+%
+%   Implementation notes:
+%     - \Collect@Body (from environ) intercepts the body without opening a
+%       nested environment, avoiding LaTeX's env-stack mismatch error.
+%     - \unexpanded{#1} prevents expansion of \solution and setup commands
+%       when the body is passed to \luaescapestring for Lua storage.
+%     - define_problem_from_env() splits the resulting string on \solution.
+
+% Internal callback: receives the full collected body as #1.
+\long\def\@problem@collect@done#1{%
+	\directlua{define_problem_from_env(
+		'\luaescapestring{\@problem@id}',
+		'\luaescapestring{\@problem@meta}',
+		'\luaescapestring{\unexpanded{#1}}'
+	)}%
+}
+
+% Scan the optional [meta] argument then start body collection.
+\def\@problem@scan{%
+	\@ifnextchar[%
+		{\@problem@getmeta}%
+		{\def\@problem@meta{}\Collect@Body\@problem@collect@done}%
+}
+\def\@problem@getmeta[#1]{%
+	\def\@problem@meta{#1}%
+	\Collect@Body\@problem@collect@done
+}
+
+% Public environment: \begin{problem}{id}[meta] ... \end{problem}
+\newenvironment{problem}[1]{%
+	\def\@problem@id{#1}%
+	% Record the bank-file line number NOW (before \Collect@Body reads ahead to
+	% \end{problem}).  By the time define_problem_from_env() runs, \inputlineno
+	% has advanced to the \end{problem} line, so we snapshot it here instead.
+	\directlua{pbank_problem_start_line = tex.inputlineno}%
+	\@problem@scan
+}{%
+	% End-code is empty; \Collect@Body handles everything at \end{problem}.
+}
+
+% ==============================================================================
+% Problem bank: retrieve
+% ==============================================================================
+
+% \getproblem{query}  — unified retrieve/query command.
+%   Plain id:      \getproblem{linear_eq}
+%   Key=val query: \getproblem{topic=algebra, diff=hard}
+%   If no '=' is found the whole string is treated as a problem id.
+%   Multiple key=value pairs are ANDed; one random match is typeset.
+%   On no match: emits a visible placeholder and a log warning.
+\NewDocumentCommand{\getproblem}{m}{%
+	\directlua{get_problem('\luaescapestring{#1}')}%
+}
+
+% Backward-compat aliases
+\let\useproblem\getproblem
+\NewDocumentCommand{\reqproblem}{m}{\getproblem{#1}}
+
+% ==============================================================================
+% \ppart and \@problem@item (item command for \begin{problems})
+% ==============================================================================
+% LaTeX naming note: \begin{problem} (definition environment) uses \problem
+% as its begin-code, so a global \problem item command would shadow it.
+% Solution: define the item command once under \@problem@item, then let
+% \begin{problems} (defined by each class) locally swap
+% \problem <-> \@problem@item and restore on exit.
+%   - \begin{problem}{id}[meta] works everywhere OUTSIDE {problems}
+%   - \problem[pts][stretch]{filter}[fix] works INSIDE {problems}
+
+% \ppart — problem-part item for use inside \begin{problem} bodies.
+%   Always delegates to exam class's \part (the list-item command inside
+%   \begin{parts}).  When the enclosing \problem item carries per-part
+%   point values (e.g. \problem[2,3]{id}), each \ppart call automatically
+%   injects the corresponding point annotation via the Lua part-index state.
+\NewDocumentCommand{\ppart}{}{\directlua{pbank_inject_part()}}
+
+% \@problem@item[points][stretch]{filter}[fix]
+%   The actual item command implementation — defined once at class load.
+%   #1 = points  (optional, default empty = no point label)
+%             Single value: annotates the \question (e.g. \problem[5]{id})
+%             Comma-sep:    distributed to \ppart calls (e.g. \problem[2,3]{id})
+%   #2 = stretch (optional, default 1 = \vspace{\stretch{1}} after body)
+%             Per-part stretch is not yet supported; first value is used.
+%   #3 = filter  (mandatory, forwarded verbatim to get_problem)
+%   #4 = fix     (optional trailing bracket, default empty)
+%             Key=value list of variable overrides applied to the problem
+%             body. e.g. \problem{quadratic}[a=1, b=2, c=3] fixes a, b, c
+%             so the bank's own \setrng/\setvar/\pick* on those names are
+%             skipped. Other variables in the bank entry remain random.
+%             Values that parse as numbers are stored as Lua numbers; all
+%             others are stored as trimmed strings.  Engine-side scope
+%             management is via push_scope/pop_scope so each problem starts
+%             with a clean fixed[] table.
+%
+%   All token output (\question, problem content, stretch) is generated inside
+%   Lua via tex.print, avoiding pre-tokenized-token interactions with the
+%   comment package's \excludecomment catcode scanner.
+\NewDocumentCommand{\@problem@item}{O{} O{1} m O{}}{%
+	\directlua{pbank_problem_item(
+		'\luaescapestring{#1}',
+		'\luaescapestring{#2}',
+		'\luaescapestring{#3}',
+		'\luaescapestring{#4}'
+	)}%
+}
+
+% ==============================================================================
+% Bank loading
+% ==============================================================================
+% \loadbank{path}  — explicitly load a problem bank file.
+%
+% Calls pbank_set_bankfile() so the engine records the bank-file path on
+% every problem.  The path enables the SyncTeX bank-file redirect: clicking
+% a typeset problem in the PDF jumps to its \begin{problem} block in the
+% real bank source, not to a generated temp file.
+%
+% Multi-version mode (autoexam_run_versions) sets pbank_suppress_redirect
+% before iterating versions, so the redirect is skipped during the version
+% loop — each version body re-\inputs every problem and the cumulative
+% bank-file \@@input calls would overflow LuaTeX's input stack after ~15
+% problems.  Single-version builds (quiz, edit-mode autoexam) leave the
+% suppress flag false and get the redirect.
+\NewDocumentCommand{\loadbank}{m}{%
+	\directlua{pbank_set_bankfile('\luaescapestring{#1}')}%
+	\input{#1}%
+}
+
+% ==============================================================================
+% Standalone problem import (one-off, scoped overrides)
+% ==============================================================================
+
+% \importproblem{path}{overrides}  — import a standalone problem file with
+%   Lua variable overrides (e.g. {a=5, b=10}) in an isolated scope.
+%
+%   The overrides are applied via pbank_apply_fix() so the imported file's
+%   own \setrng/\setvar/\calcvar/\pick* on those names become no-ops, matching
+%   the lock semantics of \problem{id}[a=1,b=2].  push_scope/pop_scope wrap
+%   the whole import so neither the override values nor the fixed[] markings
+%   leak back to surrounding code.
+\newcommand{\importproblem}[2]{%
+	\begingroup
+	\directlua{push_scope() pbank_apply_fix('\luaescapestring{#2}')}%
+	\input{#1}%
+	\directlua{pop_scope()}%
+	\endgroup
+}
+
+% ==============================================================================
+% Hooks (default implementations; classes override as needed)
+% ==============================================================================
+% \workbox{n} — reserved blank space below a problem (engine emits this).
+%   Default: stretchy \vspace.  autoexam.cls overrides to hide the space in
+%   solution builds (so a key copy doesn't get blank pages).
+\providecommand{\workbox}[1]{\vspace{\stretch{#1}}}
+
+% \autoexam@problem@sep — separator between consecutive problems on the same
+%   page (engine emits this for problems 2+ on each page).  Default: a plain
+%   \par\medskip; autoexam.cls overrides with a full-width rule.
+\providecommand{\autoexam@problem@sep}{\par\medskip}
+
+\endinput

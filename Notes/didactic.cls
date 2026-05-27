@@ -13,30 +13,21 @@
 % ==============================================================================
 % 1. PACKAGES
 % ==============================================================================
-\RequirePackage[T1]{fontenc}
-\RequirePackage{lmodern}
-\RequirePackage[margin=1in]{geometry}
-\RequirePackage{xparse}
-\RequirePackage{expl3}
+% basic-utilities transitively loads texlib-corepkg (fontenc/lmodern/geometry,
+% expl3/xparse/ifthen/etoolbox, xcolor, amsmath/amssymb/amsthm/mathtools,
+% texlib-mathutils, graphicx, tikz/pgfplots + standard libraries,
+% hyperref + canonical hypersetup) plus the heavy-class extras (siunitx,
+% caption, tasks, extra tikz libraries: datavisualization, fit, calc,
+% backgrounds).
+\RequirePackage{basic-utilities}
 \RequirePackage{xstring}
-\RequirePackage{etoolbox}
-\RequirePackage{basic-utilities}    % shared math macros, tikz config, tasks (grid layout)
 \RequirePackage{calc, adjustbox, changepage, needspace}
 \RequirePackage[shortlabels]{enumitem}
 \RequirePackage{fancyhdr, lastpage}
 \RequirePackage{tocloft, multirow}
 \RequirePackage[many]{tcolorbox}
-\RequirePackage{amsmath, amssymb, amsthm, mathtools}
 \RequirePackage{cancel}
-\RequirePackage{graphicx}
-\RequirePackage{tikz, pgfplots}
-\pgfplotsset{compat=1.18}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric,
-				datavisualization, fit, calc, backgrounds}
-\RequirePackage{hyperref}
-\hypersetup{colorlinks=true, urlcolor=blue, linkcolor=black, citecolor=black}
 \RequirePackage[capitalise,nameinlink]{cleveref}
-
 \RequirePackage{course-metadata}
 
 % Bibliography: biblatex with the biber backend. Loaded last so it can hook

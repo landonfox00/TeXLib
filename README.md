@@ -68,7 +68,7 @@ Setting up TeXLib on a new machine or for a new course.
 
 ### Lua engine
 
-- [`autoexam_engine.lua`](autoexam_engine.lua) — LuaLaTeX engine extracted from `autoexam.cls`. Handles problem-bank loading, version randomization, per-problem SyncTeX redirection (so inverse-search lands in the bank file, not generated temp files), and the per-version page-shuffle. Loaded automatically by the `autoexam` document class.
+- [`problem_engine.lua`](problem_engine.lua) — LuaLaTeX engine driving the shared problem-bank workflow. Handles problem-bank loading, version randomization (autoexam), per-problem SyncTeX redirection (so inverse-search lands in the bank file, not generated temp files), and the per-version page-shuffle. Loaded automatically by both the `autoexam` and `quiz` document classes.
 
 ### Tooling
 
@@ -91,7 +91,7 @@ Each module is a document class plus a canonical `template.tex` and a README. `s
 | Module | Class | Purpose |
 |---|---|---|
 | [`Bingo/`](Bingo/) | `bingo.cls` | 5×5 math-symbol bingo cards. Supports a standard layout (math expression per cell) and a labeled layout with separate `\bingolegend{...}` table, used for exam-review bingo. |
-| [`Exams/`](Exams/) | `autoexam.cls` | Randomized-exam class. Paired with [`autoexam_engine.lua`](autoexam_engine.lua) and a problem `bank.tex`; emits multiple shuffled versions per build. |
+| [`Exams/`](Exams/) | `autoexam.cls` | Randomized-exam class. Paired with [`problem_engine.lua`](problem_engine.lua) and a problem `bank.tex`; emits multiple shuffled versions per build. |
 | [`Notes/`](Notes/) | `didactic.cls` | Lecture-notes class with section-numbered theorems and a large theorem taxonomy (theorem, lemma, corollary, proposition, definition, procedure, example, question, note, ...). |
 | [`Problem Sets/`](Problem%20Sets/) | `pset.cls` | Problem-set class with flat theorem numbering and a smaller taxonomy. |
 | [`Quizzes/`](Quizzes/) | `quiz.cls` | Short-form quiz class. |
@@ -119,7 +119,7 @@ The Sublime build system surfaces these as palette entries; `smoke_test.py` inje
 ```
 .
 ├── *.sty                  # shared packages
-├── autoexam_engine.lua    # LuaLaTeX engine for randomized exams
+├── problem_engine.lua     # LuaLaTeX engine shared by autoexam + quiz
 ├── smoke_test.py          # build-everything safety net
 ├── Bingo/                 # bingo.cls + template
 ├── Exams/                 # autoexam.cls + bank + template

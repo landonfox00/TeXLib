@@ -1,0 +1,70 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-corepkg}[2026/05/26 v1.0 TeXLib core package bundle]
+
+% ==============================================================================
+% texlib-corepkg.sty — core package bundle for every TeXLib document class
+% ==============================================================================
+%
+% Loads the LaTeX packages every TeXLib class needs anyway: font + geometry,
+% LaTeX3 core, math (amsmath/amssymb/amsthm/mathtools), graphics
+% (graphicx/xcolor/tikz/pgfplots), and hyperref + the canonical hypersetup
+% used across the library.
+%
+% Two entry points reach this bundle:
+%
+%   1. Lightweight classes — autoexam, quiz, schedule, bingo, syllabus — load
+%      it directly:
+%          \RequirePackage{texlib-corepkg}
+%
+%   2. Heavier classes — didactic, pset, report-card — load basic-utilities,
+%      which re-requires this bundle and adds siunitx/caption/tasks/enumitem
+%      on top.
+%
+% Class-specific packages (lastpage, needspace, tocloft, multicol, tcolorbox,
+% adjustbox, comment, ...) stay in each class file; this bundle is only the
+% true intersection of every class's needs.
+
+% --- Font + geometry ---
+\RequirePackage[T1]{fontenc}
+\RequirePackage{lmodern}
+\RequirePackage[margin=1in]{geometry}
+
+% --- LaTeX3 core ---
+\RequirePackage{expl3}
+\RequirePackage{xparse}
+\RequirePackage{ifthen}
+\RequirePackage{etoolbox}
+
+% --- Color (load before tikz so tikz uses the right colour table) ---
+\RequirePackage{xcolor}
+
+% --- Math ---
+\RequirePackage{amsmath}
+\RequirePackage{amssymb}
+\RequirePackage{amsthm}
+\RequirePackage{mathtools}
+
+% --- TeXLib math macros (depends on the math packages above) ---
+\RequirePackage{texlib-mathutils}
+
+% --- Graphics + TikZ ---
+\RequirePackage{graphicx}
+\RequirePackage{tikz}
+\RequirePackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+
+% --- Hyperref + canonical setup ---
+% Five of the existing TeXLib classes ship the exact same hypersetup call.
+% Centralising it here means a single edit reaches every class.  Classes that
+% want additional tikz libraries, extra link colours, or a different setup
+% (rare) can load them AFTER \RequirePackage{texlib-corepkg}.
+\RequirePackage{hyperref}
+\hypersetup{
+	colorlinks=true,
+	urlcolor=blue,    % URLs stay blue (useful in syllabi, course sheets, etc.)
+	linkcolor=black,  % internal cross-references: invisible in print, still clickable
+	citecolor=black   % citations likewise
+}
+
+\endinput

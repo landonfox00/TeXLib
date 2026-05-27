@@ -231,8 +231,11 @@ Reserved blank space for student work.
 	`\@testdef` to suppress "multiply defined label" and
 	"labels may have changed" oscillations that arise from each version
 	rewriting the same `question@N` / `part@N@M` labels.
-- **AutoExam engine:** `autoexam_engine.lua` must sit alongside the
-	class file. The class loads it via `\directlua{dofile(...)}`.
+- **Problem engine:** `problem_engine.lua` lives at the TeXLib root
+	(shared with `quiz.cls`). The class locates it via a small kpse +
+	relative-path search inside its `\directlua{dofile(...)}` loader, so
+	the file can also sit next to the class or alongside the .tex being
+	built.
 - **Builder mode vs. standalone mode:** the Python builder watches for
 	the `examversions` declaration via regex, then invokes lualatex
 	per-version with `\def\Version{X}`. Standalone mode (no builder)
@@ -244,6 +247,6 @@ Reserved blank space for student work.
 ## Related
 
 - `course-metadata.md` — the metadata layer.
-- The Lua engine: `autoexam_engine.lua` (heavily commented in-source).
+- The Lua engine: `problem_engine.lua` (heavily commented in-source).
 - The `exam.cls` documentation (CTAN) for the `questions`/`parts`/
 	`points` machinery the class builds on.

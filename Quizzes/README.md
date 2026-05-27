@@ -67,7 +67,7 @@ Plus all `course-metadata` keys (institution, course-*, term, …).
 
 ### Problem bank API (shared with autoexam)
 
-`quiz.cls` loads `autoexam_engine.lua` so quizzes can use the same
+`quiz.cls` loads `problem_engine.lua` so quizzes can use the same
 problem-bank workflow as exams. This means you can author one bank
 file that's reusable across quizzes and exams.
 

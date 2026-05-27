@@ -1,0 +1,16 @@
+% fix-bank.tex - small bank exercising variable overrides on \problem.
+
+\begin{problem}{quadratic}[topic=quad]
+	\setrng{a}{2}{9}%
+	\setrng{b}{2}{9}%
+	\setrng{c}{2}{9}%
+	Solve $\get{a}x^2 + \get{b}x + \get{c} = 0$ for $x$.
+	\solution
+	By the quadratic formula,
+	$x = \frac{-\get{b} \pm \sqrt{\get{b}^2 - 4 \cdot \get{a} \cdot \get{c}}}{2 \cdot \get{a}}.$
+\end{problem}
+
+\begin{problem}{picky}[topic=pick]
+	\pickrange{lst}{3}{1}{20}%
+	Pick from the list: \getlist{lst}.
+\end{problem}

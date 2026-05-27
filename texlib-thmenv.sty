@@ -1,0 +1,47 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-thmenv}[2026/05/26 v1.0 TeXLib unstarred-theorem environment set]
+
+% ==============================================================================
+% texlib-thmenv.sty — \newtheorem* declarations shared by autoexam and quiz
+% ==============================================================================
+%
+% The exam-class-based TeXLib classes (autoexam, quiz) use plain amsthm
+% \newtheorem* declarations for in-text mathematical statements — i.e. the
+% lighter-weight `thm* / defn* / cor* / ...` family that ships unnumbered
+% and unboxed.  This is distinct from the tcolorbox-decorated theorem styles
+% in texlib-theorems.sty, which the heavier classes (didactic, pset) use for
+% emphasised statements.
+%
+% Both classes used to declare overlapping subsets of these environments —
+% quiz declared 14, autoexam declared 3, with one name divergence
+% (autoexam's `ex*` vs quiz's `exam*` for the Example environment).  Both
+% spellings are exposed below so existing documents using either continue
+% to build.
+%
+% Required: amsthm (provided transitively by texlib-corepkg).
+
+% --- plain style: bold heading, italic body (the amsthm default) ----------
+\newtheorem*{thm*}      {Theorem}
+\newtheorem*{defn*}     {Definition}
+\newtheorem*{cor*}      {Corollary}
+\newtheorem*{prop*}     {Proposition}
+\newtheorem*{lem*}      {Lemma}
+\newtheorem*{conj*}     {Conjecture}
+\newtheorem*{ques*}     {Question}
+\newtheorem*{prob*}     {Problem}
+\newtheorem*{exam*}     {Example}
+\newtheorem*{ex*}       {Example}    % legacy short-name spelling
+\newtheorem*{notn*}     {Notation}
+
+% --- remark style: bold heading, upright body ----------------------------
+\theoremstyle{remark}
+\newtheorem*{rmk*}        {Remark}
+\newtheorem*{recall*}     {Recall}
+\newtheorem*{case*}       {Case}
+\newtheorem*{desiderata*} {Desiderata}
+
+% Restore the default style so anything the class declares later (numbered
+% environments, etc.) starts from a clean plain-style baseline.
+\theoremstyle{plain}
+
+\endinput
