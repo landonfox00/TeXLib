@@ -26,6 +26,7 @@ Update instructions:
 ### Schedule
 
 - New page per month; repeat days to complete weeks.
+- Fix the week column length.
 
 ### Scratch page
 
@@ -40,6 +41,17 @@ Update instructions:
 #### End rubric
 
 - Should not be attached; print separate sheet and staple it to back.
+
+## Theme / customization
+
+- Make every visual choice in TeXLib (colors, rule widths, fonts, spacing,
+  cell heights, header layout, etc.) customizable rather than hard-coded
+  in the class files.
+- Provide a dedicated theme file (e.g. `texlib-theme.sty` or a `.tex`
+  loaded via `\usetheme{...}`) that ships sensible defaults and can be
+  swapped or overridden wholesale.
+- Expose per-document override commands so a single `.tex` can tweak any
+  theme value inline without editing the shared theme file.
 
 ## Exam versioning and randomization
 
