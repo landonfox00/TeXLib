@@ -599,21 +599,31 @@ end
 -- SyncTeX inverse-search strategy
 -- -------------------------------
 -- Every L_* directive tags the cells it touches with its tex.inputlineno via
--- tag_cell_source().  Here we build each week's row, take the minimum tagged
--- line across the row's cells, and stash the row string into a sparse table
--- keyed by that line.  Then we stage the redirect via texlib_synctex_stage
--- and \@@input the user's source file (tex.jobname .. ".tex"):
--- texlib_synctex.lua intercepts the \@@input, writes a temp file padded with
--- blank lines so row content sits on the source line that produced it, and
--- LuaTeX records the user's source file as the SyncTeX attribution for those
--- nodes.  Click a calendar row in the PDF -> jump to the directive line in
--- the source.
+-- tag_cell_source().  Here we build each week's row and take the minimum
+-- tagged line across the row's cells as that row's "primary directive" line.
+-- We then write the rows, in week order, to <jobname>_schedule_grid.tex and
+-- \input that file (one row per line, so grid-file line N == week N), and we
+-- emit a sidecar <jobname>.schedmap recording grid_line -> user_source_line.
+--
+-- Out of the box, SyncTeX therefore attributes the typeset rows to the GRID
+-- file (which is what \input'ing it produces).  The Sublime builder closes the
+-- loop: texlib_builder.py's _rewrite_synctex_for_schedmap reads the .schedmap
+-- after compilation and rewrites <jobname>.synctex.gz, repointing the grid-file
+-- records at the user's .tex and remapping each row's line from grid_line to
+-- the recorded source line.  Click a calendar row in the PDF -> jump to the
+-- directive line in the source.  On command-line builds (no rewrite step) the
+-- fallback is still usable: clicks land in the grid file at the matching line.
+--
+-- NB: this path does NOT use texlib_synctex.lua / texlib_synctex_stage; that
+-- helper drives the problem-bank classes' \@@input redirect, but the schedule
+-- grid is large and static, so the simpler write-file + sidecar-rewrite route
+-- is used here instead.
 --
 -- V1 limitation: assumes all directives live in the main .tex file.  If the
 -- user splits the schedule body into a separate \input'd file, source lines
 -- still get recorded but they index into the main file, not the included
--- one.  A follow-up could group rows by source-file (using status.filename
--- per directive) and stage one redirect per file.
+-- one.  A follow-up could record status.filename per directive and emit a
+-- per-file schedmap.
 function render_grid()
 	if not start_date or not start_date.time then
 		tex.print("\\textbf{ERROR: 'start-date' is missing.}")
