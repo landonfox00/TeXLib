@@ -393,6 +393,29 @@ local function typeset_problem(p, stretch)
 		for i, ln in ipairs(content_lines) do
 			sparse[sm.line + i] = ln
 		end
+		-- Suppress \par firing during the blank-line padding that precedes
+		-- the real content.  Each blank line in the served temp file would
+		-- otherwise tokenise (under the default \endlinechar=13) to a \par
+		-- token; exam.cls's \trivlist starts emitting "missing \item" once
+		-- roughly 1000 \pars have piled up inside a \question item — which
+		-- happens routinely whenever a bank problem lives past line ~1000.
+		--
+		-- Fix: bracket the blank padding with \endlinechar=-1 (no end-of-line
+		-- char appended → blank line emits zero tokens → no \par) and restore
+		-- \endlinechar=13 on the line just before content begins.  The single
+		-- \par that fires on the restore boundary is harmless — it just ends
+		-- the \question item's (empty) initial paragraph and leaves TeX in
+		-- vertical mode right before the content's first paragraph starts.
+		-- The explicit \relax terminates the integer scan unambiguously so
+		-- TeX doesn't have to peek into the next line (which would tokenise
+		-- that line under the wrong \endlinechar setting).
+		--
+		-- Skipped when sm.line < 3 (no padding to worry about, and we'd
+		-- need lines 1 and sm.line-1 to be distinct).
+		if sm.line >= 3 then
+			sparse[1]           = "\\endlinechar=-1\\relax"
+			sparse[sm.line - 1] = "\\endlinechar=13\\relax"
+		end
 		texlib_synctex_stage{
 			target_file = bank_path,
 			lines       = sparse,

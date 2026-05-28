@@ -90,7 +90,45 @@
 
 % \loadbank is provided by texlib-problembank.sty (the redirect activates
 % automatically; quizzes are always single-version so pbank_suppress_redirect
-% never trips).
+% never trips).  A coursemeta bank-path (exposed as \GetBankPath) is
+% auto-loaded at \AtBeginDocument, and a sibling bank.tex is picked up as a
+% fallback — so per-quiz \loadbank calls are usually unnecessary.  Unlike
+% autoexam.cls, no RNG seed is set (quizzes are single-version by design;
+% see section 4 above).  Bank-path resolution mirrors autoexam exactly:
+% try the literal path first (back-compat with document-relative legacy
+% values), then \GetCourseMetaDir\GetBankPath (coursemeta-relative — the
+% preferred convention, depth-agnostic), then fall through to a hard load
+% on the literal path so a missing bank raises the usual \input error.
+\AtBeginDocument{%
+	\@ifundefined{GetBankPath}{}{%
+		\edef\@tmpbankpath{\GetBankPath}%
+		\ifx\@tmpbankpath\empty\else
+			\IfFileExists{\@tmpbankpath}{%
+				\loadbank{\@tmpbankpath}%
+			}{%
+				\@ifundefined{GetCourseMetaDir}{%
+					\loadbank{\@tmpbankpath}%
+				}{%
+					\edef\@tmpbankresolved{\GetCourseMetaDir\@tmpbankpath}%
+					\IfFileExists{\@tmpbankresolved}{%
+						\loadbank{\@tmpbankresolved}%
+					}{%
+						\loadbank{\@tmpbankpath}%
+					}%
+				}%
+			}%
+		\fi
+	}%
+	% Auto-load bank.tex from the document's own directory, if present.
+	% \IfFileExists consults TEXINPUTS, so a recursive TeXLib// entry can
+	% match a stray sample bank shipped with the library and silently load
+	% the wrong file.  Probe the literal CWD via LuaFileSystem instead.
+	\directlua{%
+		if lfs.attributes('bank.tex', 'mode') == 'file' then
+			tex.print('\string\\loadbank{bank.tex}')
+		end
+	}%
+}
 
 \newenvironment{problems}{%
 	\directlua{pbank_first_on_page = true}%

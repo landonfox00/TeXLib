@@ -26,5 +26,8 @@
 	end-date        = 12-8,
 	final-date      = 12-15,
 	final-time      = {9:45-11:45am},
-	bank-path       = {../Bank/bank.tex},
+	% bank-path is resolved relative to this file's directory — both
+	% autoexam.cls and quiz.cls prepend \GetCourseMetaDir so the same
+	% string works at any document depth.
+	bank-path       = {Bank/bank.tex},
 }

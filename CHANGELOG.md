@@ -38,6 +38,7 @@ A consolidation pass: a new user-facing feature on `\problem`, four new shared `
 
 ### Fixed
 
+- **SyncTeX bank-file redirect no longer fires "missing \item" errors for problems past line ~1000.** The redirect path pads its temp file with blank lines so the served content lines up with the bank's true source lines (for accurate inverse-search attribution). Each blank line was tokenising — under the default `\endlinechar=13` — to a `\par` token; exam.cls's `\trivlist` starts complaining once roughly 1000 `\par`s have stacked inside a `\question` item, breaking single-version exams and quizzes whenever a problem lived past line ~1000 of the bank. `typeset_problem` now brackets the padding region with `\endlinechar=-1\relax` on line 1 and `\endlinechar=13\relax` on `sm.line-1`, so the blank lines emit zero tokens (no `\par`) and only one harmless `\par` fires right before the real content begins. SyncTeX line attribution is preserved — clicks still land on the correct bank line.
 - **`\importproblem` overrides are now actually locked.** Previously its overrides were set via direct `set_var` calls, which the imported file's own `\setrng` could clobber. It now routes through `pbank_apply_fix` and gets the same `fixed[]`-table semantics as `\problem[a=1,b=2]`.
 
 ### Cleanup
