@@ -641,15 +641,16 @@ function render_grid()
 	-- another row and emit a stub of column rules below the table.
 	tex.print("\\hline \\endlastfoot")
 
-	-- Build rows in week order, recording each row's first contributing
-	-- directive's source line alongside.  We emit the rows sequentially
-	-- (preserving calendar order) and write a separate sidecar `.schedmap`
-	-- that records grid_line -> user_source_line so a builder-side step can
-	-- post-process synctex.gz to redirect inverse search at the user's
-	-- template.tex.
-	local rows         = {}   -- ordered array of full row strings (no trailing newline)
-	local row_sources  = {}   -- parallel array; row_sources[i] is the first directive's source line for rows[i], or nil
-	local fallback_src = 0    -- used for "click anywhere in this auto-only week" via fallback propagation
+	-- Build rows in week order.  Each row is a list of per-cell records
+	-- carrying the cell's typeset content and the source line of the
+	-- directive that filled it (cell.source_line — set by tag_cell_source).
+	-- We then emit one cell PER LINE in the grid file so SyncTeX records each
+	-- cell's typeset nodes against its own grid_line; the sidecar .schedmap
+	-- maps those grid_lines to the user's directive lines, giving inverse
+	-- search per-cell precision rather than the old per-row minimum.
+	local rows         = {}   -- ordered array of { week_label, cells = {...}, row_attr }
+	local fallback_src = 0    -- last explicit directive line (auto-only weeks inherit)
+	local last_src     = 0    -- max directive line seen anywhere — boilerplate fallback target
 	local week_num = 1
 	local row_ptr = Date.new(start_date)
 	local start_wd = row_ptr:weekday()
@@ -661,7 +662,8 @@ function render_grid()
 	while row_ptr and row_ptr.time and row_ptr <= cursor_date do
 		safety = safety + 1; if safety > 100 then break end
 
-		local row_str = "\\centering \\raisebox{0.95em}{\\parbox[t][4.75em][c]{1.5em}{\\centering\\textbf{" .. week_num .. "}}} "
+		local week_label = "\\centering \\raisebox{0.95em}{\\parbox[t][4.75em][c]{1.5em}{\\centering\\textbf{" .. week_num .. "}}}"
+		local cells_out  = {}
 		local row_source = nil
 
 		for _, day_idx in ipairs(active_indices) do
@@ -709,29 +711,40 @@ function render_grid()
 
 			local body = cell:get_render_text(sanitize)
 			if body ~= "" then cell_content = cell_content .. "\\par\\vspace{0.3em}\\centering " .. body end
-			row_str = row_str .. "& " .. cell.color .. " " .. cell_content .. " "
 
-			-- Collect the minimum source line across the row's cells.
-			if cell.source_line and cell.source_line > 0 then
-				if not row_source or cell.source_line < row_source then
-					row_source = cell.source_line
-				end
-			end
+			local src = (cell.source_line and cell.source_line > 0) and cell.source_line or nil
+			table.insert(cells_out, {
+				text       = "& " .. cell.color .. " " .. cell_content,
+				source_line = src,
+			})
+
+			if src and (not row_source or src < row_source) then row_source = src end
+			if src and src > last_src then last_src = src end
 		end
 
-		table.insert(rows, row_str)  -- terminator added below per-position
-		-- For the srcmap: prefer the row's explicit directive line, fall back
-		-- to the previous explicit directive (auto-only weeks inherit).
 		if row_source then fallback_src = row_source end
-		table.insert(row_sources, row_source or (fallback_src > 0 and fallback_src or nil))
+		local row_attr = row_source or (fallback_src > 0 and fallback_src or nil)
+
+		table.insert(rows, {
+			week_label = week_label,
+			cells      = cells_out,
+			row_attr   = row_attr,
+		})
 
 		row_ptr = row_ptr + 7
 		week_num = week_num + 1
 		if week_num > 52 then break end
 	end
 
-	-- Write the grid file with one row per line, in week order.  The PDF
-	-- renders rows in the order the file is read — matching calendar order.
+	-- Emit the grid file: one cell per line, so SyncTeX records each cell's
+	-- typeset nodes against its own grid_line.  Per row:
+	--   <week_label>
+	--   & <cell 1>
+	--   & <cell 2>
+	--   ...
+	--   <row terminator>
+	-- xltabular treats inter-cell whitespace (including newlines) as a single
+	-- space, so splitting across lines is layout-neutral.
 	--
 	-- Row terminator: every row except the LAST ends with `\tabularnewline
 	-- \hline` (closes the row + draws the inter-row rule).  The LAST row
@@ -741,34 +754,53 @@ function render_grid()
 	-- row stub the way a trailing inter-row `\hline` would.
 	local target_file = tex.jobname .. '_schedule_grid.tex'
 	local fout = io.open(target_file, 'w')
-	local n = #rows
-	local function row_terminator(i)
-		if i < n then return " \\tabularnewline \\hline" end
-		return " \\tabularnewline"
-	end
-	if fout then
-		for i, row in ipairs(rows) do
-			fout:write(row .. row_terminator(i) .. '\n')
-		end
-		fout:close()
-		tex.print('\\input{' .. target_file .. '}')
-	else
-		-- Filesystem issue: emit rows directly via tex.print.  Inverse search
-		-- attributes everything to the \directlua call site (the old
-		-- behaviour); rows still render in week order.
-		for i, row in ipairs(rows) do
-			tex.print(row .. row_terminator(i))
+	local n_rows = #rows
+	local map_entries = {}   -- { { grid_line = N, src_line = N }, ... }
+	local line_counter = 0
+	local function emit(text, src)
+		if fout then fout:write(text .. '\n') else tex.print(text) end
+		line_counter = line_counter + 1
+		if src and src > 0 then
+			table.insert(map_entries, { grid_line = line_counter, src_line = src })
 		end
 	end
 
-	-- Write the sidecar source-line map.  Format (one entry per row):
+	for i, row in ipairs(rows) do
+		emit(row.week_label, row.row_attr)
+		for _, c in ipairs(row.cells) do
+			emit(c.text, c.source_line or row.row_attr)
+		end
+		local terminator = (i < n_rows) and "\\tabularnewline \\hline" or "\\tabularnewline"
+		emit(terminator, row.row_attr)
+	end
+
+	if fout then
+		fout:close()
+		tex.print('\\input{' .. target_file .. '}')
+	end
+	-- If fout was nil, content was already pushed via tex.print above; map
+	-- entries are still produced but the rewriter has no grid file to find,
+	-- so inverse search falls back to attributing typeset nodes to the
+	-- \directlua call site (the old pre-redirect behaviour).
+
+	-- Write the sidecar source-line map.  Format (one entry per cell line):
 	--     grid_line|user_source_line
 	-- The Sublime builder reads this after compilation and rewrites
-	-- synctex.gz so inverse search from the PDF lands in template.tex at the
+	-- synctex.gz so inverse search from the PDF lands in <base>.tex at the
 	-- recorded source line.  Without that rewrite step (e.g. command-line
 	-- builds), inverse search still works — it just lands in the
 	-- _schedule_grid.tex file at the corresponding line, where the user can
-	-- see the row content and identify the directive manually.
+	-- see the cell content and identify the directive manually.
+	--
+	-- Boilerplate fallback: typeset nodes for the table's bottom rule
+	-- (\endlastfoot), the page footer (\cfoot from fancyhdr), and other
+	-- shipout-time content get attributed by LaTeX to <base>.tex on the
+	-- \end{document} line — clicking the table's bottom edge or the page
+	-- footer would otherwise land at \end{document}.  Record the
+	-- \end{schedule} line so the rewriter can redirect any source-file
+	-- record on a later line to the last directive instead.
+	local end_sched_line  = tex.inputlineno
+	local boilerplate_dst = (last_src > 0) and last_src or end_sched_line
 	local map_file = tex.jobname .. '.schedmap'
 	local mout = io.open(map_file, 'w')
 	if mout then
@@ -776,10 +808,10 @@ function render_grid()
 		mout:write('# grid_line|user_source_line\n')
 		mout:write('# grid file: ' .. target_file .. '\n')
 		mout:write('# job file:  ' .. tex.jobname .. '.tex\n')
-		for i, src in ipairs(row_sources) do
-			if src then
-				mout:write(i .. '|' .. src .. '\n')
-			end
+		mout:write('# boilerplate-after-line: ' .. end_sched_line .. '\n')
+		mout:write('# boilerplate-target-line: ' .. boilerplate_dst .. '\n')
+		for _, e in ipairs(map_entries) do
+			mout:write(e.grid_line .. '|' .. e.src_line .. '\n')
 		end
 		mout:close()
 	end

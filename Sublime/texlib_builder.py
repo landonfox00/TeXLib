@@ -469,13 +469,37 @@ class TexlibBuilder(PdfBuilder):
         if not (schedmap and synctex):
             return
 
-        # Parse .schedmap (lines of "grid_line|user_source_line"; '#'-comments skipped)
+        # Parse .schedmap.  Body lines are "grid_line|user_source_line".
+        # Header comments may carry two extra hints:
+        #   # boilerplate-after-line: N
+        #   # boilerplate-target-line: M
+        # Records the rewriter uses to redirect Schedule.tex records on any
+        # line > N (e.g. content attributed to \end{document}: the table's
+        # bottom rule from \endlastfoot, page footers, shipout artifacts) to
+        # line M (the last directive line).
         line_map = {}
+        boilerplate_after_line  = None
+        boilerplate_target_line = None
+        header_re = re.compile(
+            r"#\s*(boilerplate-after-line|boilerplate-target-line)\s*:\s*(\d+)"
+        )
         try:
             with open(schedmap, "r", encoding="utf-8", errors="replace") as fh:
                 for raw in fh:
                     s = raw.strip()
-                    if not s or s.startswith("#"):
+                    if not s:
+                        continue
+                    if s.startswith("#"):
+                        hm = header_re.match(s)
+                        if hm:
+                            try:
+                                val = int(hm.group(2))
+                            except ValueError:
+                                continue
+                            if hm.group(1) == "boilerplate-after-line":
+                                boilerplate_after_line = val
+                            else:
+                                boilerplate_target_line = val
                         continue
                     parts = s.split("|", 1)
                     if len(parts) != 2:
@@ -502,6 +526,7 @@ class TexlibBuilder(PdfBuilder):
         src_basename  = base_name + ".tex"
 
         grid_ids = set()
+        src_ids  = set()
         src_path = None
         for m in re.finditer(r"^Input:(\d+):(.+)$", content, re.MULTILINE):
             fid = int(m.group(1))
@@ -509,8 +534,10 @@ class TexlibBuilder(PdfBuilder):
             bn = os.path.basename(path.replace("\\", "/"))
             if bn == grid_basename:
                 grid_ids.add(fid)
-            elif bn == src_basename and src_path is None:
-                src_path = path
+            elif bn == src_basename:
+                src_ids.add(fid)
+                if src_path is None:
+                    src_path = path
 
         if not grid_ids or src_path is None:
             return
@@ -524,24 +551,38 @@ class TexlibBuilder(PdfBuilder):
         content = re.sub(r"^Input:(\d+):.+$", _rewrite_input,
                          content, flags=re.MULTILINE)
 
-        # 2) Remap line numbers in typeset records that reference the grid IDs.
+        # 2) Remap line numbers in typeset records.
         #    Record prefix is one of: ( [ h v x g k r $  (boxes, nodes, math).
         #    Format: "<prefix><fileID>,<line>:..."
         #    File-scope markers ({N / }N) carry no line so they're untouched.
+        #    Two rewrites apply:
+        #      a) fileID in grid_ids and line in line_map  -> map cell -> directive.
+        #      b) fileID is the source AND line > boilerplate-after-line -> map
+        #         to boilerplate-target-line (page footers, table bottom rule).
         record_re = re.compile(r"([(\[hvxgkr$])(\d+),(\d+):")
 
+        do_boilerplate = (
+            boilerplate_after_line is not None
+            and boilerplate_target_line is not None
+            and src_ids
+        )
+
         rewrites = 0
+        boilerplate_rewrites = 0
         def _rewrite_record(match):
-            nonlocal rewrites
+            nonlocal rewrites, boilerplate_rewrites
             fid  = int(match.group(2))
             line = int(match.group(3))
             if fid in grid_ids and line in line_map:
                 rewrites += 1
                 return "%s%d,%d:" % (match.group(1), fid, line_map[line])
+            if do_boilerplate and fid in src_ids and line > boilerplate_after_line:
+                boilerplate_rewrites += 1
+                return "%s%d,%d:" % (match.group(1), fid, boilerplate_target_line)
             return match.group(0)
         content = record_re.sub(_rewrite_record, content)
 
-        if rewrites == 0:
+        if rewrites == 0 and boilerplate_rewrites == 0:
             return
 
         # Write back.  Re-gzip to keep the file format unchanged.
@@ -555,10 +596,17 @@ class TexlibBuilder(PdfBuilder):
             )
             return
 
-        self.display(
+        msg = (
             "TeXLib: rewrote %d schedule SyncTeX records "
-            "(%d row(s) mapped to user source).\n" % (rewrites, len(line_map))
+            "(%d cell(s) mapped to user source"
+            % (rewrites, len(line_map))
         )
+        if boilerplate_rewrites:
+            msg += "; %d boilerplate record(s) redirected to line %d" % (
+                boilerplate_rewrites, boilerplate_target_line
+            )
+        msg += ").\n"
+        self.display(msg)
 
     def _split_pdf_if_signaled(self, base_path):
         """Honor a <base>.spl 'split_page=N' signal: split the PDF in two."""
