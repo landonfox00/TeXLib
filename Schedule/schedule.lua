@@ -639,7 +639,14 @@ function render_grid()
 	-- trailing \hline.  This avoids a longtable/xltabular quirk where a
 	-- trailing `\tabularnewline \hline` causes the engine to prepare for
 	-- another row and emit a stub of column rules below the table.
-	tex.print("\\hline \\endlastfoot")
+	--
+	-- The lastfoot's `\hline` lives in a longtable-built row-box with an
+	-- \@arstrutbox strut (~12pt at 10pt size), which would push the bottom
+	-- rule that far below the last calendar row — leaving row 3 visibly
+	-- taller than rows 1 and 2.  The leading \noalign{\vskip -12pt} cancels
+	-- that strut so the bottom rule meets the cells' column rules where they
+	-- end, matching the inter-row spacing of every other row.
+	tex.print("\\noalign{\\vskip -12pt}\\hline \\endlastfoot")
 
 	-- Build rows in week order.  Each row is a list of per-cell records
 	-- carrying the cell's typeset content and the source line of the
