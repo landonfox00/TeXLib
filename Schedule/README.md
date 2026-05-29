@@ -153,6 +153,27 @@ the package and must accompany `schedule.cls`.
 - **Exam after a unit:** the typical pattern is
 	`\section{...} \section{...} \examreview \exam[noquiz]`.
 
+## Inverse search
+
+Inverse search (double-clicking a cell in the PDF to jump to the
+matching directive in your `.tex`) is **mostly working** when builds go
+through the TeXLib Sublime builder:
+
+- Clicking on a topic / holiday / quiz / exam cell lands on the line of
+	the directive that produced it.
+- Clicking on the table's bottom rule, the page footer, or other
+	auto-generated boilerplate redirects to the last `\topic`/`\section`
+	in the schedule body rather than `\end{document}`.
+- Edge cases: clicking the header row or the title banner still lands
+	on `\begin{schedule}`; clicks on the week-number column inherit the
+	source line of the first directive in that week.
+
+Requires the canonical `texlib_builder.py` to be deployed to
+`Packages/User/` (see `Sublime/README.md`).  Command-line builds skip
+the SyncTeX rewrite step, in which case inverse search falls back to
+landing in the generated `<base>_schedule_grid.tex` file at the
+corresponding cell line.
+
 ## Related
 
 - `course-metadata.md` — for the start-date/end-date/final-date/
