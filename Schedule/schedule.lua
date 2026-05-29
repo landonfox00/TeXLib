@@ -759,8 +759,30 @@ function render_grid()
 	-- bottom rule is drawn by `\endlastfoot` (declared above), which longtable
 	-- emits exactly once after the last body row without spawning a phantom
 	-- row stub the way a trailing inter-row `\hline` would.
+	-- Resolve the output (aux) directory if `-output-directory=X` was passed
+	-- to lualatex (the TeXLib Sublime builder routes EVERYTHING via that flag
+	-- with aux_directory="<<temp>>").  Both files we generate below — the
+	-- grid file and the .schedmap sidecar — are build artifacts the user
+	-- never edits, so writing them to the aux dir instead of CWD keeps the
+	-- source directory clean (typically just .tex + .pdf).  Falls back to
+	-- CWD for command-line builds with no -output-directory.
+	--
+	-- For the grid file, `\input{<basename>}` still finds it because
+	-- lualatex's input search includes the output dir when -output-directory
+	-- is set.  For .schedmap, the Sublime builder's _find_in_dirs probes
+	-- both the source and the aux dir.
+	local aux_dir =
+		(kpse.var_value and kpse.var_value("TEXMF_OUTPUT_DIRECTORY"))
+		or os.getenv("TEXMF_OUTPUT_DIRECTORY")
+		or os.getenv("TEXMFOUTPUT")
+	if aux_dir == "" then aux_dir = nil end
+	local function aux_path(name)
+		if aux_dir then return aux_dir .. "/" .. name end
+		return name
+	end
+
 	local target_file = tex.jobname .. '_schedule_grid.tex'
-	local fout = io.open(target_file, 'w')
+	local fout = io.open(aux_path(target_file), 'w')
 	local n_rows = #rows
 	local map_entries = {}   -- { { grid_line = N, src_line = N }, ... }
 	local line_counter = 0
@@ -809,7 +831,7 @@ function render_grid()
 	local end_sched_line  = tex.inputlineno
 	local boilerplate_dst = (last_src > 0) and last_src or end_sched_line
 	local map_file = tex.jobname .. '.schedmap'
-	local mout = io.open(map_file, 'w')
+	local mout = io.open(aux_path(map_file), 'w')
 	if mout then
 		mout:write('# schedule source map v1\n')
 		mout:write('# grid_line|user_source_line\n')

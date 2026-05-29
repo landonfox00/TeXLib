@@ -11,6 +11,8 @@ course-metadata_old.sty
 *.out
 *.toc
 *.synctex.gz
+*.synctex.gz.sum.synctex
+*.synctex
 *.fls
 *.fdb_latexmk
 *.bbl
@@ -20,6 +22,12 @@ course-metadata_old.sty
 *.vrb
 *.dvi
 *.pdf
+
+# TeXLib schedule class scaffolding (now written to the aux dir, but a
+# stale copy may linger from a command-line build that bypassed the
+# Sublime builder).
+*.schedmap
+*_schedule_grid.tex
 
 # Python build artifacts
 __pycache__/
