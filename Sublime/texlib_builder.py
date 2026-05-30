@@ -465,8 +465,15 @@ class TexlibBuilder(PdfBuilder):
         exists in the stream.
         """
         schedmap = self._find_in_dirs(base_name + ".schedmap", [tex_dir, build_dir])
-        synctex  = self._find_in_dirs(base_name + ".synctex.gz", [build_dir, tex_dir])
-        if not (schedmap and synctex):
+        if not schedmap:
+            return
+        synctex = self._find_in_dirs(base_name + ".synctex.gz", [build_dir, tex_dir])
+        if not synctex:
+            self.display(
+                "TeXLib: schedule .schedmap is present but no .synctex.gz "
+                "was found; inverse search won't be repointed at the source "
+                "(is -synctex=1 set?).\n"
+            )
             return
 
         # Parse .schedmap.  Body lines are "grid_line|user_source_line".
@@ -540,6 +547,13 @@ class TexlibBuilder(PdfBuilder):
                     src_path = path
 
         if not grid_ids or src_path is None:
+            missing = "grid-file" if not grid_ids else "source-file"
+            self.display(
+                "TeXLib: schedule SyncTeX rewrite skipped: .schedmap is "
+                f"present but no {missing} Input record was found in "
+                f"{os.path.basename(synctex)}. Inverse search will land "
+                "in the grid file instead of the source.\n"
+            )
             return
 
         # 1) Rewrite each grid-file Input record to point at the user source.

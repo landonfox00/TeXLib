@@ -289,11 +289,46 @@ def main():
     tmp2 = tempfile.mkdtemp(prefix="texlib_bt_synctex_noop_")
     with gzip.open(os.path.join(tmp2, base + ".synctex.gz"), "wt", encoding="utf-8") as fh:
         fh.write(fake_synctex)
+    b = TexlibBuilder()
     b._rewrite_synctex_for_schedmap(tmp2, tmp2, base)
     with gzip.open(os.path.join(tmp2, base + ".synctex.gz"), "rt", encoding="utf-8") as fh:
         unchanged = fh.read()
     check("schedmap rewrite: no-op when .schedmap is missing",
           unchanged == fake_synctex, "stream changed despite missing schedmap")
+    check("schedmap rewrite: silent (no display) when schedmap is missing",
+          b._displayed == "", b._displayed)
+
+    # (m) diagnostic when schedmap is present but no grid-file Input record
+    # is found in the synctex stream (the stale-builder / path-mismatch case).
+    tmp3 = tempfile.mkdtemp(prefix="texlib_bt_synctex_diag_")
+    src_path = os.path.join(tmp3, "doc.tex").replace("\\", "/")
+    # synctex stream WITHOUT any grid-file Input record
+    fake_no_grid = (
+        f"SyncTeX Version:1\n"
+        f"Input:1:{src_path}\n"
+        f"!17\n{{0\n(1,5:1000,2000:5000,500,100\n}}0\nPostamble:\n"
+    )
+    with gzip.open(os.path.join(tmp3, base + ".synctex.gz"), "wt", encoding="utf-8") as fh:
+        fh.write(fake_no_grid)
+    with open(os.path.join(tmp3, base + ".schedmap"), "w", encoding="utf-8") as fh:
+        fh.write("1|34\n")
+    b = TexlibBuilder()
+    b._rewrite_synctex_for_schedmap(tmp3, tmp3, base)
+    check("schedmap rewrite: warns when grid Input record is missing",
+          "no grid-file Input record" in b._displayed, b._displayed)
+    with gzip.open(os.path.join(tmp3, base + ".synctex.gz"), "rt", encoding="utf-8") as fh:
+        unchanged_diag = fh.read()
+    check("schedmap rewrite: stream unchanged when grid Input is missing",
+          unchanged_diag == fake_no_grid, "stream unexpectedly changed")
+
+    # (n) diagnostic when schedmap is present but synctex.gz is missing
+    tmp4 = tempfile.mkdtemp(prefix="texlib_bt_synctex_nosync_")
+    with open(os.path.join(tmp4, base + ".schedmap"), "w", encoding="utf-8") as fh:
+        fh.write("1|34\n")
+    b = TexlibBuilder()
+    b._rewrite_synctex_for_schedmap(tmp4, tmp4, base)
+    check("schedmap rewrite: warns when .synctex.gz is missing",
+          "no .synctex.gz" in b._displayed, b._displayed)
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL
