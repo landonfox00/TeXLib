@@ -59,38 +59,59 @@
 % autoexam.cls and quiz.cls now reach the engine through this package; the
 % engine and the .sty travel together at the TeXLib root.
 %
-% NOTE: no Lua `--` line comments inside this \directlua block. TeX collapses
-% the newlines into spaces before Lua sees the chunk, so a `--` comment would
-% swallow the rest of the code. Keep explanations in TeX `%` comments above.
-\directlua{
-	local function load_engine(name)
-		local path = kpse.find_file(name, "lua")
-		if path and lfs.attributes(path) then dofile(path) return end
-		local sty_path = kpse.find_file("texlib-problembank.sty")
-		local base_dir = sty_path and sty_path:match("(.*[/\\])") or ""
-		path = base_dir .. name
-		if lfs.attributes(path) then dofile(path) return end
-		dofile(name)
-	end
-	load_engine("texlib_synctex.lua")
-	load_engine("problem_engine.lua")
-}%
+% Engine bridge. The bank macros below reach Lua through \pbank@lua. Under
+% LuaLaTeX that is simply \directlua, and we load the engine now. Under any
+% other engine \directlua does not exist, so we skip the load and point
+% \pbank@lua at a clear error instead: a document that merely *loads* this
+% package (e.g. didactic.cls auto-loads it so lecture notes can optionally
+% \getproblem) still compiles under pdflatex; only an actual bank command
+% (\getproblem, \setvar, ...) raises the error. We intentionally do NOT shadow
+% the \directlua primitive itself, because other packages probe
+% \ifdefined\directlua to detect LuaTeX.
+\ifdefined\directlua
+	\let\pbank@lua\directlua
+	% NOTE: no Lua `--` line comments inside this \directlua block. TeX collapses
+	% the newlines into spaces before Lua sees the chunk, so a `--` comment would
+	% swallow the rest of the code. Keep explanations in TeX `%` comments above.
+	\pbank@lua{
+		local function load_engine(name)
+			local path = kpse.find_file(name, "lua")
+			if path and lfs.attributes(path) then dofile(path) return end
+			local sty_path = kpse.find_file("texlib-problembank.sty")
+			local base_dir = sty_path and sty_path:match("(.*[/\\])") or ""
+			path = base_dir .. name
+			if lfs.attributes(path) then dofile(path) return end
+			dofile(name)
+		end
+		load_engine("texlib_synctex.lua")
+		load_engine("problem_engine.lua")
+	}%
+\else
+	\newcommand{\pbank@lua}[1]{%
+		\PackageError{texlib-problembank}%
+			{Problem-bank features require LuaLaTeX}%
+			{A texlib-problembank command such as \string\getproblem\space or
+			 \string\setvar\space drives a Lua engine through \string\directlua,
+			 which only exists under LuaLaTeX. Compile this document with
+			 lualatex (or remove the problem-bank usage).}%
+	}%
+\fi
 
 % ==============================================================================
 % Variable management
 % ==============================================================================
 
 % \setvar{name}{value}  — store a named value
-\newcommand{\setvar}[2]{\directlua{set_var('#1', #2)}}
+\newcommand{\setvar}[2]{\pbank@lua{set_var('#1', #2)}}
 
 % \setrng{name}{min}{max}  — store a single random integer in [min, max]
-\newcommand{\setrng}[3]{\directlua{set_rng('#1', #2, #3)}}
+\newcommand{\setrng}[3]{\pbank@lua{set_rng('#1', #2, #3)}}
 
 % \calcvar{name}{lua-expr}  — compute an expression using stored vars
-\newcommand{\calcvar}[2]{\directlua{calc_var('#1', '#2')}}
+\newcommand{\calcvar}[2]{\pbank@lua{calc_var('#1', '#2')}}
 
 % \get{name}  — retrieve and typeset a stored value
-\newcommand{\get}[1]{\directlua{get_var('#1')}}
+\newcommand{\get}[1]{\pbank@lua{get_var('#1')}}
 
 % ==============================================================================
 % Randomisation: pick from list / range
@@ -99,22 +120,22 @@
 % \picklist{name}{n}{a, b, c, ...}  — pick n items WITHOUT replacement
 % NOTE: list items must not contain commas themselves.
 \NewDocumentCommand{\picklist}{m m m}{%
-	\directlua{pick_from_list('\luaescapestring{#1}', #2, '\luaescapestring{#3}')}%
+	\pbank@lua{pick_from_list('\luaescapestring{#1}', #2, '\luaescapestring{#3}')}%
 }
 
 % \picklistr{name}{n}{a, b, c, ...}  — pick n items WITH replacement
 \NewDocumentCommand{\picklistr}{m m m}{%
-	\directlua{pick_from_list_r('\luaescapestring{#1}', #2, '\luaescapestring{#3}')}%
+	\pbank@lua{pick_from_list_r('\luaescapestring{#1}', #2, '\luaescapestring{#3}')}%
 }
 
 % \pickrange{name}{n}{min}{max}  — pick n distinct integers from [min, max]
 \NewDocumentCommand{\pickrange}{m m m m}{%
-	\directlua{pick_from_range('\luaescapestring{#1}', #2, #3, #4)}%
+	\pbank@lua{pick_from_range('\luaescapestring{#1}', #2, #3, #4)}%
 }
 
 % \pickranger{name}{n}{min}{max}  — pick n integers from [min, max] with replacement
 \NewDocumentCommand{\pickranger}{m m m m}{%
-	\directlua{pick_from_range_r('\luaescapestring{#1}', #2, #3, #4)}%
+	\pbank@lua{pick_from_range_r('\luaescapestring{#1}', #2, #3, #4)}%
 }
 
 % ==============================================================================
@@ -123,19 +144,19 @@
 
 % \getlist{name}  — typeset all picked values, comma-separated
 \NewDocumentCommand{\getlist}{m}{%
-	\directlua{get_list('\luaescapestring{#1}')}%
+	\pbank@lua{get_list('\luaescapestring{#1}')}%
 }
 
 % \geti{name}{i}  — typeset the i-th picked value (1-indexed)
 \NewDocumentCommand{\geti}{m m}{%
-	\directlua{get_var('\luaescapestring{#1}_' .. #2)}%
+	\pbank@lua{get_var('\luaescapestring{#1}_' .. #2)}%
 }
 
 % \foreachpick[sep]{name}{code}  — iterate over picked values;
 %   \currentpick is set to each value before {code} is executed.
 %   Optional [sep] is inserted between items (default: comma-space).
 \NewDocumentCommand{\foreachpick}{O{,\space} m +m}{%
-	\directlua{
+	\pbank@lua{
 		local count = tonumber(tostring(vars['\luaescapestring{#2}_count'])) or 0
 		for i = 1, count do
 			local v = vars['\luaescapestring{#2}_' .. i]
@@ -161,14 +182,14 @@
 %   document body. Redefining an existing ID overwrites it with a warning.
 \NewDocumentCommand{\newproblem}{m m +m +o}{%
 	\IfNoValueTF{#4}{%
-		\directlua{define_problem(
+		\pbank@lua{define_problem(
 			'\luaescapestring{#1}',
 			'\luaescapestring{#2}',
 			'\luaescapestring{\unexpanded{#3}}',
 			''
 		)}%
 	}{%
-		\directlua{define_problem(
+		\pbank@lua{define_problem(
 			'\luaescapestring{#1}',
 			'\luaescapestring{#2}',
 			'\luaescapestring{\unexpanded{#3}}',
@@ -179,7 +200,7 @@
 
 % \dupproblem — deprecated alias for \newproblem (four mandatory args)
 \NewDocumentCommand{\dupproblem}{m m +m +m}{%
-	\directlua{define_problem(
+	\pbank@lua{define_problem(
 		'\luaescapestring{#1}',
 		'\luaescapestring{#2}',
 		'\luaescapestring{\unexpanded{#3}}',
@@ -202,7 +223,7 @@
 
 % Internal callback: receives the full collected body as #1.
 \long\def\@problem@collect@done#1{%
-	\directlua{define_problem_from_env(
+	\pbank@lua{define_problem_from_env(
 		'\luaescapestring{\@problem@id}',
 		'\luaescapestring{\@problem@meta}',
 		'\luaescapestring{\unexpanded{#1}}'
@@ -226,7 +247,7 @@
 	% Record the bank-file line number NOW (before \Collect@Body reads ahead to
 	% \end{problem}).  By the time define_problem_from_env() runs, \inputlineno
 	% has advanced to the \end{problem} line, so we snapshot it here instead.
-	\directlua{pbank_problem_start_line = tex.inputlineno}%
+	\pbank@lua{pbank_problem_start_line = tex.inputlineno}%
 	\@problem@scan
 }{%
 	% End-code is empty; \Collect@Body handles everything at \end{problem}.
@@ -243,7 +264,7 @@
 %   Multiple key=value pairs are ANDed; one random match is typeset.
 %   On no match: emits a visible placeholder and a log warning.
 \NewDocumentCommand{\getproblem}{m}{%
-	\directlua{get_problem('\luaescapestring{#1}')}%
+	\pbank@lua{get_problem('\luaescapestring{#1}')}%
 }
 
 % Backward-compat aliases
@@ -266,7 +287,7 @@
 %   \begin{parts}).  When the enclosing \problem item carries per-part
 %   point values (e.g. \problem[2,3]{id}), each \ppart call automatically
 %   injects the corresponding point annotation via the Lua part-index state.
-\NewDocumentCommand{\ppart}{}{\directlua{pbank_inject_part()}}
+\NewDocumentCommand{\ppart}{}{\pbank@lua{pbank_inject_part()}}
 
 % \@problem@item[points][stretch]{filter}[fix]
 %   The actual item command implementation — defined once at class load.
@@ -290,7 +311,7 @@
 %   Lua via tex.print, avoiding pre-tokenized-token interactions with the
 %   comment package's \excludecomment catcode scanner.
 \NewDocumentCommand{\@problem@item}{O{} O{1} m O{}}{%
-	\directlua{pbank_problem_item(
+	\pbank@lua{pbank_problem_item(
 		'\luaescapestring{#1}',
 		'\luaescapestring{#2}',
 		'\luaescapestring{#3}',
@@ -315,7 +336,7 @@
 % problems.  Single-version builds (quiz, edit-mode autoexam) leave the
 % suppress flag false and get the redirect.
 \NewDocumentCommand{\loadbank}{m}{%
-	\directlua{pbank_set_bankfile('\luaescapestring{#1}')}%
+	\pbank@lua{pbank_set_bankfile('\luaescapestring{#1}')}%
 	\input{#1}%
 }
 
@@ -333,9 +354,9 @@
 %   leak back to surrounding code.
 \newcommand{\importproblem}[2]{%
 	\begingroup
-	\directlua{push_scope() pbank_apply_fix('\luaescapestring{#2}')}%
+	\pbank@lua{push_scope() pbank_apply_fix('\luaescapestring{#2}')}%
 	\input{#1}%
-	\directlua{pop_scope()}%
+	\pbank@lua{pop_scope()}%
 	\endgroup
 }
 
