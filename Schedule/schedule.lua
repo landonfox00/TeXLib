@@ -614,7 +614,13 @@ end
 -- still get recorded but they index into the main file, not the included
 -- one.  A follow-up could group rows by source-file (using status.filename
 -- per directive) and stage one redirect per file.
-function render_grid()
+-- month_pages: when true, each calendar month is typeset as its own table on
+-- its own page (\newpage between months); a week straddling a month boundary
+-- is repeated in both months so every month shows complete weeks.  When false
+-- (the default) the whole term is one continuous table that breaks across
+-- pages wherever it runs out of room.  Toggled from the document via the
+-- `month-pages` meta key (see schedule.cls).
+function render_grid(month_pages)
 	if not start_date or not start_date.time then
 		tex.print("\\textbf{ERROR: 'start-date' is missing.}")
 		return
@@ -631,22 +637,21 @@ function render_grid()
 		col_def = col_def .. " X |"
 	end
 
-	-- Table open + header go through tex.print (they're just class boilerplate;
-	-- nobody is going to inverse-search the header).
-	tex.print("\\begin{xltabular}{\\textwidth}{" .. col_def .. "}")
-	tex.print("\\hline " .. header .. "\\tabularnewline \\hline\\noalign{\\vskip 2pt}\\hline \\endhead")
-	-- Bottom rule is supplied by \endlastfoot rather than by the last row's
-	-- trailing \hline.  This avoids a longtable/xltabular quirk where a
-	-- trailing `\tabularnewline \hline` causes the engine to prepare for
-	-- another row and emit a stub of column rules below the table.
-	--
-	-- The lastfoot's `\hline` lives in a longtable-built row-box with an
-	-- \@arstrutbox strut (~12pt at 10pt size), which would push the bottom
-	-- rule that far below the last calendar row — leaving row 3 visibly
-	-- taller than rows 1 and 2.  The leading \noalign{\vskip -12pt} cancels
-	-- that strut so the bottom rule meets the cells' column rules where they
-	-- end, matching the inter-row spacing of every other row.
-	tex.print("\\noalign{\\vskip -12pt}\\hline \\endlastfoot")
+	-- Reusable table boilerplate.  Emitted once per page-group below (so the
+	-- header repeats at the top of each month in month-pages mode).  These are
+	-- pure class boilerplate — nobody inverse-searches the header — so they go
+	-- out with no source line and produce no .schedmap entry.
+	local tbl_open = "\\begin{xltabular}{\\textwidth}{" .. col_def .. "}"
+	local tbl_head = "\\hline " .. header ..
+		"\\tabularnewline \\hline\\noalign{\\vskip 2pt}\\hline \\endhead"
+	-- Empty \endlastfoot: the bottom rule is drawn by the last row's own
+	-- trailing `\hline` (every row, including the last, ends `\tabularnewline
+	-- \hline`).  An empty lastfoot stops longtable from synthesising a phantom
+	-- trailing row whose column rules would otherwise poke out below the table
+	-- as a short vertical stub — the artifact a non-empty `\hline` lastfoot
+	-- (with its \@arstrutbox strut) used to leave behind.
+	local tbl_lastfoot = "\\endlastfoot"
+	local tbl_close = "\\end{xltabular}"
 
 	-- Build rows in week order.  Each row is a list of per-cell records
 	-- carrying the cell's typeset content and the source line of the
@@ -672,9 +677,20 @@ function render_grid()
 		local week_label = "\\centering \\raisebox{0.95em}{\\parbox[t][4.75em][c]{1.5em}{\\centering\\textbf{" .. week_num .. "}}}"
 		local cells_out  = {}
 		local row_source = nil
+		-- Months this week touches, in first-seen (calendar) order.  Drives the
+		-- month-pages grouping below: a week whose active days span two months
+		-- is listed under both, so it appears at the end of one month's page and
+		-- repeated at the top of the next.
+		local row_month_set = {}
+		local row_months     = {}
 
 		for _, day_idx in ipairs(active_indices) do
 			local cell_date = row_ptr:add_days(day_idx - 1)
+			local cell_month = cell_date:month()
+			if not row_month_set[cell_month] then
+				row_month_set[cell_month] = true
+				row_months[#row_months + 1] = cell_month
+			end
 			local cap = day_capacity_map[day_idx] or 1.0
 			if cap == 0 then cap = 1.0 end
 
@@ -736,6 +752,8 @@ function render_grid()
 			week_label = week_label,
 			cells      = cells_out,
 			row_attr   = row_attr,
+			month_set  = row_month_set,
+			months     = row_months,
 		})
 
 		row_ptr = row_ptr + 7
@@ -753,12 +771,10 @@ function render_grid()
 	-- xltabular treats inter-cell whitespace (including newlines) as a single
 	-- space, so splitting across lines is layout-neutral.
 	--
-	-- Row terminator: every row except the LAST ends with `\tabularnewline
-	-- \hline` (closes the row + draws the inter-row rule).  The LAST row
-	-- ends with `\tabularnewline` only — no trailing `\hline`.  The table's
-	-- bottom rule is drawn by `\endlastfoot` (declared above), which longtable
-	-- emits exactly once after the last body row without spawning a phantom
-	-- row stub the way a trailing inter-row `\hline` would.
+	-- Row terminator: EVERY row, including the last in each table, ends with
+	-- `\tabularnewline \hline` (closes the row + draws the rule beneath it).
+	-- Paired with the empty `\endlastfoot` declared above, the last row's own
+	-- `\hline` is the table's clean bottom rule — no phantom trailing-row stub.
 	-- Resolve the output (aux) directory if `-output-directory=X` was passed
 	-- to lualatex (the TeXLib Sublime builder routes EVERYTHING via that flag
 	-- with aux_directory="<<temp>>").  Both files we generate below — the
@@ -783,7 +799,6 @@ function render_grid()
 
 	local target_file = tex.jobname .. '_schedule_grid.tex'
 	local fout = io.open(aux_path(target_file), 'w')
-	local n_rows = #rows
 	local map_entries = {}   -- { { grid_line = N, src_line = N }, ... }
 	local line_counter = 0
 	local function emit(text, src)
@@ -794,13 +809,45 @@ function render_grid()
 		end
 	end
 
-	for i, row in ipairs(rows) do
-		emit(row.week_label, row.row_attr)
-		for _, c in ipairs(row.cells) do
-			emit(c.text, c.source_line or row.row_attr)
+	-- Partition the weeks into page-groups.  Default: one group (the whole
+	-- term, one continuous table).  month-pages: one group per calendar month
+	-- in chronological order, with boundary weeks repeated across the two
+	-- months they touch.
+	local groups
+	if month_pages then
+		local order, seen = {}, {}
+		for _, row in ipairs(rows) do
+			for _, m in ipairs(row.months) do
+				if not seen[m] then seen[m] = true; order[#order + 1] = m end
+			end
 		end
-		local terminator = (i < n_rows) and "\\tabularnewline \\hline" or "\\tabularnewline"
-		emit(terminator, row.row_attr)
+		groups = {}
+		for _, m in ipairs(order) do
+			local g = {}
+			for _, row in ipairs(rows) do
+				if row.month_set[m] then g[#g + 1] = row end
+			end
+			groups[#groups + 1] = g
+		end
+	else
+		groups = { rows }
+	end
+
+	-- One table per group; \newpage between groups.  Header/lastfoot boilerplate
+	-- is re-emitted per group so each month's table carries its own header row.
+	for gi, group in ipairs(groups) do
+		if gi > 1 then emit("\\newpage") end
+		emit(tbl_open)
+		emit(tbl_head)
+		emit(tbl_lastfoot)
+		for _, row in ipairs(group) do
+			emit(row.week_label, row.row_attr)
+			for _, c in ipairs(row.cells) do
+				emit(c.text, c.source_line or row.row_attr)
+			end
+			emit("\\tabularnewline \\hline", row.row_attr)
+		end
+		emit(tbl_close)
 	end
 
 	if fout then
@@ -821,11 +868,10 @@ function render_grid()
 	-- _schedule_grid.tex file at the corresponding line, where the user can
 	-- see the cell content and identify the directive manually.
 	--
-	-- Boilerplate fallback: typeset nodes for the table's bottom rule
-	-- (\endlastfoot), the page footer (\cfoot from fancyhdr), and other
-	-- shipout-time content get attributed by LaTeX to <base>.tex on the
-	-- \end{document} line — clicking the table's bottom edge or the page
-	-- footer would otherwise land at \end{document}.  Record the
+	-- Boilerplate fallback: typeset nodes for the page footer (\cfoot from
+	-- fancyhdr) and other shipout-time content get attributed by LaTeX to
+	-- <base>.tex on the \end{document} line — clicking the table's bottom edge
+	-- or the page footer would otherwise land at \end{document}.  Record the
 	-- \end{schedule} line so the rewriter can redirect any source-file
 	-- record on a later line to the last directive instead.
 	local end_sched_line  = tex.inputlineno
@@ -844,8 +890,6 @@ function render_grid()
 		end
 		mout:close()
 	end
-
-	tex.print("\\end{xltabular}")
 end
 
 function L_warn(msg)

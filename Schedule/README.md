@@ -33,6 +33,7 @@ dates and lecture-days, drop this into the schedule file:
 }
 
 \begin{document}
+\maketitle
 \begin{schedule}
 	% Holidays / blackouts
 	\holiday{1-19}{MLK Jr. Day}
@@ -83,6 +84,19 @@ Class-local keys (in addition to all standard `course-metadata` keys):
 | `portrait`      | `true` to force portrait                                |
 | `lecture-caps`  | Per-day weight caps, comma list matching `lecture-days` |
 | `quiz-days`     | Days of the week for quizzes (e.g. `T`, `Th`)           |
+| `month-pages`   | `true` to put each calendar month on its own page (see below). Default `false`: one continuous table. |
+
+#### `month-pages`
+
+By default the whole term is a single table that breaks across pages
+wherever it runs out of room. Set `month-pages = true` to instead
+typeset **each calendar month as its own table on its own page**, with a
+`\newpage` between months. A week that straddles a month boundary (its
+active days fall in two months) is **repeated** — it appears at the foot
+of the earlier month's page and again at the head of the next month's —
+so every month shows complete weeks, wall-calendar style. Week numbers
+are continuous across the term, so a repeated boundary week carries the
+same number on both pages.
 
 Required `course-metadata` keys: `course-subject`, `course-number`,
 `course-title`, `course-section`, `season`, `year`, `start-date`,
@@ -102,8 +116,10 @@ behaves identically to other TeXLib documents in your build pipeline.
 
 `\maketitle` (or `\scheduletitle`) emits the standard banner
 ("Math 126EE Precalculus I Tentative Schedule — Spring 2026 / Section
-1008"). The `schedule` env calls it automatically, so existing
-documents are unchanged.
+1008"). Call it explicitly in the document body (the canonical place is
+right after `\begin{document}`, before `\begin{schedule}`); the
+`schedule` environment does **not** emit the banner itself, so a
+document can run the grid title-less by simply omitting the call.
 
 ### `schedule` environment
 
