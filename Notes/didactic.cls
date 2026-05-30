@@ -166,6 +166,11 @@
 % section-based numbering, and binds each environment to a shared style.
 \RequirePackage{texlib-theorems}
 
+% Problem-bank engine -- so didactic-class documents (e.g. exam-review
+% handouts) can \getproblem{id} from the course's bank without each file
+% needing its own \usepackage{texlib-problembank} + \loadbank boilerplate.
+\RequirePackage{texlib-problembank}
+
 % Theorem-family declarations (italic body via theoremstyle plain)
 \theoremstyle{plain}
 \newtheorem{theorem}{Theorem}[section]
@@ -439,5 +444,34 @@
 \renewcommand{\cftsecpagefont}{\bfseries}
 \renewcommand{\cftsubsecfont}{\bfseries}
 \renewcommand{\cftsubsecpagefont}{\bfseries}
+
+% ==============================================================================
+% 9. PROBLEM-BANK AUTO-LOAD
+% ==============================================================================
+% Mirrored from autoexam.cls. didactic-class documents -- exam-review handouts,
+% reference packets, etc. -- can \getproblem{id} pull from the course's bank
+% without per-document boilerplate. The resolution order is identical to
+% autoexam's so the same bank-path value works in both classes.
+\AtBeginDocument{%
+	\@ifundefined{GetBankPath}{}{%
+		\edef\@tmpbankpath{\GetBankPath}%
+		\ifx\@tmpbankpath\empty\else
+			\IfFileExists{\@tmpbankpath}{%
+				\loadbank{\@tmpbankpath}%
+			}{%
+				\@ifundefined{GetCourseMetaDir}{%
+					\loadbank{\@tmpbankpath}%
+				}{%
+					\edef\@tmpbankresolved{\GetCourseMetaDir\@tmpbankpath}%
+					\IfFileExists{\@tmpbankresolved}{%
+						\loadbank{\@tmpbankresolved}%
+					}{%
+						\loadbank{\@tmpbankpath}%
+					}%
+				}%
+			}%
+		\fi
+	}%
+}
 
 \endinput
