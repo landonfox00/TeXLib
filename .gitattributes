@@ -1,0 +1,3 @@
+# Visual-regression reference images: binary, never line-ending-normalized.
+tests/visual_refs/*.png binary
+*.png binary

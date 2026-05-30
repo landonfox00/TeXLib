@@ -624,7 +624,14 @@ end
 -- still get recorded but they index into the main file, not the included
 -- one.  A follow-up could record status.filename per directive and emit a
 -- per-file schedmap.
-function render_grid()
+--
+-- month_pages: when true, each calendar month is typeset as its own table on
+-- its own page (\newpage between months); a week straddling a month boundary
+-- is repeated in both months so every month shows complete weeks.  When false
+-- (the default) the whole term is one continuous table that breaks across
+-- pages wherever it runs out of room.  Toggled from the document via the
+-- `month-pages` meta key (see schedule.cls).
+function render_grid(month_pages)
 	if not start_date or not start_date.time then
 		tex.print("\\textbf{ERROR: 'start-date' is missing.}")
 		return
@@ -641,25 +648,32 @@ function render_grid()
 		col_def = col_def .. " X |"
 	end
 
-	-- Table open + header go through tex.print (they're just class boilerplate;
-	-- nobody is going to inverse-search the header).
-	tex.print("\\begin{xltabular}{\\textwidth}{" .. col_def .. "}")
-	tex.print("\\hline " .. header .. "\\tabularnewline \\hline\\noalign{\\vskip 2pt}\\hline \\endhead")
-	-- Bottom rule is supplied by \endlastfoot rather than by the last row's
-	-- trailing \hline.  This avoids a longtable/xltabular quirk where a
-	-- trailing `\tabularnewline \hline` causes the engine to prepare for
-	-- another row and emit a stub of column rules below the table.
-	tex.print("\\hline \\endlastfoot")
+	-- Reusable table boilerplate.  Emitted once per page-group below (so the
+	-- header repeats at the top of each month in month-pages mode).  These are
+	-- pure class boilerplate — nobody inverse-searches the header — so they go
+	-- out with no source line and produce no .schedmap entry.
+	local tbl_open = "\\begin{xltabular}{\\textwidth}{" .. col_def .. "}"
+	local tbl_head = "\\hline " .. header ..
+		"\\tabularnewline \\hline\\noalign{\\vskip 2pt}\\hline \\endhead"
+	-- Empty \endlastfoot: the bottom rule is drawn by the last row's own
+	-- trailing `\hline` (every row, including the last, ends `\tabularnewline
+	-- \hline`).  An empty lastfoot stops longtable from synthesising a phantom
+	-- trailing row whose column rules would otherwise poke out below the table
+	-- as a short vertical stub — the artifact a non-empty `\hline` lastfoot
+	-- (with its \@arstrutbox strut) used to leave behind.
+	local tbl_lastfoot = "\\endlastfoot"
+	local tbl_close = "\\end{xltabular}"
 
-	-- Build rows in week order, recording each row's first contributing
-	-- directive's source line alongside.  We emit the rows sequentially
-	-- (preserving calendar order) and write a separate sidecar `.schedmap`
-	-- that records grid_line -> user_source_line so a builder-side step can
-	-- post-process synctex.gz to redirect inverse search at the user's
-	-- template.tex.
-	local rows         = {}   -- ordered array of full row strings (no trailing newline)
-	local row_sources  = {}   -- parallel array; row_sources[i] is the first directive's source line for rows[i], or nil
-	local fallback_src = 0    -- used for "click anywhere in this auto-only week" via fallback propagation
+	-- Build rows in week order.  Each row is a list of per-cell records
+	-- carrying the cell's typeset content and the source line of the
+	-- directive that filled it (cell.source_line — set by tag_cell_source).
+	-- We then emit one cell PER LINE in the grid file so SyncTeX records each
+	-- cell's typeset nodes against its own grid_line; the sidecar .schedmap
+	-- maps those grid_lines to the user's directive lines, giving inverse
+	-- search per-cell precision rather than the old per-row minimum.
+	local rows         = {}   -- ordered array of { week_label, cells = {...}, row_attr }
+	local fallback_src = 0    -- last explicit directive line (auto-only weeks inherit)
+	local last_src     = 0    -- max directive line seen anywhere — boilerplate fallback target
 	local week_num = 1
 	local row_ptr = Date.new(start_date)
 	local start_wd = row_ptr:weekday()
@@ -671,11 +685,23 @@ function render_grid()
 	while row_ptr and row_ptr.time and row_ptr <= cursor_date do
 		safety = safety + 1; if safety > 100 then break end
 
-		local row_str = "\\centering \\raisebox{0.95em}{\\parbox[t][4.75em][c]{1.5em}{\\centering\\textbf{" .. week_num .. "}}} "
+		local week_label = "\\centering \\raisebox{0.95em}{\\parbox[t][4.75em][c]{1.5em}{\\centering\\textbf{" .. week_num .. "}}}"
+		local cells_out  = {}
 		local row_source = nil
+		-- Months this week touches, in first-seen (calendar) order.  Drives the
+		-- month-pages grouping below: a week whose active days span two months
+		-- is listed under both, so it appears at the end of one month's page and
+		-- repeated at the top of the next.
+		local row_month_set = {}
+		local row_months     = {}
 
 		for _, day_idx in ipairs(active_indices) do
 			local cell_date = row_ptr:add_days(day_idx - 1)
+			local cell_month = cell_date:month()
+			if not row_month_set[cell_month] then
+				row_month_set[cell_month] = true
+				row_months[#row_months + 1] = cell_month
+			end
 			local cap = day_capacity_map[day_idx] or 1.0
 			if cap == 0 then cap = 1.0 end
 
@@ -719,82 +745,162 @@ function render_grid()
 
 			local body = cell:get_render_text(sanitize)
 			if body ~= "" then cell_content = cell_content .. "\\par\\vspace{0.3em}\\centering " .. body end
-			row_str = row_str .. "& " .. cell.color .. " " .. cell_content .. " "
 
-			-- Collect the minimum source line across the row's cells.
-			if cell.source_line and cell.source_line > 0 then
-				if not row_source or cell.source_line < row_source then
-					row_source = cell.source_line
-				end
-			end
+			local src = (cell.source_line and cell.source_line > 0) and cell.source_line or nil
+			table.insert(cells_out, {
+				text       = "& " .. cell.color .. " " .. cell_content,
+				source_line = src,
+			})
+
+			if src and (not row_source or src < row_source) then row_source = src end
+			if src and src > last_src then last_src = src end
 		end
 
-		table.insert(rows, row_str)  -- terminator added below per-position
-		-- For the srcmap: prefer the row's explicit directive line, fall back
-		-- to the previous explicit directive (auto-only weeks inherit).
 		if row_source then fallback_src = row_source end
-		table.insert(row_sources, row_source or (fallback_src > 0 and fallback_src or nil))
+		local row_attr = row_source or (fallback_src > 0 and fallback_src or nil)
+
+		table.insert(rows, {
+			week_label = week_label,
+			cells      = cells_out,
+			row_attr   = row_attr,
+			month_set  = row_month_set,
+			months     = row_months,
+		})
 
 		row_ptr = row_ptr + 7
 		week_num = week_num + 1
 		if week_num > 52 then break end
 	end
 
-	-- Write the grid file with one row per line, in week order.  The PDF
-	-- renders rows in the order the file is read — matching calendar order.
+	-- Emit the grid file: one cell per line, so SyncTeX records each cell's
+	-- typeset nodes against its own grid_line.  Per row:
+	--   <week_label>
+	--   & <cell 1>
+	--   & <cell 2>
+	--   ...
+	--   <row terminator>
+	-- xltabular treats inter-cell whitespace (including newlines) as a single
+	-- space, so splitting across lines is layout-neutral.
 	--
-	-- Row terminator: every row except the LAST ends with `\tabularnewline
-	-- \hline` (closes the row + draws the inter-row rule).  The LAST row
-	-- ends with `\tabularnewline` only — no trailing `\hline`.  The table's
-	-- bottom rule is drawn by `\endlastfoot` (declared above), which longtable
-	-- emits exactly once after the last body row without spawning a phantom
-	-- row stub the way a trailing inter-row `\hline` would.
-	local target_file = tex.jobname .. '_schedule_grid.tex'
-	local fout = io.open(target_file, 'w')
-	local n = #rows
-	local function row_terminator(i)
-		if i < n then return " \\tabularnewline \\hline" end
-		return " \\tabularnewline"
+	-- Row terminator: EVERY row, including the last in each table, ends with
+	-- `\tabularnewline \hline` (closes the row + draws the rule beneath it).
+	-- Paired with the empty `\endlastfoot` declared above, the last row's own
+	-- `\hline` is the table's clean bottom rule — no phantom trailing-row stub.
+	-- Resolve the output (aux) directory if `-output-directory=X` was passed
+	-- to lualatex (the TeXLib Sublime builder routes EVERYTHING via that flag
+	-- with aux_directory="<<temp>>").  Both files we generate below — the
+	-- grid file and the .schedmap sidecar — are build artifacts the user
+	-- never edits, so writing them to the aux dir instead of CWD keeps the
+	-- source directory clean (typically just .tex + .pdf).  Falls back to
+	-- CWD for command-line builds with no -output-directory.
+	--
+	-- For the grid file, `\input{<basename>}` still finds it because
+	-- lualatex's input search includes the output dir when -output-directory
+	-- is set.  For .schedmap, the Sublime builder's _find_in_dirs probes
+	-- both the source and the aux dir.
+	local aux_dir =
+		(kpse.var_value and kpse.var_value("TEXMF_OUTPUT_DIRECTORY"))
+		or os.getenv("TEXMF_OUTPUT_DIRECTORY")
+		or os.getenv("TEXMFOUTPUT")
+	if aux_dir == "" then aux_dir = nil end
+	local function aux_path(name)
+		if aux_dir then return aux_dir .. "/" .. name end
+		return name
 	end
-	if fout then
-		for i, row in ipairs(rows) do
-			fout:write(row .. row_terminator(i) .. '\n')
-		end
-		fout:close()
-		tex.print('\\input{' .. target_file .. '}')
-	else
-		-- Filesystem issue: emit rows directly via tex.print.  Inverse search
-		-- attributes everything to the \directlua call site (the old
-		-- behaviour); rows still render in week order.
-		for i, row in ipairs(rows) do
-			tex.print(row .. row_terminator(i))
+
+	local target_file = tex.jobname .. '_schedule_grid.tex'
+	local fout = io.open(aux_path(target_file), 'w')
+	local map_entries = {}   -- { { grid_line = N, src_line = N }, ... }
+	local line_counter = 0
+	local function emit(text, src)
+		if fout then fout:write(text .. '\n') else tex.print(text) end
+		line_counter = line_counter + 1
+		if src and src > 0 then
+			table.insert(map_entries, { grid_line = line_counter, src_line = src })
 		end
 	end
 
-	-- Write the sidecar source-line map.  Format (one entry per row):
+	-- Partition the weeks into page-groups.  Default: one group (the whole
+	-- term, one continuous table).  month-pages: one group per calendar month
+	-- in chronological order, with boundary weeks repeated across the two
+	-- months they touch.
+	local groups
+	if month_pages then
+		local order, seen = {}, {}
+		for _, row in ipairs(rows) do
+			for _, m in ipairs(row.months) do
+				if not seen[m] then seen[m] = true; order[#order + 1] = m end
+			end
+		end
+		groups = {}
+		for _, m in ipairs(order) do
+			local g = {}
+			for _, row in ipairs(rows) do
+				if row.month_set[m] then g[#g + 1] = row end
+			end
+			groups[#groups + 1] = g
+		end
+	else
+		groups = { rows }
+	end
+
+	-- One table per group; \newpage between groups.  Header/lastfoot boilerplate
+	-- is re-emitted per group so each month's table carries its own header row.
+	for gi, group in ipairs(groups) do
+		if gi > 1 then emit("\\newpage") end
+		emit(tbl_open)
+		emit(tbl_head)
+		emit(tbl_lastfoot)
+		for _, row in ipairs(group) do
+			emit(row.week_label, row.row_attr)
+			for _, c in ipairs(row.cells) do
+				emit(c.text, c.source_line or row.row_attr)
+			end
+			emit("\\tabularnewline \\hline", row.row_attr)
+		end
+		emit(tbl_close)
+	end
+
+	if fout then
+		fout:close()
+		tex.print('\\input{' .. target_file .. '}')
+	end
+	-- If fout was nil, content was already pushed via tex.print above; map
+	-- entries are still produced but the rewriter has no grid file to find,
+	-- so inverse search falls back to attributing typeset nodes to the
+	-- \directlua call site (the old pre-redirect behaviour).
+
+	-- Write the sidecar source-line map.  Format (one entry per cell line):
 	--     grid_line|user_source_line
 	-- The Sublime builder reads this after compilation and rewrites
-	-- synctex.gz so inverse search from the PDF lands in template.tex at the
+	-- synctex.gz so inverse search from the PDF lands in <base>.tex at the
 	-- recorded source line.  Without that rewrite step (e.g. command-line
 	-- builds), inverse search still works — it just lands in the
 	-- _schedule_grid.tex file at the corresponding line, where the user can
-	-- see the row content and identify the directive manually.
+	-- see the cell content and identify the directive manually.
+	--
+	-- Boilerplate fallback: typeset nodes for the page footer (\cfoot from
+	-- fancyhdr) and other shipout-time content get attributed by LaTeX to
+	-- <base>.tex on the \end{document} line — clicking the table's bottom edge
+	-- or the page footer would otherwise land at \end{document}.  Record the
+	-- \end{schedule} line so the rewriter can redirect any source-file
+	-- record on a later line to the last directive instead.
+	local end_sched_line  = tex.inputlineno
+	local boilerplate_dst = (last_src > 0) and last_src or end_sched_line
 	local map_file = tex.jobname .. '.schedmap'
-	local mout = io.open(map_file, 'w')
+	local mout = io.open(aux_path(map_file), 'w')
 	if mout then
 		mout:write('# schedule source map v1\n')
 		mout:write('# grid_line|user_source_line\n')
 		mout:write('# grid file: ' .. target_file .. '\n')
 		mout:write('# job file:  ' .. tex.jobname .. '.tex\n')
-		for i, src in ipairs(row_sources) do
-			if src then
-				mout:write(i .. '|' .. src .. '\n')
-			end
+		mout:write('# boilerplate-after-line: ' .. end_sched_line .. '\n')
+		mout:write('# boilerplate-target-line: ' .. boilerplate_dst .. '\n')
+		for _, e in ipairs(map_entries) do
+			mout:write(e.grid_line .. '|' .. e.src_line .. '\n')
 		end
 		mout:close()
 	end
-
-	tex.print("\\end{xltabular}")
 end
 
 function L_warn(msg)

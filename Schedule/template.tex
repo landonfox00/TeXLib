@@ -14,21 +14,24 @@
 \meta{
 	landscape    = true,
 	lecture-caps = {1.0, 1.0},   % equal weight for each lecture-days bucket
-	quiz-days    = T,             % weekly Tuesday quiz
+	quiz-days    = T,            % weekly Tuesday quiz
+	% month-pages = true,        % one table per month, each on its own page
 }
 
 \begin{document}
+\maketitle
 \begin{schedule}
 
 	% --- Holidays -----------------------------------------------------
-	\holiday{1-19}{MLK Jr. Day}
-	\holiday{2-16}{President's Day}
-	\holiday{3-23}[3-27]{Spring Break}
-	\holiday{5-6}{Prep Day}
+	% Fall 2026 dates, matching the Fall start/end metadata in
+	% examples/Math181-Fall2026/coursemeta.tex (and the smoke-test stub).
+	\holiday{9-7}{Labor Day}
+	\holiday{11-25}[11-27]{Thanksgiving Break}
+	\holiday{12-11}{Prep Day}
 
 	% --- Quiz overrides ----------------------------------------------
-	\noquiz{1-20}
-	\quiz[date=1-21]
+	\noquiz{8-25}
+	\quiz[date=8-26]
 
 	% --- Unit 1 -------------------------------------------------------
 	\syllabus
@@ -47,7 +50,7 @@
 
 	% --- Final week ---------------------------------------------------
 	\finalreview
-	\finalsweek[5-7][5]
+	\finalsweek[12-14][5]
 	\winterbreak
 
 \end{schedule}

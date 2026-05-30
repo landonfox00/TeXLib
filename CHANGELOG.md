@@ -20,6 +20,23 @@ A consolidation pass: a new user-facing feature on `\problem`, four new shared `
 
 ### Added
 
+- **`smoke_test.py` now verifies rendered content, not just build success.**
+  After each successful build it (1) extracts the PDF text with `pdftotext` and
+  asserts per-module expected substrings are present (`EXPECT_TEXT`), and (2)
+  checks that key generated artifacts are non-empty (`EXPECT_ARTIFACT_NONEMPTY`
+  — e.g. the schedule's `*_schedule_grid.tex`). This catches the "compiles green
+  but renders blank/garbled" class a build-only check misses — the empty
+  schedule grid is now a hard failure. Opt-in `--visual` pixel-diffs each page
+  of the deterministic modules (`VISUAL_MODULES`: Schedule, Report Cards,
+  Syllabi, Notes) against committed references in `tests/visual_refs/`
+  (`--update-refs` to regenerate), catching layout regressions like the
+  row-stub that text checks can't see. New flags: `--no-content`, `--visual`,
+  `--update-refs`, `--dump-text`. Every external-tool check (poppler /
+  ImageMagick) soft-skips when its tool is absent, so a bare TeX install still
+  runs build-only. CI (`smoke.yml`) installs `poppler-utils` so content checks
+  run on every push; visual regression stays a local aid (its references are
+  rendering-environment-specific).
+- **`month-pages` meta key on the `schedule` class.** `\meta{month-pages = true}` typesets each calendar month as its own table on its own page (`\newpage` between months) instead of one continuous term-long table. A week straddling a month boundary is repeated — at the foot of the earlier month and the head of the next — so every month shows complete weeks, wall-calendar style; week numbers stay continuous across the term. Default (`false`/omitted) is unchanged. Implemented as a page-group partition in `render_grid` (one group = whole term by default, one group per month when enabled), with the table header/lastfoot boilerplate re-emitted per group.
 - **Per-call variable overrides on `\problem`.** Inside `\begin{problems}…\end{problems}`, `\problem{id}` accepts a trailing optional argument that pins random variables to specific values for that one instance: `\problem{quadratic}[a=1, b=2, c=3]` solves `x²+2x+3` instead of a freshly-sampled quadratic. Partial fixes work too — `\problem{quadratic}[a=1]` leaves `b` and `c` random. The engine adds a `fixed[]` table that `set_var`/`set_rng`/`calc_var`/`pick_*` consult before writing, so a bank entry's own randomisation calls become no-ops on locked names. `push_scope`/`pop_scope` save and restore the table around each problem, so the override is local. `\importproblem` was upgraded to use the same lock semantics.
 - **`texlib-problembank.sty`** — single source of truth for the shared problem-bank LaTeX glue: engine loader, `\setvar`/`\setrng`/`\calcvar`/`\get`, the four `\pick*` commands, `\getlist`/`\geti`/`\foreachpick`, `\newproblem`/`\dupproblem`, `\begin{problem}`, `\getproblem` (+ `\useproblem`/`\reqproblem`), `\ppart`, `\@problem@item`, `\loadbank`, `\importproblem`, and `\providecommand` defaults for `\workbox`/`\autoexam@problem@sep`. Required by `autoexam.cls` and `quiz.cls`; collapses ~120 lines of duplicated code per class to a single `\RequirePackage`.
 - **`texlib-corepkg.sty`** — universal package bundle: fontenc/lmodern/geometry, expl3/xparse/ifthen/etoolbox, xcolor, the amsmath family, `texlib-mathutils`, graphicx, tikz/pgfplots + standard libraries, and hyperref with the canonical `\hypersetup` used across every TeXLib class. `basic-utilities.sty` now `\RequirePackage`s this and adds its own extras (siunitx, caption, tasks). `autoexam.cls`/`quiz.cls` load it directly; `didactic.cls`/`pset.cls`/`report-card.cls` inherit it transitively via basic-utilities. Each of the heavier classes shrank by 8–11 lines.
@@ -32,12 +49,26 @@ A consolidation pass: a new user-facing feature on `\problem`, four new shared `
 
 ### Changed
 
+- **The `schedule` environment no longer emits the title banner itself.** `\maketitle`/`\scheduletitle` must now be called explicitly in the document body (canonically right after `\begin{document}`, before `\begin{schedule}`), matching every other TeXLib class. This lets a schedule run title-less (e.g. when the banner lives elsewhere) by simply omitting the call. Existing schedule documents need one added `\maketitle` line; the canonical `Schedule/template.tex` and the README tutorial were updated accordingly.
 - **`autoexam_engine.lua` → `problem_engine.lua`.** The file is shared between `autoexam` and `quiz`; the old name implied otherwise.
 - **Lua engine function names: the shared ones gained a `pbank_*` prefix.** `pbank_problem_item`, `pbank_apply_fix`, `pbank_set_bankfile`, `pbank_inject_part`, `pbank_first_on_page`, `pbank_part_*`, `pbank_stretch_list`, `pbank_pending_*`, and the new `pbank_suppress_redirect` flag. Autoexam-specific functions kept their `autoexam_*` prefix (`autoexam_run_versions`, `autoexam_versions`, `autoexam_shuffle_pages`, `autoexam_write_srcmap`, `autoexam_read_body`, `autoexam_scorepage`, `autoexam_gradingrow`) — they would only ever be called by autoexam.cls.
 - **`\loadbank` is now defined once in `texlib-problembank.sty`.** It activates the SyncTeX bank-file redirect via `pbank_set_bankfile()` so inverse search from the PDF lands in the bank source file (previously: only quizzes called this; autoexam ran with the redirect dormant to avoid a multi-version input-stack overflow). `autoexam_run_versions` now sets `pbank_suppress_redirect=true` before iterating versions, so the redirect is automatically suppressed for the multi-version case and active for single-version builds.
 
 ### Fixed
 
+- **`texlib-problembank` no longer forces every loading document onto LuaLaTeX.**
+  Its load-time engine loader ran `\directlua` unconditionally, so any
+  non-LuaTeX (pdflatex) class that `\RequirePackage`s it — e.g. `didactic`,
+  which auto-loads it so lecture notes can optionally `\getproblem` — died at
+  load with "Undefined control sequence `\directlua`". The loader is now guarded
+  by `\ifdefined\directlua`: under LuaLaTeX it loads as before; under any other
+  engine the load is skipped and the bank macros route through an internal
+  `\pbank@lua` bridge that raises a clear "Problem-bank features require
+  LuaLaTeX" error — but only if a bank command is actually used, so notes/handout
+  documents that merely load the package still compile under pdflatex. The
+  `\directlua` primitive itself is left untouched (not shadowed), so other
+  packages' `\ifdefined\directlua` engine probes still work.
+- **Schedule grid no longer leaves a vertical-rule stub below the last row.** The table's bottom edge used to show a short fragment of the `WEEK`/day column rules hanging beneath the final week — longtable was synthesising a phantom trailing row from the non-empty `\endlastfoot` (`\noalign{\vskip -12pt}\hline`). `render_grid` now ends every row, including the last, with `\tabularnewline \hline` and uses an empty `\endlastfoot`, so the last row's own rule is the clean bottom edge. (The same fix applies to each month's table in `month-pages` mode.)
 - **SyncTeX bank-file redirect no longer fires "missing \item" errors for problems past line ~1000.** The redirect path pads its temp file with blank lines so the served content lines up with the bank's true source lines (for accurate inverse-search attribution). Each blank line was tokenising — under the default `\endlinechar=13` — to a `\par` token; exam.cls's `\trivlist` starts complaining once roughly 1000 `\par`s have stacked inside a `\question` item, breaking single-version exams and quizzes whenever a problem lived past line ~1000 of the bank. `typeset_problem` now brackets the padding region with `\endlinechar=-1\relax` on line 1 and `\endlinechar=13\relax` on `sm.line-1`, so the blank lines emit zero tokens (no `\par`) and only one harmless `\par` fires right before the real content begins. SyncTeX line attribution is preserved — clicks still land on the correct bank line.
 - **`\importproblem` overrides are now actually locked.** Previously its overrides were set via direct `set_var` calls, which the imported file's own `\setrng` could clobber. It now routes through `pbank_apply_fix` and gets the same `fixed[]`-table semantics as `\problem[a=1,b=2]`.
 
