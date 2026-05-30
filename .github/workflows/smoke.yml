@@ -23,8 +23,12 @@ jobs:
         uses: xu-cheng/texlive-action@v2
         with:
           scheme: full
+          # poppler-utils provides pdftotext for the content checks (substring
+          # assertions + non-empty artifact checks). Visual regression is a
+          # local-only aid (environment-specific reference images), so
+          # ImageMagick is intentionally not installed here.
           run: |
-            apk add --no-cache python3
+            apk add --no-cache python3 poppler-utils
             python3 smoke_test.py -v
 
       - name: Upload failed-build logs
