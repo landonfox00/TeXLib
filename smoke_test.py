@@ -18,6 +18,18 @@ Usage:
     python smoke_test.py --modes all     # default + student + key + solutions
     python smoke_test.py --timeout 180   # raise per-build timeout (seconds)
     python smoke_test.py -v              # print full TeX log on failure
+    python smoke_test.py --no-content    # build-only (skip pdftotext/artifact checks)
+    python smoke_test.py --visual        # also diff each page vs tests/visual_refs/
+    python smoke_test.py --update-refs   # (re)generate the visual references
+    python smoke_test.py --dump-text     # print each module's extracted PDF text
+
+Content checks (on by default) extract the rendered PDF's text with `pdftotext`
+and assert each module's expected substrings are present, plus that key
+generated artifacts (e.g. the schedule grid file) are non-empty — catching
+"builds green but renders blank" regressions. Visual checks (opt-in) render
+each page and pixel-diff it against committed references. All of these degrade
+to a soft skip when their external tool (poppler / ImageMagick) is absent, so a
+bare TeX install still runs the build-only smoke test.
 
 Exit code is the number of failed builds (0 = all passed).
 """
@@ -25,6 +37,7 @@ Exit code is the number of failed builds (0 = all passed).
 from __future__ import annotations
 
 import argparse
+import glob
 import os
 import re
 import shutil
@@ -39,6 +52,31 @@ import time
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TEXLIB_ROOT = SCRIPT_DIR  # script lives at TeXLib root
+
+# External tools for content/visual checks. All optional: when a tool is
+# missing the corresponding check is skipped (with a warning) rather than
+# failing, so a bare `lualatex`/`pdflatex` install can still run build-only.
+#   pdftotext / pdftoppm  -> poppler-utils
+#   magick (or compare)   -> ImageMagick
+PDFTOTEXT = shutil.which("pdftotext")
+PDFTOPPM = shutil.which("pdftoppm")
+MAGICK = shutil.which("magick")
+COMPARE = shutil.which("compare")  # ImageMagick 6 standalone
+
+# Committed reference images for visual regression (--visual). Generated with
+# --update-refs; environment-specific (font rendering differs across TeX Live
+# builds), so regenerate after an intentional layout change or a toolchain bump.
+VISUAL_REF_DIR = os.path.join(TEXLIB_ROOT, "tests", "visual_refs")
+VISUAL_DPI = 100
+# Visual regression only makes sense for modules whose output is DETERMINISTIC.
+# autoexam/quiz shuffle versions and pull random bank problems, so their pages
+# differ build-to-build — pixel-diffing them is pure noise. Restrict to the
+# fixed-layout modules (the schedule grid is the motivating case).
+VISUAL_MODULES = {"Schedule", "Report Cards", "Syllabi", "Notes"}
+# Max fraction of differing pixels (after a small color fuzz) tolerated per page
+# before a page is flagged as a visual regression. Tight, because refs and the
+# build under test come from the same machine in the intended local workflow.
+VISUAL_MAX_DIFF_FRAC = 0.002
 
 # Modules and their template files. Engine is auto-detected from \documentclass.
 MODULES = [
@@ -97,10 +135,189 @@ STUB_COURSEMETA = r"""% coursemeta.tex - auto-generated stub for TeXLib smoke te
 
 
 # ---------------------------------------------------------------------------
+# Content expectations
+# ---------------------------------------------------------------------------
+#
+# After a successful build, the rendered PDF's text (via pdftotext) must
+# contain every substring listed for that module (case-insensitive). These
+# catch the "compiles green but renders blank/garbled" class that a build-only
+# check misses — e.g. the schedule grid that silently rendered zero rows.
+# Keep the strings to durable, content-level tokens (column headers, directive
+# output, instruction boilerplate), NOT layout/font-sensitive details.
+EXPECT_TEXT = {
+    # Bingo renders the banner as spaced letters ("B  I  N  G  O"), so match the
+    # always-present grid cell coordinates instead.
+    "Bingo":        ["B1", "O5"],
+    "Exams":        ["Problem 1", "Problem 2"],
+    "Notes":        ["Introduction", "Theorem"],
+    "Quizzes":      ["Quiz"],
+    "Report Cards": ["Report Card"],
+    "Schedule":     ["MONDAY", "WEEK", "Quiz 1", "Final Exam"],
+    # Syllabi/template.tex carries its own metadata (not the stub), so key on
+    # the template's stable section headings.
+    "Syllabi":      ["Course Description", "Office Hours"],
+    "Problem Sets": ["Problem 1"],
+    "Test/Exams":   ["Problem 1"],
+}
+
+# Generated sidecar files that must exist AND be non-empty after a build. A
+# dependency-free content signal (no pdftotext needed): the schedule's grid
+# file is 0 bytes exactly when render_grid produced no rows — the empty-grid
+# bug. Patterns are globbed inside the build's temp dir.
+EXPECT_ARTIFACT_NONEMPTY = {
+    "Schedule": ["*_schedule_grid.tex"],
+}
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 DOCCLASS_RE = re.compile(r"\\documentclass(?:\[[^\]]*\])?\{(\w[\w-]*)\}")
+
+
+def safe_name(module: str) -> str:
+    """Filesystem-safe slug for a module name (e.g. 'Test/Exams' -> 'Test_Exams')."""
+    return re.sub(r"[^\w.-]+", "_", module)
+
+
+def extract_pdf_text(pdf_path: str) -> str | None:
+    """Return the PDF's text via pdftotext, or None if the tool is unavailable."""
+    if not PDFTOTEXT:
+        return None
+    try:
+        r = subprocess.run(
+            [PDFTOTEXT, "-layout", pdf_path, "-"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+        )
+        return r.stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def check_content(module: str, tmp: str, pdf_path: str) -> tuple[list[str], bool]:
+    """
+    Verify rendered content. Returns (problems, text_skipped).
+    `text_skipped` is True when substring checks were requested but pdftotext
+    is unavailable (a soft skip, not a failure).
+    """
+    problems: list[str] = []
+
+    # Artifact non-emptiness (dependency-free).
+    for pat in EXPECT_ARTIFACT_NONEMPTY.get(module, []):
+        hits = glob.glob(os.path.join(tmp, pat))
+        if not any(os.path.getsize(h) > 0 for h in hits):
+            problems.append(f"artifact {pat} missing or empty")
+
+    # Text substrings (needs pdftotext).
+    expects = EXPECT_TEXT.get(module, [])
+    text_skipped = False
+    if expects:
+        text = extract_pdf_text(pdf_path)
+        if text is None:
+            text_skipped = True
+        else:
+            low = text.lower()
+            missing = [s for s in expects if s.lower() not in low]
+            if missing:
+                problems.append("missing text: " + ", ".join(repr(s) for s in missing))
+
+    return problems, text_skipped
+
+
+def _compare_pages(ref_png: str, test_png: str) -> int | None:
+    """
+    Return the number of differing pixels (ImageMagick AE metric, small fuzz)
+    between two PNGs, or None if no comparison tool is available. A huge value
+    is returned when dimensions differ (ImageMagick reports that as an error).
+    """
+    if MAGICK:
+        cmd = [MAGICK, "compare", "-metric", "AE", "-fuzz", "3%", ref_png, test_png, "null:"]
+    elif COMPARE:
+        cmd = [COMPARE, "-metric", "AE", "-fuzz", "3%", ref_png, test_png, "null:"]
+    else:
+        return None
+    try:
+        r = subprocess.run(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace", timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    # AE count is printed to stderr (merged into stdout here); may look like
+    # "1234" or "1234 (0.00188)". Dimension mismatch -> non-zero exit + no count.
+    m = re.search(r"\d+", r.stdout or "")
+    if m:
+        return int(m.group())
+    return 10**9 if r.returncode != 0 else 0
+
+
+def check_visual(module: str, tmp: str, pdf_path: str, update: bool) -> tuple[list[str], bool]:
+    """
+    Render every PDF page to PNG and compare against committed references.
+    With `update`, (re)write the references instead. Returns (problems, skipped).
+    """
+    if not PDFTOPPM or not (MAGICK or COMPARE):
+        return [], True  # soft skip: missing poppler/imagemagick
+
+    slug = safe_name(module)
+    prefix = os.path.join(tmp, "vis")
+    try:
+        subprocess.run(
+            [PDFTOPPM, "-png", "-r", str(VISUAL_DPI), pdf_path, prefix],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return [f"pdftoppm failed: {exc}"], False
+    pages = sorted(glob.glob(prefix + "*.png"))
+    if not pages:
+        return ["no pages rendered"], False
+
+    if update:
+        os.makedirs(VISUAL_REF_DIR, exist_ok=True)
+        for old in glob.glob(os.path.join(VISUAL_REF_DIR, f"{slug}-*.png")):
+            os.remove(old)
+        for i, pg in enumerate(pages, 1):
+            shutil.copy2(pg, os.path.join(VISUAL_REF_DIR, f"{slug}-{i}.png"))
+        return [], False
+
+    refs = sorted(glob.glob(os.path.join(VISUAL_REF_DIR, f"{slug}-*.png")))
+    if not refs:
+        return [f"no reference images for {module} (run --update-refs)"], False
+    if len(pages) != len(refs):
+        return [f"page count {len(pages)} != reference {len(refs)}"], False
+
+    problems: list[str] = []
+    for i, (pg, rf) in enumerate(zip(pages, refs), 1):
+        diff = _compare_pages(rf, pg)
+        if diff is None:
+            return [], True
+        # Budget scales with page area so a fixed fraction means the same thing
+        # for portrait notes and landscape schedules.
+        w, h = _png_size(rf)
+        budget = int(w * h * VISUAL_MAX_DIFF_FRAC)
+        if diff > budget:
+            problems.append(f"page {i} differs ({diff} px > {budget} budget)")
+    return problems, False
+
+
+def _png_size(path: str) -> tuple[int, int]:
+    """Read a PNG's (width, height) from its IHDR header. Falls back to a
+    landscape-letter guess at VISUAL_DPI if the header can't be read."""
+    import struct
+    try:
+        with open(path, "rb") as fh:
+            head = fh.read(24)
+        if head[:8] == b"\x89PNG\r\n\x1a\n":
+            return struct.unpack(">II", head[16:24])
+    except (OSError, struct.error):
+        pass
+    return (1100, 850)
 
 
 def detect_engine(tex_path: str) -> str:
@@ -150,15 +367,24 @@ def build_one(
     mode_macro: str | None,
     timeout: int,
     verbose: bool,
-) -> tuple[bool, float, str, str]:
+    content: bool = True,
+    visual: str | None = None,
+    dump_text: bool = False,
+) -> tuple[bool, float, str, str, bool]:
     """
     Build a single template.tex in an isolated temp directory.
-    Returns (ok, elapsed_seconds, error_excerpt, full_log_path_on_failure).
+
+    `content`: run text/artifact content checks after a successful build.
+    `visual`:  None (off), "check" (compare to refs), or "update" (write refs).
+
+    Returns (ok, elapsed_seconds, error_excerpt, log_path_on_failure, skipped),
+    where `skipped` is True if a requested content/visual check was soft-skipped
+    because its external tool (poppler / ImageMagick) was unavailable.
     """
     module_dir = os.path.join(TEXLIB_ROOT, module)
     tex_src = os.path.join(module_dir, template)
     if not os.path.exists(tex_src):
-        return False, 0.0, f"missing template: {tex_src}", ""
+        return False, 0.0, f"missing template: {tex_src}", "", False
 
     engine = detect_engine(tex_src)
 
@@ -251,7 +477,7 @@ def build_one(
         except subprocess.TimeoutExpired as exc:
             elapsed = time.time() - t0
             partial = _decode(exc.stdout)
-            return False, elapsed, f"timeout after {timeout}s", _save_log(tmp, partial)
+            return False, elapsed, f"timeout after {timeout}s", _save_log(tmp, partial), False
 
         jobname = os.path.splitext(template)[0]
         pdf = os.path.join(tmp, jobname + ".pdf")
@@ -266,12 +492,31 @@ def build_one(
                 pass
 
         ok = r.returncode == 0 and os.path.exists(pdf)
+        if ok and dump_text:
+            txt = extract_pdf_text(pdf)
+            print(f"\n===== {module} :: extracted text =====")
+            print(txt if txt is not None else "(pdftotext unavailable)")
+            print(f"===== end {module} =====\n")
         if ok:
-            return True, elapsed, "", ""
+            skipped = False
+            problems: list[str] = []
+            if content:
+                cp, text_skipped = check_content(module, tmp, pdf)
+                problems += cp
+                skipped = skipped or text_skipped
+            if visual and module in VISUAL_MODULES:
+                vp, vis_skipped = check_visual(module, tmp, pdf, update=(visual == "update"))
+                problems += vp
+                skipped = skipped or vis_skipped
+            if problems:
+                err = "CONTENT: " + "; ".join(problems)
+                saved = _save_log(tmp, log_text or r.stdout, verbose=verbose, jobname=jobname)
+                return False, elapsed, err, saved, skipped
+            return True, elapsed, "", "", skipped
 
         err = extract_tex_errors(log_text or r.stdout) or f"exit={r.returncode}, no pdf"
         saved = _save_log(tmp, log_text or r.stdout, verbose=verbose, jobname=jobname)
-        return False, elapsed, err, saved
+        return False, elapsed, err, saved, False
     finally:
         # Don't trash the temp dir if we need the log for diagnosis.
         # The _save_log() helper has already copied the log out if needed.
@@ -302,6 +547,15 @@ def _save_log(tmp_dir: str, log_text, verbose: bool = False, jobname: str = "bui
 # ---------------------------------------------------------------------------
 
 def main() -> int:
+    # PDF text (and TeX logs) can carry glyphs the host console encoding can't
+    # represent (e.g. cp1252 on Windows). Make our own output tolerant so a
+    # stray character never crashes the run.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="backslashreplace")  # type: ignore[attr-defined]
+        except (AttributeError, ValueError):
+            pass
+
     p = argparse.ArgumentParser(
         description="Smoke-test every TeXLib module template under one or more build modes."
     )
@@ -318,7 +572,30 @@ def main() -> int:
     )
     p.add_argument("--timeout", type=int, default=120, help="Per-build timeout in seconds.")
     p.add_argument("-v", "--verbose", action="store_true", help="Show last 50 log lines on failure.")
+    p.add_argument(
+        "--no-content", action="store_true",
+        help="Skip content checks (pdftotext substrings + artifact non-emptiness); build-only.",
+    )
+    p.add_argument(
+        "--visual", action="store_true",
+        help="Also compare each rendered page against tests/visual_refs/ (needs poppler + ImageMagick).",
+    )
+    p.add_argument(
+        "--update-refs", action="store_true",
+        help="Regenerate visual reference images instead of comparing. Implies --visual.",
+    )
+    p.add_argument(
+        "--dump-text", action="store_true",
+        help="Print each module's extracted PDF text and exit (aid for writing EXPECT_TEXT).",
+    )
     args = p.parse_args()
+
+    visual_mode: str | None = None
+    if args.update_refs:
+        visual_mode = "update"
+    elif args.visual:
+        visual_mode = "check"
+    content_enabled = not args.no_content
 
     if args.modules:
         wanted = set(args.modules)
@@ -335,24 +612,50 @@ def main() -> int:
         if enable_all or getattr(args, flag):
             modes.append((flag, MODES[flag]))
 
+    # --dump-text: build each target once (default mode) and print its text.
+    if args.dump_text:
+        for module, template in targets:
+            build_one(module, template, None, args.timeout, args.verbose,
+                      content=False, visual=None, dump_text=True)
+        return 0
+
+    # Surface missing optional tools up front so a green run isn't mistaken for
+    # "content verified" when the checker silently no-op'd.
+    check_bits = []
+    if content_enabled:
+        check_bits.append("content" + ("" if PDFTOTEXT else " [pdftotext MISSING -> text checks skipped]"))
+    if visual_mode:
+        have_magick = bool(MAGICK or COMPARE)
+        miss = [n for n, ok in (("pdftoppm", PDFTOPPM), ("ImageMagick", have_magick)) if not ok]
+        check_bits.append(
+            ("visual:update" if visual_mode == "update" else "visual")
+            + (f" [{', '.join(miss)} MISSING -> skipped]" if miss else "")
+        )
+
     print(f"TeXLib smoke test")
     print(f"  root    : {TEXLIB_ROOT}")
     print(f"  modules : {len(targets)} ({', '.join(m for m, _ in targets)})")
     print(f"  modes   : {', '.join(name for name, _ in modes)}")
+    print(f"  checks  : build{(' + ' + ', '.join(check_bits)) if check_bits else ' only'}")
     print()
 
     results: list[tuple[str, str, bool, float, str]] = []
+    any_skipped = False
     t_start = time.time()
     for module, template in targets:
         for mode_name, mode_macro in modes:
             label = f"  [{module:<14}] {mode_name:<9} "
             sys.stdout.write(label + "... ")
             sys.stdout.flush()
-            ok, elapsed, err, saved = build_one(
-                module, template, mode_macro, args.timeout, args.verbose
+            ok, elapsed, err, saved, skipped = build_one(
+                module, template, mode_macro, args.timeout, args.verbose,
+                content=content_enabled, visual=visual_mode,
             )
+            any_skipped = any_skipped or skipped
             status = "PASS" if ok else "FAIL"
             tail = "" if ok else f"  ({err})"
+            if skipped and ok:
+                tail = "  (checks partially skipped)"
             if saved and not ok:
                 tail += f"  log: {saved}"
             print(f"{status} {elapsed:5.1f}s{tail}")
@@ -364,6 +667,8 @@ def main() -> int:
 
     print()
     print(f"Summary: {passed}/{len(results)} passed in {total:.1f}s total")
+    if any_skipped:
+        print("Note: some content/visual checks were skipped (missing poppler/ImageMagick).")
     if failed:
         print("Failures:")
         for m, mode, err in failed:

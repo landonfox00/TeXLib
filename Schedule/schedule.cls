@@ -80,10 +80,16 @@
 \clist_new:N \g__sched_lecture_caps_clist
 \clist_new:N \g__sched_quiz_days_clist
 \bool_new:N  \g__sched_landscape_bool
+\bool_new:N  \g__sched_monthpages_bool
 
 \keys_define:nn { meta } {
 	lecture-caps  .clist_gset:N = \g__sched_lecture_caps_clist,
 	quiz-days     .clist_gset:N = \g__sched_quiz_days_clist,
+
+	% month-pages = true  ->  one table per calendar month, each on its own
+	% page, with month-boundary weeks repeated so every month shows full weeks.
+	% Default (false / key omitted) keeps the term as one continuous table.
+	month-pages   .bool_gset:N = \g__sched_monthpages_bool,
 
 	landscape     .code:n = {
 		\str_if_eq:nnTF { #1 } { true }
@@ -112,14 +118,21 @@
 	\clist_use:Nn \g__sched_quiz_days_clist {,}
 }
 
+% Expands to the Lua literal `true`/`false` for the month-pages flag, so the
+% \end{schedule} hook can pass it straight into render_grid(...).
+\NewExpandableDocumentCommand{\GetMonthPagesFlag}{}{
+	\bool_if:NTF \g__sched_monthpages_bool { true } { false }
+}
+
 \ExplSyntaxOff
 
 % ==============================================================================
 % 6. SCHEDULE ENVIRONMENT
 % ==============================================================================
-% \maketitle / \scheduletitle render the standard banner. The schedule env
-% calls \scheduletitle automatically, so existing documents are unchanged;
-% \maketitle provides the unified TeXLib entry point.
+% \maketitle / \scheduletitle render the standard banner. Call \maketitle
+% (or \scheduletitle) explicitly in the document body when you want the
+% banner; the schedule environment no longer emits it on its own, so a
+% document can run the grid title-less (e.g. when the title lives elsewhere).
 \newcommand{\scheduletitle}{%
 	\noindent
 	{\LARGE \GetCourseSubject\ \GetCourseNumber\ \GetCourseTitle\ Tentative\ Schedule
@@ -149,8 +162,6 @@
 			"\GetYear"
 		)
 	}
-
-	\scheduletitle
 
 	% ----- Schedule directives -----
 	\RenewDocumentCommand{\section}{ O{1.0} m }{
@@ -207,7 +218,7 @@
 	\NewDocumentCommand{\debugdate}{ }{ \directlua{ L_debug_cursor() } }
 }
 {
-	\directlua{ render_grid() }
+	\directlua{ render_grid(\GetMonthPagesFlag) }
 }
 
 \endinput
