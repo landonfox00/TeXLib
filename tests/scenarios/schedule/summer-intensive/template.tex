@@ -1,0 +1,41 @@
+% Scenario: schedule / summer-intensive   (tier: core)
+% A short MTWRF summer intensive: daily lectures, five day-columns, compact
+% term. Exercises the wide 5-column grid and a sub-month schedule.
+\documentclass{schedule}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	season         = Summer,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	course-room    = TBD,
+	lecture-days   = MTWRF,
+	lecture-times  = {9:00-10:50am},
+	start-date     = 6-1,
+	end-date       = 6-19,
+	final-date     = 6-22,
+	final-time     = {9:00-11:00am},
+}
+
+\meta{ landscape = true }
+
+\begin{document}
+\maketitle
+\begin{schedule}
+	\syllabus
+	\topic{Limits}
+	\topic{Continuity}
+	\topic{Derivatives}
+	\topic{Chain Rule}
+	\examreview
+	\exam
+	\topic{Integrals}
+	\topic{Fundamental Theorem}
+	\finalreview
+	\finalsweek[6-22][3]
+\end{schedule}
+\end{document}

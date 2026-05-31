@@ -26,10 +26,12 @@ A consolidation pass: a new user-facing feature on `\problem`, four new shared `
   via `\metasetup`) exercising one configuration, built and pixel-diffed against
   `tests/visual_refs/<area>__<name>-*.png`. Tiers via an optional `tags` file
   (`core` runs by default, `full` only with `--full`); `--scenarios [AREA...]`
-  filters by area, `--update-refs` regenerates. Ships a Schedule pack —
-  `landscape-mwf`, `portrait`, `month-pages` (core) and `mid-week-start` (full)
-  — covering orientation, the month-pages render path, and a partial first week.
-  Local-only, like all visual checks (references are environment-specific).
+  filters by area, `--update-refs` regenerates. Ships a 7-scenario Schedule
+  pack — `landscape-mwf`, `portrait`, `month-pages`, `summer-intensive` (core)
+  and `mid-week-start`, `recitations`, `no-quiz` (full) — covering orientation,
+  the month-pages render path, a 5-day intensive, a partial first week, a
+  recitation column, and a quiz-free grid. Local-only, like all visual checks
+  (references are environment-specific).
 - **`smoke_test.py` now verifies rendered content, not just build success.**
   After each successful build it (1) extracts the PDF text with `pdftotext` and
   asserts per-module expected substrings are present (`EXPECT_TEXT`), and (2)

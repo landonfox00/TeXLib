@@ -50,10 +50,13 @@ tools soft-skip.
 
 | Area | Scenario | Tier | Exercises |
 |------|----------|------|-----------|
-| schedule | `landscape-mwf`   | core | the common case: Fall MWF, landscape |
-| schedule | `portrait`        | core | portrait geometry branch |
-| schedule | `month-pages`     | core | per-month tables + boundary-week repeat (multi-page) |
-| schedule | `mid-week-start`  | full | term starting mid-week → partial first week |
+| schedule | `landscape-mwf`     | core | the common case: Fall MWF, landscape (4 cols incl. quiz) |
+| schedule | `portrait`          | core | portrait geometry branch |
+| schedule | `month-pages`       | core | per-month tables + boundary-week repeat (multi-page) |
+| schedule | `summer-intensive`  | core | MTWRF daily, 5 day-columns, sub-month term |
+| schedule | `mid-week-start`    | full | term starting mid-week → partial first week |
+| schedule | `recitations`       | full | a recitation column alongside lectures |
+| schedule | `no-quiz`           | full | MWF only, no quiz column (3 cols) |
 
 ## Adding a scenario
 

@@ -1,0 +1,44 @@
+% Scenario: schedule / no-quiz   (tier: full)
+% MWF with no quiz-days set: no auto-quiz column and no orange quiz cells (a
+% three-column grid). Exercises the empty-quiz_idx_map path.
+\documentclass{schedule}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	season         = Fall,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	course-room    = TBD,
+	lecture-days   = MWF,
+	lecture-times  = {9:00-9:50am},
+	start-date     = 8-24,
+	end-date       = 12-8,
+	final-date     = 12-15,
+	final-time     = {9:45-11:45am},
+}
+
+\meta{ landscape = true }
+
+\begin{document}
+\maketitle
+\begin{schedule}
+	\holiday{9-7}{Labor Day}
+	\holiday{11-25}[11-27]{Thanksgiving Break}
+
+	\syllabus
+	\section{1.1}
+	\section{1.2}
+	\section[2]{1.3}
+	\examreview
+	\exam
+	\section{2.1}
+	\section{2.2}
+	\finalreview
+	\finalsweek[12-14][5]
+	\winterbreak
+\end{schedule}
+\end{document}

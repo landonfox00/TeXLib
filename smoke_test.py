@@ -218,11 +218,15 @@ def extract_pdf_text(pdf_path: str) -> str | None:
         return None
 
 
-def check_content(module: str, tmp: str, pdf_path: str) -> tuple[list[str], bool]:
+def check_content(module: str, tmp: str, pdf_path: str,
+                  check_text: bool = True) -> tuple[list[str], bool]:
     """
     Verify rendered content. Returns (problems, text_skipped).
     `text_skipped` is True when substring checks were requested but pdftotext
-    is unavailable (a soft skip, not a failure).
+    is unavailable (a soft skip, not a failure). `check_text=False` runs only
+    the dependency-free artifact check — used by scenario builds, where the
+    per-page visual diff (not a fixed substring list) is the content check and
+    EXPECT_TEXT's module tokens may not apply to every configuration.
     """
     problems: list[str] = []
 
@@ -233,7 +237,7 @@ def check_content(module: str, tmp: str, pdf_path: str) -> tuple[list[str], bool
             problems.append(f"artifact {pat} missing or empty")
 
     # Text substrings (needs pdftotext).
-    expects = EXPECT_TEXT.get(module, [])
+    expects = EXPECT_TEXT.get(module, []) if check_text else []
     text_skipped = False
     if expects:
         text = extract_pdf_text(pdf_path)
@@ -686,9 +690,10 @@ def build_scenario(scen: dict, timeout: int, verbose: bool,
         problems: list[str] = []
         skipped = False
         if content:
-            # Reuse the area's module content checks (grid non-empty + the
-            # schedule text tokens, which every scenario config still renders).
-            cp, tskip = check_content(module, tmp, pdf)
+            # Artifact check only (grid non-empty). The per-page visual diff is
+            # the real content check for scenarios; the module's EXPECT_TEXT
+            # tokens (e.g. "Quiz 1") don't apply across every configuration.
+            cp, tskip = check_content(module, tmp, pdf, check_text=False)
             problems += cp
             skipped = skipped or tskip
         vp, vskip = check_visual(slug, tmp, pdf, update=(visual == "update"))
