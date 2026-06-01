@@ -30,9 +30,6 @@
 
 \RequirePackage{course-metadata}
 
-% Default getter for fields some courses don't set
-\providecommand{\GetRecitationDays}{}
-
 % ==============================================================================
 % 2. BUILD FLAGS — UNIFIED TeXLib CLI
 % ==============================================================================
@@ -79,12 +76,14 @@
 
 \clist_new:N \g__sched_lecture_caps_clist
 \clist_new:N \g__sched_quiz_days_clist
+\clist_new:N \g__sched_recitation_days_clist
 \bool_new:N  \g__sched_landscape_bool
 \bool_new:N  \g__sched_monthpages_bool
 
 \keys_define:nn { meta } {
-	lecture-caps  .clist_gset:N = \g__sched_lecture_caps_clist,
-	quiz-days     .clist_gset:N = \g__sched_quiz_days_clist,
+	lecture-caps     .clist_gset:N = \g__sched_lecture_caps_clist,
+	quiz-days        .clist_gset:N = \g__sched_quiz_days_clist,
+	recitation-days  .clist_gset:N = \g__sched_recitation_days_clist,
 
 	% month-pages = true  ->  one table per calendar month, each on its own
 	% page, with month-boundary weeks repeated so every month shows full weeks.
@@ -116,6 +115,9 @@
 }
 \NewExpandableDocumentCommand{\GetQuizDays}{}{
 	\clist_use:Nn \g__sched_quiz_days_clist {,}
+}
+\NewExpandableDocumentCommand{\GetRecitationDays}{}{
+	\clist_use:Nn \g__sched_recitation_days_clist {,}
 }
 
 % Expands to the Lua literal `true`/`false` for the month-pages flag, so the

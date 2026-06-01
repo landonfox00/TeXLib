@@ -94,7 +94,11 @@ VISUAL_MAX_DIFF_FRAC = 0.002
 # marks the tier; absent => {"core"}. `core` runs by default; `full` only with
 # --full. A scenario's <area> maps to the module whose .cls/.lua it builds on.
 SCENARIOS_DIR = os.path.join(TEXLIB_ROOT, "tests", "scenarios")
-SCENARIO_AREA_MODULE = {"schedule": "Schedule"}
+SCENARIO_AREA_MODULE = {
+    "schedule": "Schedule",
+    "report-cards": "Report Cards",
+    "syllabi": "Syllabi",
+}
 
 # Modules and their template files. Engine is auto-detected from \documentclass.
 MODULES = [

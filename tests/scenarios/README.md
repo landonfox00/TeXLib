@@ -57,6 +57,10 @@ tools soft-skip.
 | schedule | `mid-week-start`    | full | term starting mid-week → partial first week |
 | schedule | `recitations`       | full | a recitation column alongside lectures |
 | schedule | `no-quiz`           | full | MWF only, no quiz column (3 cols) |
+| report-cards | `standard`      | core | one student: full card (breakdown, standing bar, scenarios) |
+| report-cards | `multi-student` | full | two students in one file → multi-page / per-card reset |
+| syllabi | `standard`           | core | title block, sections, two-column grade tables |
+| syllabi | `long`               | full | content-heavy syllabus that spills onto page 2 |
 
 ## Adding a scenario
 

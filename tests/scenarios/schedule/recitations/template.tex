@@ -13,20 +13,16 @@
 	course-title    = {Smoke Test Course},
 	course-section  = 1,
 	course-room     = TBD,
-	lecture-days    = MWF,
-	lecture-times   = {9:00-9:50am},
-	start-date      = 8-24,
-	end-date        = 12-8,
-	final-date      = 12-15,
-	final-time      = {9:45-11:45am},
+	lecture-days     = MWF,
+	recitation-days  = R,
+	lecture-times    = {9:00-9:50am},
+	start-date       = 8-24,
+	end-date         = 12-8,
+	final-date       = 12-15,
+	final-time       = {9:45-11:45am},
 }
 
 \meta{ landscape = true }
-
-% Thursday recitation column. NOTE: the schedule class reads \GetRecitationDays
-% but currently exposes no `recitation-days` meta key to set it (despite the
-% README documenting one), so we set it directly. See TODO.
-\renewcommand{\GetRecitationDays}{R}
 
 \begin{document}
 \maketitle

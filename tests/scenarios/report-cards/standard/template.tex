@@ -1,0 +1,63 @@
+% Scenario: report-cards / standard   (tier: core)
+% A single student's end-of-term report card -- the canonical layout
+% (grade breakdown, standing bar, final-exam scenarios, sign-off).
+\documentclass{report-card}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	season         = Fall,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+}
+
+\meta{ report-date = {May 7, 2026} }
+
+\begin{document}
+
+\begin{reportcard}{Jordan Lee}
+
+	\section*{Current Grade Calculation}
+
+	Based on the syllabus, here is your grade breakdown prior to the
+	Final Exam. Homework and Quiz averages reflect the ``drop lowest 5''
+	policy.
+
+	\gradebreakdown{
+		Homework Avg. & 15\% & 96.0\% & +14.4 \\
+		Quiz Avg.     & 10\% & 88.0\% & +8.8  \\
+		\midrule
+		Exam 1        & 10\% & 84\%   & +8.4  \\
+		Exam 2        & 10\% & 79\%   & +7.9  \\
+		Exam 3        & 10\% & 91\%   & +9.1  \\
+		Exam 4        & 10\% & 86\%   & +8.6  \\
+		Exam 5        & 10\% & 88\%   & +8.8  \\
+	}{75\% & \fbox{\textbf{82.0\%}} & 66.0}
+
+	\section*{Visual Standing}
+
+	\standingbar{9.0}{7.5}{8.75}{10}{11.25}
+
+	\section*{Final Exam Scenarios}
+
+	The Final Exam is worth 25\% of your grade. Based on your current
+	standing of \textbf{66.0 points}, here is what you must score on the
+	Final Exam to achieve specific letter grades.
+
+	\scenarios{
+		To Pass     & D 60\% & \textbf{already secured} \\
+		To get a C  & C 70\% & \textbf{16.0\%}          \\
+		To get a B  & B 80\% & \textbf{56.0\%}          \\
+		To get an A & A 90\% & \textbf{96.0\%}          \\
+	}
+
+	\signoff{%
+		Excellent work this term --- keep it up!
+	}
+
+\end{reportcard}
+
+\end{document}

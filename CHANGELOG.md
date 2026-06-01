@@ -26,12 +26,13 @@ A consolidation pass: a new user-facing feature on `\problem`, four new shared `
   via `\metasetup`) exercising one configuration, built and pixel-diffed against
   `tests/visual_refs/<area>__<name>-*.png`. Tiers via an optional `tags` file
   (`core` runs by default, `full` only with `--full`); `--scenarios [AREA...]`
-  filters by area, `--update-refs` regenerates. Ships a 7-scenario Schedule
-  pack — `landscape-mwf`, `portrait`, `month-pages`, `summer-intensive` (core)
-  and `mid-week-start`, `recitations`, `no-quiz` (full) — covering orientation,
-  the month-pages render path, a 5-day intensive, a partial first week, a
-  recitation column, and a quiz-free grid. Local-only, like all visual checks
-  (references are environment-specific).
+  filters by area, `--update-refs` regenerates. Ships packs for **Schedule**
+  (`landscape-mwf`, `portrait`, `month-pages`, `summer-intensive`,
+  `mid-week-start`, `recitations`, `no-quiz`), **Report Cards** (`standard`,
+  `multi-student`), and **Syllabi** (`standard`, `long`) — covering orientation,
+  month-pages, a 5-day intensive, partial weeks, recitation columns, a quiz-free
+  grid, multi-student report cards, and multi-page syllabi. Local-only, like all
+  visual checks (references are environment-specific).
 - **`smoke_test.py` now verifies rendered content, not just build success.**
   After each successful build it (1) extracts the PDF text with `pdftotext` and
   asserts per-module expected substrings are present (`EXPECT_TEXT`), and (2)
@@ -51,6 +52,12 @@ A consolidation pass: a new user-facing feature on `\problem`, four new shared `
   while the `.log` requests it (latexmk-style) — so `\pageref{LastPage}` and
   other cross-references resolve in the rendered output ("1 of 2" rather than
   the one-shot "1 of ??").
+- **`recitation-days` meta key on the `schedule` class.** Now registered in the
+  `meta` family (mirroring `quiz-days`: a `\clist_gset` store + an expandable
+  `\GetRecitationDays`), so `\meta{recitation-days = R}` adds a capacity-0
+  recitation column. Previously `\GetRecitationDays` was an empty
+  `\providecommand` with no key to set it, despite the README documenting one —
+  `\meta{recitation-days=...}` errored with "unknown key".
 - **`month-pages` meta key on the `schedule` class.** `\meta{month-pages = true}` typesets each calendar month as its own table on its own page (`\newpage` between months) instead of one continuous term-long table. A week straddling a month boundary is repeated — at the foot of the earlier month and the head of the next — so every month shows complete weeks, wall-calendar style; week numbers stay continuous across the term. Default (`false`/omitted) is unchanged. Implemented as a page-group partition in `render_grid` (one group = whole term by default, one group per month when enabled), with the table header/lastfoot boilerplate re-emitted per group.
 - **Per-call variable overrides on `\problem`.** Inside `\begin{problems}…\end{problems}`, `\problem{id}` accepts a trailing optional argument that pins random variables to specific values for that one instance: `\problem{quadratic}[a=1, b=2, c=3]` solves `x²+2x+3` instead of a freshly-sampled quadratic. Partial fixes work too — `\problem{quadratic}[a=1]` leaves `b` and `c` random. The engine adds a `fixed[]` table that `set_var`/`set_rng`/`calc_var`/`pick_*` consult before writing, so a bank entry's own randomisation calls become no-ops on locked names. `push_scope`/`pop_scope` save and restore the table around each problem, so the override is local. `\importproblem` was upgraded to use the same lock semantics.
 - **`texlib-problembank.sty`** — single source of truth for the shared problem-bank LaTeX glue: engine loader, `\setvar`/`\setrng`/`\calcvar`/`\get`, the four `\pick*` commands, `\getlist`/`\geti`/`\foreachpick`, `\newproblem`/`\dupproblem`, `\begin{problem}`, `\getproblem` (+ `\useproblem`/`\reqproblem`), `\ppart`, `\@problem@item`, `\loadbank`, `\importproblem`, and `\providecommand` defaults for `\workbox`/`\autoexam@problem@sep`. Required by `autoexam.cls` and `quiz.cls`; collapses ~120 lines of duplicated code per class to a single `\RequirePackage`.

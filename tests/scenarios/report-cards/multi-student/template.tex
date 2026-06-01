@@ -1,0 +1,49 @@
+% Scenario: report-cards / multi-student   (tier: full)
+% Two students in one file (repeated reportcard environments) -- exercises the
+% multi-card, multi-page flow and the per-card header/footer reset.
+\documentclass{report-card}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	season         = Fall,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+}
+
+\meta{ report-date = {May 7, 2026} }
+
+\begin{document}
+
+\begin{reportcard}{Avery Stone}
+	\section*{Current Grade Calculation}
+	A strong term overall.
+	\gradebreakdown{
+		Homework Avg. & 15\% & 94.0\% & +14.1 \\
+		Quiz Avg.     & 10\% & 90.0\% & +9.0  \\
+		\midrule
+		Exam 1        & 10\% & 88\%   & +8.8  \\
+		Exam 2        & 10\% & 82\%   & +8.2  \\
+		Exam 3        & 10\% & 91\%   & +9.1  \\
+	}{45\% & \fbox{\textbf{89.2\%}} & 49.2}
+	\signoff{Great consistency this term.}
+\end{reportcard}
+
+\begin{reportcard}{Blair Nguyen}
+	\section*{Current Grade Calculation}
+	A solid recovery after a slow start.
+	\gradebreakdown{
+		Homework Avg. & 15\% & 78.0\% & +11.7 \\
+		Quiz Avg.     & 10\% & 71.0\% & +7.1  \\
+		\midrule
+		Exam 1        & 10\% & 62\%   & +6.2  \\
+		Exam 2        & 10\% & 74\%   & +7.4  \\
+		Exam 3        & 10\% & 80\%   & +8.0  \\
+	}{45\% & \fbox{\textbf{72.7\%}} & 40.4}
+	\signoff{Nice upward trajectory --- finish strong.}
+\end{reportcard}
+
+\end{document}

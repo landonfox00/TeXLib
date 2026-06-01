@@ -89,12 +89,10 @@ _(open)_
 - Grow the visual scenario packs beyond Schedule (Report Cards multi-section,
   Notes theorem taxonomy, syllabus variants). Infrastructure is in place — just
   drop `tests/scenarios/<area>/<name>/template.tex` folders.
-- **`recitation-days` meta key is documented but unimplemented.** `schedule.cls`
-  reads `\GetRecitationDays` (default empty) and `Schedule/README.md` documents a
-  `recitation-days` key, but no such key is registered in the `meta` family — so
-  `\meta{recitation-days=R}` errors with "unknown key". Add it alongside
-  `quiz-days` (mirror the `\clist_gset` + `\Get…` pattern). The `recitations`
-  visual scenario currently works around it with `\renewcommand\GetRecitationDays`.
+- ~~**`recitation-days` meta key is documented but unimplemented.**~~ **Done** —
+  registered in `schedule.cls`'s `meta` family (mirrors `quiz-days`:
+  `\clist_gset` + an expandable `\GetRecitationDays`); the `recitations` scenario
+  and the README now use it idiomatically.
 - Visual scenarios are local-only (env-specific refs). To make them CI-gateable,
   pin the TeX Live container version and generate/commit refs from that image,
   then add a separate (non-required, or nightly) visual job. Also: parallelize
