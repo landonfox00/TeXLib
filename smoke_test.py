@@ -383,6 +383,49 @@ def _decode(s) -> str:
     return s
 
 
+# Log signals that another compilation pass is needed. A single pass leaves
+# \pageref{LastPage} (and other forward refs / TOC entries) unresolved -- the
+# "1 of ??" you see in a one-shot build -- because the label only reaches the
+# .aux at end of run. Re-running clears it, the way latexmk / the Sublime
+# builder do.
+RERUN_RE = re.compile(
+    r"(Rerun to get|Rerun LaTeX|There were undefined references"
+    r"|Label\(s\) may have changed)", re.I)
+
+
+def _run_with_reruns(cmd: list[str], tmp: str, env: dict, timeout: int,
+                     jobname: str, max_passes: int = 3):
+    """
+    Run the TeX engine, re-running while its .log asks for it (cross-refs /
+    LastPage / TOC), up to `max_passes`. Returns
+    (returncode, log_text, stdout, elapsed, passes). Propagates
+    subprocess.TimeoutExpired (per pass) like subprocess.run.
+    """
+    log_path = os.path.join(tmp, jobname + ".log")
+    t0 = time.time()
+    returncode, stdout, log_text, passes = 0, "", "", 0
+    for i in range(max_passes):
+        passes = i + 1
+        r = subprocess.run(
+            cmd, cwd=tmp, env=env, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+            errors="replace", timeout=timeout,
+        )
+        returncode, stdout = r.returncode, r.stdout
+        log_text = ""
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, encoding="utf-8", errors="replace") as f:
+                    log_text = f.read()
+            except OSError:
+                pass
+        # Stop on a fatal error (a rerun won't fix it) or once no rerun is asked.
+        if returncode != 0 or i + 1 >= max_passes \
+                or not RERUN_RE.search(log_text or stdout or ""):
+            break
+    return returncode, log_text, stdout, time.time() - t0, passes
+
+
 def build_one(
     module: str,
     template: str,
@@ -482,38 +525,17 @@ def build_one(
         else:
             cmd.append(template)
 
-        t0 = time.time()
-        try:
-            r = subprocess.run(
-                cmd,
-                cwd=tmp,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout,
-            )
-            elapsed = time.time() - t0
-        except subprocess.TimeoutExpired as exc:
-            elapsed = time.time() - t0
-            partial = _decode(exc.stdout)
-            return False, elapsed, f"timeout after {timeout}s", _save_log(tmp, partial), False
-
         jobname = os.path.splitext(template)[0]
         pdf = os.path.join(tmp, jobname + ".pdf")
-        log_path = os.path.join(tmp, jobname + ".log")
+        t0 = time.time()
+        try:
+            returncode, log_text, stdout_text, elapsed, _passes = _run_with_reruns(
+                cmd, tmp, env, timeout, jobname)
+        except subprocess.TimeoutExpired as exc:
+            return (False, time.time() - t0, f"timeout after {timeout}s",
+                    _save_log(tmp, _decode(exc.stdout)), False)
 
-        log_text = ""
-        if os.path.exists(log_path):
-            try:
-                with open(log_path, "r", encoding="utf-8", errors="replace") as f:
-                    log_text = f.read()
-            except OSError:
-                pass
-
-        ok = r.returncode == 0 and os.path.exists(pdf)
+        ok = returncode == 0 and os.path.exists(pdf)
         if ok and dump_text:
             txt = extract_pdf_text(pdf)
             print(f"\n===== {module} :: extracted text =====")
@@ -532,12 +554,12 @@ def build_one(
                 skipped = skipped or vis_skipped
             if problems:
                 err = "CONTENT: " + "; ".join(problems)
-                saved = _save_log(tmp, log_text or r.stdout, verbose=verbose, jobname=jobname)
+                saved = _save_log(tmp, log_text or stdout_text, verbose=verbose, jobname=jobname)
                 return False, elapsed, err, saved, skipped
             return True, elapsed, "", "", skipped
 
-        err = extract_tex_errors(log_text or r.stdout) or f"exit={r.returncode}, no pdf"
-        saved = _save_log(tmp, log_text or r.stdout, verbose=verbose, jobname=jobname)
+        err = extract_tex_errors(log_text or stdout_text) or f"exit={returncode}, no pdf"
+        saved = _save_log(tmp, log_text or stdout_text, verbose=verbose, jobname=jobname)
         return False, elapsed, err, saved, False
     finally:
         # Don't trash the temp dir if we need the log for diagnosis.
@@ -660,32 +682,19 @@ def build_scenario(scen: dict, timeout: int, verbose: bool,
             cmd.append("-shell-escape")
         cmd.append(template)
 
+        jobname = os.path.splitext(template)[0]
+        pdf = os.path.join(tmp, jobname + ".pdf")
         t0 = time.time()
         try:
-            r = subprocess.run(
-                cmd, cwd=tmp, env=env, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                errors="replace", timeout=timeout,
-            )
-            elapsed = time.time() - t0
+            returncode, log_text, stdout_text, elapsed, _passes = _run_with_reruns(
+                cmd, tmp, env, timeout, jobname)
         except subprocess.TimeoutExpired as exc:
             return (False, time.time() - t0, f"timeout after {timeout}s",
                     _save_log(tmp, _decode(exc.stdout)), False)
 
-        jobname = os.path.splitext(template)[0]
-        pdf = os.path.join(tmp, jobname + ".pdf")
-        log_path = os.path.join(tmp, jobname + ".log")
-        log_text = ""
-        if os.path.exists(log_path):
-            try:
-                with open(log_path, encoding="utf-8", errors="replace") as f:
-                    log_text = f.read()
-            except OSError:
-                pass
-
-        if r.returncode != 0 or not os.path.exists(pdf):
-            err = extract_tex_errors(log_text or r.stdout) or f"exit={r.returncode}, no pdf"
-            return False, elapsed, err, _save_log(tmp, log_text or r.stdout, verbose, jobname), False
+        if returncode != 0 or not os.path.exists(pdf):
+            err = extract_tex_errors(log_text or stdout_text) or f"exit={returncode}, no pdf"
+            return False, elapsed, err, _save_log(tmp, log_text or stdout_text, verbose, jobname), False
 
         problems: list[str] = []
         skipped = False
