@@ -17,66 +17,87 @@
 %   texlibproposition  violet  — Proposition
 %   texlibdefinition   blue    — Definition / Convention
 %   texlibprocedure    teal    — Procedure
-%   texlibexample      black   — Example / Exercise (plain rule, no tint)
+%   texlibexample      black   — Example / Exercise (no tint; rule only)
 %   texlibquestion     orange  — Question / Challenge
 %   texlibnote         gray    — Note / Notation / Recall
+%
+% GEOMETRY (consolidated 2026/05/30). Every rule is the SAME width
+% (\texlibrulewidth) and the SAME horizontal position. The box bleeds
+% \texlibruleshift into the left margin (`grow to left by`) while keeping
+% \texlibruleshift of inner left padding, so the body text lands back on the
+% ordinary text margin — i.e. aligned with non-ruled environments such as
+% `remark` and plain paragraphs — and the rule + tint sit out in the margin.
+% Change \texlibrulewidth / \texlibruleshift below to retune all styles at
+% once; the solution / dashed-answer rules in didactic.cls and pset.cls read
+% the same two values.
 %
 % A class applies them like:
 %   \tcolorboxenvironment{theorem}{texlibtheorem}
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{texlib-theorems}[2026/05/13 v1.0 TeXLib shared theorem styling]
+\ProvidesPackage{texlib-theorems}[2026/05/30 v1.1 TeXLib shared theorem styling]
 
 \RequirePackage[many]{tcolorbox}
 \RequirePackage{amsthm}
 
-% Shared base: breakable, no full frame, gentle asymmetric padding
-% (extra left padding leaves room for the colored rule).
+% Single source of truth for every TeXLib left rule. Consumed here and by the
+% solution / hint / dashed-answer boxes in didactic.cls and pset.cls.
+\newcommand{\texlibrulewidth}{1.5pt}
+\newlength{\texlibruleshift}\setlength{\texlibruleshift}{8pt}
+
+% Shared base: breakable, no full frame, gentle asymmetric padding. The box is
+% grown \texlibruleshift into the left margin and carries \texlibruleshift of
+% inner left padding, so body text returns to the ordinary margin while the
+% rule lives in the margin.
 \tcbset{
 	texlibbase/.style={
 		enhanced jigsaw, breakable,
 		sharp corners, frame hidden,
 		boxrule=0pt,
-		left=8pt, right=4pt, top=4pt, bottom=4pt,
+		grow to left by=\texlibruleshift,
+		left=\texlibruleshift, right=4pt, top=4pt, bottom=4pt,
 		before skip=10pt, after skip=10pt,
 	},
 }
 
-% Per-family overlays. Each: a colored left rule + ~2% background tint.
+% Per-family overlays. Each: a colored left rule (\texlibrulewidth, flush with
+% the grown left edge) + ~2% background tint. Hues are unchanged from v1.0.
 \tcbset{
 	texlibtheorem/.style={
 		texlibbase,
 		colback=red!2!white,
-		borderline west={1.5pt}{0pt}{red!60!black},
+		borderline west={\texlibrulewidth}{0pt}{red!60!black},
 	},
 	texlibproposition/.style={
 		texlibbase,
 		colback=violet!2!white,
-		borderline west={1.5pt}{0pt}{violet!60!black},
+		borderline west={\texlibrulewidth}{0pt}{violet!60!black},
 	},
 	texlibdefinition/.style={
 		texlibbase,
 		colback=blue!2!white,
-		borderline west={1.5pt}{0pt}{blue!60!black},
+		borderline west={\texlibrulewidth}{0pt}{blue!60!black},
 	},
 	texlibprocedure/.style={
 		texlibbase,
 		colback=teal!2!white,
-		borderline west={1.5pt}{0pt}{teal!60!black},
+		borderline west={\texlibrulewidth}{0pt}{teal!60!black},
 	},
+	% Example/Exercise keeps NO tint as its deliberate non-color cue (the one
+	% "quiet" family), but now shares the common rule width and position.
 	texlibexample/.style={
 		texlibbase,
 		colback=white,
-		borderline west={1pt}{0pt}{black},
+		borderline west={\texlibrulewidth}{0pt}{black},
 	},
 	texlibquestion/.style={
 		texlibbase,
 		colback=orange!3!white,
-		borderline west={1.5pt}{0pt}{orange!60!black},
+		borderline west={\texlibrulewidth}{0pt}{orange!60!black},
 	},
 	texlibnote/.style={
 		texlibbase,
 		colback=gray!4!white,
-		borderline west={1.5pt}{0pt}{gray!50!black},
+		borderline west={\texlibrulewidth}{0pt}{gray!50!black},
 	},
 }
 

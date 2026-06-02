@@ -306,17 +306,17 @@
 %       thin green left rule + 2% tint + inline "Solution." label
 %   - otherwise (default, 'solutions = false', or 'student = true'):
 %       dashed thin grey left rule outlining a fixed-height blank box
+% Shares the canonical TeXLib geometry (texlibbase: same rule width via
+% \texlibrulewidth, same margin bleed/position as the theorem boxes). The
+% green solved-rule and the dashed blank-answer rule are the same width and
+% sit in the same place as every other TeXLib rule.
 \NewTColorBox{solution}{ O{3cm} }{
-	enhanced, breakable,
-	sharp corners, frame hidden,
-	boxrule=0pt,
-	left=8pt, right=4pt, top=4pt, bottom=4pt,
-	before skip=10pt, after skip=10pt,
+	texlibbase,
 	code={
 		\ifsolutions
 			\tcbset{
 				colback=green!3!white,
-				borderline west={1.5pt}{-6pt}{green!50!black},
+				borderline west={\texlibrulewidth}{0pt}{green!50!black},
 				before upper={\textbf{Solution.}\par\smallskip},
 			}
 		\else
@@ -324,7 +324,7 @@
 				height=#1,
 				upperbox=invisible,
 				colback=white,
-				borderline west={0.5pt}{-6pt}{black!40, dash pattern=on 3pt off 2pt},
+				borderline west={\texlibrulewidth}{0pt}{black!40, dash pattern=on 3pt off 2pt},
 			}
 		\fi
 	}
