@@ -95,22 +95,40 @@ check("grid file was written", grid ~= nil, grid_path)
 check("schedmap was written", mapl ~= nil, map_path)
 
 if grid and mapl then
-	-- 1) One grid row per week, calendar order, expected count.
-	check("grid has 18 rows (one per week)", #grid == 18, "#rows=" .. #grid)
+	-- render_grid emits, per page-group: \begin{xltabular} / header+\endhead /
+	-- (empty) \endlastfoot, then for EACH week a \raisebox week-label line, one
+	-- line per active day-cell, and a `\tabularnewline \hline` terminator;
+	-- finally \end{xltabular}.  One cell per line is what gives SyncTeX its
+	-- per-cell precision, so grid_line is NOT the week number — we locate each
+	-- week by its label line.
 
-	-- 2) Row terminators: all but the last end with the inter-row rule;
-	--    the last ends with a bare \tabularnewline (the phantom-row fix).
-	local term_ok, last_ok = true, false
+	-- 1) One week-label row per week, in calendar order.  Each label carries the
+	--    week number, so collect week -> grid_line of its label.
+	local label_line = {}      -- week number -> grid_line
+	local nweeks = 0
 	for i, row in ipairs(grid) do
-		local has_hline = row:find("\\tabularnewline%s+\\hline%s*$") ~= nil
-		if i < #grid then
-			if not has_hline then term_ok = false end
-		else
-			last_ok = row:find("\\tabularnewline%s*$") ~= nil and not has_hline
+		local wk = row:match("\\raisebox.-\\textbf{(%d+)}")
+		if wk then
+			nweeks = nweeks + 1
+			label_line[tonumber(wk)] = i
 		end
 	end
-	check("rows 1..n-1 end with \\tabularnewline \\hline", term_ok)
-	check("last row ends with bare \\tabularnewline (no trailing \\hline)", last_ok)
+	check("grid has one label row per week (18)", nweeks == 18, "#weeks=" .. nweeks)
+
+	-- 2) Every week row ends with `\tabularnewline \hline` (the cleaned-up
+	--    bottom rule: empty \endlastfoot, no special bare last row), and the
+	--    table closes with \end{xltabular}.
+	local nterm = 0
+	for _, row in ipairs(grid) do
+		if row:find("^\\tabularnewline%s+\\hline%s*$") then nterm = nterm + 1 end
+	end
+	local has_empty_lastfoot = false
+	for _, row in ipairs(grid) do
+		if row:find("^\\endlastfoot%s*$") then has_empty_lastfoot = true end
+	end
+	check("every week row ends with \\tabularnewline \\hline (18)", nterm == 18, "#term=" .. nterm)
+	check("empty \\endlastfoot + \\end{xltabular} close the table",
+		has_empty_lastfoot and grid[#grid]:find("\\end{xltabular}") ~= nil)
 
 	-- 3) Parse the schedmap into grid_line -> source_line.
 	local got = {}
@@ -121,7 +139,8 @@ if grid and mapl then
 		end
 	end
 
-	-- Golden mapping for the scenario above.  Reasoning behind the key rows:
+	-- Golden week -> primary source line.  The attribution contract is unchanged
+	-- (only the grid_line numbering moved when cells went one-per-line):
 	--   wk1 -> 34  : \syllabus is the first directive touching week 1.
 	--   wk2 -> 24  : MLK \holiday (line 24) is the min line in week 2,
 	--                beating the \noquiz/\quiz/\section lines that also land there.
@@ -129,6 +148,7 @@ if grid and mapl then
 	--   wk6..10->25: no own dated directive -> inherit President's Day (line 25).
 	--   wk11..16->26: inherit Spring Break (line 26).
 	--   wk18 -> 50 : \finalsweek.
+	-- Each week's primary attribution is recorded on its label line.
 	local expected = {
 		[1]=34, [2]=24, [3]=38, [4]=43, [5]=45,
 		[6]=25, [7]=25, [8]=25, [9]=25, [10]=25,
@@ -138,21 +158,23 @@ if grid and mapl then
 
 	local map_ok, mism = true, nil
 	for wk = 1, 18 do
-		if got[wk] ~= expected[wk] then
+		local gl = label_line[wk]
+		if not gl or got[gl] ~= expected[wk] then
 			map_ok = false
-			mism = string.format("week %d: got %s, expected %d", wk, tostring(got[wk]), expected[wk])
+			mism = string.format("week %d (grid_line %s): got %s, expected %d",
+				wk, tostring(gl), tostring(gl and got[gl]), expected[wk])
 			break
 		end
 	end
-	check("schedmap matches golden grid_line -> source_line mapping", map_ok, mism)
+	check("schedmap maps each week's label line to its golden source line", map_ok, mism)
 
 	-- 4) Targeted property checks (independent of the full golden blob).
 	check("min-line-wins: MLK holiday (24) beats later directives in week 2",
-		got[2] == 24, "week2=" .. tostring(got[2]))
+		got[label_line[2]] == 24, "week2=" .. tostring(got[label_line[2]]))
 	check("fallback: directive-less week 8 inherits previous directive line 25",
-		got[8] == 25, "week8=" .. tostring(got[8]))
+		got[label_line[8]] == 25, "week8=" .. tostring(got[label_line[8]]))
 	check("first week attributed to first directive (\\syllabus, line 34)",
-		got[1] == 34, "week1=" .. tostring(got[1]))
+		got[label_line[1]] == 34, "week1=" .. tostring(got[label_line[1]]))
 end
 
 -- ---- cleanup ---------------------------------------------------------------

@@ -22,6 +22,16 @@ Usage:
     python smoke_test.py --visual        # also diff each page vs tests/visual_refs/
     python smoke_test.py --update-refs   # (re)generate the visual references
     python smoke_test.py --dump-text     # print each module's extracted PDF text
+    python smoke_test.py --scenarios            # run core visual scenario packs
+    python smoke_test.py --scenarios schedule   # ...limited to one area
+    python smoke_test.py --scenarios --full     # the ultimate run (all tiers)
+    python smoke_test.py --scenarios --update-refs   # regenerate scenario refs
+
+Visual scenario packs live under tests/scenarios/<area>/<name>/ — each a
+self-contained template exercising one configuration (orientation, month-pages,
+edge dates, ...). `--scenarios` builds and visually diffs them; tier `core`
+runs by default, `full` only with `--full`. This is a local aid (references are
+rendering-environment-specific), separate from the per-push module suite.
 
 Content checks (on by default) extract the rendered PDF's text with `pdftotext`
 and assert each module's expected substrings are present, plus that key
@@ -77,6 +87,19 @@ VISUAL_MODULES = {"Schedule", "Report Cards", "Syllabi", "Notes"}
 # before a page is flagged as a visual regression. Tight, because refs and the
 # build under test come from the same machine in the intended local workflow.
 VISUAL_MAX_DIFF_FRAC = 0.002
+
+# Visual scenario packs (tier 2/3): tests/scenarios/<area>/<name>/template.tex,
+# each a self-contained doc (metadata inline via \metasetup) exercising ONE
+# configuration. An optional `tags` file (whitespace-separated, e.g. "full")
+# marks the tier; absent => {"core"}. `core` runs by default; `full` only with
+# --full. A scenario's <area> maps to the module whose .cls/.lua it builds on.
+SCENARIOS_DIR = os.path.join(TEXLIB_ROOT, "tests", "scenarios")
+SCENARIO_AREA_MODULE = {
+    "schedule": "Schedule",
+    "report-cards": "Report Cards",
+    "syllabi": "Syllabi",
+    "notes": "Notes",
+}
 
 # Modules and their template files. Engine is auto-detected from \documentclass.
 MODULES = [
@@ -200,11 +223,15 @@ def extract_pdf_text(pdf_path: str) -> str | None:
         return None
 
 
-def check_content(module: str, tmp: str, pdf_path: str) -> tuple[list[str], bool]:
+def check_content(module: str, tmp: str, pdf_path: str,
+                  check_text: bool = True) -> tuple[list[str], bool]:
     """
     Verify rendered content. Returns (problems, text_skipped).
     `text_skipped` is True when substring checks were requested but pdftotext
-    is unavailable (a soft skip, not a failure).
+    is unavailable (a soft skip, not a failure). `check_text=False` runs only
+    the dependency-free artifact check — used by scenario builds, where the
+    per-page visual diff (not a fixed substring list) is the content check and
+    EXPECT_TEXT's module tokens may not apply to every configuration.
     """
     problems: list[str] = []
 
@@ -215,7 +242,7 @@ def check_content(module: str, tmp: str, pdf_path: str) -> tuple[list[str], bool
             problems.append(f"artifact {pat} missing or empty")
 
     # Text substrings (needs pdftotext).
-    expects = EXPECT_TEXT.get(module, [])
+    expects = EXPECT_TEXT.get(module, []) if check_text else []
     text_skipped = False
     if expects:
         text = extract_pdf_text(pdf_path)
@@ -361,6 +388,49 @@ def _decode(s) -> str:
     return s
 
 
+# Log signals that another compilation pass is needed. A single pass leaves
+# \pageref{LastPage} (and other forward refs / TOC entries) unresolved -- the
+# "1 of ??" you see in a one-shot build -- because the label only reaches the
+# .aux at end of run. Re-running clears it, the way latexmk / the Sublime
+# builder do.
+RERUN_RE = re.compile(
+    r"(Rerun to get|Rerun LaTeX|There were undefined references"
+    r"|Label\(s\) may have changed)", re.I)
+
+
+def _run_with_reruns(cmd: list[str], tmp: str, env: dict, timeout: int,
+                     jobname: str, max_passes: int = 3):
+    """
+    Run the TeX engine, re-running while its .log asks for it (cross-refs /
+    LastPage / TOC), up to `max_passes`. Returns
+    (returncode, log_text, stdout, elapsed, passes). Propagates
+    subprocess.TimeoutExpired (per pass) like subprocess.run.
+    """
+    log_path = os.path.join(tmp, jobname + ".log")
+    t0 = time.time()
+    returncode, stdout, log_text, passes = 0, "", "", 0
+    for i in range(max_passes):
+        passes = i + 1
+        r = subprocess.run(
+            cmd, cwd=tmp, env=env, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+            errors="replace", timeout=timeout,
+        )
+        returncode, stdout = r.returncode, r.stdout
+        log_text = ""
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, encoding="utf-8", errors="replace") as f:
+                    log_text = f.read()
+            except OSError:
+                pass
+        # Stop on a fatal error (a rerun won't fix it) or once no rerun is asked.
+        if returncode != 0 or i + 1 >= max_passes \
+                or not RERUN_RE.search(log_text or stdout or ""):
+            break
+    return returncode, log_text, stdout, time.time() - t0, passes
+
+
 def build_one(
     module: str,
     template: str,
@@ -460,38 +530,17 @@ def build_one(
         else:
             cmd.append(template)
 
-        t0 = time.time()
-        try:
-            r = subprocess.run(
-                cmd,
-                cwd=tmp,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout,
-            )
-            elapsed = time.time() - t0
-        except subprocess.TimeoutExpired as exc:
-            elapsed = time.time() - t0
-            partial = _decode(exc.stdout)
-            return False, elapsed, f"timeout after {timeout}s", _save_log(tmp, partial), False
-
         jobname = os.path.splitext(template)[0]
         pdf = os.path.join(tmp, jobname + ".pdf")
-        log_path = os.path.join(tmp, jobname + ".log")
+        t0 = time.time()
+        try:
+            returncode, log_text, stdout_text, elapsed, _passes = _run_with_reruns(
+                cmd, tmp, env, timeout, jobname)
+        except subprocess.TimeoutExpired as exc:
+            return (False, time.time() - t0, f"timeout after {timeout}s",
+                    _save_log(tmp, _decode(exc.stdout)), False)
 
-        log_text = ""
-        if os.path.exists(log_path):
-            try:
-                with open(log_path, "r", encoding="utf-8", errors="replace") as f:
-                    log_text = f.read()
-            except OSError:
-                pass
-
-        ok = r.returncode == 0 and os.path.exists(pdf)
+        ok = returncode == 0 and os.path.exists(pdf)
         if ok and dump_text:
             txt = extract_pdf_text(pdf)
             print(f"\n===== {module} :: extracted text =====")
@@ -510,12 +559,12 @@ def build_one(
                 skipped = skipped or vis_skipped
             if problems:
                 err = "CONTENT: " + "; ".join(problems)
-                saved = _save_log(tmp, log_text or r.stdout, verbose=verbose, jobname=jobname)
+                saved = _save_log(tmp, log_text or stdout_text, verbose=verbose, jobname=jobname)
                 return False, elapsed, err, saved, skipped
             return True, elapsed, "", "", skipped
 
-        err = extract_tex_errors(log_text or r.stdout) or f"exit={r.returncode}, no pdf"
-        saved = _save_log(tmp, log_text or r.stdout, verbose=verbose, jobname=jobname)
+        err = extract_tex_errors(log_text or stdout_text) or f"exit={returncode}, no pdf"
+        saved = _save_log(tmp, log_text or stdout_text, verbose=verbose, jobname=jobname)
         return False, elapsed, err, saved, False
     finally:
         # Don't trash the temp dir if we need the log for diagnosis.
@@ -540,6 +589,189 @@ def _save_log(tmp_dir: str, log_text, verbose: bool = False, jobname: str = "bui
         for ln in log_text.splitlines()[-50:]:
             print(f"    {ln}")
     return dest
+
+
+# ---------------------------------------------------------------------------
+# Visual scenario packs
+# ---------------------------------------------------------------------------
+
+def discover_scenarios(area_filter: list[str], include_full: bool) -> list[dict]:
+    """
+    Find scenario dirs under tests/scenarios/<area>/<name>/ (each holding a
+    template.tex). Returns dicts {area, name, dir, slug, tags}, filtered by
+    `area_filter` (empty = all areas) and tier (core always; full only when
+    `include_full`). `slug` is "<area>__<name>" — the visual-ref key.
+    """
+    out: list[dict] = []
+    if not os.path.isdir(SCENARIOS_DIR):
+        return out
+    for area in sorted(os.listdir(SCENARIOS_DIR)):
+        area_dir = os.path.join(SCENARIOS_DIR, area)
+        if not os.path.isdir(area_dir) or (area_filter and area not in area_filter):
+            continue
+        for name in sorted(os.listdir(area_dir)):
+            sdir = os.path.join(area_dir, name)
+            if not os.path.isfile(os.path.join(sdir, "template.tex")):
+                continue
+            tags = {"core"}
+            tagfile = os.path.join(sdir, "tags")
+            if os.path.isfile(tagfile):
+                try:
+                    with open(tagfile, encoding="utf-8") as f:
+                        tags = set(f.read().split()) or {"core"}
+                except OSError:
+                    pass
+            if "core" not in tags and not include_full:
+                continue
+            out.append({"area": area, "name": name, "dir": sdir,
+                        "slug": f"{area}__{name}", "tags": tags})
+    return out
+
+
+def _copy_shared_into(tmp: str) -> None:
+    """Copy the TeXLib-root shared files (.sty/.lua/.cls) and every module's
+    .cls into a build dir, never overwriting files already there. Mirrors
+    build_one's cwd-copy strategy that dodges the comma-in-TEXINPUTS limit."""
+    for entry in os.listdir(TEXLIB_ROOT):
+        src = os.path.join(TEXLIB_ROOT, entry)
+        if os.path.isfile(src) and entry.lower().endswith((".sty", ".lua", ".cls")):
+            dest = os.path.join(tmp, entry)
+            if not os.path.exists(dest):
+                shutil.copy2(src, dest)
+    for entry in os.listdir(TEXLIB_ROOT):
+        sub = os.path.join(TEXLIB_ROOT, entry)
+        if not os.path.isdir(sub):
+            continue
+        for f in os.listdir(sub):
+            if f.lower().endswith(".cls"):
+                dest = os.path.join(tmp, f)
+                if not os.path.exists(dest):
+                    shutil.copy2(os.path.join(sub, f), dest)
+
+
+def build_scenario(scen: dict, timeout: int, verbose: bool,
+                   content: bool, visual: str) -> tuple[bool, float, str, str, bool]:
+    """
+    Build one scenario in isolation and run content + visual checks against its
+    slug. The scenario ships its own metadata inline (no stub coursemeta).
+    Returns (ok, elapsed, err, log_path_on_failure, skipped).
+    """
+    area, slug, sdir = scen["area"], scen["slug"], scen["dir"]
+    module = SCENARIO_AREA_MODULE.get(area)
+    if not module:
+        return False, 0.0, f"no module mapping for scenario area '{area}'", "", False
+    module_dir = os.path.join(TEXLIB_ROOT, module)
+    template = "template.tex"
+    engine = detect_engine(os.path.join(sdir, template))
+
+    tmp = tempfile.mkdtemp(prefix=f"texlib_scen_{safe_name(slug)}_")
+    try:
+        # Scenario files first (they win name clashes), then the module's
+        # .cls/.lua, then root shared files. No stub coursemeta — scenarios set
+        # metadata inline via \metasetup.
+        for entry in os.listdir(sdir):
+            src = os.path.join(sdir, entry)
+            if os.path.isfile(src):
+                shutil.copy2(src, tmp)
+        for entry in os.listdir(module_dir):
+            src = os.path.join(module_dir, entry)
+            if os.path.isfile(src) and not os.path.exists(os.path.join(tmp, entry)):
+                shutil.copy2(src, tmp)
+        _copy_shared_into(tmp)
+
+        env = os.environ.copy()
+        sep = ";" if os.name == "nt" else ":"
+        env["TEXINPUTS"] = f".{sep}{TEXLIB_ROOT}//{sep}{env.get('TEXINPUTS', '')}"
+        cmd = [engine, "-interaction=nonstopmode", "-halt-on-error"]
+        if engine == "lualatex":
+            cmd.append("-shell-escape")
+        cmd.append(template)
+
+        jobname = os.path.splitext(template)[0]
+        pdf = os.path.join(tmp, jobname + ".pdf")
+        t0 = time.time()
+        try:
+            returncode, log_text, stdout_text, elapsed, _passes = _run_with_reruns(
+                cmd, tmp, env, timeout, jobname)
+        except subprocess.TimeoutExpired as exc:
+            return (False, time.time() - t0, f"timeout after {timeout}s",
+                    _save_log(tmp, _decode(exc.stdout)), False)
+
+        if returncode != 0 or not os.path.exists(pdf):
+            err = extract_tex_errors(log_text or stdout_text) or f"exit={returncode}, no pdf"
+            return False, elapsed, err, _save_log(tmp, log_text or stdout_text, verbose, jobname), False
+
+        problems: list[str] = []
+        skipped = False
+        if content:
+            # Artifact check only (grid non-empty). The per-page visual diff is
+            # the real content check for scenarios; the module's EXPECT_TEXT
+            # tokens (e.g. "Quiz 1") don't apply across every configuration.
+            cp, tskip = check_content(module, tmp, pdf, check_text=False)
+            problems += cp
+            skipped = skipped or tskip
+        vp, vskip = check_visual(slug, tmp, pdf, update=(visual == "update"))
+        problems += vp
+        skipped = skipped or vskip
+        if problems:
+            return (False, elapsed, "CONTENT: " + "; ".join(problems),
+                    _save_log(tmp, log_text or r.stdout, verbose, jobname), skipped)
+        return True, elapsed, "", "", skipped
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def run_scenarios(area_filter: list[str], include_full: bool, update_refs: bool,
+                  content_enabled: bool, timeout: int, verbose: bool) -> int:
+    """Run the visual scenario packs. Returns the number of failures."""
+    scen = discover_scenarios(area_filter, include_full)
+    visual_mode = "update" if update_refs else "check"
+    have_magick = bool(MAGICK or COMPARE)
+    vmiss = [n for n, ok in (("pdftoppm", PDFTOPPM), ("ImageMagick", have_magick)) if not ok]
+
+    print("TeXLib smoke test — visual scenarios")
+    print(f"  dir     : {SCENARIOS_DIR}")
+    print(f"  filter  : {', '.join(area_filter) if area_filter else 'all areas'}"
+          f"; tier: {'core+full' if include_full else 'core'}")
+    print(f"  visual  : {'update refs' if update_refs else 'compare'}"
+          + (f"  [{', '.join(vmiss)} MISSING -> skipped]" if vmiss else ""))
+    print(f"  found   : {len(scen)} scenario(s)")
+    print()
+    if not scen:
+        print("No scenarios matched. Add tests/scenarios/<area>/<name>/template.tex.")
+        return 0
+
+    results: list[tuple[str, bool, str]] = []
+    any_skipped = False
+    t_start = time.time()
+    for s in scen:
+        sys.stdout.write(f"  [{s['slug']:<26}] ... ")
+        sys.stdout.flush()
+        ok, elapsed, err, saved, skipped = build_scenario(
+            s, timeout, verbose, content_enabled, visual_mode)
+        any_skipped = any_skipped or skipped
+        tail = "" if ok else f"  ({err})"
+        if skipped and ok:
+            tail = "  (checks partially skipped)"
+        if saved and not ok:
+            tail += f"  log: {saved}"
+        print(f"{'PASS' if ok else 'FAIL'} {elapsed:5.1f}s{tail}")
+        results.append((s["slug"], ok, err))
+
+    total = time.time() - t_start
+    passed = sum(1 for _, ok, _ in results if ok)
+    failed = [(slug, err) for slug, ok, err in results if not ok]
+    print()
+    print(f"Summary: {passed}/{len(results)} scenarios passed in {total:.1f}s total")
+    if update_refs:
+        print(f"(reference images written under {VISUAL_REF_DIR})")
+    if any_skipped:
+        print("Note: some checks were skipped (missing poppler/ImageMagick).")
+    if failed:
+        print("Failures:")
+        for slug, err in failed:
+            print(f"  - {slug}: {err}")
+    return len(failed)
 
 
 # ---------------------------------------------------------------------------
@@ -588,6 +820,16 @@ def main() -> int:
         "--dump-text", action="store_true",
         help="Print each module's extracted PDF text and exit (aid for writing EXPECT_TEXT).",
     )
+    p.add_argument(
+        "--scenarios", nargs="*", metavar="AREA", default=None,
+        help="Run visual scenario packs (tests/scenarios/) instead of the module suite. "
+             "Optionally limit to AREA(s), e.g. --scenarios schedule. Always visual; "
+             "combine with --update-refs to regenerate scenario references.",
+    )
+    p.add_argument(
+        "--full", action="store_true",
+        help="With --scenarios, include `full`-tier scenarios (default: core only).",
+    )
     args = p.parse_args()
 
     visual_mode: str | None = None
@@ -596,6 +838,11 @@ def main() -> int:
     elif args.visual:
         visual_mode = "check"
     content_enabled = not args.no_content
+
+    # Scenario packs are a separate run path (their own templates + refs).
+    if args.scenarios is not None:
+        return run_scenarios(args.scenarios, args.full, args.update_refs,
+                             content_enabled, args.timeout, args.verbose)
 
     if args.modules:
         wanted = set(args.modules)

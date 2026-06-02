@@ -1,0 +1,86 @@
+% Scenario: syllabi / long   (tier: full)
+% A content-heavy syllabus that spills onto a second page -- exercises the
+% running header/footer and multi-page flow of the syllabus class.
+\documentclass{syllabus}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	season         = Fall,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 181,
+}
+
+\meta{
+	course-title   = Math 181 Calculus I,
+	course-section = 1001,
+	short-title    = Math 181 Calc I,
+	instructor     = Test Instructor,
+	email          = test@example.edu,
+	office         = 100 NLLC,
+	office-hours   = MWF 11:00--11:50am,
+	class-time     = MWF 9:00--9:50am,
+	course-room    = SEM 101,
+}
+
+\begin{document}
+\maketitle
+
+\syllabussection{Office Hours}
+Walk-in office hours are listed above, or by appointment. I am also reachable
+after each lecture for quick questions.
+
+\syllabussection{Communication}
+Canvas (WebCampus) Inbox is my preferred mode of contact. I will try to respond
+to messages within 48 hours on weekdays; weekend messages may not be answered
+until Monday.
+
+\syllabussection{Required Materials}
+A graphing utility (Desmos is free and sufficient) and the openly licensed
+course notes posted on Canvas. No physical textbook purchase is required.
+
+\syllabussection{Course Description}
+The following topics will be covered in this course:
+\begin{itemize}
+	\item Limits and continuity
+	\item Derivatives and the rules of differentiation
+	\item Applications of derivatives (related rates, optimization)
+	\item Integrals and the Fundamental Theorem of Calculus
+	\item Transcendental functions and their calculus
+\end{itemize}
+
+\syllabussection{Attendance and Participation}
+Regular attendance is expected. More than three unexcused absences may affect
+the participation component of your grade. If you must miss class, you are
+responsible for the material covered.
+
+\syllabussection{Academic Integrity}
+All submitted work must be your own. Collaboration is encouraged on practice
+problems but prohibited on quizzes and exams. Violations are reported per
+university policy.
+
+\syllabussection{Accommodations}
+Students with documented disabilities should contact the Disability Resource
+Center and share their accommodation letter with me as early as possible so we
+can make arrangements.
+
+\syllabussection{Grade Scale}
+Course grades will be determined as follows:
+
+\gradetables{
+	Homework   & 15\% \\ \hline
+	Quizzes    & 10\% \\ \hline
+	Exams      & 50\% \\ \hline
+	Final Exam & 25\%
+}{
+	$A$ & $90 \leq x$      \\ \hline
+	$B$ & $80 \leq x < 90$ \\ \hline
+	$C$ & $70 \leq x < 80$ \\ \hline
+	$D$ & $60 \leq x < 70$ \\ \hline
+	$F$ & $x < 60$
+}
+
+\syllabussection{Course Schedule}
+See \texttt{Schedule.pdf} on the Syllabus page of our Canvas course.
+
+\end{document}

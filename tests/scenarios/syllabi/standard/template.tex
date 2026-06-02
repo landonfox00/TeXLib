@@ -1,0 +1,64 @@
+% Scenario: syllabi / standard   (tier: core)
+% A canonical single-page-ish course syllabus: title block, sections, and the
+% two-column grade/scale tables.
+\documentclass{syllabus}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	season         = Fall,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 181,
+}
+
+\meta{
+	course-title   = Math 181 Calculus I,
+	course-section = 1001,
+	short-title    = Math 181 Calc I,
+	instructor     = Test Instructor,
+	email          = test@example.edu,
+	office         = 100 NLLC,
+	office-hours   = MWF 11:00--11:50am,
+	class-time     = MWF 9:00--9:50am,
+	course-room    = SEM 101,
+}
+
+\begin{document}
+\maketitle
+
+\syllabussection{Office Hours}
+Walk-in office hours are listed above, or by appointment.
+
+\syllabussection{Communication}
+Canvas (WebCampus) Inbox is my preferred mode of contact. I will try to
+respond to messages within 48 hours.
+
+\syllabussection{Course Description}
+The following topics will be covered in this course:
+\begin{itemize}
+	\item Limits and continuity
+	\item Derivatives and applications
+	\item Integrals and the Fundamental Theorem
+	\item Transcendental functions
+\end{itemize}
+
+\syllabussection{Grade Scale}
+Course grades will be determined as follows:
+
+\gradetables{
+	Homework   & 15\% \\ \hline
+	Quizzes    & 10\% \\ \hline
+	Exams      & 50\% \\ \hline
+	Final Exam & 25\%
+}{
+	$A$ & $90 \leq x$      \\ \hline
+	$B$ & $80 \leq x < 90$ \\ \hline
+	$C$ & $70 \leq x < 80$ \\ \hline
+	$D$ & $60 \leq x < 70$ \\ \hline
+	$F$ & $x < 60$
+}
+
+\syllabussection{Course Schedule}
+See \texttt{Schedule.pdf} on the Syllabus page of our Canvas course.
+
+\end{document}

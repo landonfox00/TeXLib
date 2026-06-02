@@ -1,10 +1,15 @@
 # Visual-regression reference images
 
-PNG renders of each deterministic module's smoke-test build, one per page,
-named `<module>-<page>.png` (e.g. `Schedule-1.png`). `smoke_test.py --visual`
-renders the current build and pixel-diffs it against these, catching **layout**
-regressions that the text/content checks can't see — the motivating case was a
-stray vertical-rule stub under the schedule's last row.
+PNG renders of smoke-test builds, one per page, pixel-diffed by `smoke_test.py`
+to catch **layout** regressions that the text/content checks can't see — the
+motivating case was a stray vertical-rule stub under the schedule's last row.
+Two naming schemes share this directory:
+
+- `<module>-<page>.png` (e.g. `Schedule-1.png`) — the canonical per-module
+  templates, compared by `--visual`.
+- `<area>__<scenario>-<page>.png` (e.g. `schedule__month-pages-1.png`) — the
+  visual scenario packs, compared by `--scenarios`. See
+  [../scenarios/README.md](../scenarios/README.md).
 
 ## Scope
 

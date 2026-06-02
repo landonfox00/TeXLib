@@ -83,8 +83,20 @@ _(open)_
   only if a bank command is actually used. Non-bank `didactic` documents
   compile under pdflatex again. (Surfaced by the smoke build check on branch
   `feat/quiz-auto-load-bank`.)
-- Add a second Schedule smoke case (or mode) built with `month-pages = true`,
-  so that render path is exercised in CI.
+- ~~Add a second Schedule smoke case (or mode) built with `month-pages = true`~~
+  **Done** — the `month-pages` render path is now covered by the
+  `schedule/month-pages` visual scenario (`--scenarios`).
+- Grow the visual scenario packs beyond Schedule (Report Cards multi-section,
+  Notes theorem taxonomy, syllabus variants). Infrastructure is in place — just
+  drop `tests/scenarios/<area>/<name>/template.tex` folders.
+- ~~**`recitation-days` meta key is documented but unimplemented.**~~ **Done** —
+  registered in `schedule.cls`'s `meta` family (mirrors `quiz-days`:
+  `\clist_gset` + an expandable `\GetRecitationDays`); the `recitations` scenario
+  and the README now use it idiomatically.
+- Visual scenarios are local-only (env-specific refs). To make them CI-gateable,
+  pin the TeX Live container version and generate/commit refs from that image,
+  then add a separate (non-required, or nightly) visual job. Also: parallelize
+  builds + seed-pin autoexam/quiz to bring randomized modules into visual scope.
 - **Delete orphaned `Quizzes/preamble.tex`** — not `\input`/`\usepackage`d
   anywhere (only named in the top-level README layout); superseded by
   `quiz.cls`. Verify, remove, and fix the README layout line.

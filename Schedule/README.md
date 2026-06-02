@@ -84,6 +84,7 @@ Class-local keys (in addition to all standard `course-metadata` keys):
 | `portrait`      | `true` to force portrait                                |
 | `lecture-caps`  | Per-day weight caps, comma list matching `lecture-days` |
 | `quiz-days`     | Days of the week for quizzes (e.g. `T`, `Th`)           |
+| `recitation-days` | Days of the week for recitations (e.g. `R`); adds a capacity-0 column. Default: none. |
 | `month-pages`   | `true` to put each calendar month on its own page (see below). Default `false`: one continuous table. |
 
 #### `month-pages`
@@ -100,8 +101,7 @@ same number on both pages.
 
 Required `course-metadata` keys: `course-subject`, `course-number`,
 `course-title`, `course-section`, `season`, `year`, `start-date`,
-`end-date`, `final-date`, `final-time`, `lecture-days`. (Recitation
-days come from the optional `recitation-days` key, defaulting to empty.)
+`end-date`, `final-date`, `final-time`, `lecture-days`.
 
 ### Build flags (TeXLib unified CLI)
 

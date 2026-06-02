@@ -1,0 +1,46 @@
+% Scenario: schedule / mid-week-start   (tier: full)
+% Term starts on a Wednesday (Jan 14 2026), so week 1 is partial: the Monday
+% cell precedes start-date. Exercises the leading-partial-week handling in
+% render_grid (row_ptr backs up to the week's Monday and renders pre-start days).
+\documentclass{schedule}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	season         = Spring,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	course-room    = TBD,
+	lecture-days   = MWF,
+	lecture-times  = {9:00-9:50am},
+	start-date     = 1-14,
+	end-date       = 5-6,
+	final-date     = 5-11,
+	final-time     = {9:45-11:45am},
+}
+
+\meta{ landscape = true, quiz-days = T }
+
+\begin{document}
+\maketitle
+\begin{schedule}
+	\holiday{1-19}{MLK Jr. Day}
+	\holiday{2-16}{President's Day}
+	\holiday{3-23}[3-27]{Spring Break}
+
+	\syllabus
+	\section{1.1}
+	\section{1.2}
+	\section[2]{1.3}
+	\examreview
+	\exam[noquiz]
+
+	\section{2.1}
+	\finalreview
+	\finalsweek[5-7][5]
+	\winterbreak
+\end{schedule}
+\end{document}

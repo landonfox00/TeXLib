@@ -226,14 +226,17 @@
 \newtheorem{note}[theorem]{Note}
 \newtheorem{recall}[theorem]{Recall}
 
-% Bind each boxed environment to a shared style. remark/note/recall are
-% deliberately left as plain inline theorems (no box), matching didactic.
+% Bind each boxed environment to a shared style. note/recall carry the gray
+% note rule (matching didactic, where notation/recall use texlibnote); remark
+% stays plain inline (no box), also matching didactic.
 \tcolorboxenvironment{theorem}{texlibtheorem}
 \tcolorboxenvironment{definition}{texlibdefinition}
 \tcolorboxenvironment{corollary}{texlibtheorem}
 \tcolorboxenvironment{proposition}{texlibproposition}
 \tcolorboxenvironment{lemma}{texlibtheorem}
 \tcolorboxenvironment{example}{texlibexample}
+\tcolorboxenvironment{note}{texlibnote}
+\tcolorboxenvironment{recall}{texlibnote}
 
 % Unnumbered (starred) twins of every environment above. Same headings, styles,
 % and tcolorbox styling (remark*/note*/recall* left plain, like their numbered
@@ -260,6 +263,8 @@
 \tcolorboxenvironment{proposition*}{texlibproposition}
 \tcolorboxenvironment{lemma*}{texlibtheorem}
 \tcolorboxenvironment{example*}{texlibexample}
+\tcolorboxenvironment{note*}{texlibnote}
+\tcolorboxenvironment{recall*}{texlibnote}
 
 % ==============================================================================
 % 8. SOLUTION ENVIRONMENT — gated on \ShowKey/\ShowSolutions/\StudentMode
@@ -275,23 +280,35 @@
 % body-discarding environment via the `comment` package, replacing
 % the tcolorbox version. This keeps the box completely off the page
 % (no spacing artifacts).
+% Shares the canonical TeXLib geometry (texlibbase): the green solved-rule and
+% the dashed blank-answer rule are the same width (\texlibrulewidth) and sit in
+% the same margin position as every other TeXLib rule, and match didactic's
+% solution box. The full-frame blue "Solution:" title box is retired.
 \NewTColorBox{solution}{ O{3cm} }{
-	enhanced, breakable,
-	colback=white, colframe=black,
-	title={\textbf{Solution:}},
+	texlibbase,
 	code={
 		\ifsolutions
-			\tcbset{ colback=blue!5, colframe=blue!40!black }
+			\tcbset{
+				colback=green!3!white,
+				borderline west={\texlibrulewidth}{0pt}{green!50!black},
+				before upper={\textbf{Solution.}\par\smallskip},
+			}
 		\else
 			\ifkey
-				\tcbset{ colback=blue!5, colframe=blue!40!black }
+				\tcbset{
+					colback=green!3!white,
+					borderline west={\texlibrulewidth}{0pt}{green!50!black},
+					before upper={\textbf{Solution.}\par\smallskip},
+				}
 			\else
 				\ifstudent
 					\tcbset{
 						height=#1,
 						upperbox=invisible,
+						colback=white,
+						borderline west={\texlibrulewidth}{0pt}{black!40, dash pattern=on 3pt off 2pt},
 						watermark text={\textit{Show your work here}},
-						watermark color=black!10
+						watermark color=black!10,
 					}
 				\fi
 			\fi
@@ -317,13 +334,14 @@
 % 9. HINT ENVIRONMENT — always visible, lighter than a solution
 % ==============================================================================
 % \begin{hint} ... \end{hint}
+% Left-rule aesthetic (texlibbase: same width/position as every TeXLib rule),
+% keeping hint's existing yellow identity. The inline "Hint." label replaces
+% the old full-frame title bar.
 \NewTColorBox{hint}{ }{
-	enhanced, breakable,
-	colback=yellow!5, colframe=yellow!40!black,
-	boxrule=0.4pt, sharp corners,
-	title={\textbf{Hint:}},
-	fonttitle=\small,
-	before skip=8pt, after skip=8pt
+	texlibbase,
+	colback=yellow!4!white,
+	borderline west={\texlibrulewidth}{0pt}{yellow!55!black},
+	before upper={\textbf{Hint.}\par\smallskip},
 }
 
 % ==============================================================================
