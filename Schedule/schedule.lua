@@ -798,10 +798,19 @@ function render_grid(month_pages)
 	-- lualatex's input search includes the output dir when -output-directory
 	-- is set.  For .schedmap, the Sublime builder's _find_in_dirs probes
 	-- both the source and the aux dir.
-	local aux_dir =
-		(kpse.var_value and kpse.var_value("TEXMF_OUTPUT_DIRECTORY"))
-		or os.getenv("TEXMF_OUTPUT_DIRECTORY")
-		or os.getenv("TEXMFOUTPUT")
+	-- kpse.var_value raises ("call kpse.set_program_name() first") when kpse is
+	-- not initialised — e.g. a standalone `texlua` harness that calls
+	-- render_grid directly (test_schedule_synctex.lua). Checking that the
+	-- function *exists* isn't enough; pcall it and fall back to the environment.
+	local aux_dir
+	do
+		local ok, val = pcall(function()
+			return kpse.var_value("TEXMF_OUTPUT_DIRECTORY")
+		end)
+		aux_dir = (ok and val)
+			or os.getenv("TEXMF_OUTPUT_DIRECTORY")
+			or os.getenv("TEXMFOUTPUT")
+	end
 	if aux_dir == "" then aux_dir = nil end
 	local function aux_path(name)
 		if aux_dir then return aux_dir .. "/" .. name end
