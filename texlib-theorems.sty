@@ -34,7 +34,11 @@
 % A class applies them like:
 %   \tcolorboxenvironment{theorem}{texlibtheorem}
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{texlib-theorems}[2026/05/30 v1.1 TeXLib shared theorem styling]
+\ProvidesPackage{texlib-theorems}[2026/06/01 v1.2 TeXLib shared theorem styling]
+%
+% Customization: \texlibtheoremsetup{ rule=false, tint=false,
+% theorem-color=purple, ... } toggles the left rule / background tint globally
+% or recolours individual families.  See the "customization" section below.
 
 \RequirePackage[many]{tcolorbox}
 \RequirePackage{amsthm}
@@ -59,46 +63,90 @@
 	},
 }
 
-% Per-family overlays. Each: a colored left rule (\texlibrulewidth, flush with
-% the grown left edge) + ~2% background tint. Hues are unchanged from v1.0.
-\tcbset{
-	texlibtheorem/.style={
-		texlibbase,
-		colback=red!2!white,
-		borderline west={\texlibrulewidth}{0pt}{red!60!black},
-	},
-	texlibproposition/.style={
-		texlibbase,
-		colback=violet!2!white,
-		borderline west={\texlibrulewidth}{0pt}{violet!60!black},
-	},
-	texlibdefinition/.style={
-		texlibbase,
-		colback=blue!2!white,
-		borderline west={\texlibrulewidth}{0pt}{blue!60!black},
-	},
-	texlibprocedure/.style={
-		texlibbase,
-		colback=teal!2!white,
-		borderline west={\texlibrulewidth}{0pt}{teal!60!black},
-	},
-	% Example/Exercise keeps NO tint as its deliberate non-color cue (the one
-	% "quiet" family), but now shares the common rule width and position.
-	texlibexample/.style={
-		texlibbase,
-		colback=white,
-		borderline west={\texlibrulewidth}{0pt}{black},
-	},
-	texlibquestion/.style={
-		texlibbase,
-		colback=orange!3!white,
-		borderline west={\texlibrulewidth}{0pt}{orange!60!black},
-	},
-	texlibnote/.style={
-		texlibbase,
-		colback=gray!4!white,
-		borderline west={\texlibrulewidth}{0pt}{gray!50!black},
-	},
+% ==============================================================================
+% Per-family appearance + customization
+% ==============================================================================
+% Each family carries three tunables — its base hue, its tint percentage (the
+% "!N" white mix; 0 = never tinted), and its rule darkening ("!M!black") — whose
+% defaults reproduce the v1.1 look exactly.  Two global toggles drop the left
+% rule or the background tint across all families.  \texlibtheoremsetup{...}
+% changes any of these and rebuilds the styles, so it works in a preamble or
+% mid-document:
+%
+%   \texlibtheoremsetup{rule=false}                 % no left rules anywhere
+%   \texlibtheoremsetup{tint=false}                 % no background tints
+%   \texlibtheoremsetup{theorem-color=purple,       % recolour individual
+%                       definition-color=teal}      %   families (rule + tint)
+%
+% Implementation note: the styles are rebuilt with LITERAL colour values baked
+% in (via \edef), and the left rule's `borderline west` is omitted entirely
+% when rule=false — so xcolor/tcolorbox never see a conditional and a disabled
+% rule leaves no degenerate mark.  The rule WIDTH stays the live
+% \texlibrulewidth, preserving the single-source-of-truth tuning above.
+
+\newif\iftexlib@thm@rule  \texlib@thm@ruletrue
+\newif\iftexlib@thm@tint  \texlib@thm@tinttrue
+
+% \texlib@thm@param{family}{hue}{tint-pct}{rule-mix}
+\newcommand{\texlib@thm@param}[4]{%
+	\@namedef{texlib@thm@hue@#1}{#2}%
+	\@namedef{texlib@thm@pct@#1}{#3}%
+	\@namedef{texlib@thm@mix@#1}{#4}%
+}
+\texlib@thm@param{theorem}    {red}    {2}{60}
+\texlib@thm@param{proposition}{violet} {2}{60}
+\texlib@thm@param{definition} {blue}   {2}{60}
+\texlib@thm@param{procedure}  {teal}   {2}{60}
+\texlib@thm@param{example}    {black}  {0}{60}   % "quiet" family: never tinted
+\texlib@thm@param{question}   {orange} {3}{60}
+\texlib@thm@param{note}       {gray}   {4}{50}
+
+% Rebuild one family's tcolorbox style from its current parameters + the global
+% toggles, reducing colback/border colour to literals before \tcbset sees them.
+\newcommand{\texlib@thm@build}[1]{%
+	\edef\texlib@thm@bg{%
+		\iftexlib@thm@tint
+			\ifnum\@nameuse{texlib@thm@pct@#1}=0 white%
+			\else \@nameuse{texlib@thm@hue@#1}!\@nameuse{texlib@thm@pct@#1}!white\fi
+		\else white\fi}%
+	\edef\texlib@thm@rc{\@nameuse{texlib@thm@hue@#1}!\@nameuse{texlib@thm@mix@#1}!black}%
+	\edef\texlib@thm@do{%
+		\noexpand\tcbset{texlib#1/.style={texlibbase, colback=\texlib@thm@bg
+			\iftexlib@thm@rule
+				,borderline west={\noexpand\texlibrulewidth}{0pt}{\texlib@thm@rc}%
+			\fi}}}%
+	\texlib@thm@do
+}
+% Rebuild every family.  Called at load (with the defaults above) and by
+% \texlibtheoremsetup after a settings change.
+\newcommand{\texlibtheoremrebuild}{%
+	\texlib@thm@build{theorem}\texlib@thm@build{proposition}%
+	\texlib@thm@build{definition}\texlib@thm@build{procedure}%
+	\texlib@thm@build{example}\texlib@thm@build{question}\texlib@thm@build{note}%
+}
+\texlibtheoremrebuild
+
+% Public key interface.
+\pgfqkeys{/texlib/thm}{%
+	rule/.is choice, rule/true/.code={\texlib@thm@ruletrue}, rule/false/.code={\texlib@thm@rulefalse},
+	tint/.is choice, tint/true/.code={\texlib@thm@tinttrue}, tint/false/.code={\texlib@thm@tintfalse},
+	theorem-color/.code     ={\@namedef{texlib@thm@hue@theorem}{#1}},
+	proposition-color/.code ={\@namedef{texlib@thm@hue@proposition}{#1}},
+	definition-color/.code  ={\@namedef{texlib@thm@hue@definition}{#1}},
+	procedure-color/.code   ={\@namedef{texlib@thm@hue@procedure}{#1}},
+	example-color/.code     ={\@namedef{texlib@thm@hue@example}{#1}},
+	question-color/.code    ={\@namedef{texlib@thm@hue@question}{#1}},
+	note-color/.code        ={\@namedef{texlib@thm@hue@note}{#1}},
+}
+% \texlibtheoremsetup{key=value, ...} — update the theorem look. Keys:
+%   rule = true|false          left rule on/off (all families)
+%   tint = true|false          background tint on/off (all families)
+%   <family>-color = <hue>     recolour one family (drives its rule + tint);
+%                              <family> in theorem/proposition/definition/
+%                              procedure/example/question/note.
+\newcommand{\texlibtheoremsetup}[1]{%
+	\pgfqkeys{/texlib/thm}{#1}%
+	\texlibtheoremrebuild
 }
 
 \endinput

@@ -1,0 +1,44 @@
+% Scenario: notes / theorem-custom   (tier: core)
+% Exercises \texlibtheoremsetup (texlib-theorems): turn the background tint off
+% (rule-only look) and recolour two families, then render the didactic theorem
+% boxes.  The reference pins the *customised* appearance, so a regression in the
+% toggle/recolour machinery is caught visually.
+\documentclass{didactic}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	season         = Fall,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+}
+
+\meta{ unit = Lecture, number = 1, title = Customised Theorem Boxes }
+
+% Rule-only (no tint) + recoloured theorem/definition families.
+\texlibtheoremsetup{ tint = false, theorem-color = teal, definition-color = purple }
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+These boxes use the customised look: no background tint, a teal theorem rule and
+a purple definition rule.
+
+\begin{definition}[Continuity]
+	A function $f$ is continuous at $a$ if $\lim_{x \to a} f(x) = f(a)$.
+\end{definition}
+
+\begin{theorem}[Intermediate Value]
+	If $f$ is continuous on $[a,b]$ and $N$ lies between $f(a)$ and $f(b)$,
+	then there exists $c \in (a,b)$ with $f(c) = N$.
+\end{theorem}
+
+\begin{exercise}
+	Show that $x^3 - x - 1 = 0$ has a solution in $(1, 2)$.
+\end{exercise}
+
+\end{document}

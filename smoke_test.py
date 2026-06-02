@@ -98,6 +98,7 @@ SCENARIO_AREA_MODULE = {
     "schedule": "Schedule",
     "report-cards": "Report Cards",
     "syllabi": "Syllabi",
+    "notes": "Notes",
 }
 
 # Modules and their template files. Engine is auto-detected from \documentclass.

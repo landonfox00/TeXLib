@@ -61,6 +61,7 @@ tools soft-skip.
 | report-cards | `multi-student` | full | two students in one file → multi-page / per-card reset |
 | syllabi | `standard`           | core | title block, sections, two-column grade tables |
 | syllabi | `long`               | full | content-heavy syllabus that spills onto page 2 |
+| notes | `theorem-custom`       | core | `\texlibtheoremsetup` — tint off + recoloured theorem/definition rules |
 
 ## Adding a scenario
 
