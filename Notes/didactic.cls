@@ -474,4 +474,11 @@
 	}%
 }
 
+% ==============================================================================
+% Structural hang: section/subsection headings, the TOC title, the bibliography
+% heading, and the running header/footer all hang onto one outer left edge.
+% Loaded LAST so its redefinitions land on top of the article defaults.
+% ==============================================================================
+\RequirePackage{texlib-sectionhang}
+
 \endinput
