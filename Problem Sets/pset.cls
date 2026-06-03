@@ -105,16 +105,15 @@
 % ==============================================================================
 % 4. PAGE LAYOUT — METADATA-DRIVEN HEADERS
 % ==============================================================================
+\RequirePackage{texlib-footer}   % shared footer: Course | page X of Y | Institution
 \setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\bfseries \GetPsetTitle}
+\fancyhead[C]{\ifkey\textit{Answer Key}\fi}
 \fancyhead[R]{\GetCourse}
-\fancyfoot[L]{\GetTerm}
-\fancyfoot[C]{\thepage\ of \pageref{LastPage}}
-\fancyfoot[R]{\ifkey \textit{Answer Key} \else \GetInstructor \fi}
+\SetTeXLibFooter
 \renewcommand{\headrulewidth}{0.4pt}
-\renewcommand{\footrulewidth}{0.4pt}
 
 % Title-page style: same footer as the regular `fancy` style, but the
 % header and its rule are suppressed so the title block sits at the top
@@ -122,11 +121,8 @@
 % want the header back on page 1 can call \thispagestyle{fancy} after it.
 \fancypagestyle{firstpage}{%
 	\fancyhf{}%
-	\fancyfoot[L]{\GetTerm}%
-	\fancyfoot[C]{\thepage\ of \pageref{LastPage}}%
-	\fancyfoot[R]{\ifkey \textit{Answer Key} \else \GetInstructor \fi}%
+	\SetTeXLibFooter
 	\renewcommand{\headrulewidth}{0pt}%
-	\renewcommand{\footrulewidth}{0.4pt}%
 }
 
 % ==============================================================================
