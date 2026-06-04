@@ -15,8 +15,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+      - name: Install pypdf (merge tests)
+        run: python -m pip install --quiet pypdf
       - name: Builder logic + orchestration tests
         run: python Sublime/test_texlib_builder.py
+      - name: Parallel version-builder tests
+        run: python test_build_versions.py
 
   # Real end-to-end: drives the actual builder coroutine against real
   # pdflatex + biber on a biblatex fixture, proving the biber-skip cache and
