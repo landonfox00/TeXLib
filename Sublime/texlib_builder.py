@@ -170,6 +170,7 @@ class TexlibBuilder(PdfBuilder):
         # the PDF viewer and SyncTeX both keep working.
         tex_dir = self._tex_dir()
         self._aux_target = self._resolve_aux_directory(tex_dir)
+        self._version_sources = []
         base = [engine, "-interaction=nonstopmode", "-synctex=1"]
         if engine in ("lualatex", "xelatex"):
             base.append("-shell-escape")
@@ -285,7 +286,12 @@ class TexlibBuilder(PdfBuilder):
         """One \\versions{} entry, built as <base>_<version>.pdf."""
         macro = MODE_MACROS.get(mode, "")
         jobname = f"{self.base_name}_{version}"
-        arg = f"\\def\\Version{{{version}}}{macro}\\input{{{self.tex_name}}}"
+        # autoexam reads its body from <jobname>.tex (\shufflepages requires
+        # it), but the root source is named differently (doc.tex vs jobname
+        # doc_A). Build this version against a source copy named to match the
+        # jobname; _cleanup_version_scratch removes it afterwards.
+        input_name = self._make_version_source_copy(jobname)
+        arg = f"\\def\\Version{{{version}}}{macro}\\input{{{input_name}}}"
         cmd = base + [f"--jobname={jobname}", arg]
 
         run = 1
@@ -302,6 +308,52 @@ class TexlibBuilder(PdfBuilder):
         while run < MAX_RERUNS and self._needs_another_run():
             run += 1
             yield (cmd, f"version {version} rerun {run}...")
+
+    def _make_version_source_copy(self, jobname):
+        """Ensure <jobname>.tex exists as this version's body source; return the
+        basename to \\input.
+
+        autoexam reads its body from \\jobname.tex and \\shufflepages requires
+        it, so a version built under jobname <base>_<ver> needs a source named
+        to match. Copy the root source to <jobname>.tex (tracked for cleanup).
+        If the source is already named <jobname>.tex (e.g. build_versions.py
+        pre-staged it), no copy is made. Falls back to the original source on
+        error -- which keeps the no-shuffle case working.
+        """
+        target = jobname + ".tex"
+        if self.tex_name == target:
+            return target
+        tex_dir = self._tex_dir()
+        dst = os.path.join(tex_dir, target)
+        try:
+            self._force_remove(dst)
+            shutil.copyfile(os.path.join(tex_dir, self.tex_name), dst)
+        except OSError as exc:  # noqa: BLE001 - degrade to the original source
+            self.display(
+                f"TeXLib: could not stage version source {target}: {exc}; "
+                "building from the original (\\shufflepages may fail).\n"
+            )
+            return self.tex_name
+        self._version_sources = getattr(self, "_version_sources", [])
+        self._version_sources.append(dst)
+        return target
+
+    def _cleanup_version_scratch(self):
+        """Remove the per-version source copies + jobname-keyed scratch the
+        autoexam engine writes to the source dir, preserving the output PDFs /
+        SyncTeX. No-op unless _make_version_source_copy staged anything.
+        """
+        tex_dir = self._tex_dir()
+        for src in getattr(self, "_version_sources", []):
+            jobname = os.path.splitext(os.path.basename(src))[0]
+            for pat in (
+                jobname + ".tex", jobname + ".srcmap", jobname + "_synctex.tex",
+                jobname + "_*.sco", jobname + "_autoexam_body*.tex",
+                jobname + "_prob_*.tex",
+            ):
+                for f in glob.glob(os.path.join(tex_dir, pat)):
+                    self._force_remove(f)
+        self._version_sources = []
 
     def _build_quick(self, base, engine):
         """One engine pass, no biber, no rerun loop -- fast preview while writing.
@@ -568,6 +620,8 @@ class TexlibBuilder(PdfBuilder):
         self._split_pdf_if_signaled(base_path)
 
         self._finalize_synctex(tex_dir)
+
+        self._cleanup_version_scratch()
 
     def _finalize_synctex(self, tex_dir):
         """Reduce inverse-search artifacts to a single uncompressed <base>.synctex.

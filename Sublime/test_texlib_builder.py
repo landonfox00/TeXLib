@@ -262,6 +262,9 @@ def main():
     check("allversions -> \\def\\Version{A} in first build",
           bool(cmds) and r"\def\Version{A}" in cmds[0][0][-1],
           cmds[0][0][-1] if cmds else "")
+    check("allversions -> \\input{doc_A.tex} (per-version source copy)",
+          bool(cmds) and r"\input{doc_A.tex}" in cmds[0][0][-1],
+          cmds[0][0][-1] if cmds else "")
 
     # (g) \examversions alias also parsed
     cmds, _ = run_builder(
@@ -710,6 +713,45 @@ def main():
     os.chmod(ro, 0o444)  # read-only
     TexlibBuilder._force_remove(ro)
     check("_force_remove: read-only file is deleted", not os.path.exists(ro), ro)
+
+    # ====================================================================== #
+    # (t) per-version source copy: autoexam reads its body from <jobname>.tex,
+    #     so allversions stages a copy named to match the jobname -- which is
+    #     what makes \shufflepages work under a distinct jobname.
+    # ====================================================================== #
+    tmpv = tempfile.mkdtemp(prefix="texlib_vsrc_")
+    with open(os.path.join(tmpv, "doc.tex"), "w", encoding="utf-8") as fh:
+        fh.write("body")
+    vb = TexlibBuilder()
+    vb.tex_name = "doc.tex"
+    vb.base_name = "doc"
+    vb.tex_dir = tmpv
+    ret = vb._make_version_source_copy("doc_A")
+    check("vsrc: returns the per-version copy name", ret == "doc_A.tex", ret)
+    check("vsrc: copy created with the source content",
+          os.path.exists(os.path.join(tmpv, "doc_A.tex"))
+          and open(os.path.join(tmpv, "doc_A.tex")).read() == "body")
+
+    vb2 = TexlibBuilder()
+    vb2.tex_name = "doc_A.tex"  # already named as the jobname (build_versions case)
+    vb2.base_name = "doc"
+    vb2.tex_dir = tmpv
+    check("vsrc: no-op when source already named <jobname>.tex",
+          vb2._make_version_source_copy("doc_A") == "doc_A.tex")
+
+    for n in ("doc_A_A.sco", "doc_A.srcmap", "doc_A_synctex.tex",
+              "doc_A_autoexam_body_A.tex"):
+        open(os.path.join(tmpv, n), "w").close()
+    open(os.path.join(tmpv, "doc_A.pdf"), "w").close()  # the real output
+    vb._cleanup_version_scratch()
+    check("vsrc: cleanup removes the source copy",
+          not os.path.exists(os.path.join(tmpv, "doc_A.tex")))
+    check("vsrc: cleanup removes jobname scratch (.sco/.srcmap/body/synctex)",
+          not any(os.path.exists(os.path.join(tmpv, n)) for n in
+                  ("doc_A_A.sco", "doc_A.srcmap", "doc_A_synctex.tex",
+                   "doc_A_autoexam_body_A.tex")))
+    check("vsrc: cleanup preserves the output PDF",
+          os.path.exists(os.path.join(tmpv, "doc_A.pdf")))
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL
