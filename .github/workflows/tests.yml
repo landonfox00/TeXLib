@@ -1,0 +1,42 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Fast: the builder's decision logic + multi-pass orchestration, simulated.
+  # No TeX toolchain needed, so this runs in seconds on every push.
+  builder-logic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Builder logic + orchestration tests
+        run: python Sublime/test_texlib_builder.py
+
+  # Real end-to-end: drives the actual builder coroutine against real
+  # pdflatex + biber on a biblatex fixture, proving the biber-skip cache and
+  # rerun handling work against the genuine toolchain. The test soft-skips if
+  # the tools are missing, so an apt hiccup degrades gracefully.
+  biber-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install TeX Live + biber
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-base \
+            texlive-latex-recommended \
+            texlive-latex-extra \
+            texlive-bibtex-extra \
+            biber
+      - name: Real biber integration test
+        run: python Sublime/test_biber_integration.py
