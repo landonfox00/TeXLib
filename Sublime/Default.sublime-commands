@@ -10,5 +10,6 @@
 	{ "caption": "TeXLib: Build — Student Copy", "command": "build", "args": {"variant": "Student Copy"} },
 	{ "caption": "TeXLib: Build — Rubric",       "command": "build", "args": {"variant": "Rubric"} },
 	{ "caption": "TeXLib: Build — Draft",        "command": "build", "args": {"variant": "Draft"} },
+	{ "caption": "TeXLib: Build — Quick",        "command": "build", "args": {"variant": "Quick (single pass, refs may be stale)"} },
 	{ "caption": "TeXLib: Build — All Versions", "command": "build", "args": {"variant": "All Versions (separate PDFs)"} }
 ]

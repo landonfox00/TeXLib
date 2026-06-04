@@ -52,6 +52,9 @@ Open any TeXLib document (`autoexam`, `quiz`, `didactic`, `pset`, `schedule`,
   - **Student Copy** — injects `\def\StudentMode{}`
   - **Rubric** — injects `\def\ShowRubric{}`
   - **Draft** — injects `\def\ShowDraft{}`
+  - **Quick** — a single engine pass, no biber, no rerun loop; for fast preview
+    while writing. Cross-references / citations may be stale — run a normal
+    build to settle them before sharing.
   - **All Versions (separate PDFs)** — for `autoexam`, builds one PDF per
     `\versions{A,B,C}` entry (`<base>_A.pdf`, `<base>_B.pdf`, …)
 - The same modes are in the **command palette** (`Ctrl+Shift+P` → type "TeXLib").
@@ -68,6 +71,11 @@ command line, exactly the way `smoke_test.py` does.
   documents are untouched.
 - **Cross-reference reruns.** Re-runs the engine (up to 3×) while the log still
   says "Rerun to get cross-references right."
+- **biber change-detection.** For biblatex documents, biber (and its forced
+  re-pass) only runs when the `.bcf` changed since the `.bbl` was last built —
+  the hash is cached in the aux dir. Editing prose no longer pays for a biber
+  run plus an extra engine pass on every build; touch a `\cite` or the
+  bibliography and it re-runs automatically.
 - **PDF splitting.** If the engine drops a `<base>.spl` file containing
   `split_page=N`, the builder splits `<base>.pdf` into `<base>_Exam.pdf` and
   `<base>_Solutions.pdf` (the autoexam key-build workflow). Needs `pypdf`.
@@ -76,6 +84,27 @@ command line, exactly the way `smoke_test.py` does.
 It folds in the useful logic from the three retired scripts: `onetex_build.py`
 (engine detection, rerun loop), `OneTeXBuilder.py` (synctex hiding), and
 `autoexam.py` (version loop, PDF split).
+
+## Testing
+
+The builder has three layers of automated tests (none deployed to Sublime):
+
+| Script | Needs TeX? | Covers |
+|--------|-----------|--------|
+| `test_texlib_builder.py` | No | Decision logic + **full multi-pass orchestration** (biber-skip cache, rerun detection, `MAX_RERUNS` cap, per-version biber, aux routing, hidden-file recovery, schedmap rewrite). Drives `commands()` with a scripted side-effect timeline so the biber/rerun branches actually execute. |
+| `test_biber_integration.py` | Yes (`pdflatex`/`lualatex` + `biber`) | Real end-to-end: drives the actual builder coroutine against the real toolchain on a biblatex fixture. Proves a fresh build settles with no undefined refs, an unchanged rebuild **skips biber** in one pass, and editing the `.bib` re-runs biber. Soft-skips if the tools are absent. |
+| `smoke_test.py` (repo root) | Yes (`lualatex`) | Builds every module template; content/visual regression for shared `.sty`/`.cls` refactors. |
+
+Run them directly:
+
+```sh
+python Sublime/test_texlib_builder.py        # fast, no TeX
+python Sublime/test_biber_integration.py     # real pdflatex + biber
+python smoke_test.py                          # full template builds
+```
+
+`.github/workflows/tests.yml` runs the first two on every push: a fast
+no-TeX logic job, and an integration job that installs TeX Live + biber.
 
 ## Notes
 

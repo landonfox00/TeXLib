@@ -15,7 +15,7 @@
 #     require it. A plain pdflatex document still builds with pdflatex.
 #
 #   * Build modes -- Default / Answer Key / Solutions / Student / Rubric /
-#     Draft. Selected via the TeXLib.sublime-build *variants* (Ctrl+Shift+B,
+#     Draft / Quick. Selected via the TeXLib.sublime-build *variants* (Ctrl+Shift+B,
 #     or the "TeXLib: Build ..." entries in the command palette). Each variant
 #     passes  --texlib-mode=<mode>  through LaTeXTools' documented `options`
 #     channel; this builder pops that token out of self.options and injects the
@@ -28,6 +28,11 @@
 #
 #   * Cross-reference reruns -- re-runs the engine (up to MAX_RERUNS) while the
 #     log still says "Rerun to get cross-references right."
+#
+#   * biber change-detection -- biber (and its forced re-pass) only runs when
+#     the .bcf changed since the .bbl was last built. Editing prose in a
+#     biblatex document no longer pays for a biber run plus an extra pass.
+#     The "Quick" mode goes further: a single pass, no biber, no reruns.
 #
 #   * PDF splitting -- if the engine drops a <base>.spl signal file containing
 #     "split_page=N", the resulting <base>.pdf is split into <base>_Exam.pdf
@@ -103,13 +108,26 @@ MODE_MACROS = {
 # A pseudo-mode: build every \versions{...} entry as its own PDF.
 MODE_ALLVERSIONS = "allversions"
 
+# A pseudo-mode: a single engine pass with no biber and no rerun loop, for fast
+# preview while writing. Cross-references / citations may be stale; a normal
+# build settles them.
+MODE_QUICK = "quick"
+
 # How many times to re-run the engine chasing stable cross-references.
 MAX_RERUNS = 3
 
 # Regexes over the root document / engine output.
 DOCCLASS_RE = re.compile(r"\\documentclass(?:\[[^\]]*\])?\{(\w[\w-]*)\}")
 VERSIONS_RE = re.compile(r"\\(?:exam)?versions\s*\{([^}]+)\}")
-RERUN_RE = re.compile(r"Rerun to get .* right\.")
+# Engine/package signals that another LaTeX pass will resolve something:
+#   * "...Rerun to get cross-references right." / "Rerun to get outlines right."
+#   * "Label(s) may have changed. Rerun..."   (cross-references / toc)
+#   * biblatex's "Please rerun LaTeX."        (emitted after biber writes .bbl;
+#     without this the post-biber pass leaves undefined references behind)
+RERUN_RE = re.compile(
+    r"Rerun to get .* right\.|Label\(s\) may have changed|Please re-?run LaTeX",
+    re.IGNORECASE,
+)
 # biblatex's "please run biber" message (varies slightly across versions).
 BIBER_RERUN_RE = re.compile(r"Please \(?re\)?(?:run|rerun) Biber", re.IGNORECASE)
 MODE_OPT_RE = re.compile(r"^--texlib-mode=(.+)$")
@@ -174,6 +192,8 @@ class TexlibBuilder(PdfBuilder):
                 )
                 for version in versions:
                     yield from self._build_version(base, engine, version)
+        elif mode == MODE_QUICK:
+            yield from self._build_quick(base, engine)
         else:
             yield from self._build_once(base, engine, mode)
 
@@ -196,7 +216,7 @@ class TexlibBuilder(PdfBuilder):
                 mode = match.group(1).strip().lower()
             else:
                 passthrough.append(opt)
-        if mode not in MODE_MACROS and mode != MODE_ALLVERSIONS:
+        if mode not in MODE_MACROS and mode not in (MODE_ALLVERSIONS, MODE_QUICK):
             self.display(
                 f"TeXLib: unknown build mode {mode!r}; falling back to default.\n"
             )
@@ -246,10 +266,14 @@ class TexlibBuilder(PdfBuilder):
         run = 1
         yield (cmd, f"{label} run {run}...")
 
-        # biblatex: if the first pass produced a .bcf, run biber and force
-        # one additional engine pass so the freshly written .bbl is read in.
-        if self._biber_needed(self.base_name):
+        # biblatex: run biber only when the bibliography actually changed since
+        # the .bbl was last built. The .bbl persists in the aux dir, so an edit
+        # that doesn't touch citations skips both biber and its forced re-pass.
+        if self._biber_needed(self.base_name) and not self._biber_is_current(
+            self.base_name
+        ):
             yield (self._biber_command(self.base_name), "biber...")
+            self._record_biber_hash(self.base_name)
             run += 1
             yield (cmd, f"{label} rerun {run} (post-biber)...")
 
@@ -267,15 +291,27 @@ class TexlibBuilder(PdfBuilder):
         run = 1
         yield (cmd, f"version {version} run {run}...")
 
-        # biblatex: same .bcf detection, scoped to the version's jobname.
-        if self._biber_needed(jobname):
+        # biblatex: same change-detection, scoped to the version's jobname, so
+        # a rebuilt version reuses its .bbl when its bibliography is unchanged.
+        if self._biber_needed(jobname) and not self._biber_is_current(jobname):
             yield (self._biber_command(jobname), f"biber [{version}]...")
+            self._record_biber_hash(jobname)
             run += 1
             yield (cmd, f"version {version} rerun {run} (post-biber)...")
 
         while run < MAX_RERUNS and self._needs_another_run():
             run += 1
             yield (cmd, f"version {version} rerun {run}...")
+
+    def _build_quick(self, base, engine):
+        """One engine pass, no biber, no rerun loop -- fast preview while writing.
+
+        Cross-references and the bibliography may be stale (a ?? or an
+        unresolved citation can show up); run a normal build to settle them
+        before sharing. Builds in the default visual mode (no \\Show... flag).
+        """
+        cmd = base + [self.tex_name]
+        yield (cmd, f"{engine} [quick] single pass (refs may be stale)...")
 
     def _tex_dir(self):
         """The directory containing the root .tex file."""
@@ -352,6 +388,151 @@ class TexlibBuilder(PdfBuilder):
         cmd.append(jobname)
         return cmd
 
+    def _aux_path(self, name):
+        """Absolute path for an aux artifact, honoring -output-directory routing."""
+        search_dir = getattr(self, "_aux_target", None) or self._tex_dir()
+        return os.path.join(search_dir, name)
+
+    @staticmethod
+    def _hash_file(path):
+        """MD5 of a file's bytes, or None if it can't be read."""
+        try:
+            with open(path, "rb") as fh:
+                return hashlib.md5(fh.read()).hexdigest()
+        except OSError:
+            return None
+
+    @staticmethod
+    def _force_remove(path):
+        """Delete `path` if present, clearing Hidden/ReadOnly first (Windows).
+
+        Overwriting an existing Hidden or ReadOnly file with open('wb') or
+        shutil.copy2 raises PermissionError (Errno 13) on Windows. We hide
+        <base>.synctex after every build, and OneDrive can dehydrate
+        <base>.synctex.gz into a hidden reparse-point placeholder -- so the next
+        build's decompress / copy-back would fail on the stale hidden file, and
+        keep failing forever once it does. Removing it first self-heals that.
+        """
+        if not os.path.exists(path):
+            return
+        try:
+            os.remove(path)
+            return
+        except OSError:
+            pass
+        if os.name == "nt":
+            try:
+                import ctypes
+
+                FILE_ATTRIBUTE_NORMAL = 0x80
+                ctypes.windll.kernel32.SetFileAttributesW(
+                    str(path), FILE_ATTRIBUTE_NORMAL
+                )
+            except Exception:  # noqa: BLE001 - best-effort attribute reset
+                pass
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+    @staticmethod
+    def _bcf_datasources(bcf_path):
+        """The .bib datasource filenames a .bcf references (as written inside)."""
+        try:
+            with open(bcf_path, "r", encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except OSError:
+            return []
+        return re.findall(
+            r"<bcf:datasource[^>]*>([^<]+)</bcf:datasource>", text
+        )
+
+    def _resolve_datasource(self, name):
+        """Locate a .bcf datasource on disk, or None if it can't be found.
+
+        Checks the tex dir and aux dir (and treats absolute paths as-is), with
+        and without a .bib extension. None means "can't prove it's unchanged",
+        which the caller treats as a reason to re-run biber.
+        """
+        name = name.strip()
+        bases = [name]
+        if not name.lower().endswith(".bib"):
+            bases.append(name + ".bib")
+        for base in bases:
+            if os.path.isabs(base):
+                if os.path.isfile(base):
+                    return base
+                continue
+            for d in (self._tex_dir(), getattr(self, "_aux_target", None)):
+                if d:
+                    cand = os.path.join(d, base)
+                    if os.path.isfile(cand):
+                        return cand
+        return None
+
+    def _biber_inputs_hash(self, jobname):
+        """Fingerprint of everything biber consumes: the .bcf + its .bib files.
+
+        Returns None if any referenced datasource can't be located -- the caller
+        then re-runs biber rather than risk reusing a stale .bbl. Keying on the
+        .bcf alone is not enough: editing a .bib entry (without touching a
+        \\cite) leaves the .bcf unchanged, so the .bib contents must be folded in
+        too. This mirrors how latexmk tracks biber's dependencies.
+        """
+        bcf_hash = self._hash_file(self._aux_path(jobname + ".bcf"))
+        if bcf_hash is None:
+            return None
+        parts = [bcf_hash]
+        for src in self._bcf_datasources(self._aux_path(jobname + ".bcf")):
+            path = self._resolve_datasource(src)
+            if path is None:
+                return None
+            src_hash = self._hash_file(path)
+            if src_hash is None:
+                return None
+            parts.append(src.strip() + ":" + src_hash)
+        return "|".join(parts)
+
+    def _biber_is_current(self, jobname):
+        """True if the existing .bbl already reflects the current biber inputs.
+
+        The engine rewrites the .bcf on every pass, but biber's output only
+        changes when the .bcf or a referenced .bib changes. We stash a
+        fingerprint of those inputs in a sidecar; if it still matches and the
+        .bbl is present, biber and its forced re-pass can both be skipped. This
+        is the change-detection latexmk does, scoped to our persistent aux dir.
+        """
+        if not os.path.exists(self._aux_path(jobname + ".bbl")):
+            return False
+        current = self._biber_inputs_hash(jobname)
+        if current is None:
+            return False
+        try:
+            with open(
+                self._aux_path(jobname + ".bcf.texlibhash"), "r", encoding="utf-8"
+            ) as fh:
+                return fh.read().strip() == current
+        except OSError:
+            return False
+
+    def _record_biber_hash(self, jobname):
+        """Persist the current biber-inputs fingerprint (best effort).
+
+        Called right after biber runs (biber reads the .bcf + .bib files and
+        writes the .bbl but alters none of them), so this records the exact
+        inputs the new .bbl corresponds to.
+        """
+        current = self._biber_inputs_hash(jobname)
+        if current is None:
+            return
+        try:
+            with open(
+                self._aux_path(jobname + ".bcf.texlibhash"), "w", encoding="utf-8"
+            ) as fh:
+                fh.write(current)
+        except OSError:
+            pass
+
     def _needs_another_run(self):
         """Check for a standard cross-ref rerun OR a biblatex rerun signal."""
         out = self._last_output()
@@ -386,15 +567,58 @@ class TexlibBuilder(PdfBuilder):
 
         self._split_pdf_if_signaled(base_path)
 
-        # Hide the synctex artifact on Windows -- it is needed for sync but is
-        # noise in the folder listing (and in OneDrive's change feed).
-        if os.name == "nt":
-            synctex = base_path + ".synctex.gz"
-            if os.path.exists(synctex):
+        self._finalize_synctex(tex_dir)
+
+    def _finalize_synctex(self, tex_dir):
+        """Reduce inverse-search artifacts to a single uncompressed <base>.synctex.
+
+        A build leaves up to three SyncTeX-related files in the source folder;
+        this collapses them to one:
+
+          * <base>.synctex.gz  — lualatex's gzipped map. We decompress it to a
+            plain <base>.synctex and delete the .gz. A PDF viewer reads an
+            uncompressed .synctex directly, so SumatraPDF no longer spawns its
+            own <base>.synctex.gz.sum.synctex decompression cache — that second
+            file simply never appears.
+          * <base>_synctex.tex — the build-time scratch the bank/exam SyncTeX
+            redirect serves its content through. SyncTeX records the bank/source
+            file, never this scratch, so once the build is done it is pure
+            leftover. Removed. (Also sweeps the legacy per-problem
+            <base>_synctex_<id>.tex files from before the single-file change.)
+
+        Globs cover per-version outputs (e.g. template_A.synctex.gz). On
+        Windows the resulting .synctex is hidden, matching the old behaviour of
+        keeping it out of the folder listing and OneDrive's change feed.
+        """
+        # 1. Decompress <base>*.synctex.gz -> <base>*.synctex; drop the .gz.
+        for gz in glob.glob(os.path.join(tex_dir, self.base_name + "*.synctex.gz")):
+            plain = gz[:-3]  # strip the ".gz" suffix
+            # The previous build hid <base>.synctex; open('wb') over a hidden
+            # file is an Errno 13 on Windows, so drop the stale one first.
+            self._force_remove(plain)
+            try:
+                with gzip.open(gz, "rb") as fin, open(plain, "wb") as fout:
+                    shutil.copyfileobj(fin, fout)
+                os.remove(gz)
+            except Exception as exc:  # noqa: BLE001 - best-effort
+                self.display(
+                    f"TeXLib: could not decompress {os.path.basename(gz)}: {exc}\n"
+                )
+                continue
+            if os.name == "nt":
                 try:
-                    os.system(f'attrib +h "{synctex}"')
+                    os.system(f'attrib +h "{plain}"')
                 except Exception:
                     pass
+
+        # 2. Remove the build-time SyncTeX scratch file(s).
+        scratch = glob.glob(os.path.join(tex_dir, self.base_name + "_synctex.tex"))
+        scratch += glob.glob(os.path.join(tex_dir, self.base_name + "_synctex_*.tex"))
+        for f in scratch:
+            try:
+                os.remove(f)
+            except Exception:
+                pass
 
     def _copy_back_from_aux(self, tex_dir):
         """If aux routing is active, copy viewer-facing artifacts back.
@@ -414,6 +638,10 @@ class TexlibBuilder(PdfBuilder):
         for pat in patterns:
             for src in glob.glob(os.path.join(aux_target, pat)):
                 dst = os.path.join(tex_dir, os.path.basename(src))
+                # Clear any stale Hidden/ReadOnly dest first -- shutil.copy2 onto
+                # a hidden file (e.g. a OneDrive-dehydrated .synctex.gz) is an
+                # Errno 13 on Windows.
+                self._force_remove(dst)
                 try:
                     shutil.copy2(src, dst)
                 except Exception as exc:  # noqa: BLE001 - best-effort copy
