@@ -186,24 +186,61 @@
 
 % \shufflepages
 %   Declared in the PREAMBLE alongside \examversions.  When present, the Lua
-%   version loop splits the \begin{problems}...\end{problems} body on each
-%   top-level \newpage (treating them as page-group separators), shuffles the
-%   groups independently per version using that version's RNG seed, and writes
-%   a per-version temp file before TeX processes any tokens.  No changes to
-%   the exam body are needed — \newpage continues to serve as the separator
-%   exactly as it did before.
+%   version loop reorders the questions inside \begin{problems}...\end{problems}
+%   independently per version (seeded by that version) and writes a per-version
+%   temp file before TeX processes any tokens.  The shuffle is SECTION-AWARE:
+%   \section / \section* headers are hard boundaries kept in their original
+%   order with the header fixed at the top, and questions are permuted only
+%   within their own section.  The per-page question counts you authored (the
+%   \newpage layout) are preserved, and \extracredit stays last.  No exam-body
+%   changes are needed — author one canonical order and let each version shuffle.
 \newcommand{\shufflepages}{%
 	\directlua{set_autoexam_shuffle_pages()}%
 }
 
+% Multiple-choice option shuffling (used with \shufflepages).  Authors write the
+% exam-class \begin{choices}/\begin{oneparchoices} with \choice/\CorrectChoice;
+% the Lua shuffler reorders the options per version (\CorrectChoice travels with
+% its option, so the key auto-follows).  These definitions make the pinning
+% markers compile in EVERY build mode (with or without shuffle):
+%   \fixedchoice            -- an option the shuffler pins in place ("None of
+%                              the above"); renders exactly like \choice.
+%   \begin{choices}[fixed]  -- keep this block in authored order (ordered
+%                              numeric answers); the [..] tag is read by the
+%                              shuffler and ignored at render time.
+\newcommand{\fixedchoice}{\choice}
+\let\@ax@choices\choices            \let\@ax@endchoices\endchoices
+\renewenvironment{choices}[1][]{\@ax@choices}{\@ax@endchoices}
+\@ifundefined{oneparchoices}{}{%
+	\let\@ax@opc\oneparchoices      \let\@ax@endopc\endoneparchoices
+	\renewenvironment{oneparchoices}[1][]{\@ax@opc}{\@ax@endopc}%
+}
+
 % \byversion{A content}{B content}{C content}
-%   Selects and typesets the argument matching the current \theExamVersion.
-%   Uses \csname dispatch to avoid \ifx long-macro comparison pitfalls.
+%   Three-version convenience: typesets the argument matching the current
+%   \theExamVersion (A/B/C).  Versioning is NOT limited to three — the version
+%   loop, \shufflepages, and seeding all handle any number of versions.  This
+%   command is just the 3-arg shorthand; for a version beyond C it falls back to
+%   the A argument (its question ORDER still varies via \shufflepages).  For
+%   version-specific content at any number of versions, use \vercase.
 \long\def\@byv@A#1#2#3{#1}
 \long\def\@byv@B#1#2#3{#2}
 \long\def\@byv@C#1#2#3{#3}
 \newcommand{\byversion}[3]{%
-	\csname @byv@\theExamVersion\endcsname{#1}{#2}{#3}%
+	\ifcsname @byv@\theExamVersion\endcsname
+		\csname @byv@\theExamVersion\endcsname{#1}{#2}{#3}%
+	\else
+		#1%
+	\fi
+}
+% \vercase{ver}{content}
+%   Typeset content only when the current version equals ver (any version label).
+%   Composes for any number of versions:
+%     \vercase{A}{...}\vercase{B}{...}\vercase{D}{...}
+\newcommand{\vercase}[2]{%
+	\edef\@vc@cur{\theExamVersion}%
+	\edef\@vc@want{#1}%
+	\ifx\@vc@cur\@vc@want #2\fi
 }
 
 % \importproblem is provided by texlib-problembank.sty.
@@ -751,14 +788,16 @@
 % used by quiz.cls.
 \RequirePackage{texlib-pagestyle}
 \SetTeXLibExamRules
-\firstpagefooter{Section \theCourseSection}{}{\theSchool}
-\runningheader{Math \theCourseNumber\ \theCourseTitle}{}{Exam \theExamNumber}
 % Center footer shows "X of N" where N = last problem page via \label{@lastqpage}
 % (placed by \blankpage on first call).  Falls back to \numpages until that label
 % exists, and for exams without \blankpage at the end.
-\runningfooter{Section \theCourseSection}{%
+\firstpagefooter{\GetCourse}{%
 	\thepage\ of\ \@ifundefined{r@@lastqpage}{\numpages}{\pageref*{@lastqpage}}%
-}{\theSchool}
+}{\GetInstitution}
+\runningheader{Math \theCourseNumber\ \theCourseTitle}{}{Exam \theExamNumber}
+\runningfooter{\GetCourse}{%
+	\thepage\ of\ \@ifundefined{r@@lastqpage}{\numpages}{\pageref*{@lastqpage}}%
+}{\GetInstitution}
 
 \renewcommand{\maketitle}{%
 	% ---- suppress header/footer on the title page ----------------------------

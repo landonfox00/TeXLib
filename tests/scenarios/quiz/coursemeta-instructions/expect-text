@@ -1,0 +1,5 @@
+# The rendered quiz PDF must contain this marker, proving coursemeta's
+# quiz-instructions-file key was resolved (coursemeta-relative) and its file
+# used -- not the library default. If the feature regresses (wrong file, or a
+# resolution/clash error), the marker is absent and this scenario fails.
+CMQUIZINSTRMARKER

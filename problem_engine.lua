@@ -75,29 +75,38 @@ autoexam_versions = {}
 --   \loadbank so that source-map entries know which bank each problem came from.
 --
 -- source_map: table of { id -> {file, line, tmpfile} } accumulated as problems
---   are defined.  Written to <jobname>.srcmap after the version loop so the
---   custom builder can post-process SyncTeX files to remap per-problem temp-file
---   references back to their originating bank file and line.
+--   are defined, and written to <jobname>.srcmap.  (No builder currently
+--   consumes the .srcmap; inverse search is handled live by the redirect, not
+--   by post-processing.  The map is kept as a diagnostic / future hook.)
 --
--- Per-problem temp files (<jobname>_prob_<id>.tex):
---   typeset_problem() writes p.content to a named temp file and \inputs it.
---   LuaTeX's SyncTeX then attributes every typeset node in the problem content
---   to that temp file.  The .srcmap tells the builder: temp file X corresponds
---   to bank file Y at line Z, enabling line-accurate inverse search after
---   builder-assisted SyncTeX post-processing.
---   Without the builder, clicking in the PDF still jumps to the temp file
---   (human-readable, one problem per file) rather than the raw \directlua call.
+-- Primary path — SyncTeX redirect (typeset_problem):
+--   For every problem with a known source — a \loadbank'd bank file, OR the
+--   exam/quiz itself for a \begin{problem} written directly in the document —
+--   the typeset content is served via texlib_synctex.lua and attributed
+--   directly to that file at the \begin{problem} line, so clicking the problem
+--   in the PDF jumps into the real source.  This is the path for both single-
+--   and multi-version builds.  The helper backs the served content with ONE
+--   reused scratch file per job (<jobname>_synctex.tex), not one per problem.
+--
+-- Fallback path — per-problem temp files (<jobname>_prob_<id>.tex):
+--   Used only when a problem has no usable source: a \begin{problem} in a
+--   transient multi-version body-replay file, or the helper being inactive.
+--   typeset_problem() then writes p.content to a named temp file and \inputs
+--   it; SyncTeX points at that temp file (human-readable, one problem per file)
+--   rather than the raw \directlua call.
 
 local current_bank_file = nil
+local bank_file_stack   = {}    -- saved current_bank_file across nested \loadbank
 local source_map = {}           -- id -> {file=, line=, tmpfile=}
 pbank_problem_start_line = 0  -- set by \begin{problem} before \Collect@Body
 -- pbank_suppress_redirect: when true, typeset_problem skips the bank-file
--- SyncTeX redirect even if it would otherwise apply.  autoexam_run_versions
--- sets this before iterating versions because each version body re-\inputs
--- every problem and the cumulative bank-file \@@input opens overflow LuaTeX's
--- input stack after ~15 problems ("TeX capacity exceeded").  Single-version
--- builds (quiz, edit-mode autoexam) leave it false so the redirect activates
--- and SyncTeX inverse search lands in the bank file.
+-- SyncTeX redirect even if it would otherwise apply, forcing the per-problem
+-- _prob_ temp-file fallback.  Left false everywhere now: both single- and
+-- multi-version builds use the redirect so inverse search lands in the bank
+-- file.  (autoexam_run_versions formerly set it true to dodge an input-stack
+-- overflow; the texlib_synctex.lua helper pops each \@@input at EOF, so that
+-- no longer happens — see the note in autoexam_run_versions.)  The flag stays
+-- as an explicit override hook for any future caller that needs the fallback.
 pbank_suppress_redirect = false
 
 -- Called from \loadbank before \input{bankfile}.
@@ -108,8 +117,25 @@ pbank_suppress_redirect = false
 -- typeset_problem() stages the per-problem redirect via texlib_synctex_stage
 -- immediately before \@@input-ing the bank file.
 function pbank_set_bankfile(name)
+	bank_file_stack[#bank_file_stack + 1] = current_bank_file or false
 	current_bank_file = name
 	texlib_synctex_setup()
+end
+
+-- Called from \loadbank AFTER \input{bankfile} completes.  Restores the
+-- previous bank context (nil at top level) so that any \begin{problem} written
+-- in the exam/quiz *after* a \loadbank is attributed to the document itself,
+-- not to the bank that happened to be loaded earlier.  Stack-based so nested
+-- \loadbank calls (a bank that \loadbanks another) restore correctly.
+function pbank_clear_bankfile()
+	local n = #bank_file_stack
+	if n > 0 then
+		local prev = bank_file_stack[n]
+		bank_file_stack[n] = nil
+		current_bank_file = prev or nil
+	else
+		current_bank_file = nil
+	end
 end
 
 -- Sanitise a problem id for use as a filename component.
@@ -136,15 +162,27 @@ pbank_stretch_list = {}   -- full stretch list passed in from pbank_problem_item
 -- SEEDING
 -- ============================================================
 function set_exam_seed(ver)
-	local seed_val = 0
+	local seed_val
 	if ver == nil or ver == "" then
 		seed_val = os.time()
 	else
+		-- djb2-style string hash: adjacent version letters (A/B/C) must map to
+		-- well-separated seeds, or their shuffles come out correlated (e.g. two
+		-- versions sharing question order).  Deterministic per version.
+		seed_val = 5381
 		for i = 1, #ver do
-			seed_val = seed_val + string.byte(ver, i) * (10 ^ i)
+			seed_val = (seed_val * 33 + string.byte(ver, i)) % 2147483647
 		end
 	end
+	-- Final multiplicative mix (Knuth's constant): single-letter versions hash to
+	-- near-consecutive integers, which seed correlated sequences; this scatters
+	-- consecutive seeds far apart so A/B/C shuffles are independent.
+	seed_val = (seed_val * 2654435761) % 2147483647
 	math.randomseed(seed_val)
+	-- Warm up by a seed-dependent count so different versions advance to
+	-- different stream positions before any shuffle draw — desynchronises the
+	-- sequences so versions don't share their first picks.
+	for _ = 1, 16 + (seed_val % 17) do math.random() end
 end
 
 -- ============================================================
@@ -365,10 +403,12 @@ local function typeset_problem(p, stretch)
 	-- file name, LuaTeX naturally attributes typeset nodes to that file.
 	--
 	-- Fallback (no source info, helper inactive, or suppress flag set):
-	-- write a plain temp file and \input it; SyncTeX will point to the
-	-- temp file instead.  autoexam_run_versions sets pbank_suppress_redirect
-	-- so the multi-version loop avoids the bank-file \@@input that would
-	-- otherwise overflow the input stack.
+	-- write a plain per-problem temp file and \input it; SyncTeX will point to
+	-- the temp file instead of the bank.  Reached now only for problems with no
+	-- usable source map (a \begin{problem} in a transient multi-version body
+	-- replay file) or under a non-redirect engine — both single- and
+	-- multi-version exams otherwise keep the redirect, so the normal path is the
+	-- bank \@@input above.
 	if sm and sm.file and sm.file ~= '' and sm.line and sm.line > 0
 			and texlib_synctex_is_active() and not pbank_suppress_redirect then
 		local bank_path = sm.file
@@ -464,18 +504,6 @@ local function problem_not_found(query_str)
 	tex.print("\\textbf{[AutoExam: " .. msg .. "]}")
 end
 
--- ---- Legacy command interface (\newproblem / \dupproblem) ----
--- define_problem: takes content and solution as separate strings.
--- Also stores meta.id for consistency with the environment interface.
-function define_problem(id, meta_str, content, sol)
-	local meta = parse_meta(meta_str)
-	meta.id = id  -- always store id in meta
-	if problem_db[id] ~= nil then
-		texio.write_nl("AutoExam WARNING: problem '" .. id .. "' redefined.")
-	end
-	problem_db[id] = { meta = meta, content = content, solution = sol or "" }
-end
-
 -- ---- Environment interface (\begin{problem}...\solution...\end{problem}) ----
 -- body_str is the full captured body string from \luaescapestring{\unexpanded\BODY}.
 -- Everything before the first \solution token is content; the rest is solution.
@@ -508,7 +536,35 @@ function define_problem_from_env(id, meta_str, body_str)
 	-- \begin{problem} line in the bank file.  tex.inputlineno here would be
 	-- the \end{problem} line (too far ahead).  current_bank_file is set by \loadbank.
 	local src_line = pbank_problem_start_line or tex.inputlineno or 0
-	local src_file = current_bank_file or ''
+
+	-- Source file for inverse search.
+	--   * A \loadbank'd problem is attributed to its bank file.
+	--   * A problem written directly in the exam/quiz with no bank is
+	--     attributed to the file it lives in (status.filename, the file LuaTeX
+	--     is reading at \end{problem} — the same file as \begin{problem}, since
+	--     the environment can't span files).  Double-clicking it in the PDF
+	--     then jumps to its \begin{problem} block in that source, through the
+	--     same single-scratch-file redirect — no per-problem _prob_ file.
+	-- Transient multi-version body-replay files (<jobname>_autoexam_body_*,
+	-- deleted after the build) are excluded so inverse search never points at a
+	-- vanished file; problems defined in the body of such a build fall back to
+	-- the per-problem temp file.  (Problems defined in the preamble are read
+	-- from the real source, so they redirect normally even multi-version.)
+	local src_file = current_bank_file
+	if not src_file or src_file == '' then
+		local cf = (status and status.filename or ''):gsub('^%./', '')
+		if cf ~= '' and not cf:find('_autoexam_body_', 1, true) then
+			src_file = cf
+			-- Activate the redirect helper for documents that define problems
+			-- inline with no \loadbank (which is the only other path that calls
+			-- setup).  Idempotent — the first call registers the open_read_file
+			-- callback, later ones are no-ops.  Without this, a bank-less quiz
+			-- or exam would fall back to per-problem _prob_ temp files.
+			texlib_synctex_setup()
+		else
+			src_file = ''
+		end
+	end
 
 	problem_db[id] = { meta = meta, content = content, solution = solution,
 						part_count = part_count,
@@ -736,7 +792,10 @@ local function split_problems_on_newpage(inner)
 
 	while pos <= len do
 		local c = inner:sub(pos, pos)
-		if c == '{' then
+		if c == '%' then
+			local nl = inner:find("\n", pos, true)
+			pos = nl and (nl + 1) or (len + 1)
+		elseif c == '{' then
 			depth = depth + 1; pos = pos + 1
 		elseif c == '}' then
 			depth = depth - 1; pos = pos + 1
@@ -766,27 +825,287 @@ local function split_problems_on_newpage(inner)
 	return result
 end
 
--- Locate \begin{problems}...\end{problems} in body, split its interior on
--- top-level \newpage, Fisher-Yates shuffle the chunks, and return the
--- reassembled body.  Everything outside the problems environment is unchanged.
+-- Split a section body into individual problem items at brace-depth 0.
+-- An item begins at \problem / \extracredit / \importproblem (depth 0, outside
+-- comments) and runs until the next such command or end of body.  Leading
+-- non-item text (comments/blank lines before the first item) is dropped — it is
+-- decorative inside a section that is about to be reordered.
+local function split_section_into_items(body)
+	local cmds = { problem = true, extracredit = true, importproblem = true }
+	local starts = {}
+	local depth, pos, len = 0, 1, #body
+	while pos <= len do
+		local c = body:sub(pos, pos)
+		if c == '{' then depth = depth + 1; pos = pos + 1
+		elseif c == '}' then depth = depth - 1; pos = pos + 1
+		elseif c == '%' then
+			local nl = body:find("\n", pos, true)
+			pos = nl and (nl + 1) or (len + 1)
+		elseif c == '\\' and depth == 0 then
+			local name = body:match("^\\(%a+)", pos)
+			if name and cmds[name] then
+				table.insert(starts, pos); pos = pos + 1 + #name
+			else
+				pos = pos + 1
+			end
+		else
+			pos = pos + 1
+		end
+	end
+	local items = {}
+	for i = 1, #starts do
+		local s = starts[i]
+		local e = (i < #starts) and (starts[i + 1] - 1) or len
+		table.insert(items, (body:sub(s, e):gsub("%s+$", "")))
+	end
+	return items
+end
+
+-- Shuffle the problem items inside ONE section, preserving the per-page item
+-- counts the author chose (the \newpage layout) and pinning any \extracredit to
+-- the end so the bonus stays last.  Uses math.random, which the version loop
+-- seeds per version before calling.
+local function shuffle_section_body(seg_body)
+	local groups = split_problems_on_newpage(seg_body)
+	if #groups == 0 then return seg_body end
+	local counts, all_items = {}, {}
+	for _, g in ipairs(groups) do
+		local items = split_section_into_items(g)
+		table.insert(counts, #items)
+		for _, it in ipairs(items) do table.insert(all_items, it) end
+	end
+	if #all_items == 0 then return seg_body end   -- nothing shuffleable
+	local movable, pinned = {}, {}
+	for _, it in ipairs(all_items) do
+		if it:match("^\\extracredit") then table.insert(pinned, it)
+		else table.insert(movable, it) end
+	end
+	for i = #movable, 2, -1 do                    -- Fisher-Yates
+		local j = math.random(1, i)
+		movable[i], movable[j] = movable[j], movable[i]
+	end
+	local reordered = {}
+	for _, it in ipairs(movable) do table.insert(reordered, it) end
+	for _, it in ipairs(pinned)  do table.insert(reordered, it) end
+	local out, idx = {}, 1
+	for _, n in ipairs(counts) do
+		if n > 0 then
+			local parts = {}
+			for _ = 1, n do
+				if reordered[idx] then table.insert(parts, reordered[idx]); idx = idx + 1 end
+			end
+			table.insert(out, table.concat(parts, "\n"))
+		end
+	end
+	while idx <= #reordered do                    -- safety: append any leftover
+		out[#out] = (out[#out] or "") .. "\n" .. reordered[idx]; idx = idx + 1
+	end
+	return table.concat(out, "\n\\newpage\n")
+end
+
+-- Locate \begin{problems}...\end{problems} and shuffle question order PER
+-- SECTION.  \section / \section* headers are hard boundaries: they stay in their
+-- original order with the header fixed at the top, and items are shuffled only
+-- within their own section (per-page counts preserved, \extracredit last).  An
+-- exam with no \section headers shuffles as a single section.  Everything
+-- outside \begin{problems} is unchanged.
+-- Find \begin{problems} / \end{problems} while ignoring matches that sit inside
+-- a % comment.  Author comments frequently mention "\begin{problems} ...
+-- \end{problems}" as prose; a naive find() latches onto the comment and slices
+-- the body there, corrupting the environment.  Returns start,end of the marker.
+local function find_problems_marker(body, which, init)
+	local pat = "^\\" .. which .. "%s*{problems}"
+	local pos, len = init or 1, #body
+	while pos <= len do
+		local c = body:sub(pos, pos)
+		if c == '%' then
+			local nl = body:find("\n", pos, true)
+			pos = nl and (nl + 1) or (len + 1)
+		elseif c == '\\' then
+			local s, e = body:find(pat, pos)
+			if s == pos then return s, e end
+			pos = pos + 1
+		else
+			pos = pos + 1
+		end
+	end
+	return nil
+end
+
 local function shuffle_problems_body(body)
-	local s1, e1 = body:find("\\begin%s*{problems}")
+	local s1, e1 = find_problems_marker(body, "begin", 1)
 	if not s1 then return body end
-	local s2, e2 = body:find("\\end%s*{problems}", e1 + 1)  -- luacheck: ignore e2
+	local s2 = find_problems_marker(body, "end", e1 + 1)
 	if not s2 then return body end
 
-	local before = body:sub(1, e1)          -- up to and including \begin{problems}
-	local inner  = body:sub(e1 + 1, s2 - 1) -- content between the environment tags
-	local after  = body:sub(s2)             -- from \end{problems} onwards
+	local before = body:sub(1, e1)
+	local inner  = body:sub(e1 + 1, s2 - 1)
+	local after  = body:sub(s2)
 
-	local chunks = split_problems_on_newpage(inner)
-	local n = #chunks
-	for i = n, 2, -1 do                     -- Fisher-Yates shuffle
-		local j = math.random(1, i)
-		chunks[i], chunks[j] = chunks[j], chunks[i]
+	-- \section / \section* header positions at brace-depth 0 (skip comments).
+	local marks = {}
+	do
+		local depth, pos, len = 0, 1, #inner
+		while pos <= len do
+			local c = inner:sub(pos, pos)
+			if c == '{' then depth = depth + 1; pos = pos + 1
+			elseif c == '}' then depth = depth - 1; pos = pos + 1
+			elseif c == '%' then
+				local nl = inner:find("\n", pos, true)
+				pos = nl and (nl + 1) or (len + 1)
+			elseif c == '\\' and depth == 0 and inner:sub(pos + 1, pos + 7) == "section" then
+				table.insert(marks, pos); pos = pos + 8
+			else
+				pos = pos + 1
+			end
+		end
 	end
 
-	return before .. table.concat(chunks, "\n\\newpage\n") .. after
+	local body_out
+	if #marks == 0 then
+		body_out = shuffle_section_body(inner)
+	else
+		local pre = inner:sub(1, marks[1] - 1)
+		local secs = {}
+		for mi = 1, #marks do
+			local seg_start = marks[mi]
+			local seg_end   = (mi < #marks) and (marks[mi + 1] - 1) or #inner
+			local seg = inner:sub(seg_start, seg_end)
+			local nl  = seg:find("\n")
+			local header = nl and seg:sub(1, nl - 1) or seg
+			local sbody  = nl and seg:sub(nl + 1) or ""
+			table.insert(secs, header .. "\n" .. shuffle_section_body(sbody))
+		end
+		body_out = table.concat(secs, "\n\\newpage\n")
+		if pre:match("%S") then body_out = (pre:gsub("%s+$", "")) .. "\n" .. body_out end
+	end
+
+	return before .. "\n" .. body_out .. "\n" .. after
+end
+
+-- ============================================================
+-- MULTIPLE-CHOICE OPTION SHUFFLE
+-- ============================================================
+-- Reorder the options inside each \begin{choices} / \begin{oneparchoices}
+-- block, per version.  \CorrectChoice travels with its option, so the answer
+-- key follows automatically -- no separate bookkeeping.  Pinning:
+--   \begin{choices}[fixed]  -> the whole block keeps its authored order
+--                              (ordered numeric answers, etc.).
+--   \fixedchoice            -> this option keeps its slot (e.g. a pinned
+--                              "None of the above"); others shuffle around it.
+-- The author writes ordinary exam-class markup; these are read from the source
+-- string and the class also defines them so every build mode still compiles.
+local CHOICE_ENVS = { choices = true, oneparchoices = true }
+
+-- Split a choices block's inner text into option items at \choice /
+-- \CorrectChoice / \fixedchoice (brace depth 0, skipping comments).  Returns
+-- the prefix before the first option and a list of { text =, fixed = }.
+local function split_choice_items(inner)
+	local kind = { choice = false, CorrectChoice = false, fixedchoice = true }
+	local starts, fixed = {}, {}
+	local depth, pos, len = 0, 1, #inner
+	while pos <= len do
+		local c = inner:sub(pos, pos)
+		if c == '{' then depth = depth + 1; pos = pos + 1
+		elseif c == '}' then depth = depth - 1; pos = pos + 1
+		elseif c == '%' then
+			local nl = inner:find("\n", pos, true); pos = nl and (nl + 1) or (len + 1)
+		elseif c == '\\' and depth == 0 then
+			local name = inner:match("^\\(%a+)", pos)
+			if name and kind[name] ~= nil then
+				table.insert(starts, pos); table.insert(fixed, kind[name])
+				pos = pos + 1 + #name
+			else
+				pos = pos + 1
+			end
+		else
+			pos = pos + 1
+		end
+	end
+	if #starts == 0 then return inner, {} end
+	local prefix, items = inner:sub(1, starts[1] - 1), {}
+	for i = 1, #starts do
+		local s = starts[i]
+		local e = (i < #starts) and (starts[i + 1] - 1) or len
+		table.insert(items, { text = (inner:sub(s, e):gsub("%s+$", "")),
+		                      fixed = fixed[i] })
+	end
+	return prefix, items
+end
+
+-- Fisher-Yates over the movable options; \fixedchoice items keep their slot.
+local function shuffle_choice_items(items)
+	local movable = {}
+	for _, it in ipairs(items) do
+		if not it.fixed then table.insert(movable, it) end
+	end
+	for i = #movable, 2, -1 do
+		local j = math.random(1, i)
+		movable[i], movable[j] = movable[j], movable[i]
+	end
+	local out, mi = {}, 1
+	for _, it in ipairs(items) do
+		if it.fixed then table.insert(out, it.text)
+		else table.insert(out, movable[mi].text); mi = mi + 1 end
+	end
+	return out
+end
+
+-- Walk the body, shuffling each choices block in place (comment-aware), unless
+-- it is tagged \begin{choices}[fixed].  Everything else is copied verbatim.
+local function shuffle_choices_body(body)
+	local result, i, len = {}, 1, #body
+	while i <= len do
+		local c = body:sub(i, i)
+		if c == '%' then
+			local nl = body:find("\n", i, true)
+			local e = nl or len
+			table.insert(result, body:sub(i, e)); i = e + 1
+		elseif c == '\\' then
+			local env = body:match("^\\begin%s*{(%a+)}", i)
+			if env and CHOICE_ENVS[env] then
+				local _, be = body:find("^\\begin%s*{" .. env .. "}", i)
+				local head = body:sub(i, be)
+				local j = be + 1
+				local fixed_block = false
+				local _, oe, opt = body:find("^%s*%[([^%]]*)%]", j)
+				if opt then
+					fixed_block = opt:find("fixed") ~= nil
+					head = head .. body:sub(j, oe); j = oe + 1
+				end
+				-- find matching \end{env}, skipping comments
+				local es, ee, p = nil, nil, j
+				while p <= len do
+					if body:sub(p, p) == '%' then
+						local nl = body:find("\n", p, true); p = nl and (nl + 1) or (len + 1)
+					else
+						local s2, e2 = body:find("^\\end%s*{" .. env .. "}", p)
+						if s2 then es, ee = s2, e2; break end
+						p = p + 1
+					end
+				end
+				if not es then
+					table.insert(result, head); i = j
+				else
+					local inner = body:sub(j, es - 1)
+					if not fixed_block then
+						local prefix, items = split_choice_items(inner)
+						if #items > 1 then
+							inner = prefix ..
+							        table.concat(shuffle_choice_items(items), "\n") .. "\n"
+						end
+					end
+					table.insert(result, head .. inner .. body:sub(es, ee))
+					i = ee + 1
+				end
+			else
+				table.insert(result, c); i = i + 1
+			end
+		else
+			table.insert(result, c); i = i + 1
+		end
+	end
+	return table.concat(result)
 end
 
 -- set_autoexam_shuffle_pages()
@@ -907,14 +1226,26 @@ function autoexam_run_versions()
 	-- at the END of the run via a second write — see below).
 	autoexam_write_srcmap()
 
-	-- Suppress the bank-file SyncTeX redirect for the duration of the version
-	-- loop.  Each version body re-\inputs every problem and the cumulative
-	-- bank-file \@@input calls overflow LuaTeX's input stack after ~15
-	-- problems.  Per-problem temp files (the fallback path in typeset_problem)
-	-- have none of those input-stack issues, so the loop falls back to them.
-	-- Single-version builds (quiz, edit-mode autoexam) leave this flag false
-	-- so the redirect activates as set up at \loadbank time.
-	pbank_suppress_redirect = true
+	-- Keep the bank-file SyncTeX redirect ACTIVE during the version loop so
+	-- multi-version exams get the same inverse-search-into-the-bank behaviour
+	-- (and the same single reused scratch file) as single-version builds,
+	-- instead of one per-problem _prob_ temp file each.
+	--
+	-- History: this used to be set true.  The redirect \@@inputs the bank file
+	-- once per problem, and the original (pre-helper) redirect did not pop those
+	-- inputs, so a version loop that re-inputs every problem overflowed LuaTeX's
+	-- input stack after ~15 problems.  The generic texlib_synctex.lua helper
+	-- fixed that: its open_read_file reader closes the fd at EOF, so each
+	-- \@@input pops before the next problem and the input-stack depth stays ~2
+	-- regardless of problem/version count.  Verified empirically — a 3-version
+	-- exam (36 bank \@@inputs) builds cleanly even with max_in_open forced down
+	-- to 20, well below the input count, confirming the inputs do not
+	-- accumulate.  The max_in_open=127 bump above is now belt-and-suspenders.
+	--
+	-- The flag is left in place (typeset_problem still honours it) for any
+	-- caller that needs to force the per-problem fallback, but the version loop
+	-- no longer engages it.
+	pbank_suppress_redirect = false
 
 	local builder_ver = token.get_macro("Version")
 	local versions_to_run = autoexam_versions
@@ -952,6 +1283,7 @@ function autoexam_run_versions()
 			-- below so TeX-side bank picks start from the same fresh seed.
 			set_exam_seed(ver)
 			ver_body = shuffle_problems_body(body)
+			ver_body = shuffle_choices_body(ver_body)
 		end
 
 		-- Prescan the (possibly shuffled) body and write the .sco file NOW,

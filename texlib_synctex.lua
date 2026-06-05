@@ -79,7 +79,15 @@ local function write_temp_file(p)
 	for k in pairs(p.lines) do
 		if type(k) == 'number' and k > maxline then maxline = k end
 	end
-	local tmpfile = tex.jobname .. '_synctex_' .. sanitize_id(p.id) .. '.tex'
+	-- One reused scratch file per job, not one per problem.  SyncTeX records
+	-- p.target_file (the bank) as the source, never this temp file, so the
+	-- content can be overwritten freely between problems: the helper serves
+	-- redirects strictly sequentially (stage -> @@input read-to-EOF+close ->
+	-- stage), so the previous problem's fd is always closed before the next
+	-- write.  Collapsing to a single name keeps course folders from
+	-- accumulating one orphan .tex per problem.  p.id is retained only for
+	-- diagnostics now.
+	local tmpfile = tex.jobname .. '_synctex.tex'
 	local fout    = io.open(tmpfile, 'w')
 	if not fout then return nil end
 	for i = 1, maxline do

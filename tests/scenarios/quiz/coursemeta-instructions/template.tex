@@ -1,0 +1,22 @@
+% Scenario: course-wide quiz instructions via coursemeta's quiz-instructions-file.
+%
+% The sibling coursemeta.tex sets  quiz-instructions-file = course-quiz-instructions
+% (a file in this scenario dir).  A quiz that sets NO instructions of its own must
+% therefore render that course-local file's text — proving the coursemeta key was
+% resolved (relative to coursemeta) and used instead of the library default.
+% Asserted by the `expect-text` marker, not a pixel reference.
+\documentclass{quiz}
+\meta{ quiz-number = 1 }
+
+% Problem defined inline (no bank needed for this scenario).
+\begin{problem}{demo}
+	Evaluate $\displaystyle\int_0^1 x \, dx$.
+	\solution $1/2$.
+\end{problem}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem{demo}
+\end{problems}
+\end{document}
