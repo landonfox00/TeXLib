@@ -29,6 +29,14 @@ course-metadata_old.sty
 *.schedmap
 *_schedule_grid.tex
 
+# autoexam / SyncTeX build scratch (generated next to the source by a
+# command-line build that bypassed the Sublime builder's cleanup).
+*.key
+*.srcmap
+*_synctex.tex
+*_synctex_*.tex
+_footer_check.png
+
 # Python build artifacts
 __pycache__/
 *.pyc

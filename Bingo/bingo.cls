@@ -42,9 +42,15 @@
 \tl_new:N \g__bingo_free_symbol_tl
 \tl_gset:Nn \g__bingo_free_symbol_tl { \star }
 
+% Running-header title (e.g. "Exam 2 Bingo"); set per document via
+% \meta{bingo-title={...}}. Defaults to a bare "Bingo".
+\tl_new:N \g__bingo_title_tl
+\tl_gset:Nn \g__bingo_title_tl { Bingo }
+
 \keys_define:nn { meta } {
 	cell-size      .code:n  = { \dim_gset:Nn \g__bingo_cell_size_dim { #1 } },
 	free-symbol    .tl_gset:N = \g__bingo_free_symbol_tl,
+	bingo-title    .tl_gset:N = \g__bingo_title_tl,
 	show-headers   .choice:,
 	show-headers / true   .code:n = { \bingo@headerstrue  },
 	show-headers / false  .code:n = { \bingo@headersfalse },
@@ -53,6 +59,9 @@
 	show-title  / false   .code:n = { \bingo@titlefalse },
 }
 
+\NewExpandableDocumentCommand{\GetBingoTitle}{}{
+	\tl_use:N \g__bingo_title_tl
+}
 \NewExpandableDocumentCommand{\GetBingoFreeSymbol}{}{
 	\tl_use:N \g__bingo_free_symbol_tl
 }
@@ -63,9 +72,80 @@
 \ExplSyntaxOff
 
 % ==============================================================================
-% 4. PAGE STYLE
+% 4. PAGE STYLE — unified TeXLib footer with a per-card verification ID
 % ==============================================================================
-\pagestyle{empty}
+% Each card carries the shared TeXLib footer
+%     LEFT = \GetCourse  |  CENTER = card ID  |  RIGHT = \GetInstitution
+% with the standard 0.4pt footrule, but the center field replaces the usual
+% "page X of Y" with a per-card verification identifier:
+%
+%     #<n> <bullet> <CODE>
+%
+% <n>    sequential copy number (#1, #2, ...) — lets the instructor count sheets.
+% <CODE>6 uppercase hex digits of the MD5 checksum of this card's *ordered cell
+%        contents* (every \bcell / \bcelltext / \labelcells entry, detokenized).
+%
+% The CODE is deterministic: the same arrangement of cells always yields the
+% same CODE, and changing, adding, or reordering any cell changes it. To verify
+% a physical sheet against the generated set, rebuild the card and confirm the
+% printed CODE matches — a forged or photocopied sheet whose grid differs will
+% carry a CODE that does not match its own layout. See \bingo@record /
+% \bingo@finalise below.
+%
+% Cards are one-per-page by design (put \newpage between cards). If two cards
+% share a page, the footer shows the last card's ID.
+
+\RequirePackage{texlib-footer}   % shared L/C/R footer + 0.4pt footrule
+
+% --- per-card content accumulator, counter, and ID --------------------------
+\newcounter{bingocardno}
+\newcommand{\bingo@content}{}     % running detokenized list of this card's cells
+\newcommand{\bingo@cardid}{------}
+
+% Engine-agnostic MD5 (pdflatex: \pdfmdfivesum; lualatex: \mdfivesum). Both
+% return a 32-char uppercase hex string and are fully expandable.
+\ifdefined\pdfmdfivesum
+	\let\bingo@mdfive\pdfmdfivesum
+\else
+	\ifdefined\mdfivesum
+		\let\bingo@mdfive\mdfivesum
+	\else
+		\def\bingo@mdfive#1{000000000000000000000000000000NO}% no primitive: degrade
+	\fi
+\fi
+
+% Append a pre-expanded string to the accumulator (used for \labelcells, whose
+% labels expand from \foreach variables).
+\newcommand{\bingo@record@str}[1]{%
+	\edef\bingo@tmp{\detokenize{#1};}%
+	\expandafter\g@addto@macro\expandafter\bingo@content\expandafter{\bingo@tmp}%
+}
+% \bingo@record{col}{row}{content}: record one cell. The content is kept
+% verbatim (detokenized, not evaluated) so math like \frac{d}{dx} is safe.
+\newcommand{\bingo@record}[3]{%
+	\edef\bingo@tmp{\detokenize{#1#2=#3};}%
+	\expandafter\g@addto@macro\expandafter\bingo@content\expandafter{\bingo@tmp}%
+}
+% Grab the first six characters of the 32-char MD5 hex string.
+\def\bingo@sixchars#1#2#3#4#5#6#7\relax{#1#2#3#4#5#6}
+% Compute this card's ID from the accumulated cell contents.
+\newcommand{\bingo@finalise}{%
+	\edef\bingo@hash{\bingo@mdfive{\bingo@content}}%
+	\xdef\bingo@cardid{\expandafter\bingo@sixchars\bingo@hash\relax}%
+}
+
+% --- install the header + footer --------------------------------------------
+\newcommand{\bingo@footcenter}{\#\thebingocardno~\textbullet~\bingo@cardid}
+\setlength{\headheight}{14pt}
+\pagestyle{fancy}
+\fancyhf{}
+% Header: L = bingo title (e.g. "Exam 2 Bingo")  R = student name field
+% (mirroring quiz/exam). Center is left empty -- the "Answer Key" indicator
+% already lives in the body title block (\bingotitle).
+\SetTeXLibHeader{\bfseries\GetBingoTitle}{}{Name:\ \underline{\hspace{2in}}}
+\SetTeXLibFooter                    % L=\GetCourse | C (overridden) | R=\GetInstitution, 0.4pt rule
+\fancyfoot[C]{\bingo@footcenter}    % override center: per-card verification ID
+\TeXLibRuleBleed                    % symmetric rule length, matching didactic
 
 % ==============================================================================
 % 5. BINGO CARD ENVIRONMENT
@@ -88,16 +168,20 @@
 
 % \bcell{col}{row}{content} — math-mode content
 \newcommand{\bcell}[3]{%
+	\bingo@record{#1}{#2}{#3}%
 	\node at (\csname bingo@x@#1\endcsname, \csname bingo@y@#2\endcsname) {\Huge $#3$};%
 }
 % \bcelltext{col}{row}{content} — text-mode content
 \newcommand{\bcelltext}[3]{%
+	\bingo@record{#1}{#2}{#3}%
 	\node at (\csname bingo@x@#1\endcsname, \csname bingo@y@#2\endcsname) {#3};%
 }
 
 % \begin{bingocard}[options] ... \end{bingocard}
 \NewDocumentEnvironment{bingocard}{ O{} }
 {%
+	\stepcounter{bingocardno}%
+	\gdef\bingo@content{}%
 	\ifx\\#1\\\else\metasetup{#1}\fi
 	\ifbingo@title\bingotitle\fi
 	\begin{center}%
@@ -118,6 +202,7 @@
 }{%
 	\end{tikzpicture}%
 	\end{center}%
+	\bingo@finalise
 }
 
 % ==============================================================================
@@ -130,9 +215,11 @@
 		\foreach \rw in {1,2,3,4,5}{%
 			\ifnum\rw=3
 				\ifnum\ci=3\else
+					\edef\bingo@lbl{\col\rw}\expandafter\bingo@record@str\expandafter{\bingo@lbl}%
 					\node at ({\ci-0.5}, {5.5-\rw}) {\Huge \col\rw};%
 				\fi
 			\else
+				\edef\bingo@lbl{\col\rw}\expandafter\bingo@record@str\expandafter{\bingo@lbl}%
 				\node at ({\ci-0.5}, {5.5-\rw}) {\Huge \col\rw};%
 			\fi
 		}%

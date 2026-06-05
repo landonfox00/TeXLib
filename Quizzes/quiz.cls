@@ -24,13 +24,15 @@
 \tl_new:N \g__quiz_number_tl
 \tl_new:N \g__quiz_title_tl
 \tl_new:N \g__quiz_instructions_tl
-\tl_new:N \g__quiz_instructions_file_tl
 
+% Note: quiz-instructions-file is NOT defined here.  It lives in
+% course-metadata.sty (alongside bank-path) so it can be set course-wide in
+% coursemeta.tex as well as per quiz via \meta — coursemeta is read before this
+% class body, so a key defined only here would miss it.
 \keys_define:nn { meta } {
 	quiz-number             .tl_gset:N = \g__quiz_number_tl,
 	quiz-title              .tl_gset:N = \g__quiz_title_tl,
 	quiz-instructions       .tl_gset:N = \g__quiz_instructions_tl,
-	quiz-instructions-file  .tl_gset:N = \g__quiz_instructions_file_tl,
 }
 
 \NewExpandableDocumentCommand{\GetQuizNumber}{}{ \tl_use:N \g__quiz_number_tl }
@@ -45,12 +47,12 @@
 \NewExpandableDocumentCommand{\GetQuizInstructions}{}{
 	\tl_use:N \g__quiz_instructions_tl
 }
-\NewExpandableDocumentCommand{\GetQuizInstructionsFile}{}{
-	\tl_use:N \g__quiz_instructions_file_tl
-}
-% \IfQuizInstructionsFile{true}{false} — branch on whether a file was set.
+% \GetQuizInstructionsFile is provided by course-metadata.sty (the
+% quiz-instructions-file key now lives there, set per quiz via \meta or
+% course-wide in coursemeta.tex).
+% \IfQuizInstructionsFile{true}{false} — true when a file was set anywhere.
 \NewDocumentCommand{\IfQuizInstructionsFile}{ +m +m }{
-	\tl_if_empty:NTF \g__quiz_instructions_file_tl { #2 } { #1 }
+	\IfMetaSet{quiz-instructions-file}{ #1 }{ #2 }
 }
 % \IfQuizInstructionsInline{true}{false} — branch on whether inline text was set.
 \NewDocumentCommand{\IfQuizInstructionsInline}{ +m +m }{
@@ -64,6 +66,30 @@
 % autoexam's autoexam-instructions.tex.  Used only when the document sets
 % neither quiz-instructions-file nor an inline quiz-instructions.
 \newcommand{\@quiz@instructions@file}{quiz-instructions}
+
+% \input the user-specified instructions file (from \meta or coursemeta),
+% resolving its path coursemeta-relative FIRST, then literal:
+%   1. \GetCourseMetaDir + path  -- a course-wide file set in coursemeta.tex,
+%      found from any quiz folder.  Checked first so a bare filename like
+%      "quiz-instructions" resolves to the COURSE copy and is not shadowed by
+%      the library's default of the same name sitting on TEXINPUTS.
+%   2. path as-is  -- a per-quiz file in the quiz's own folder (kpse searches
+%      the current directory first), used when no coursemeta-relative file
+%      matches.  A per-quiz \meta override therefore still wins for files that
+%      live beside the quiz (its folder is not the coursemeta dir).
+\newcommand{\quiz@input@userinstructions}{%
+	\edef\@quiz@ipath{\GetQuizInstructionsFile}%
+	\@ifundefined{GetCourseMetaDir}{%
+		\input{\@quiz@ipath}%
+	}{%
+		\edef\@quiz@ipathcm{\GetCourseMetaDir\@quiz@ipath}%
+		\IfFileExists{\@quiz@ipathcm}{%
+			\input{\@quiz@ipathcm}%
+		}{%
+			\input{\@quiz@ipath}%
+		}%
+	}%
+}
 
 % texlib-problembank.sty loads problem_engine.lua and defines the shared
 % problem-bank LaTeX glue (\setvar, \setrng, \pick*, \getproblem,
@@ -110,15 +136,16 @@
 % rule + running head/foot rules into \SetTeXLibExamRules.  Quiz adds the
 % first-page header rule on top (its title page carries a name field).
 \RequirePackage{texlib-pagestyle}
+\RequirePackage{lastpage}    % \pageref{LastPage} for the shared "X of Y" footer
 % \title is auto-derived from metadata.
 \AtBeginDocument{%
 	\title{\LARGE \GetQuizTitle}%
 	\SetTeXLibExamRules
 	\firstpageheadrule
 	\firstpageheader{\GetCourse}{}{Name:\ \underline{\hspace{2.5in}}}%
-	\firstpagefooter{Section\ \GetCourseSection}{}{\GetInstitution}%
+	\firstpagefooter{\GetCourse}{\thepage\ of \pageref{LastPage}}{\GetInstitution}%
 	\runningheader{\GetCourse}{}{Name:\ \underline{\hspace{2.5in}}}%
-	\runningfooter{Section\ \GetCourseSection}{}{\GetInstitution}%
+	\runningfooter{\GetCourse}{\thepage\ of \pageref{LastPage}}{\GetInstitution}%
 }
 
 \renewcommand{\maketitle}{%
@@ -129,7 +156,7 @@
 			{\LARGE \GetQuizTitle}%
 			\ifkey\par\vspace{0.4em}\textit{Answer~Key}\fi
 		\end{center}
-		\input{\GetQuizInstructionsFile}%
+		\quiz@input@userinstructions
 	}{%
 		\begin{center}
 			{\LARGE \GetQuizTitle}%
