@@ -111,10 +111,10 @@
 \setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\GetShortTitle}
-\fancyhead[R]{\GetTerm}
+% Header: L = short title  C = (none)  R = term.
+\SetTeXLibHeader{\bfseries\GetShortTitle}{}{\GetTerm}
 \SetTeXLibFooter
-\renewcommand{\headrulewidth}{0.4pt}
+\TeXLibRuleBleed                  % symmetric rule length, matching didactic
 
 % Title page (\maketitle uses \thispagestyle{plain}): keep the shared footer,
 % suppress the header + its rule.

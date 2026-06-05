@@ -58,10 +58,14 @@
 	\defbibheading{bibliography}[\bibname]{\section*{#1}}%
 }{}
 
-% Running header + footer (fancyhdr): widen the head/foot into the left margin
-% so their rules and left-hand content reach the same hang line.
+% Running header + footer (fancyhdr): widen the head/foot into BOTH margins by
+% the hang amount. The LEFT end (and the left-hand slot text) reach the hang
+% line so they align with the hung headings; the RIGHT end mirrors it, keeping
+% the rule symmetric about the page midpoint with the right-hand slot text flush
+% at that end. This matches the shared \TeXLibRuleBleed geometry the non-hang
+% classes use, so every TeXLib class's header/footer rule is the same length.
 \@ifpackageloaded{fancyhdr}{%
-	\fancyhfoffset[L]{\texlibsectionhang}%
+	\fancyhfoffset[LR]{\texlibsectionhang}%
 }{}
 
 \endinput

@@ -85,10 +85,10 @@
 \setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\GetCourseShort\ \GetCourseTitle}
-\fancyhead[R]{Report~Card,~\GetReportDate}
+% Header: L = course short + title  C = (none)  R = term.
+\SetTeXLibHeader{\bfseries\GetCourseShort\ \GetCourseTitle}{}{\GetTerm}
 \SetTeXLibFooter
-\renewcommand{\headrulewidth}{0.4pt}
+\TeXLibRuleBleed                  % symmetric rule length, matching didactic
 
 % ==============================================================================
 % 5. TITLE BLOCKS

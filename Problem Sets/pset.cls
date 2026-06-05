@@ -109,11 +109,12 @@
 \setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\bfseries \GetPsetTitle}
-\fancyhead[C]{\ifkey\textit{Answer Key}\fi}
-\fancyhead[R]{\GetCourse}
+% Header: L = pset title  C = build badge  R = term. (R was \GetCourse, which
+% duplicated the footer-left course; term removes that redundancy.)
+\SetTeXLibBuildBadge{\ifkey Answer Key\fi}
+\SetTeXLibHeader{\bfseries\GetPsetTitle}{\TeXLibBuildBadge}{\GetTerm}
 \SetTeXLibFooter
-\renewcommand{\headrulewidth}{0.4pt}
+\TeXLibRuleBleed                  % symmetric rule length, matching didactic
 
 % Title-page style: same footer as the regular `fancy` style, but the
 % header and its rule are suppressed so the title block sits at the top
