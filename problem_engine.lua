@@ -1118,14 +1118,44 @@ end
 -- SCORE-PAGE PRESCAN
 -- ============================================================
 
--- Scan a body string for all \problem[pts][stretch]{query} calls in order.
--- Returns a list of {qno, pts, pageno} tables where pts is the raw pts CSV
--- string and pageno is the 1-based problem-page number (reset by
--- \begin{problems}).  The page number is derived by splitting the inner
--- \begin{problems}...\end{problems} content on \newpage, so it matches the
--- exam page counter that \begin{problems} resets to 1.
--- Runs on the (possibly shuffled) ver_body so the question order matches
--- the version the student actually sees.
+-- Find every \problem call in a chunk and return its raw pts string in order.
+-- Tolerates all documented spellings: \problem{q}, \problem[pts]{q},
+-- \problem[pts][stretch]{q}, and any of those with a trailing [fix].  The
+-- FIRST optional [..] after \problem is always the pts CSV (per the
+-- \problem[pts][stretch]{filter}[fix] signature); a bracketless \problem{q}
+-- yields pts = '' because its points are resolved from the bank at typeset
+-- time and cannot be known from the source.  Rejects \problemfoo and the
+-- definition macro names that merely start with "problem".
+local function scan_problem_pts(chunk)
+	local out = {}
+	local i, n = 1, #chunk
+	while true do
+		local s, e = chunk:find('\\problem', i, true)
+		if not s then break end
+		i = e + 1
+		-- Must be the \problem retrieval macro: next char is [ , { or space.
+		local nextc = chunk:sub(e + 1, e + 1)
+		if nextc == '[' or nextc == '{' or nextc == '' or nextc:match('%s') then
+			local j = e + 1
+			while j <= n and chunk:sub(j, j):match('%s') do j = j + 1 end
+			local pts = ''
+			if chunk:sub(j, j) == '[' then
+				local close = chunk:find(']', j + 1, true)
+				if close then pts = chunk:sub(j + 1, close - 1) end
+			end
+			out[#out + 1] = pts:match('^%s*(.-)%s*$')
+		end
+	end
+	return out
+end
+
+-- Scan a body string for all \problem calls in order.  Returns a list of
+-- {qno, pts, pageno} tables where pts is the raw pts CSV string and pageno is
+-- the 1-based problem-page number (reset by \begin{problems}).  The page
+-- number is derived by splitting the inner \begin{problems}...\end{problems}
+-- content on \newpage, so it matches the exam page counter that
+-- \begin{problems} resets to 1.  Runs on the (possibly shuffled) ver_body so
+-- the question order matches the version the student actually sees.
 local function prescan_problems(body)
 	-- Extract the content between \begin{problems} and \end{problems}.
 	local inner = body:match('\\begin%s*{problems}(.-)\\end%s*{problems}')
@@ -1133,11 +1163,9 @@ local function prescan_problems(body)
 		-- Fallback: scan whole body without page tracking.
 		local rows = {}
 		local qno  = 0
-		for pts in body:gmatch('\\problem%[([^%]]+)%]%[[^%]]+%]{[^}]+}') do
+		for _, pts in ipairs(scan_problem_pts(body)) do
 			qno = qno + 1
-			table.insert(rows, { qno = tostring(qno),
-									pts = pts:match('^%s*(.-)%s*$'),
-									pageno = '?' })
+			table.insert(rows, { qno = tostring(qno), pts = pts, pageno = '?' })
 		end
 		return rows
 	end
@@ -1151,10 +1179,10 @@ local function prescan_problems(body)
 	local rows = {}
 	local qno  = 0
 	for pageno, chunk in ipairs(pages) do
-		for pts in chunk:gmatch('\\problem%[([^%]]+)%]%[[^%]]+%]{[^}]+}') do
+		for _, pts in ipairs(scan_problem_pts(chunk)) do
 			qno = qno + 1
 			table.insert(rows, { qno    = tostring(qno),
-									pts    = pts:match('^%s*(.-)%s*$'),
+									pts    = pts,
 									pageno = tostring(pageno) })
 		end
 	end
