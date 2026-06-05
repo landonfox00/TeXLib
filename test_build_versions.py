@@ -15,7 +15,6 @@ import os
 import subprocess
 import sys
 import tempfile
-import types
 
 # Import build_versions (it stubs LaTeXTools' PdfBuilder itself on import).
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

@@ -105,10 +105,9 @@ def build_one_version(tex_root, base, version, engine, timeout, verbose):
     b.out = ""
     b._aux_target = aux
 
-    base_cmd = [engine, "-interaction=nonstopmode", "-synctex=1"]
-    if engine in ("lualatex", "xelatex"):
-        base_cmd.append("-shell-escape")
-    base_cmd.append(f"-output-directory={aux}")
+    # Reuse the builder's command assembly so the two never drift. aux is a
+    # distinct temp dir, so this adds -output-directory.
+    base_cmd = TexlibBuilder._base_engine_cmd(engine, aux, tex_dir)
 
     t0 = time.monotonic()
     heads, log = [], []
@@ -129,6 +128,11 @@ def build_one_version(tex_root, base, version, engine, timeout, verbose):
             item = gen.send(proc.returncode)
     except StopIteration:
         pass
+    except FileNotFoundError as exc:  # engine not on PATH
+        return {"version": version, "ok": False, "pdf": None, "passes": heads,
+                "seconds": time.monotonic() - t0,
+                "log": f"engine {engine!r} not found on PATH "
+                       f"-- is TeX Live installed and on PATH? ({exc})"}
     except Exception as exc:  # noqa: BLE001
         return {"version": version, "ok": False, "pdf": None, "passes": heads,
                 "seconds": time.monotonic() - t0, "log": f"{exc}"}
@@ -163,32 +167,43 @@ def _cleanup_scratch(tex_dir, jobname, keep_pdf):
     <jobname>_<ver>.sco, <jobname>_autoexam_body_*.tex, <jobname>_prob_*.tex,
     <jobname>_synctex.tex, etc. -- all prefixed by the jobname. Sweep them, but
     never touch the final <jobname>.pdf when keep_pdf is True.
+
+    Globs are delimiter-anchored ("<jobname>." and "<jobname>_") rather than a
+    bare "<jobname>*": with versions A and AB, "exam_A*" would also sweep
+    exam_AB's files (and a real sibling like exam_Answers.pdf). "exam_A." /
+    "exam_A_" cannot match "exam_AB...".
     """
-    for path in glob.glob(os.path.join(tex_dir, jobname + "*")):
-        if keep_pdf and path.endswith(".pdf"):
-            continue
-        try:
-            TexlibBuilder._force_remove(path)
-        except Exception:  # noqa: BLE001
-            pass
+    patterns = (jobname + ".*", jobname + "_*")
+    for pat in patterns:
+        for path in glob.glob(os.path.join(tex_dir, pat)):
+            if keep_pdf and path.endswith(".pdf"):
+                continue
+            try:
+                TexlibBuilder._force_remove(path)
+            except Exception:  # noqa: BLE001
+                pass
 
 
 # --- Merge ------------------------------------------------------------------
 def merge_pdfs(version_pdfs, out_path):
     """Concatenate per-version PDFs (in version order) into out_path."""
     try:
-        from pypdf import PdfReader, PdfWriter
+        from pypdf import PdfWriter
     except ImportError:
         return False, ("pypdf not installed -- cannot merge. Install with "
                        "'pip install pypdf', or use --separate.")
     writer = PdfWriter()
-    for pdf in version_pdfs:
-        reader = PdfReader(pdf)
-        for page in reader.pages:
-            writer.add_page(page)
-    TexlibBuilder._force_remove(out_path)
-    with open(out_path, "wb") as fh:
-        writer.write(fh)
+    try:
+        # append() reads each file fully and releases its handle, so no reader
+        # stays open holding a per-version PDF (which on Windows would block the
+        # later _force_remove of that PDF with a sharing violation).
+        for pdf in version_pdfs:
+            writer.append(pdf)
+        TexlibBuilder._force_remove(out_path)
+        with open(out_path, "wb") as fh:
+            writer.write(fh)
+    finally:
+        writer.close()
     return True, out_path
 
 
