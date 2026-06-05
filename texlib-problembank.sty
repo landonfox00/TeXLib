@@ -2,9 +2,6 @@
 \ProvidesPackage{texlib-problembank}[2026/05/26 v1.0 TeXLib shared problem-bank
 	machinery (engine loader, randomisation, bank queries, item command).]
 
-% ==============================================================================
-% texlib-problembank.sty — shared by autoexam.cls and quiz.cls
-% ==============================================================================
 %
 % Provides the problem-bank LaTeX interface and loads the Lua engine that
 % backs it.  Both `autoexam` (randomised, multi-version exams) and `quiz`
@@ -21,30 +18,31 @@
 %   Variable management . . .  \setvar, \setrng, \calcvar, \get
 %   Randomisation . . . . . .  \picklist, \picklistr, \pickrange, \pickranger
 %   Retrieval . . . . . . . .  \getlist, \geti, \foreachpick
-%   Bank: define problems . .  \newproblem, \dupproblem, \begin{problem}
+%   Bank: define problems . .  \begin{problem} environment
 %   Bank: retrieve problems .  \getproblem (= \useproblem, \reqproblem)
-%   Problems environment . .   \ppart, \@problem@item (\problem item command —
-%                              \begin{problems} in each class swaps it in)
+%   Problems environment . .   \begin{problems} (shared; class page policy via
+%                              \problems@begin@hook / \problems@end@hook), \ppart,
+%                              \@problem@item (the \problem item command, which
+%                              {problems} swaps in for \problem in its body)
 %   Standalone import . . . .  \importproblem
-%   Hooks (overridable) . . .  \workbox, \autoexam@problem@sep
+%   Hooks (overridable) . . .  \workbox, \autoexam@problem@sep,
+%                              \problems@begin@hook, \problems@end@hook
+%
+% \loadbank (below) is shared: it calls pbank_set_bankfile() so the SyncTeX
+% bank-file redirect is active for BOTH single- and multi-version builds,
+% landing inverse search in the bank source.  (The multi-version loop used to
+% suppress the redirect to avoid an \@@input-stack overflow; the
+% texlib_synctex.lua helper pops each input at EOF, so that no longer applies.)
 %
 % Not provided (kept per-class because the semantics differ):
-%   \loadbank . . . . . . . .  autoexam.cls deliberately omits
-%                              pbank_set_bankfile() to dodge a multi-version
-%                              \@@input-stack overflow; quiz.cls calls it for
-%                              SyncTeX inverse-search inside the bank file.
-%   \begin{problems} . . . .   autoexam has page-counter reset, @lastqpage label,
-%                              and elaborate header/footer machinery; quiz
-%                              ships a minimal version.
-%   Versioning, scorepage, etc. autoexam-only.
-% ==============================================================================
+%   Versioning, scorepage, etc. autoexam-only.  The {problems} environment is
+%   now shared (see "Problems environment" below); classes inject their page
+%   policy via \problems@begin@hook / \problems@end@hook rather than redefining
+%   the environment.
 
 \RequirePackage{xparse}
 \RequirePackage{environ}  % \Collect@Body for the {problem} environment
 
-% ==============================================================================
-% Lua engine loader
-% ==============================================================================
 % Locates problem_engine.lua and its texlib_synctex.lua dependency across
 % three possible layouts:
 %   (1) installed in a TEXMF tree              → kpse with the "lua" format
@@ -97,10 +95,6 @@
 	}%
 \fi
 
-% ==============================================================================
-% Variable management
-% ==============================================================================
-
 % \setvar{name}{value}  — store a named value
 \newcommand{\setvar}[2]{\pbank@lua{set_var('#1', #2)}}
 
@@ -112,10 +106,6 @@
 
 % \get{name}  — retrieve and typeset a stored value
 \newcommand{\get}[1]{\pbank@lua{get_var('#1')}}
-
-% ==============================================================================
-% Randomisation: pick from list / range
-% ==============================================================================
 
 % \picklist{name}{n}{a, b, c, ...}  — pick n items WITHOUT replacement
 % NOTE: list items must not contain commas themselves.
@@ -137,10 +127,6 @@
 \NewDocumentCommand{\pickranger}{m m m m}{%
 	\pbank@lua{pick_from_range_r('\luaescapestring{#1}', #2, #3, #4)}%
 }
-
-% ==============================================================================
-% Retrieval helpers
-% ==============================================================================
 
 % \getlist{name}  — typeset all picked values, comma-separated
 \NewDocumentCommand{\getlist}{m}{%
@@ -169,43 +155,6 @@
 			end
 		end
 	}%
-}
-
-% ==============================================================================
-% Problem bank: define
-% ==============================================================================
-
-% \newproblem{id}{meta}{content}[solution]
-%   Define a problem in the database. The solution argument is optional;
-%   if omitted, the problem has no solution shown in key/solution builds.
-%   May be called in the document preamble, inside a bank file, or in the
-%   document body. Redefining an existing ID overwrites it with a warning.
-\NewDocumentCommand{\newproblem}{m m +m +o}{%
-	\IfNoValueTF{#4}{%
-		\pbank@lua{define_problem(
-			'\luaescapestring{#1}',
-			'\luaescapestring{#2}',
-			'\luaescapestring{\unexpanded{#3}}',
-			''
-		)}%
-	}{%
-		\pbank@lua{define_problem(
-			'\luaescapestring{#1}',
-			'\luaescapestring{#2}',
-			'\luaescapestring{\unexpanded{#3}}',
-			'\luaescapestring{\unexpanded{#4}}'
-		)}%
-	}%
-}
-
-% \dupproblem — deprecated alias for \newproblem (four mandatory args)
-\NewDocumentCommand{\dupproblem}{m m +m +m}{%
-	\pbank@lua{define_problem(
-		'\luaescapestring{#1}',
-		'\luaescapestring{#2}',
-		'\luaescapestring{\unexpanded{#3}}',
-		'\luaescapestring{\unexpanded{#4}}'
-	)}%
 }
 
 % \begin{problem}{id}[key=val, key=val, ...]
@@ -253,10 +202,6 @@
 	% End-code is empty; \Collect@Body handles everything at \end{problem}.
 }
 
-% ==============================================================================
-% Problem bank: retrieve
-% ==============================================================================
-
 % \getproblem{query}  — unified retrieve/query command.
 %   Plain id:      \getproblem{linear_eq}
 %   Key=val query: \getproblem{topic=algebra, diff=hard}
@@ -271,9 +216,6 @@
 \let\useproblem\getproblem
 \NewDocumentCommand{\reqproblem}{m}{\getproblem{#1}}
 
-% ==============================================================================
-% \ppart and \@problem@item (item command for \begin{problems})
-% ==============================================================================
 % LaTeX naming note: \begin{problem} (definition environment) uses \problem
 % as its begin-code, so a global \problem item command would shadow it.
 % Solution: define the item command once under \@problem@item, then let
@@ -319,9 +261,6 @@
 	)}%
 }
 
-% ==============================================================================
-% Bank loading
-% ==============================================================================
 % \loadbank{path}  — explicitly load a problem bank file.
 %
 % Calls pbank_set_bankfile() so the engine records the bank-file path on
@@ -329,20 +268,54 @@
 % a typeset problem in the PDF jumps to its \begin{problem} block in the
 % real bank source, not to a generated temp file.
 %
-% Multi-version mode (autoexam_run_versions) sets pbank_suppress_redirect
-% before iterating versions, so the redirect is skipped during the version
-% loop — each version body re-\inputs every problem and the cumulative
-% bank-file \@@input calls would overflow LuaTeX's input stack after ~15
-% problems.  Single-version builds (quiz, edit-mode autoexam) leave the
-% suppress flag false and get the redirect.
+% The redirect is active for every build mode — single-version (quiz,
+% edit-mode autoexam) and multi-version (autoexam_run_versions) alike — so all
+% of them serve one reused scratch file per job and land inverse search in the
+% bank.  Multi-version formerly set pbank_suppress_redirect to dodge an
+% input-stack overflow; the texlib_synctex.lua helper closes each \@@input at
+% EOF, so the inputs pop and the depth never accumulates (verified with a
+% 3-version exam under a deliberately low max_in_open).
 \NewDocumentCommand{\loadbank}{m}{%
 	\pbank@lua{pbank_set_bankfile('\luaescapestring{#1}')}%
 	\input{#1}%
+	% Restore the previous bank context so a \begin{problem} written directly in
+	% the document after this \loadbank is attributed to the document, not the
+	% bank (its inverse search should land in the document's own source).
+	\pbank@lua{pbank_clear_bankfile()}%
 }
 
-% ==============================================================================
-% Standalone problem import (one-off, scoped overrides)
-% ==============================================================================
+% \pbank@load@coursebank — auto-load a course-level bank, called by each class
+% from its own \AtBeginDocument (not registered here, so non-assessment
+% consumers like didactic are unaffected). Tries the coursemeta bank-path
+% (literal first for legacy document-relative values, then coursemeta-relative),
+% then a sibling bank.tex. The CWD probe uses lfs rather than \IfFileExists so a
+% recursive TEXINPUTS entry can't silently match a stray library sample bank.
+\newcommand{\pbank@load@coursebank}{%
+	\@ifundefined{GetBankPath}{}{%
+		\edef\@tmpbankpath{\GetBankPath}%
+		\ifx\@tmpbankpath\empty\else
+			\IfFileExists{\@tmpbankpath}{%
+				\loadbank{\@tmpbankpath}%
+			}{%
+				\@ifundefined{GetCourseMetaDir}{%
+					\loadbank{\@tmpbankpath}%
+				}{%
+					\edef\@tmpbankresolved{\GetCourseMetaDir\@tmpbankpath}%
+					\IfFileExists{\@tmpbankresolved}{%
+						\loadbank{\@tmpbankresolved}%
+					}{%
+						\loadbank{\@tmpbankpath}%
+					}%
+				}%
+			}%
+		\fi
+	}%
+	\directlua{%
+		if lfs.attributes('bank.tex', 'mode') == 'file' then
+			tex.print('\string\\loadbank{bank.tex}')
+		end
+	}%
+}
 
 % \importproblem{path}{overrides}  — import a standalone problem file with
 %   Lua variable overrides (e.g. {a=5, b=10}) in an isolated scope.
@@ -360,9 +333,6 @@
 	\endgroup
 }
 
-% ==============================================================================
-% Hooks (default implementations; classes override as needed)
-% ==============================================================================
 % \workbox{n} — reserved blank space below a problem (engine emits this).
 %   Default: stretchy \vspace.  autoexam.cls overrides to hide the space in
 %   solution builds (so a key copy doesn't get blank pages).
@@ -372,5 +342,47 @@
 %   page (engine emits this for problems 2+ on each page).  Default: a plain
 %   \par\medskip; autoexam.cls overrides with a full-width rule.
 \providecommand{\autoexam@problem@sep}{\par\medskip}
+
+% \begin{problems} ... \end{problems}
+%   Drop-in replacement for {questions} that accepts \problem items (the
+%   {questions} environment is preserved for backward compat).  The core is
+%   identical in every class: it tracks the first problem on each page (for the
+%   inter-problem separator), patches \newpage to reset that flag, opens
+%   {questions}, and swaps \problem <-> \@problem@item for the body.
+%
+%   Class-specific page policy is injected through two overridable hooks, both
+%   no-ops by default:
+%     \problems@begin@hook — runs before {questions} opens.  autoexam.cls fills
+%        it with \clearpage, the page-counter reset, the problem-style
+%        header/footer slots, and a single-use guard; quiz.cls leaves it empty
+%        (quizzes have no cover page or separate "X of N" numbering, so the
+%        environment must NOT clear the page or reset the counter).
+%     \problems@end@hook   — runs after {questions} closes.  autoexam.cls uses
+%        it to place \label{@lastqpage} for the "X of N" footer.
+%   The hooks run INSIDE the environment's group, so a plain \def a class makes
+%   in \problems@begin@hook is local to the environment (use \global for slots
+%   that must outlive it — see autoexam.cls).
+\providecommand{\problems@begin@hook}{}
+\providecommand{\problems@end@hook}{}
+\newenvironment{problems}{%
+	\problems@begin@hook
+	% ---- inter-problem separator: first problem on a page gets no rule -------
+	\directlua{pbank_first_on_page = true}%
+	% Patch \newpage so crossing a page boundary resets the "first on page" flag.
+	\let\@problems@saved@newpage\newpage
+	\renewcommand{\newpage}{%
+		\@problems@saved@newpage
+		\directlua{pbank_first_on_page = true}%
+	}%
+	% ---- start questions list ------------------------------------------------
+	\begin{questions}%
+	\let\@saved@problem\problem
+	\let\problem\@problem@item
+}{%
+	\let\problem\@saved@problem
+	\let\newpage\@problems@saved@newpage
+	\end{questions}%
+	\problems@end@hook
+}
 
 \endinput

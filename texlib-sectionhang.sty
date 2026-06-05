@@ -1,0 +1,71 @@
+% texlib-sectionhang.sty
+% Shared "structural hang" for the section-based TeXLib classes (didactic, pset).
+%
+% Hangs every structural marker into the left margin by \texlibsectionhang so
+% they share one outer left edge, while body text and the theorem rules sit
+% inside it:
+%   * \section / \subsection headings (numbers or, when unnumbered, the title)
+%   * the table-of-contents title  (tocloft)
+%   * the bibliography heading      (biblatex)
+%   * the running header + footer   (fancyhdr)
+%
+% Each piece is applied only if the relevant package is loaded, so the file is
+% safe to drop into any article-derived class.  LOAD IT LAST in the class (after
+% fancyhdr / tocloft / biblatex are set up) so its redefinitions land on top;
+% a document preamble can still override afterwards, and \setlength
+% \texlibsectionhang to 0pt disables the effect entirely.
+%
+% The rule WIDTH of the theorem boxes is untouched (\texlibrulewidth, in
+% texlib-theorems.sty); this only moves the heading/frame left edge.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-sectionhang}[2026/06/01 v1.0 TeXLib hanging section headings]
+
+\RequirePackage{etoolbox}
+
+% How far every structural marker hangs into the left margin. Single source of
+% truth: change this (or set it per-document) to retune all of them at once.
+\newlength{\texlibsectionhang}
+\setlength{\texlibsectionhang}{24pt}
+
+% \section / \subsection: re-issue the article defaults with a NEGATIVE indent,
+% so the heading's left edge lands \texlibsectionhang into the margin. (didactic
+% and pset both build on article and don't otherwise restyle these.)
+\newcommand{\texlib@sh@sections}{%
+	\renewcommand\section{\@startsection{section}{1}{-\texlibsectionhang}%
+		{-3.5ex \@plus -1ex \@minus -.2ex}%
+		{2.3ex \@plus.2ex}%
+		{\normalfont\Large\bfseries}}%
+	\renewcommand\subsection{\@startsection{subsection}{2}{-\texlibsectionhang}%
+		{-3.25ex\@plus -1ex \@minus -.2ex}%
+		{1.5ex \@plus .2ex}%
+		{\normalfont\large\bfseries}}%
+}
+
+% Apply now (file is loaded last in the class, so this lands on top of the
+% class's article-default sections; the optional pieces below are guarded).
+\texlib@sh@sections
+
+% TOC title (tocloft): prepend a negative \hspace to the title font so "Contents"
+% starts on the hang line. \preto keeps whatever font the class already set.
+\@ifpackageloaded{tocloft}{%
+	\preto\cfttoctitlefont{\hspace*{-\texlibsectionhang}}%
+}{}
+
+% Bibliography heading (biblatex): biblatex's default heading already uses
+% \section*, which now hangs — but make it explicit so it holds regardless of
+% how a document calls \printbibliography.
+\@ifpackageloaded{biblatex}{%
+	\defbibheading{bibliography}[\bibname]{\section*{#1}}%
+}{}
+
+% Running header + footer (fancyhdr): widen the head/foot into BOTH margins by
+% the hang amount. The LEFT end (and the left-hand slot text) reach the hang
+% line so they align with the hung headings; the RIGHT end mirrors it, keeping
+% the rule symmetric about the page midpoint with the right-hand slot text flush
+% at that end. This matches the shared \TeXLibRuleBleed geometry the non-hang
+% classes use, so every TeXLib class's header/footer rule is the same length.
+\@ifpackageloaded{fancyhdr}{%
+	\fancyhfoffset[LR]{\texlibsectionhang}%
+}{}
+
+\endinput

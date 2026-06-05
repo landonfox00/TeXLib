@@ -38,4 +38,18 @@
 \newcommand{\studentmode}{\studenttrue\instructorfalse}
 \newcommand{\instructormode}{\instructortrue\studentfalse}
 
+% Header build-mode badge ------------------------------------------------------
+% The centered header indicator that marks an answers/instructor build. The
+% mechanism (italic, header-center slot) is shared; the WORDING is class-specific
+% -- lecture notes say "Instructor Version", problem sets/quizzes say "Answer
+% Key" -- so each class declares its label once via \SetTeXLibBuildBadge and the
+% header places \TeXLibBuildBadge in the center slot. The label is itself flag-
+% guarded, so the badge vanishes in a plain student build:
+%
+%   \SetTeXLibBuildBadge{\ifsolutions Instructor Version\fi}   % in the class
+%   \SetTeXLibHeader{...}{\TeXLibBuildBadge}{...}               % center slot
+\newcommand{\texlib@buildbadge}{}
+\newcommand{\SetTeXLibBuildBadge}[1]{\renewcommand{\texlib@buildbadge}{#1}}
+\newcommand{\TeXLibBuildBadge}{\textit{\texlib@buildbadge}}
+
 \endinput

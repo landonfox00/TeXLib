@@ -99,6 +99,7 @@ SCENARIO_AREA_MODULE = {
     "report-cards": "Report Cards",
     "syllabi": "Syllabi",
     "notes": "Notes",
+    "quiz": "Quizzes",
 }
 
 # Modules and their template files. Engine is auto-detected from \documentclass.
@@ -649,6 +650,24 @@ def _copy_shared_into(tmp: str) -> None:
                     shutil.copy2(os.path.join(sub, f), dest)
 
 
+def _read_expect_text(sdir: str) -> list[str]:
+    """A scenario's optional `expect-text` file: substrings (one per line) that
+    must appear in the rendered PDF. Blank lines and '#' comments are ignored."""
+    path = os.path.join(sdir, "expect-text")
+    if not os.path.isfile(path):
+        return []
+    out: list[str] = []
+    try:
+        with open(path, encoding="utf-8") as f:
+            for ln in f:
+                s = ln.strip()
+                if s and not s.startswith("#"):
+                    out.append(s)
+    except OSError:
+        return []
+    return out
+
+
 def build_scenario(scen: dict, timeout: int, verbose: bool,
                    content: bool, visual: str) -> tuple[bool, float, str, str, bool]:
     """
@@ -705,17 +724,42 @@ def build_scenario(scen: dict, timeout: int, verbose: bool,
         skipped = False
         if content:
             # Artifact check only (grid non-empty). The per-page visual diff is
-            # the real content check for scenarios; the module's EXPECT_TEXT
-            # tokens (e.g. "Quiz 1") don't apply across every configuration.
+            # the real content check for visual scenarios; the module's
+            # EXPECT_TEXT tokens don't apply across every configuration.
             cp, tskip = check_content(module, tmp, pdf, check_text=False)
             problems += cp
             skipped = skipped or tskip
-        vp, vskip = check_visual(slug, tmp, pdf, update=(visual == "update"))
-        problems += vp
-        skipped = skipped or vskip
+
+        # Optional per-scenario text assertion: an `expect-text` file lists
+        # substrings (one per line; blank lines and '#' comments ignored) that
+        # MUST appear in the rendered PDF. Lets a scenario assert content
+        # directly (e.g. that the right instructions file was resolved),
+        # independent of pixel references.
+        text_expects = _read_expect_text(sdir)
+        if text_expects:
+            text = extract_pdf_text(pdf)
+            if text is None:
+                skipped = True  # pdftotext unavailable -> soft skip
+            else:
+                low = text.lower()
+                missing = [s for s in text_expects if s.lower() not in low]
+                if missing:
+                    problems.append(
+                        "missing text: " + ", ".join(repr(s) for s in missing))
+
+        # Visual diff: the assertion for visual scenarios. Skipped for a
+        # text-only scenario (ships `expect-text`, carries no reference PNGs) so
+        # it needn't commit a pixel ref.
+        has_refs = bool(glob.glob(
+            os.path.join(VISUAL_REF_DIR, f"{safe_name(slug)}-*.png")))
+        if has_refs or not text_expects:
+            vp, vskip = check_visual(slug, tmp, pdf, update=(visual == "update"))
+            problems += vp
+            skipped = skipped or vskip
+
         if problems:
             return (False, elapsed, "CONTENT: " + "; ".join(problems),
-                    _save_log(tmp, log_text or r.stdout, verbose, jobname), skipped)
+                    _save_log(tmp, log_text or stdout_text, verbose, jobname), skipped)
         return True, elapsed, "", "", skipped
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

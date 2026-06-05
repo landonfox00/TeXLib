@@ -11,9 +11,9 @@ calling it.
 
 - A `\versions{A, B, C}` declaration (or `\examversions{...}`) that
 	drives everything else.
-- A problem-bank workflow: `\loadbank{...}`, `\newproblem{...}`,
-	`\getproblem{key=val}`, plus a `problem` environment for inline
-	definition of multi-line problems.
+- A problem-bank workflow: `\loadbank{...}`, the `problem` environment
+	(`\begin{problem}{id} ... \end{problem}`) for defining problems, and
+	`\getproblem{key=val}` / `\problem{id}` for retrieving them.
 - Per-version randomization built on a Lua engine: `\setrng`,
 	`\calcvar`, `\picklist`, `\pickrange`, `\foreachpick`, with
 	`\get`/`\geti`/`\getlist` for retrieval.
@@ -124,16 +124,11 @@ Compile-time toggles: `\ShowSolutions`, `\ShowKey`, `\ShowRubric`,
 Load a problem bank from a file. Equivalent to `\input{bank.tex}` but
 tracks load order for diagnostics.
 
-`\newproblem{id}{key=val,...}{content}[solution]`
-Define a problem. Square-bracket solution is optional. Calls may sit
-in the bank file, in the document preamble, or in the body.
-
-`\dupproblem{id}{key=val,...}{content}{solution}` (deprecated)
-Same as `\newproblem` but with mandatory solution argument.
-
 `\begin{problem}{id}[key=val,...] ... \solution ... \end{problem}`
-Multi-line / environment-style problem definition. Body text before
-`\solution` is the problem; text after is the solution.
+Define a problem. Body text before `\solution` is the problem; text after
+is the (optional) solution. May sit in the bank file, in the document
+preamble, or in the body. Inverse search (double-click in the PDF) jumps
+back to the `\begin{problem}` block in its source file.
 
 `\getproblem{query}` (aliases: `\useproblem`, `\reqproblem`)
 Retrieve a problem. `query` is either an id (`linear_eq`) or a

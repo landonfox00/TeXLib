@@ -14,6 +14,8 @@ tests/scenarios/
   <area>/                     # maps to a module (see SCENARIO_AREA_MODULE)
     <name>/
       template.tex            # required — metadata inline via \metasetup
+      coursemeta.tex          # optional — ship one to exercise coursemeta keys
+      expect-text             # optional — PDF substrings to assert (text scenario)
       tags                    # optional — whitespace-separated tier tags
 ```
 
@@ -26,6 +28,16 @@ tests/scenarios/
 - **`tags`** (optional) marks the tier. Absent ⇒ `core`. Put `full` in the file
   to make a scenario run only under `--full` (use for edge cases you don't need
   on every focused run).
+- **`expect-text`** (optional) turns a scenario into a **text-assertion** check:
+  list substrings (one per line; blank lines and `#` comments ignored) that must
+  appear in the rendered PDF. A scenario that ships `expect-text` and has *no*
+  reference PNGs skips the pixel diff — ideal when what's under test is *which
+  text renders* (e.g. that a `coursemeta.tex` key resolved to the right file),
+  not layout. If it also has refs, both the text check and the diff run. Use
+  single-token markers (no spaces/hyphens) so `pdftotext` can't split them.
+- A scenario may ship its own **`coursemeta.tex`** — the harness auto-loads it
+  (it does *not* drop the smoke-test stub for scenarios), so you can exercise
+  course-metadata keys like `quiz-instructions-file` or `bank-path`.
 
 References land in `../visual_refs/<area>__<name>-<page>.png`.
 
@@ -62,9 +74,16 @@ tools soft-skip.
 | syllabi | `standard`           | core | title block, sections, two-column grade tables |
 | syllabi | `long`               | full | content-heavy syllabus that spills onto page 2 |
 | notes | `theorem-custom`       | core | `\texlibtheoremsetup` — tint off + recoloured theorem/definition rules |
+| quiz | `coursemeta-instructions` | core | `quiz-instructions-file` set in `coursemeta.tex` resolves to a course-local instructions file (text-assertion scenario, no PNG ref) |
 
 ## Adding a scenario
 
 Drop a new `tests/scenarios/<area>/<name>/template.tex` (self-contained), add a
 `tags` file if it's `full`-only, then `python smoke_test.py --scenarios <area>
 --full --update-refs` to mint its reference and commit the PNG(s).
+
+For a **text-focused** feature (where the assertion is "the right text rendered",
+not pixels), skip the PNG ref: ship an `expect-text` file with a unique marker
+instead. The `quiz/coursemeta-instructions` pack is the model — its `template.tex`
++ `coursemeta.tex` + `course-quiz-instructions.tex` prove a coursemeta key
+resolved to a course-local file, asserted by the `CMQUIZINSTRMARKER` marker.

@@ -104,12 +104,10 @@
 \setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
-% Headers are class-specific to lecture notes:
-%   L: unit title    C: "Instructor Version" if solutions are on    R: section
-\fancyhead[L]{\bfseries \GetUnitTitle}
-\fancyhead[C]{\ifsolutions\textit{Instructor Version}\fi}
-\fancyhead[R]{Section \thesection}
-\renewcommand{\headrulewidth}{0.4pt}
+% Header: L = unit title  C = build badge  R = section. Shared mechanism;
+% the badge wording is class-specific (lecture notes -> "Instructor Version").
+\SetTeXLibBuildBadge{\ifsolutions Instructor Version\fi}
+\SetTeXLibHeader{\bfseries\GetUnitTitle}{\TeXLibBuildBadge}{Section \thesection}
 % Footer is the shared TeXLib layout (course | page | institution)
 \SetTeXLibFooter
 
@@ -473,5 +471,12 @@
 		\fi
 	}%
 }
+
+% ==============================================================================
+% Structural hang: section/subsection headings, the TOC title, the bibliography
+% heading, and the running header/footer all hang onto one outer left edge.
+% Loaded LAST so its redefinitions land on top of the article defaults.
+% ==============================================================================
+\RequirePackage{texlib-sectionhang}
 
 \endinput

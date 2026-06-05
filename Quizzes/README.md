@@ -61,9 +61,25 @@ Options pass through to `exam.cls`. Default base size is 11pt.
 | `quiz-number`             | Used in the title block (e.g. "Quiz 1")         |
 | `quiz-title`              | Override the title (defaults to `Quiz <number>`) |
 | `quiz-instructions`       | Override the boxed instructions paragraph (inline) |
-| `quiz-instructions-file`  | `\input` the named file instead of the boxed inline string. Filename is given without `.tex`. If both `quiz-instructions` and `quiz-instructions-file` are set, the file wins. |
+| `quiz-instructions-file`  | `\input` the named file instead of the boxed default. Filename without `.tex`. Resolved as-is first (relative to the quiz folder), then relative to `coursemeta.tex` — so it can be set **course-wide in `coursemeta.tex`** to point every quiz at one local file (see below). Precedence: per-quiz `\meta` file > coursemeta file > inline `quiz-instructions` > default `quiz-instructions.tex`. |
 
 Plus all `course-metadata` keys (institution, course-*, term, …).
+
+**Course-wide instructions:** because `quiz-instructions-file` is a `course-metadata`
+key, set it once in `coursemeta.tex` to apply a course-local instructions file to
+every quiz:
+
+```latex
+\metasetup{
+    ...
+    quiz-instructions-file = quiz-instructions,   % e.g. <course>/quiz-instructions.tex
+}
+```
+
+It resolves relative to `coursemeta.tex`'s directory, so the same string works from
+any quiz folder. An individual quiz can still override it with its own
+`\meta{ quiz-instructions-file = ... }` (or clear it with `= {}` to fall back to the
+shared default).
 
 ### Problem bank API (shared with autoexam)
 
@@ -72,22 +88,21 @@ problem-bank workflow as exams. This means you can author one bank
 file that's reusable across quizzes and exams.
 
 `\loadbank{path}` — explicitly load a problem bank file. Inside, you
-typically have a sequence of `\newproblem{...}` or `\begin{problem}`
-calls.
-
-`\newproblem{id}{key=val,...}{content}[solution]` — define a problem
-in the database. The solution argument is optional. Example:
-
-```latex
-\newproblem{linear_eq}{topic=algebra, diff=easy}{
-	Solve $2x + 5 = 11$ for $x$.
-}[$x = 3$]
-```
+typically have a sequence of `\begin{problem}` blocks.
 
 `\begin{problem}{id}[key=val,...] ... \solution ... \end{problem}`
-— environment-style definition. Body before `\solution` is the
-problem content; body after is the solution. Useful for multi-line
-problems with embedded code or display math.
+— define a problem in the database. Body before `\solution` is the
+problem content; body after is the (optional) solution. May sit in a
+bank file, in the document preamble, or in the body. Double-clicking the
+typeset problem in the PDF jumps back to its `\begin{problem}` block.
+Example:
+
+```latex
+\begin{problem}{linear_eq}[topic=algebra, diff=easy]
+	Solve $2x + 5 = 11$ for $x$.
+	\solution $x = 3$
+\end{problem}
+```
 
 `\getproblem{query}` — retrieve a problem and typeset it. The query
 is either a plain id (`linear_eq`) or a key=value filter

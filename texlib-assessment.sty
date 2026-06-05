@@ -1,0 +1,24 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-assessment}[2026/06/02 v1.0 TeXLib shared assessment-class setup]
+
+% Common package set and presentation defaults shared by autoexam.cls and
+% quiz.cls. Both subclass exam.cls and load this right after \LoadClass, so the
+% \renewcommand of \questionlabel below assumes an exam-derived class.
+% Class-specific packages (tcolorbox, multicol, the adjustbox/tocloft option
+% variants, ...) stay in each class.
+
+\RequirePackage{texlib-corepkg}
+\RequirePackage{texlib-build}
+\RequirePackage{changepage}
+\RequirePackage{comment}
+\RequirePackage{lastpage}
+\RequirePackage{needspace}
+\RequirePackage{cancel}
+\RequirePackage{pdfpages}
+\RequirePackage{course-metadata}
+
+% Unified labels: "Problem N." with question-qualified parts ("Na.").
+\renewcommand{\questionlabel}{\textbf{Problem \thequestion.}}
+\renewcommand{\partlabel}{\textbf{\thequestion\thepartno.}}
+
+\endinput

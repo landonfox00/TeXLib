@@ -3,54 +3,36 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesClass{quiz}[2026/05/07 v1.0 UNR In-Class Quizzes (TeXLib)]
 
-% ==============================================================================
-% 0. OPTIONS
-% ==============================================================================
 \DeclareOption*{\PassOptionsToClass{\CurrentOption}{exam}}
 \ProcessOptions\relax
 \LoadClass[11pt]{exam}
 
-% ==============================================================================
-% 1. PACKAGES
-% ==============================================================================
-% Core bundle: fontenc/lmodern/geometry, expl3/xparse/ifthen/etoolbox, xcolor,
-% amsmath/amssymb/amsthm/mathtools, texlib-mathutils, graphicx, tikz/pgfplots
-% (with compat=1.18 + standard library set), hyperref + canonical hypersetup.
-\RequirePackage{texlib-corepkg}
+% Shared assessment setup (texlib-corepkg, texlib-build, course-metadata, the
+% common aux packages, and the unified problem/part labels). Shared with autoexam.
+\RequirePackage{texlib-assessment}
 
-% Class-specific packages
-\RequirePackage{adjustbox, changepage, comment}
-% NOTE: enumitem is intentionally NOT loaded at the top level — it is known to
-% conflict with exam.cls's redefinition of \list (used by `questions`/`parts`).
-% Quizzes that need enumitem-style lists may load it locally.
-\RequirePackage{lastpage}
-\RequirePackage{needspace}
-\RequirePackage{cancel}
-\RequirePackage{pdfpages}
+% quiz-only packages. enumitem is intentionally absent: it conflicts with
+% exam.cls's \list redefinition (used by questions/parts).
+\RequirePackage{adjustbox}
 \RequirePackage{tocloft}
-\RequirePackage{course-metadata}
 
-% ==============================================================================
-% 2. BUILD FLAGS — UNIFIED TeXLib CLI
-% ==============================================================================
-\RequirePackage{texlib-build}
+% Provided by texlib-build (loaded via texlib-assessment): \ifsolutions, \ifkey,
+% \ifrubric, \ifdraft, \ifstudent, \ifinstructor and the matching CLI toggles.
 
-
-% ==============================================================================
-% 3. CLASS-LOCAL METADATA KEYS
-% ==============================================================================
 \ExplSyntaxOn
 
 \tl_new:N \g__quiz_number_tl
 \tl_new:N \g__quiz_title_tl
 \tl_new:N \g__quiz_instructions_tl
-\tl_new:N \g__quiz_instructions_file_tl
 
+% Note: quiz-instructions-file is NOT defined here.  It lives in
+% course-metadata.sty (alongside bank-path) so it can be set course-wide in
+% coursemeta.tex as well as per quiz via \meta — coursemeta is read before this
+% class body, so a key defined only here would miss it.
 \keys_define:nn { meta } {
 	quiz-number             .tl_gset:N = \g__quiz_number_tl,
 	quiz-title              .tl_gset:N = \g__quiz_title_tl,
 	quiz-instructions       .tl_gset:N = \g__quiz_instructions_tl,
-	quiz-instructions-file  .tl_gset:N = \g__quiz_instructions_file_tl,
 }
 
 \NewExpandableDocumentCommand{\GetQuizNumber}{}{ \tl_use:N \g__quiz_number_tl }
@@ -59,26 +41,56 @@
 		{ Quiz~\GetQuizNumber }
 		{ \tl_use:N \g__quiz_title_tl }
 }
+% Inline instruction text (set via \meta{quiz-instructions={...}}); empty by
+% default — the default wording now lives in quiz-instructions.tex so it can be
+% a SyncTeX inverse-search target (see \maketitle below).
 \NewExpandableDocumentCommand{\GetQuizInstructions}{}{
-	\tl_if_empty:NTF \g__quiz_instructions_tl
-		{ Notes~or~other~aids~are~not~allowed.~ Calculators~of~any~kind~are~not~permitted.~
-			To~receive~full~credit,~you~must~show~all~of~your~work.~ Write~your~answers~in~
-			the~space~provided,~and~box~or~circle~all~final~answers. }
-		{ \tl_use:N \g__quiz_instructions_tl }
+	\tl_use:N \g__quiz_instructions_tl
 }
-\NewExpandableDocumentCommand{\GetQuizInstructionsFile}{}{
-	\tl_use:N \g__quiz_instructions_file_tl
-}
-% \IfQuizInstructionsFile{true}{false} — branch on whether a file was set.
+% \GetQuizInstructionsFile is provided by course-metadata.sty (the
+% quiz-instructions-file key now lives there, set per quiz via \meta or
+% course-wide in coursemeta.tex).
+% \IfQuizInstructionsFile{true}{false} — true when a file was set anywhere.
 \NewDocumentCommand{\IfQuizInstructionsFile}{ +m +m }{
-	\tl_if_empty:NTF \g__quiz_instructions_file_tl { #2 } { #1 }
+	\IfMetaSet{quiz-instructions-file}{ #1 }{ #2 }
+}
+% \IfQuizInstructionsInline{true}{false} — branch on whether inline text was set.
+\NewDocumentCommand{\IfQuizInstructionsInline}{ +m +m }{
+	\tl_if_empty:NTF \g__quiz_instructions_tl { #2 } { #1 }
 }
 
 \ExplSyntaxOff
 
-% ==============================================================================
-% 4. PROBLEM-BANK ENGINE (shared with autoexam.cls)
-% ==============================================================================
+% Default boxed instructions are \input from a real file so SyncTeX inverse
+% search (double-click in the PDF) jumps to the instruction source, mirroring
+% autoexam's autoexam-instructions.tex.  Used only when the document sets
+% neither quiz-instructions-file nor an inline quiz-instructions.
+\newcommand{\@quiz@instructions@file}{quiz-instructions}
+
+% \input the user-specified instructions file (from \meta or coursemeta),
+% resolving its path coursemeta-relative FIRST, then literal:
+%   1. \GetCourseMetaDir + path  -- a course-wide file set in coursemeta.tex,
+%      found from any quiz folder.  Checked first so a bare filename like
+%      "quiz-instructions" resolves to the COURSE copy and is not shadowed by
+%      the library's default of the same name sitting on TEXINPUTS.
+%   2. path as-is  -- a per-quiz file in the quiz's own folder (kpse searches
+%      the current directory first), used when no coursemeta-relative file
+%      matches.  A per-quiz \meta override therefore still wins for files that
+%      live beside the quiz (its folder is not the coursemeta dir).
+\newcommand{\quiz@input@userinstructions}{%
+	\edef\@quiz@ipath{\GetQuizInstructionsFile}%
+	\@ifundefined{GetCourseMetaDir}{%
+		\input{\@quiz@ipath}%
+	}{%
+		\edef\@quiz@ipathcm{\GetCourseMetaDir\@quiz@ipath}%
+		\IfFileExists{\@quiz@ipathcm}{%
+			\input{\@quiz@ipathcm}%
+		}{%
+			\input{\@quiz@ipath}%
+		}%
+	}%
+}
+
 % texlib-problembank.sty loads problem_engine.lua and defines the shared
 % problem-bank LaTeX glue (\setvar, \setrng, \pick*, \getproblem,
 % \begin{problem}, \ppart, \@problem@item, \importproblem, ...).  Quizzes
@@ -88,88 +100,30 @@
 % texlib-problembank.sty for the full API.
 \RequirePackage{texlib-problembank}
 
-% \loadbank is provided by texlib-problembank.sty (the redirect activates
-% automatically; quizzes are always single-version so pbank_suppress_redirect
-% never trips).  A coursemeta bank-path (exposed as \GetBankPath) is
-% auto-loaded at \AtBeginDocument, and a sibling bank.tex is picked up as a
-% fallback — so per-quiz \loadbank calls are usually unnecessary.  Unlike
-% autoexam.cls, no RNG seed is set (quizzes are single-version by design;
-% see section 4 above).  Bank-path resolution mirrors autoexam exactly:
-% try the literal path first (back-compat with document-relative legacy
-% values), then \GetCourseMetaDir\GetBankPath (coursemeta-relative — the
-% preferred convention, depth-agnostic), then fall through to a hard load
-% on the literal path so a missing bank raises the usual \input error.
-\AtBeginDocument{%
-	\@ifundefined{GetBankPath}{}{%
-		\edef\@tmpbankpath{\GetBankPath}%
-		\ifx\@tmpbankpath\empty\else
-			\IfFileExists{\@tmpbankpath}{%
-				\loadbank{\@tmpbankpath}%
-			}{%
-				\@ifundefined{GetCourseMetaDir}{%
-					\loadbank{\@tmpbankpath}%
-				}{%
-					\edef\@tmpbankresolved{\GetCourseMetaDir\@tmpbankpath}%
-					\IfFileExists{\@tmpbankresolved}{%
-						\loadbank{\@tmpbankresolved}%
-					}{%
-						\loadbank{\@tmpbankpath}%
-					}%
-				}%
-			}%
-		\fi
-	}%
-	% Auto-load bank.tex from the document's own directory, if present.
-	% \IfFileExists consults TEXINPUTS, so a recursive TeXLib// entry can
-	% match a stray sample bank shipped with the library and silently load
-	% the wrong file.  Probe the literal CWD via LuaFileSystem instead.
-	\directlua{%
-		if lfs.attributes('bank.tex', 'mode') == 'file' then
-			tex.print('\string\\loadbank{bank.tex}')
-		end
-	}%
-}
+% \loadbank is provided by texlib-problembank.sty. A coursemeta bank-path and a
+% sibling bank.tex are auto-loaded below (shared resolution, see
+% \pbank@load@coursebank), so per-quiz \loadbank is usually unnecessary. Quizzes
+% set no RNG seed (single-version by design), so the hook is just the bank load.
+\AtBeginDocument{\pbank@load@coursebank}
 
-\newenvironment{problems}{%
-	\directlua{pbank_first_on_page = true}%
-	\let\@problems@saved@newpage\newpage
-	\renewcommand{\newpage}{%
-		\@problems@saved@newpage
-		\directlua{pbank_first_on_page = true}%
-	}%
-	\begin{questions}%
-	\let\@saved@problem\problem
-	\let\problem\@problem@item
-}{%
-	\let\problem\@saved@problem
-	\let\newpage\@problems@saved@newpage
-	\end{questions}%
-}
+% \begin{problems} is provided by texlib-problembank.sty (shared with
+% autoexam.cls).  Quizzes need no page-section setup, so the shared
+% \problems@begin@hook / \problems@end@hook are left at their no-op defaults:
+% the environment simply wraps {questions} and enables the \problem item
+% command.  (autoexam fills those hooks with \clearpage, a page-counter reset,
+% header/footer slots, and a single-use guard — none of which quizzes want.)
 
-% ==============================================================================
-% 5. MATH UTILITIES
-% ==============================================================================
 % Math macros (\mbb, \abs, \lrp, \dd, \deriv, \inte, \todo, ...) are provided
 % by texlib-mathutils.sty, loaded in section 1 above.
 
-% ==============================================================================
-% 6. UNSTARRED THEOREM-LIKE ENVIRONMENTS
-% ==============================================================================
 % Theorem environments come from texlib-thmenv.sty (shared with autoexam.cls).
 \RequirePackage{texlib-thmenv}
 
-% ==============================================================================
-% 7. ANSWER FORMATTING
-% ==============================================================================
-\renewcommand{\questionlabel}{\textbf{\arabic{question}.}}
-\renewcommand{\partlabel}{\textbf{\alph{partno}.}}
+% \questionlabel / \partlabel are set in texlib-assessment (shared with autoexam).
 
 % \encircle and \extracredit come from texlib-itemfmt.sty.
 \RequirePackage{texlib-itemfmt}
 
-% ==============================================================================
-% 8. FIGURE WRAPPER
-% ==============================================================================
 \NewDocumentCommand{\fig}{ O{} m }{%
 	\begin{figure}[!h]
 		\centering
@@ -178,27 +132,22 @@
 	\end{figure}%
 }
 
-% ==============================================================================
-% 9. HEADER / FOOTER
-% ==============================================================================
 % texlib-pagestyle.sty bundles \pagestyle{headandfoot} + first-page-footer
 % rule + running head/foot rules into \SetTeXLibExamRules.  Quiz adds the
 % first-page header rule on top (its title page carries a name field).
 \RequirePackage{texlib-pagestyle}
+\RequirePackage{lastpage}    % \pageref{LastPage} for the shared "X of Y" footer
 % \title is auto-derived from metadata.
 \AtBeginDocument{%
 	\title{\LARGE \GetQuizTitle}%
 	\SetTeXLibExamRules
 	\firstpageheadrule
 	\firstpageheader{\GetCourse}{}{Name:\ \underline{\hspace{2.5in}}}%
-	\firstpagefooter{Section\ \GetCourseSection}{}{\GetInstitution}%
+	\firstpagefooter{\GetCourse}{\thepage\ of \pageref{LastPage}}{\GetInstitution}%
 	\runningheader{\GetCourse}{}{Name:\ \underline{\hspace{2.5in}}}%
-	\runningfooter{Section\ \GetCourseSection}{}{\GetInstitution}%
+	\runningfooter{\GetCourse}{\thepage\ of \pageref{LastPage}}{\GetInstitution}%
 }
 
-% ==============================================================================
-% 10. TITLE BLOCK
-% ==============================================================================
 \renewcommand{\maketitle}{%
 	% Instructions: file overrides inline text overrides default.
 	% File content controls its own layout (no automatic box around it).
@@ -207,7 +156,7 @@
 			{\LARGE \GetQuizTitle}%
 			\ifkey\par\vspace{0.4em}\textit{Answer~Key}\fi
 		\end{center}
-		\input{\GetQuizInstructionsFile}%
+		\quiz@input@userinstructions
 	}{%
 		\begin{center}
 			{\LARGE \GetQuizTitle}%
@@ -215,15 +164,17 @@
 			\par\medskip
 			\fbox{\fbox{\parbox{6.25in}{%
 				\centering\footnotesize
-				\GetQuizInstructions
+				% Inline text typesets directly; the default wording is \input
+				% from quiz-instructions.tex so double-clicking it in the PDF
+				% lands on that source (inverse search).
+				\IfQuizInstructionsInline
+					{\GetQuizInstructions}%
+					{\input{\@quiz@instructions@file}}%
 			}}}%
 		\end{center}
 	}%
 }
 
-% ==============================================================================
-% 11. BACKWARD-COMPAT \the* ALIASES (quiz-specific only)
-% ==============================================================================
 % Course-metadata aliases (\theCourse, \theCourseNumber, \theCourseTitle,
 % \theCourseSection, \theSeason, \theYear, \theTerm, \theSchool, ...) are
 % provided by course-metadata.sty.  Quiz-specific aliases stay here.

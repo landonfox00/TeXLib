@@ -81,16 +81,14 @@
 % ==============================================================================
 % 4. PAGE LAYOUT
 % ==============================================================================
+\RequirePackage{texlib-footer}   % shared footer: Course | page X of Y | Institution
 \setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\GetCourseShort\ \GetCourseTitle}
-\fancyhead[R]{Report~Card,~\GetReportDate}
-\fancyfoot[L]{Section\ \GetCourseSection}
-\fancyfoot[R]{\GetInstitution}
-\fancyfoot[C]{\thepage\ of \pageref{LastPage}}
-\renewcommand{\headrulewidth}{0.4pt}
-\renewcommand{\footrulewidth}{0.4pt}
+% Header: L = course short + title  C = (none)  R = term.
+\SetTeXLibHeader{\bfseries\GetCourseShort\ \GetCourseTitle}{}{\GetTerm}
+\SetTeXLibFooter
+\TeXLibRuleBleed                  % symmetric rule length, matching didactic
 
 % ==============================================================================
 % 5. TITLE BLOCKS

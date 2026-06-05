@@ -107,14 +107,21 @@
 % ==============================================================================
 % 5. PAGE LAYOUT
 % ==============================================================================
+\RequirePackage{texlib-footer}   % shared footer: Course | page X of Y | Institution
 \setlength{\headheight}{14pt}
-\pagestyle{fancyplain}
+\pagestyle{fancy}
 \fancyhf{}
-\fancyfoot[C]{\thepage\ of \pageref{LastPage}}
+% Header: L = short title  C = (none)  R = term.
+\SetTeXLibHeader{\bfseries\GetShortTitle}{}{\GetTerm}
+\SetTeXLibFooter
+\TeXLibRuleBleed                  % symmetric rule length, matching didactic
 
-\AtBeginDocument{%
-	\lhead{\fancyplain{}{\GetShortTitle}}%
-	\rhead{\fancyplain{}{\GetTerm}}%
+% Title page (\maketitle uses \thispagestyle{plain}): keep the shared footer,
+% suppress the header + its rule.
+\fancypagestyle{plain}{%
+	\fancyhf{}%
+	\SetTeXLibFooter
+	\renewcommand{\headrulewidth}{0pt}%
 }
 
 \renewcommand{\thefootnote}{\fnsymbol{footnote}}

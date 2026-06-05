@@ -39,4 +39,30 @@
 	\renewcommand{\footrulewidth}{0.4pt}%
 }
 
+% \SetTeXLibHeader{L}{C}{R} -- the header analog of \SetTeXLibFooter. Places the
+% three slots and the shared 0.4pt rule, so classes stop hand-writing
+% \fancyhead[L/C/R] + \headrulewidth. Content stays class-specific (the center
+% slot is usually \TeXLibBuildBadge from texlib-build); structure + rule are
+% centralized here. Call after \fancyhf{} and \pagestyle{fancy}.
+\newcommand{\SetTeXLibHeader}[3]{%
+	\fancyhead[L]{#1}%
+	\fancyhead[C]{#2}%
+	\fancyhead[R]{#3}%
+	\renewcommand{\headrulewidth}{0.4pt}%
+}
+
+% Symmetric rule bleed: widen the header AND footer rules by \texlibrulebleed
+% into BOTH margins, so every class's rules are the same length and symmetric
+% about the page midpoint, with the L/R slot text sitting flush at the rule
+% ends. The bleed equals the section hang (\texlibsectionhang = 24pt), so in
+% didactic the LEFT end lands exactly on the hung-heading line while the right
+% end mirrors it; the non-hang classes get the identical geometry (left bleed
+% into otherwise-empty margin). Keep this value in sync with \texlibsectionhang.
+% Call once, after \pagestyle{fancy}. (\fancyhfoffset adjusts head + foot
+% together.) didactic gets its bleed from texlib-sectionhang's [LR] offset
+% instead, so it must NOT also call \TeXLibRuleBleed.
+\newlength{\texlibrulebleed}
+\setlength{\texlibrulebleed}{24pt}
+\newcommand{\TeXLibRuleBleed}{\fancyhfoffset[LR]{\texlibrulebleed}}
+
 \endinput

@@ -8,39 +8,20 @@
 % Load the base class
 \LoadClass[11pt]{exam}
 
-% ==============================================================================
-% 1. PACKAGES
-% ==============================================================================
-% Core bundle: fontenc/lmodern/geometry, expl3/xparse/ifthen/etoolbox, xcolor,
-% amsmath/amssymb/amsthm/mathtools, texlib-mathutils, graphicx, tikz/pgfplots
-% (with compat=1.18 + arrows.meta/positioning/shapes.geometric libraries),
-% hyperref + canonical hypersetup.  Shared with quiz, didactic, pset, ...
-\RequirePackage{texlib-corepkg}
+% Shared assessment setup (texlib-corepkg, texlib-build, course-metadata, the
+% common aux packages, and the unified problem/part labels). Shared with quiz.
+\RequirePackage{texlib-assessment}
 
-% Class-specific packages
+% autoexam-only packages. enumitem is intentionally absent: it patches \list and
+% breaks exam.cls's questions/parts.
 \RequirePackage[export]{adjustbox}
-\RequirePackage{changepage}
-\RequirePackage{comment}
-% enumitem removed — known incompatibility with exam.cls (exam.cls defines
-% questions/parts as list environments; enumitem patches \list and breaks them)
-\RequirePackage{lastpage}
-\RequirePackage{needspace}
 \RequirePackage{subfigure}
-\RequirePackage{cancel}           % \cancel{} for crossing out terms in solutions
-% \RequirePackage{siunitx}  % unavailable on test server
-\RequirePackage{pdfpages}
 \RequirePackage[subfigure]{tocloft}
-% \RequirePackage{luacode} % Essential for the engine  % replaced by dofile in test env
 \RequirePackage{array}
 \RequirePackage{multirow}
 \RequirePackage{multicol}
 \RequirePackage[many]{tcolorbox}    % minimal-style solution box (matches didactic)
-\RequirePackage{environ} % For capturing solution bodies
-\RequirePackage{course-metadata} % Auto-loads coursemeta.tex from ancestor dirs
-
-% ==============================================================================
-% 2. CONFIGURATION & SETUP
-% ==============================================================================
+\RequirePackage{environ}            % capturing solution bodies
 
 % Extra TikZ libraries (corepkg already loads arrows.meta/positioning/shapes.geometric)
 \usetikzlibrary{datavisualization, datavisualization.formats.functions}
@@ -68,13 +49,9 @@
 }
 \fi
 
-% ==============================================================================
-% 3. BUILD MODES & FLAGS
-% ==============================================================================
-% Adopt the unified TeXLib build-flag CLI. \ifsolutions, \ifkey, \ifrubric,
-% \ifdraft, \ifstudent, \ifinstructor and the matching \Show.../\StudentMode
-% command-line toggles are all defined here.
-\RequirePackage{texlib-build}
+% texlib-build (loaded via texlib-assessment) provides \ifsolutions, \ifkey,
+% \ifrubric, \ifdraft, \ifstudent, \ifinstructor and the matching command-line
+% toggles.
 
 % Backward-compat aliases for autoexam's internal naming. Existing logic
 % (and downstream documents) using \if@autoexam@rubric / \@autoexam@rubrictrue
@@ -113,12 +90,9 @@
 % Source-level toggles \solutions, \keys, \rubrics, \drafts, \studentmode,
 % \instructormode are provided by texlib-build (loaded above).
 
-% ==============================================================================
-% 4. PROBLEM-BANK ENGINE (shared with quiz.cls)
-% ==============================================================================
 % texlib-problembank.sty loads problem_engine.lua and defines the shared
 % machinery: \setvar/\setrng/\calcvar/\get, \pick* commands, \getlist/\geti/
-% \foreachpick, \newproblem/\dupproblem, \begin{problem} environment,
+% \foreachpick, \begin{problem} environment,
 % \getproblem (+ aliases), \ppart, \@problem@item, \importproblem, and
 % \providecommand defaults for \workbox and \autoexam@problem@sep.  Quiz.cls
 % requires the same package; keeping the LaTeX glue in one place ensures the
@@ -126,19 +100,52 @@
 \RequirePackage{texlib-problembank}
 
 % \begin{problems} ... \end{problems}
-%   Drop-in replacement for {questions} that accepts \problem items.
-%   The {questions} environment is preserved for backward compat.
+%   The environment itself is defined once in texlib-problembank.sty (shared
+%   with quiz.cls).  autoexam supplies its page policy through the two hooks the
+%   shared environment calls:
 %
-%   On entry:
-%     - resets the page counter to 1 so Q1 lands on page 1
-%     - restores first-page and running header/footer slots (problem style)
-%     - initialises the inter-problem separator state (first on page = no rule)
-%     - patches \newpage to also reset the separator flag
+%   \problems@begin@hook (on entry):
+%     - a single-use guard (warns if {problems} is opened twice in one version)
+%     - \clearpage, then resets the page counter to 1 so Q1 lands on "page 1"
+%     - restores the problem-style first-page and running header/footer slots
 %
-%   On exit:
+%   \problems@end@hook (on exit):
 %     - places \label{@lastqpage} on the last problem page (read by the "X of N"
 %       footer once \blankpage ships that page)
-\newenvironment{problems}{%
+%
+%   The shared environment handles the parts common to both classes: the
+%   inter-problem separator flag, the \newpage patch, opening {questions}, and
+%   swapping \problem <-> \@problem@item.
+
+% \@problems@lastver: the \theExamVersion under which {problems} was last
+% opened.  Empty until first use; consulted by the single-use guard below.
+\gdef\@problems@lastver{}
+
+\renewcommand{\problems@begin@hook}{%
+	% ---- single-use guard ----------------------------------------------------
+	% {problems} resets the page counter and issues \clearpage on entry, so it
+	% is designed to wrap the entire problem section ONCE per version.  Opening
+	% it again under the same version orphans the preceding heading onto its own
+	% page and restarts the "X of N" footer.  Compare against \theExamVersion so
+	% the per-version replay of a correct multi-version exam stays silent (the
+	% engine re-inputs the body once per version, each with a new \theExamVersion).
+	\edef\@problems@curver{\theExamVersion}%
+	\ifx\@problems@curver\@problems@lastver
+		\ClassWarning{autoexam}{%
+			Two or more {problems} environments in version
+			"\@problems@curver".\MessageBreak
+			{problems} is single-use: it issues \string\clearpage\space and
+			resets the\MessageBreak
+			page counter on entry, orphaning any preceding heading and\MessageBreak
+			restarting the page footer.  Use ONE {problems} block with\MessageBreak
+			\string\section* / \string\subsection* headings inside it and
+			\string\newpage\MessageBreak
+			between groups (see template.tex or Math 127 exam1.tex).\MessageBreak
+			Reported%
+		}%
+	\else
+		\global\let\@problems@lastver\@problems@curver
+	\fi
 	% ---- ship any pending page (e.g. pre-problem scratch page from \blankpage) -
 	\clearpage
 	% ---- page counter & header/footer ----------------------------------------
@@ -147,8 +154,8 @@
 	% Restore those slots to match the running header so Q1 looks identical to
 	% every subsequent problem page.
 	%
-	% IMPORTANT: \begin{problems} opens a LaTeX environment group (\begingroup).
-	% Any \def here is LOCAL and reverts when \end{problems} closes the group.
+	% IMPORTANT: this hook runs inside the {problems} environment group, so a
+	% plain \def here is LOCAL and reverts when \end{problems} closes the group.
 	% The last problem page and the \scorepage both ship AFTER the group closes,
 	% so their headers/footers must be set with \global (\gdef / \global\def).
 	% First-page slots (\@lhead etc.) are only needed for Q1, which ships via
@@ -165,23 +172,9 @@
 	\global\def\run@cfoot{%
 		\thepage\ of\ \@ifundefined{r@@lastqpage}{\numpages}{\pageref*{@lastqpage}}%
 	}%
-	% ---- inter-problem separator ---------------------------------------------
-	% First problem on each page gets no rule; subsequent problems get a rule above.
-	\directlua{pbank_first_on_page = true}%
-	% Patch \newpage so crossing a page boundary resets the "first on page" flag.
-	\let\@problems@saved@newpage\newpage
-	\renewcommand{\newpage}{%
-		\@problems@saved@newpage
-		\directlua{pbank_first_on_page = true}%
-	}%
-	% ---- start questions list -----------------------------------------------
-	\begin{questions}%
-	\let\@saved@problem\problem
-	\let\problem\@problem@item
-}{%
-	\let\problem\@saved@problem
-	\let\newpage\@problems@saved@newpage
-	\end{questions}%
+}
+
+\renewcommand{\problems@end@hook}{%
 	% Place the label on the last problem page.  \blankpage (which follows) ships
 	% that page via \clearpage, recording the correct page number for "X of N".
 	\label{@lastqpage}%
@@ -193,69 +186,72 @@
 
 % \shufflepages
 %   Declared in the PREAMBLE alongside \examversions.  When present, the Lua
-%   version loop splits the \begin{problems}...\end{problems} body on each
-%   top-level \newpage (treating them as page-group separators), shuffles the
-%   groups independently per version using that version's RNG seed, and writes
-%   a per-version temp file before TeX processes any tokens.  No changes to
-%   the exam body are needed — \newpage continues to serve as the separator
-%   exactly as it did before.
+%   version loop reorders the questions inside \begin{problems}...\end{problems}
+%   independently per version (seeded by that version) and writes a per-version
+%   temp file before TeX processes any tokens.  The shuffle is SECTION-AWARE:
+%   \section / \section* headers are hard boundaries kept in their original
+%   order with the header fixed at the top, and questions are permuted only
+%   within their own section.  The per-page question counts you authored (the
+%   \newpage layout) are preserved, and \extracredit stays last.  No exam-body
+%   changes are needed — author one canonical order and let each version shuffle.
 \newcommand{\shufflepages}{%
 	\directlua{set_autoexam_shuffle_pages()}%
 }
 
+% Multiple-choice option shuffling (used with \shufflepages).  Authors write the
+% exam-class \begin{choices}/\begin{oneparchoices} with \choice/\CorrectChoice;
+% the Lua shuffler reorders the options per version (\CorrectChoice travels with
+% its option, so the key auto-follows).  These definitions make the pinning
+% markers compile in EVERY build mode (with or without shuffle):
+%   \fixedchoice            -- an option the shuffler pins in place ("None of
+%                              the above"); renders exactly like \choice.
+%   \begin{choices}[fixed]  -- keep this block in authored order (ordered
+%                              numeric answers); the [..] tag is read by the
+%                              shuffler and ignored at render time.
+\newcommand{\fixedchoice}{\choice}
+\let\@ax@choices\choices            \let\@ax@endchoices\endchoices
+\renewenvironment{choices}[1][]{\@ax@choices}{\@ax@endchoices}
+\@ifundefined{oneparchoices}{}{%
+	\let\@ax@opc\oneparchoices      \let\@ax@endopc\endoneparchoices
+	\renewenvironment{oneparchoices}[1][]{\@ax@opc}{\@ax@endopc}%
+}
+
 % \byversion{A content}{B content}{C content}
-%   Selects and typesets the argument matching the current \theExamVersion.
-%   Uses \csname dispatch to avoid \ifx long-macro comparison pitfalls.
+%   Three-version convenience: typesets the argument matching the current
+%   \theExamVersion (A/B/C).  Versioning is NOT limited to three — the version
+%   loop, \shufflepages, and seeding all handle any number of versions.  This
+%   command is just the 3-arg shorthand; for a version beyond C it falls back to
+%   the A argument (its question ORDER still varies via \shufflepages).  For
+%   version-specific content at any number of versions, use \vercase.
 \long\def\@byv@A#1#2#3{#1}
 \long\def\@byv@B#1#2#3{#2}
 \long\def\@byv@C#1#2#3{#3}
 \newcommand{\byversion}[3]{%
-	\csname @byv@\theExamVersion\endcsname{#1}{#2}{#3}%
+	\ifcsname @byv@\theExamVersion\endcsname
+		\csname @byv@\theExamVersion\endcsname{#1}{#2}{#3}%
+	\else
+		#1%
+	\fi
+}
+% \vercase{ver}{content}
+%   Typeset content only when the current version equals ver (any version label).
+%   Composes for any number of versions:
+%     \vercase{A}{...}\vercase{B}{...}\vercase{D}{...}
+\newcommand{\vercase}[2]{%
+	\edef\@vc@cur{\theExamVersion}%
+	\edef\@vc@want{#1}%
+	\ifx\@vc@cur\@vc@want #2\fi
 }
 
 % \importproblem is provided by texlib-problembank.sty.
 
 % --- Initialization ---
 
-% Seed RNG and auto-load any course-level banks at document start.
+% Seed the per-version RNG, then auto-load any course-level bank (the bank
+% resolution itself is shared — see \pbank@load@coursebank in texlib-problembank).
 \AtBeginDocument{%
 	\directlua{set_exam_seed('\theExamVersion')}%
-	% Auto-load bank declared in coursemeta.tex (bank-path key).
-	% Resolution order:
-	%   1. literal \GetBankPath as-is (document-relative — back-compat with
-	%      legacy bank-path values authored for a specific document depth);
-	%   2. \GetCourseMetaDir\GetBankPath (coursemeta-relative — the
-	%      preferred convention, depth-agnostic);
-	%   3. fall through to \loadbank{\GetBankPath} so \input raises the
-	%      familiar "I can't find file" error if neither resolves.
-	\@ifundefined{GetBankPath}{}{%
-		\edef\@tmpbankpath{\GetBankPath}%
-		\ifx\@tmpbankpath\empty\else
-			\IfFileExists{\@tmpbankpath}{%
-				\loadbank{\@tmpbankpath}%
-			}{%
-				\@ifundefined{GetCourseMetaDir}{%
-					\loadbank{\@tmpbankpath}%
-				}{%
-					\edef\@tmpbankresolved{\GetCourseMetaDir\@tmpbankpath}%
-					\IfFileExists{\@tmpbankresolved}{%
-						\loadbank{\@tmpbankresolved}%
-					}{%
-						\loadbank{\@tmpbankpath}%
-					}%
-				}%
-			}%
-		\fi
-	}%
-	% Auto-load bank.tex from the document's own directory, if present.
-	% \IfFileExists consults TEXINPUTS, so a recursive TeXLib// entry can
-	% match a stray sample bank shipped with the library and silently load
-	% the wrong file.  Probe the literal CWD via LuaFileSystem instead.
-	\directlua{%
-		if lfs.attributes('bank.tex', 'mode') == 'file' then
-			tex.print('\string\\loadbank{bank.tex}')
-		end
-	}%
+	\pbank@load@coursebank
 }
 
 % Version loop hook — fires at the very end of \begin{document} setup,
@@ -270,10 +266,6 @@
 	% confusing "incomplete \ifx" warning.
 	\directlua{autoexam_run_versions()}%
 }
-
-% ==============================================================================
-% 5. ENVIRONMENTS (Solution & Key)
-% ==============================================================================
 
 % ---------------------------------------------------------------------------
 % Internal rubric-overlay machinery
@@ -438,10 +430,6 @@
 	\fi
 }
 
-% ==============================================================================
-% 6. SMART COLUMNS & SEPARATORS (Your Original Logic)
-% ==============================================================================
-
 % Horizontal Separator
 \newcommand{\qsep}{%
 	\par\vspace{1em}
@@ -548,10 +536,6 @@
 	\par
 }
 
-% ==============================================================================
-% 7. METADATA & CUSTOM COMMANDS
-% ==============================================================================
-
 % --- Document-specific metadata: set via \renewcommand in each .tex file ---
 \newcommand{\theExamNumber}{\todo}
 \newcommand{\theExamDate}{\todo}
@@ -560,9 +544,7 @@
 % Course-metadata aliases (\theCourseNumber, \theCourseTitle, \theCourseSection,
 % \theSeason, \theYear, \theSchool, ...) are provided by course-metadata.sty
 % as \providecommand's, so individual documents may \renewcommand them.
-
-\renewcommand{\questionlabel}{\textbf{Problem \thequestion.}}
-\renewcommand{\partlabel}{\textbf{\thequestion\thepartno.}}
+% \questionlabel / \partlabel are set in texlib-assessment (shared with quiz).
 
 % Top-level enumerate: bold lowercase-roman labels (i., ii., iii., ...).
 % enumitem is intentionally NOT loaded in this class (see section 1 — it
@@ -580,10 +562,6 @@
 
 % Theorem environments come from texlib-thmenv.sty (shared with quiz.cls).
 \RequirePackage{texlib-thmenv}
-
-% ==============================================================================
-% 7b. EXAM SETUP INTERFACE
-% ==============================================================================
 
 % \@autoexam@instructions@file: path (without .tex) of the instructions file
 %   loaded into the cover-page box.  Override via \examsetup{instructions-file=…}
@@ -651,10 +629,6 @@
 	\null
 }
 
-% ==============================================================================
-% 7c. GRAPH COMMAND
-% ==============================================================================
-
 % \graph[options]{xmin}{xmax}{ymin}{ymax}
 %   Draws a coordinate-plane grid: dashed help lines, axis arrows with labels,
 %   and tick marks at every integer.  One TikZ unit = 1 cm, so the axis ranges
@@ -709,10 +683,6 @@
 		}%
 	\end{tikzpicture}%
 }
-
-% ==============================================================================
-% 7d. RUBRIC & WORKBOX SYSTEM
-% ==============================================================================
 
 % \workbox{n}  — proportional answer space, equivalent to \vspace{\stretch{n}}.
 %   Semantically marks an intentional student answer area.  The stretch factor n
@@ -792,10 +762,6 @@
 	\fi
 }
 
-% ==============================================================================
-% 7e. SCORE PAGE
-% ==============================================================================
-
 % \scorepage[max_rows]  — auto-generated instructor score sheet.
 %   Place after \maketitle (before \blankpage and \begin{problems}).
 %   Point data is read directly from the \problem calls in the document
@@ -817,22 +783,21 @@
 	\directlua{autoexam_scorepage(#1)}%
 }
 
-% ==============================================================================
-% 8. PAGE LAYOUT & TITLE PAGE (Your Original Logic)
-% ==============================================================================
 % texlib-pagestyle.sty bundles \pagestyle{headandfoot} + first-page-footer
 % rule + running head/foot rules into one call.  Identical boilerplate is
 % used by quiz.cls.
 \RequirePackage{texlib-pagestyle}
 \SetTeXLibExamRules
-\firstpagefooter{Section \theCourseSection}{}{\theSchool}
-\runningheader{Math \theCourseNumber\ \theCourseTitle}{}{Exam \theExamNumber}
 % Center footer shows "X of N" where N = last problem page via \label{@lastqpage}
 % (placed by \blankpage on first call).  Falls back to \numpages until that label
 % exists, and for exams without \blankpage at the end.
-\runningfooter{Section \theCourseSection}{%
+\firstpagefooter{\GetCourse}{%
 	\thepage\ of\ \@ifundefined{r@@lastqpage}{\numpages}{\pageref*{@lastqpage}}%
-}{\theSchool}
+}{\GetInstitution}
+\runningheader{Math \theCourseNumber\ \theCourseTitle}{}{Exam \theExamNumber}
+\runningfooter{\GetCourse}{%
+	\thepage\ of\ \@ifundefined{r@@lastqpage}{\numpages}{\pageref*{@lastqpage}}%
+}{\GetInstitution}
 
 \renewcommand{\maketitle}{%
 	% ---- suppress header/footer on the title page ----------------------------
