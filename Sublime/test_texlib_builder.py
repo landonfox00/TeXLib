@@ -15,6 +15,7 @@ test steps cover the Sublime wiring.
 Run:  python test_texlib_builder.py     (exit code = number of failures)
 """
 
+import hashlib
 import os
 import sys
 import types
@@ -69,17 +70,24 @@ from texlib_builder import TexlibBuilder  # noqa: E402
 
 # --- 2. Harness ------------------------------------------------------------
 
-def run_builder(doc_src, options=None, engine="pdflatex"):
+def run_builder(doc_src, options=None, engine="pdflatex", aux_files=None):
     """Build a TexlibBuilder over a synthetic document; return (commands, display).
 
     `commands` is the list of (command_list, message) tuples the builder would
     run. We feed exit status 0 back for every command (so no rerun fires, since
     self.out is empty).
+
+    `aux_files` (optional) maps filename -> contents to pre-create in the tex
+    dir before building -- used to exercise the biber change-detection path
+    (e.g. a doc.bcf / doc.bbl / doc.bcf.texlibhash trio).
     """
     tmp = tempfile.mkdtemp(prefix="texlib_bt_")
     tex_path = os.path.join(tmp, "doc.tex")
     with open(tex_path, "w", encoding="utf-8") as fh:
         fh.write(doc_src)
+    for name, contents in (aux_files or {}).items():
+        with open(os.path.join(tmp, name), "w", encoding="utf-8") as fh:
+            fh.write(contents)
 
     b = TexlibBuilder()
     b.tex_root = tex_path
@@ -100,6 +108,85 @@ def run_builder(doc_src, options=None, engine="pdflatex"):
     except StopIteration:
         pass
     return cmds, getattr(b, "_displayed", "")
+
+
+def drive_builder(doc_src, options=None, engine="pdflatex",
+                  seed_files=None, steps=None):
+    """Drive commands() with a scripted side-effect timeline -> (cmds, disp, tmp).
+
+    run_builder feeds empty output, so the biber/rerun branches never fire. This
+    harness instead simulates a real multi-pass build so those branches execute
+    and the FULL command sequence can be asserted:
+
+      seed_files : {name: contents} written to the tex dir BEFORE the build,
+                   to mimic artifacts a previous build left behind
+                   (e.g. a doc.bbl + doc.bcf.texlibhash that lets biber skip).
+      steps      : list aligned to the yielded commands. steps[i] is applied
+                   AFTER the i-th command is yielded and BEFORE the next send(),
+                   so it models what that command "did":
+                     {"out":    "<engine output the builder will inspect>",
+                      "write":  {name: contents},  # aux files the pass created
+                      "remove": [names]}           # aux files it deleted
+                   Entries past the end of the list default to clean output
+                   (out="") with no file changes.
+
+    The builder reads biber state from the filesystem (.bcf/.bbl/.texlibhash in
+    the tex dir, since no aux_directory is set) and rerun state from self.out --
+    both of which this harness controls per step.
+    """
+    tmp = tempfile.mkdtemp(prefix="texlib_sim_")
+    tex_path = os.path.join(tmp, "doc.tex")
+    with open(tex_path, "w", encoding="utf-8") as fh:
+        fh.write(doc_src)
+    for name, contents in (seed_files or {}).items():
+        with open(os.path.join(tmp, name), "w", encoding="utf-8") as fh:
+            fh.write(contents)
+
+    b = TexlibBuilder()
+    b.tex_root = tex_path
+    b.tex_name = "doc.tex"
+    b.base_name = "doc"
+    b.tex_dir = tmp
+    b.engine = engine
+    b.options = list(options or [])
+    b.out = ""
+
+    steps = steps or []
+
+    def apply(i):
+        step = steps[i] if i < len(steps) else {}
+        for name in step.get("remove", []):
+            try:
+                os.remove(os.path.join(tmp, name))
+            except OSError:
+                pass
+        for name, contents in step.get("write", {}).items():
+            with open(os.path.join(tmp, name), "w", encoding="utf-8") as fh:
+                fh.write(contents)
+        b.out = step.get("out", "")
+
+    cmds = []
+    gen = b.commands()
+    try:
+        item = next(gen)
+        i = 0
+        while True:
+            cmds.append(item)
+            apply(i)
+            i += 1
+            item = gen.send(0)
+    except StopIteration:
+        pass
+    return cmds, getattr(b, "_displayed", ""), tmp
+
+
+def heads(cmds):
+    """The first token (engine name or 'biber') of each yielded command."""
+    return [c[0][0] for c in cmds]
+
+
+def _md5(s):
+    return hashlib.md5(s.encode("utf-8")).hexdigest()
 
 
 _PASS = 0
@@ -175,6 +262,9 @@ def main():
     check("allversions -> \\def\\Version{A} in first build",
           bool(cmds) and r"\def\Version{A}" in cmds[0][0][-1],
           cmds[0][0][-1] if cmds else "")
+    check("allversions -> \\input{doc_A.tex} (per-version source copy)",
+          bool(cmds) and r"\input{doc_A.tex}" in cmds[0][0][-1],
+          cmds[0][0][-1] if cmds else "")
 
     # (g) \examversions alias also parsed
     cmds, _ = run_builder(
@@ -200,6 +290,78 @@ def main():
     check("unknown mode -> no macro injected (plain filename)",
           bool(cmds) and cmds[0][0][-1] == "doc.tex", cmds)
     check("unknown mode -> warning shown", "unknown build mode" in disp, repr(disp))
+
+    # (j2) quick mode -> exactly one engine pass, plain filename, no biber even
+    # when a .bcf is present, no mode macro.
+    cmds, disp = run_builder(
+        r"\documentclass{article}\begin{document}x\end{document}",
+        options=["--texlib-mode=quick"],
+        aux_files={"doc.bcf": "<bcf/>"})  # would trigger biber in a normal build
+    check("quick -> exactly one build", len(cmds) == 1, f"{len(cmds)} builds")
+    check("quick -> plain filename arg, no mode macro",
+          bool(cmds) and cmds[0][0][-1] == "doc.tex", cmds)
+    check("quick -> no biber despite .bcf present",
+          not any(c[0][0] == "biber" for c in cmds), cmds)
+    check("quick -> single-pass message shown",
+          bool(cmds) and "quick" in cmds[0][1], cmds[0][1] if cmds else "")
+
+    # (j3) biber change-detection
+    BCF = "<bcf>cite-keys</bcf>"
+    BCF_HASH = hashlib.md5(BCF.encode("utf-8")).hexdigest()
+
+    #   first build: .bcf present, no .bbl yet -> biber runs + forced re-pass
+    cmds, _ = run_builder(
+        r"\documentclass{article}\begin{document}x\end{document}",
+        aux_files={"doc.bcf": BCF})
+    biber_cmds = [c for c in cmds if c[0][0] == "biber"]
+    check("biber: fresh .bcf, no .bbl -> biber runs", len(biber_cmds) == 1, cmds)
+    check("biber: fresh .bcf -> forced post-biber re-pass (3 cmds)",
+          len(cmds) == 3, f"{len(cmds)} cmds")
+
+    #   unchanged rebuild: .bcf + matching .bbl + hash -> biber skipped
+    cmds, _ = run_builder(
+        r"\documentclass{article}\begin{document}x\end{document}",
+        aux_files={"doc.bcf": BCF, "doc.bbl": "...", "doc.bcf.texlibhash": BCF_HASH})
+    check("biber: unchanged .bcf -> biber skipped (1 cmd)",
+          len(cmds) == 1 and not any(c[0][0] == "biber" for c in cmds),
+          f"{len(cmds)} cmds")
+
+    #   changed citations: .bbl present but stale hash -> biber re-runs
+    cmds, _ = run_builder(
+        r"\documentclass{article}\begin{document}x\end{document}",
+        aux_files={"doc.bcf": BCF, "doc.bbl": "...", "doc.bcf.texlibhash": "stale"})
+    check("biber: changed .bcf (stale hash) -> biber re-runs",
+          any(c[0][0] == "biber" for c in cmds), cmds)
+
+    # (j4) _force_remove deletes a Hidden file (the synctex copy-back / decompress
+    # fix: open('wb')/copy2 over a hidden file is Errno 13 on Windows).
+    tmp = tempfile.mkdtemp(prefix="texlib_fr_")
+    hidden = os.path.join(tmp, "hidden.synctex")
+    with open(hidden, "w", encoding="utf-8") as fh:
+        fh.write("x")
+    if os.name == "nt":
+        import ctypes
+        ctypes.windll.kernel32.SetFileAttributesW(hidden, 0x2)  # FILE_ATTRIBUTE_HIDDEN
+    TexlibBuilder._force_remove(hidden)
+    check("_force_remove: hidden file is deleted", not os.path.exists(hidden), hidden)
+    TexlibBuilder._force_remove(hidden)  # idempotent: no error when absent
+    check("_force_remove: no-op when file already gone", not os.path.exists(hidden))
+
+    # (j5) rerun detection recognizes every "run LaTeX again" signal, but NOT a
+    # bare undefined-reference warning (which may never resolve -> avoid looping
+    # to MAX_RERUNS on a genuinely-missing label).
+    rb = TexlibBuilder()
+    rerun_cases = [
+        ("Label(s) may have changed. Rerun to get cross-references right.", True),
+        ("Package biblatex Warning: Please rerun LaTeX.", True),
+        ("Package rerunfilecheck Warning: Rerun to get outlines right.", True),
+        ("LaTeX Warning: There were undefined references.", False),
+        ("Output written. No warnings.", False),
+    ]
+    for msg, want in rerun_cases:
+        rb.out = msg
+        check(f"rerun-detect: {msg[:34]!r} -> {want}",
+              rb._needs_another_run() == want, msg)
 
     # (k) schedule .schedmap -> synctex.gz rewrite
     import gzip
@@ -329,6 +491,267 @@ def main():
     b._rewrite_synctex_for_schedmap(tmp4, tmp4, base)
     check("schedmap rewrite: warns when .synctex.gz is missing",
           "no .synctex.gz" in b._displayed, b._displayed)
+
+    # ====================================================================== #
+    # (o) Multi-pass orchestration sequences (simulation harness).
+    #     These exercise the biber + rerun branches end-to-end by scripting
+    #     the per-pass output and the aux files each pass produces.
+    # ====================================================================== #
+    ART = r"\documentclass{article}\begin{document}x\end{document}"
+    RERUN = "Label(s) may have changed. Rerun to get cross-references right."
+
+    # No bibliography, clean first pass -> exactly one engine run, no biber.
+    cmds, _, _ = drive_builder(ART)
+    check("seq: plain + clean -> 1 pass, no biber",
+          heads(cmds) == ["pdflatex"], heads(cmds))
+
+    # Cross-ref churn: rerun signal once, then clean -> two passes.
+    cmds, _, _ = drive_builder(ART, steps=[{"out": RERUN}, {"out": ""}])
+    check("seq: rerun signal then clean -> 2 passes",
+          heads(cmds) == ["pdflatex", "pdflatex"], heads(cmds))
+
+    # Persistent rerun signal -> capped at MAX_RERUNS (3) passes, never looping.
+    cmds, _, _ = drive_builder(ART, steps=[{"out": RERUN}] * 6)
+    check("seq: persistent rerun -> capped at 3 passes",
+          heads(cmds) == ["pdflatex"] * 3, f"{len(cmds)} passes")
+
+    # biblatex 'Please rerun LaTeX' is honored (the bug that shipped ?? refs).
+    cmds, _, _ = drive_builder(
+        ART, steps=[{"out": "Package biblatex Warning: Please rerun LaTeX."},
+                    {"out": ""}])
+    check("seq: 'Please rerun LaTeX' triggers another pass",
+          heads(cmds) == ["pdflatex", "pdflatex"], heads(cmds))
+
+    # Fresh bibliography: pass1 emits .bcf, biber runs, post-biber pass needs a
+    # further rerun, then settles -> run, biber, run, run. Hash gets recorded.
+    BCF = "<bcf>v1</bcf>"
+    cmds, _, tmp = drive_builder(
+        ART,
+        steps=[
+            {"write": {"doc.bcf": BCF}},                 # pass 1 wrote the .bcf
+            {"write": {"doc.bbl": "bbl-v1"}},            # biber wrote the .bbl
+            {"out": "Package biblatex Warning: Please rerun LaTeX."},
+            {"out": ""},
+        ])
+    check("seq: fresh bib -> run, biber, run, run",
+          heads(cmds) == ["pdflatex", "biber", "pdflatex", "pdflatex"], heads(cmds))
+    check("seq: fresh bib -> .bcf hash recorded for next build",
+          os.path.exists(os.path.join(tmp, "doc.bcf.texlibhash")))
+
+    # The post-biber re-pass is unconditional (needed to read the new .bbl) even
+    # if pass 1 reported nothing -> run, biber, run (then stops, output clean).
+    cmds, _, _ = drive_builder(
+        ART,
+        steps=[{"write": {"doc.bcf": BCF}}, {"write": {"doc.bbl": "b"}}, {"out": ""}])
+    check("seq: biber always forces one post-biber pass",
+          heads(cmds) == ["pdflatex", "biber", "pdflatex"], heads(cmds))
+
+    # Unchanged rebuild: .bcf + matching .bbl + hash already present -> biber and
+    # its re-pass are BOTH skipped. This is the headline optimization.
+    cmds, _, _ = drive_builder(
+        ART,
+        seed_files={"doc.bcf": BCF, "doc.bbl": "bbl-v1",
+                    "doc.bcf.texlibhash": _md5(BCF)},
+        steps=[{"out": ""}])
+    check("seq: unchanged bib rebuild -> 1 pass, biber skipped",
+          heads(cmds) == ["pdflatex"], heads(cmds))
+
+    # Changed citations: stale hash -> biber re-runs even though a .bbl exists.
+    cmds, _, _ = drive_builder(
+        ART,
+        seed_files={"doc.bcf": "<bcf>v2</bcf>", "doc.bbl": "bbl-v1",
+                    "doc.bcf.texlibhash": _md5("<bcf>v1</bcf>")},
+        steps=[{"out": ""}, {"out": ""}])
+    check("seq: changed bib rebuild -> biber re-runs",
+          "biber" in heads(cmds), heads(cmds))
+
+    # biber + a bare undefined-references warning (no rerun hint) -> the loop
+    # stops after the post-biber pass instead of churning to MAX_RERUNS.
+    cmds, _, _ = drive_builder(
+        ART,
+        steps=[{"write": {"doc.bcf": BCF}}, {"write": {"doc.bbl": "b"}},
+               {"out": "LaTeX Warning: There were undefined references."},
+               {"out": ""}])
+    check("seq: biber + bare undefined-refs -> no extra pass",
+          heads(cmds) == ["pdflatex", "biber", "pdflatex"], heads(cmds))
+
+    # allversions: biber gating is per-version. Seed version A as up-to-date
+    # (skips biber); version B is fresh (runs biber). MAX_RERUNS is per version.
+    DOCV = r"\documentclass{autoexam}\versions{A,B}\begin{document}x\end{document}"
+    cmds, _, _ = drive_builder(
+        DOCV, options=["--texlib-mode=allversions"], engine="lualatex",
+        seed_files={"doc_A.bcf": "<a>", "doc_A.bbl": "ba",
+                    "doc_A.bcf.texlibhash": _md5("<a>")},
+        steps=[
+            {"out": ""},                          # A pass 1: A is current -> skip
+            {"write": {"doc_B.bcf": "<b>"}},      # B pass 1 wrote its .bcf
+            {"write": {"doc_B.bbl": "bb"}},       # B biber wrote .bbl
+            {"out": ""},                          # B post-biber pass clean
+        ])
+    check("seq: allversions per-version biber -> A skipped, B ran",
+          heads(cmds) == ["lualatex", "lualatex", "biber", "lualatex"], heads(cmds))
+    biber_cmd = next((c for c in cmds if c[0][0] == "biber"), None)
+    check("seq: allversions biber targets version B's jobname",
+          biber_cmd is not None and any("doc_B" in str(a) for a in biber_cmd[0]),
+          biber_cmd)
+
+    # ====================================================================== #
+    # (p) biber change-detection helpers, exercised directly.
+    # ====================================================================== #
+    tmpc = tempfile.mkdtemp(prefix="texlib_cache_")
+    bc = TexlibBuilder()
+    bc.tex_dir = tmpc
+    bc._aux_target = None
+    check("cache: nothing present -> not current", not bc._biber_is_current("doc"))
+    with open(os.path.join(tmpc, "doc.bcf"), "w") as fh:
+        fh.write("X")
+    check("cache: .bcf only (no .bbl) -> not current",
+          not bc._biber_is_current("doc"))
+    with open(os.path.join(tmpc, "doc.bbl"), "w") as fh:
+        fh.write("b")
+    check("cache: .bcf+.bbl but no hash -> not current",
+          not bc._biber_is_current("doc"))
+    bc._record_biber_hash("doc")
+    check("cache: after record_biber_hash -> current",
+          bc._biber_is_current("doc"))
+    with open(os.path.join(tmpc, "doc.bcf"), "w") as fh:
+        fh.write("Y")  # citations changed
+    check("cache: .bcf changed -> not current",
+          not bc._biber_is_current("doc"))
+
+    # The fingerprint also tracks .bib datasource CONTENTS, so fixing a typo in
+    # a bibliography entry (without touching a \cite) invalidates the cache.
+    tmpb = tempfile.mkdtemp(prefix="texlib_bibdep_")
+    bb = TexlibBuilder()
+    bb.tex_dir = tmpb
+    bb._aux_target = None
+    with open(os.path.join(tmpb, "doc.bcf"), "w", encoding="utf-8") as fh:
+        fh.write('<bcf:datasource type="file">refs.bib</bcf:datasource>')
+    with open(os.path.join(tmpb, "doc.bbl"), "w", encoding="utf-8") as fh:
+        fh.write("b")
+    with open(os.path.join(tmpb, "refs.bib"), "w", encoding="utf-8") as fh:
+        fh.write("@article{k, title={A}}")
+    bb._record_biber_hash("doc")
+    check("bibdep: after record -> current", bb._biber_is_current("doc"))
+    with open(os.path.join(tmpb, "refs.bib"), "w", encoding="utf-8") as fh:
+        fh.write("@article{k, title={B}}")  # edited .bib, same cite key
+    check("bibdep: editing .bib invalidates the cache",
+          not bb._biber_is_current("doc"))
+
+    # An unresolvable datasource -> conservatively NOT current (re-run biber).
+    tmpu = tempfile.mkdtemp(prefix="texlib_bibmiss_")
+    bu = TexlibBuilder()
+    bu.tex_dir = tmpu
+    bu._aux_target = None
+    with open(os.path.join(tmpu, "doc.bcf"), "w", encoding="utf-8") as fh:
+        fh.write('<bcf:datasource type="file">nowhere.bib</bcf:datasource>')
+    with open(os.path.join(tmpu, "doc.bbl"), "w", encoding="utf-8") as fh:
+        fh.write("b")
+    with open(os.path.join(tmpu, "doc.bcf.texlibhash"), "w", encoding="utf-8") as fh:
+        fh.write("anything")
+    check("bibdep: unresolvable .bib -> not current (safe re-run)",
+          not bu._biber_is_current("doc"))
+    with open(os.path.join(tmpu, "extra.bib"), "w", encoding="utf-8") as fh:
+        fh.write("x")
+    check("bibdep: datasource resolved with added .bib extension",
+          bu._resolve_datasource("extra") is not None)
+    check("bibdep: datasource resolved by exact name",
+          bu._resolve_datasource("extra.bib") is not None)
+    check("bibdep: genuinely missing datasource -> None",
+          bu._resolve_datasource("ghost.bib") is None)
+
+    # ====================================================================== #
+    # (q) biber command construction (aux-directory routing).
+    # ====================================================================== #
+    bcmd = TexlibBuilder()
+    bcmd.tex_dir = os.path.join(tempfile.gettempdir(), "texlib_q_src")
+    bcmd._aux_target = None
+    check("biber-cmd: no aux routing -> ['biber', jobname]",
+          bcmd._biber_command("doc") == ["biber", "doc"],
+          bcmd._biber_command("doc"))
+    bcmd._aux_target = os.path.join(tempfile.gettempdir(), "texlib_q_aux")
+    qcmd = bcmd._biber_command("doc")
+    check("biber-cmd: aux routing -> --input/--output-directory + jobname",
+          qcmd[0] == "biber" and qcmd[-1] == "doc"
+          and any(str(a).startswith("--input-directory=") for a in qcmd)
+          and any(str(a).startswith("--output-directory=") for a in qcmd),
+          qcmd)
+
+    # ====================================================================== #
+    # (r) aux_directory resolution.
+    # ====================================================================== #
+    ab = TexlibBuilder()
+    ab.tex_root = os.path.join(tempfile.gettempdir(), "proj", "doc.tex")
+    proj = os.path.join(tempfile.gettempdir(), "proj")
+    ab.aux_directory = ""
+    check("aux-dir: empty -> None (routing disabled)",
+          ab._resolve_aux_directory(proj) is None)
+    ab.aux_directory = "<<root>>"
+    check("aux-dir: <<root>> -> None", ab._resolve_aux_directory(proj) is None)
+    ab.aux_directory = "<<temp>>"
+    tdir = ab._resolve_aux_directory(proj)
+    check("aux-dir: <<temp>> -> existing temp subdir",
+          bool(tdir) and os.path.isdir(tdir), tdir)
+    abs_dir = os.path.join(tempfile.gettempdir(), "texlib_abs_aux")
+    ab.aux_directory = abs_dir
+    check("aux-dir: absolute path passed through",
+          ab._resolve_aux_directory(proj) == abs_dir,
+          ab._resolve_aux_directory(proj))
+    ab.aux_directory = "build"
+    check("aux-dir: relative path joined onto tex dir",
+          ab._resolve_aux_directory(proj) == os.path.normpath(
+              os.path.join(proj, "build")),
+          ab._resolve_aux_directory(proj))
+
+    # ====================================================================== #
+    # (s) _force_remove also clears a ReadOnly file (the other Errno-13 cause).
+    # ====================================================================== #
+    tmpr = tempfile.mkdtemp(prefix="texlib_ro_")
+    ro = os.path.join(tmpr, "doc.synctex")
+    with open(ro, "w") as fh:
+        fh.write("x")
+    os.chmod(ro, 0o444)  # read-only
+    TexlibBuilder._force_remove(ro)
+    check("_force_remove: read-only file is deleted", not os.path.exists(ro), ro)
+
+    # ====================================================================== #
+    # (t) per-version source copy: autoexam reads its body from <jobname>.tex,
+    #     so allversions stages a copy named to match the jobname -- which is
+    #     what makes \shufflepages work under a distinct jobname.
+    # ====================================================================== #
+    tmpv = tempfile.mkdtemp(prefix="texlib_vsrc_")
+    with open(os.path.join(tmpv, "doc.tex"), "w", encoding="utf-8") as fh:
+        fh.write("body")
+    vb = TexlibBuilder()
+    vb.tex_name = "doc.tex"
+    vb.base_name = "doc"
+    vb.tex_dir = tmpv
+    ret = vb._make_version_source_copy("doc_A")
+    check("vsrc: returns the per-version copy name", ret == "doc_A.tex", ret)
+    check("vsrc: copy created with the source content",
+          os.path.exists(os.path.join(tmpv, "doc_A.tex"))
+          and open(os.path.join(tmpv, "doc_A.tex")).read() == "body")
+
+    vb2 = TexlibBuilder()
+    vb2.tex_name = "doc_A.tex"  # already named as the jobname (build_versions case)
+    vb2.base_name = "doc"
+    vb2.tex_dir = tmpv
+    check("vsrc: no-op when source already named <jobname>.tex",
+          vb2._make_version_source_copy("doc_A") == "doc_A.tex")
+
+    for n in ("doc_A_A.sco", "doc_A.srcmap", "doc_A_synctex.tex",
+              "doc_A_autoexam_body_A.tex"):
+        open(os.path.join(tmpv, n), "w").close()
+    open(os.path.join(tmpv, "doc_A.pdf"), "w").close()  # the real output
+    vb._cleanup_version_scratch()
+    check("vsrc: cleanup removes the source copy",
+          not os.path.exists(os.path.join(tmpv, "doc_A.tex")))
+    check("vsrc: cleanup removes jobname scratch (.sco/.srcmap/body/synctex)",
+          not any(os.path.exists(os.path.join(tmpv, n)) for n in
+                  ("doc_A_A.sco", "doc_A.srcmap", "doc_A_synctex.tex",
+                   "doc_A_autoexam_body_A.tex")))
+    check("vsrc: cleanup preserves the output PDF",
+          os.path.exists(os.path.join(tmpv, "doc_A.pdf")))
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL
