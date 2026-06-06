@@ -44,7 +44,11 @@ __pycache__/
 # smoke_test.py failure logs + local scratch
 .smoke_logs/
 /dump.txt
-_scratch/
+# Underscore-prefixed scratch dirs (_scratch, _custtest, _psettest, ...) are
+# local experiments that must never reach the public repo.
+_*/
+# Retired per-machine Sublime user folder (kept on disk, not tracked).
+SublimeUser/
 
 # OS / editor cruft
 .DS_Store

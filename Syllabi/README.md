@@ -26,7 +26,7 @@ syllabi that used command-style metadata (`\instructor{}`, `\email{}`,
 	course-section = 1008,
 	short-title    = Math 126EE Precalc,        % used in running header
 	instructor     = Landon Fox,
-	email          = landonf@unr.edu,
+	email          = instructor@university.edu,
 	office         = 146F NLLC,
 	office-hours   = MWF 10:00--10:50am,
 	class-time     = MWF 9:00--9:50am,
