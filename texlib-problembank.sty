@@ -197,7 +197,26 @@
 }
 
 % Public environment: \begin{problem}{id}[meta] ... \end{problem}
+%
+% Misuse guard: `\problem` names two different things -- this DEFINITION
+% environment everywhere, and (inside \begin{problems}, where it is \let to the
+% retrieval item) a RETRIEVAL command. A user who writes a bare \problem{filter}
+% OUTSIDE {problems} expecting retrieval actually invokes this environment's
+% begin-code, which would then run away scanning for \end{problem}. \begin sets
+% \@currenvir to "problem"; if it isn't, we were not entered via \begin{problem},
+% so raise a targeted error instead. Fail-safe: only errors when we can prove the
+% environment opener was reached outside a \begin{problem}.
 \newenvironment{problem}[1]{%
+	\def\@texlib@penv{problem}%
+	\ifx\@currenvir\@texlib@penv\else
+		\PackageError{texlib-problembank}%
+			{\protect\problem\space used outside \protect\begin{problems}}%
+			{To DEFINE a bank problem, use the environment:^^J%
+			 \space\space\string\begin{problem}{id} ... \string\end{problem}.^^J%
+			 To RETRIEVE one, use \string\getproblem{filter} anywhere, or^^J%
+			 \space\space\string\problem[pts]{filter} INSIDE \string\begin{problems}.^^J%
+			 It looks like you wrote a bare \string\problem outside {problems}.}%
+	\fi
 	\def\@problem@id{#1}%
 	% Record the bank-file line number NOW (before \Collect@Body reads ahead to
 	% \end{problem}).  By the time define_problem_from_env() runs, \inputlineno
