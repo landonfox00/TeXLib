@@ -176,15 +176,28 @@ pbank_stretch_list = {}   -- full stretch list passed in from pbank_problem_item
 -- ============================================================
 -- SEEDING
 -- ============================================================
+-- Optional pinned seed set via \setexamseed{n}. When set, it makes builds
+-- reproducible: the no-version case uses it directly instead of os.time(), and
+-- versioned exams salt their per-version hash with it (so the whole set is
+-- reproducible yet versions stay decorrelated). nil => previous behavior.
+exam_seed_override = nil
+
 function set_exam_seed(ver)
 	local seed_val
+	local pin = tonumber(exam_seed_override)
 	if ver == nil or ver == "" then
-		seed_val = os.time()
+		-- No version context (quizzes, single-version exams): pin if given, else
+		-- a time-based seed (fresh randomization each build).
+		seed_val = pin or os.time()
 	else
 		-- djb2-style string hash: adjacent version letters (A/B/C) must map to
 		-- well-separated seeds, or their shuffles come out correlated (e.g. two
-		-- versions sharing question order).  Deterministic per version.
+		-- versions sharing question order).  Deterministic per version.  When a
+		-- seed is pinned, fold it in first so the set is reproducible.
 		seed_val = 5381
+		if pin then
+			seed_val = (seed_val * 33 + (pin % 2147483647)) % 2147483647
+		end
 		for i = 1, #ver do
 			seed_val = (seed_val * 33 + string.byte(ver, i)) % 2147483647
 		end

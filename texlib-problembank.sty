@@ -107,6 +107,15 @@
 % \setrng{name}{min}{max}  — store a single random integer in [min, max]
 \newcommand{\setrng}[3]{\pbank@lua{set_rng('#1', #2, #3)}}
 
+% \setexamseed{n}  — pin the RNG to integer n for reproducible builds. Put it in
+% the preamble. Without it, an exam WITH \versions{...} is already deterministic
+% per version, but a quiz / single-version doc reseeds from the clock each build
+% (fresh randomization). With it, both become reproducible: versioned exams fold
+% n into each per-version seed (so the set is reproducible yet versions stay
+% decorrelated), and the no-version case uses n directly. Seeds immediately so it
+% also covers quizzes, which never call the per-version seeder.
+\newcommand{\setexamseed}[1]{\pbank@lua{exam_seed_override = #1 set_exam_seed('')}}
+
 % \calcvar{name}{lua-expr}  — compute an expression using stored vars
 \newcommand{\calcvar}[2]{\pbank@lua{calc_var('#1', '#2')}}
 
