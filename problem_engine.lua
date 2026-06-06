@@ -77,6 +77,11 @@ pbank_pending_fix = nil
 problem_db = {}
 autoexam_versions = {}
 
+-- Part labels for multi-part score/grading rows (a, b, c, ...). Module-level so
+-- the score-table and grading-row renderers share one definition; parts beyond
+-- the 8th fall back to a parenthesized index.
+local part_letters = {'a','b','c','d','e','f','g','h'}
+
 -- ============================================================
 -- SOURCE TRACKING (for SyncTeX / inverse search)
 -- ============================================================
@@ -1397,7 +1402,6 @@ local function render_score_row(qno, pts_str, pageno)
 	end
 	local total   = 0
 	for _, v in ipairs(parts) do total = total + v end
-	local letters = {'a','b','c','d','e','f','g','h'}
 	local pg      = pageno or '?'   -- page number cell (plain, not bold)
 
 	if #parts <= 1 then
@@ -1418,7 +1422,7 @@ local function render_score_row(qno, pts_str, pageno)
 			-- effective for a score table.
 			local pg_cell = (i == 1) and pg or ''
 			local q_cell  = (i == 1) and ('\\textbf{' .. qno .. '}') or ''
-			local lbl = '\\textbf{' .. (letters[i] or ('(' .. i .. ')')) .. '}'
+			local lbl = '\\textbf{' .. (part_letters[i] or ('(' .. i .. ')')) .. '}'
 			tex.print(pg_cell .. ' & ' .. q_cell .. ' & ' .. lbl .. ' & ' .. pts .. ' & \\\\')
 			if i < k then tex.print('\\cline{3-5}') end
 		end
@@ -1566,7 +1570,6 @@ function autoexam_gradingrow(qno, pts_str)
 	end
 	local total = 0
 	for _, v in ipairs(parts) do total = total + v end
-	local letters = {'a','b','c','d','e','f','g','h'}
 
 	if #parts <= 1 then
 		local pts = parts[1] or 0
@@ -1575,7 +1578,7 @@ function autoexam_gradingrow(qno, pts_str)
 	else
 		for i, pts in ipairs(parts) do
 			local q_cell = (i == 1) and ('\\textbf{' .. qno .. '}') or ''
-			local lbl = letters[i] or ('(' .. i .. ')')
+			local lbl = part_letters[i] or ('(' .. i .. ')')
 			tex.print(q_cell .. ' & ' .. lbl .. ' & ' .. pts .. ' & \\\\')
 			if i < #parts then tex.print('\\cline{2-4}') end
 		end
