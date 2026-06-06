@@ -195,7 +195,15 @@ end
 
 function get_var(name)
 	local val = vars[name]
-	if val == nil then tex.print("\\textbf{??}") else tex.print(tostring(val)) end
+	if val == nil then
+		-- Surface the typo in the log -- otherwise a misspelled \get{} ships a
+		-- silent "??" into the PDF with no diagnostic.
+		texio.write_nl("TeXLib warning: \\get{" .. tostring(name) ..
+			"} references an undefined variable; printing '??'.")
+		tex.print("\\textbf{??}")
+	else
+		tex.print(tostring(val))
+	end
 end
 
 function set_rng(name, min, max)
@@ -203,6 +211,12 @@ function set_rng(name, min, max)
 	vars[name] = math.random(min, max)
 end
 
+-- Evaluate `expr` as a Lua expression in a sandbox whose only globals are the
+-- `math` library and the current vars, and store the result in `name`. Despite
+-- the "math expression" framing in the docs, this is a real Lua eval -- so e.g.
+-- `(a^2 + b^2)^0.5` works, but so does any Lua expression over {math, vars}. The
+-- sandbox env deliberately excludes os/io/etc.; the only practical hazard is an
+-- expression that loops forever, which would hang the compile.
 function calc_var(name, expr)
 	if fixed[name] then return end
 	local env = {math = math}
@@ -317,9 +331,17 @@ end
 function get_list(name, sep)
 	sep = sep or ", "
 	local count = tonumber(tostring(vars[name .. "_count"])) or 0
+	if count == 0 then
+		texio.write_nl("TeXLib warning: \\getlist{" .. tostring(name) ..
+			"} references an undefined or empty list; nothing printed.")
+	end
 	local parts = {}
 	for i = 1, count do
 		local v = vars[name .. "_" .. i]
+		if v == nil then
+			texio.write_nl("TeXLib warning: \\getlist{" .. tostring(name) ..
+				"} slot " .. i .. " is missing; printing '??'.")
+		end
 		table.insert(parts, tostring(v ~= nil and v or "??"))
 	end
 	tex.sprint(table.concat(parts, sep))
@@ -604,6 +626,10 @@ function get_problem(query_str, pts_list)
 			if ok then table.insert(candidates, id) end
 		end
 		if #candidates > 0 then
+			-- pairs() order over problem_db is unspecified, so sort the
+			-- candidate ids before the random pick -- otherwise a fixed exam
+			-- seed could select a different matching problem run-to-run.
+			table.sort(candidates)
 			match = problem_db[candidates[math.random(1, #candidates)]]
 		end
 	else
