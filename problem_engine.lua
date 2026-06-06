@@ -680,6 +680,9 @@ function get_problem(query_str, pts_list)
 	--   |s| = 1  → single trailing stretch after whole problem; no inter-part space
 	--   |s| > 1  → per-part stretch: s[i] below part i, s[k] trailing after last part
 	--              (parts with i > |s| get no stretch; extra s values are ignored)
+	-- Not an off-by-one: inject_part emits s[i] as the gap BELOW part i when the
+	-- NEXT part begins (so s[1..k-1] land between parts), and s[k] is the trailing
+	-- space after part k -- i.e. s[k] *is* "below part k". Every s[i] is used once.
 	local k = match.part_count or 0
 	local trailing = 0
 	if #sl == 0 then
@@ -812,11 +815,32 @@ function autoexam_read_body()
 	f:close()
 	local _, begin_end = content:find("\\begin%s*{document}[^\n]*\n?")
 	if not begin_end then return nil end
+	-- Find the REAL \end{document}: the first occurrence that is NOT inside a TeX
+	-- comment. A raw (non-commented) \end{document} in a problem body would
+	-- itself end the document, so the first non-comment occurrence is always the
+	-- true end. This is robust against a stray \end{document} sitting in a
+	-- trailing comment, which the old "last occurrence" scan mis-sliced (pulling
+	-- the real \end{document} into the returned body).
 	local end_start, pos = nil, begin_end + 1
 	while true do
-		local s = content:find("\\end%s*{document}", pos)
-		if s then end_start = s; pos = s + 1
-		else break end
+		local s, e = content:find("\\end%s*{document}", pos)
+		if not s then break end
+		local line_start = content:sub(1, s):match("()[^\n]*$") or 1
+		local prefix = content:sub(line_start, s - 1)
+		-- Commented out if an unescaped % precedes it on the same line.
+		if not (prefix:find("^%%") or prefix:find("[^\\]%%")) then
+			end_start = s
+			break
+		end
+		pos = e + 1
+	end
+	if not end_start then
+		-- Defensive fallback: original last-occurrence heuristic.
+		pos = begin_end + 1
+		while true do
+			local s = content:find("\\end%s*{document}", pos)
+			if s then end_start = s; pos = s + 1 else break end
+		end
 	end
 	if not end_start then return nil end
 	return content:sub(begin_end + 1, end_start - 1)
