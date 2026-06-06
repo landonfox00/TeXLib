@@ -67,11 +67,10 @@
 % the \directlua primitive itself, because other packages probe
 % \ifdefined\directlua to detect LuaTeX.
 \ifdefined\directlua
-	\let\pbank@lua\directlua
 	% NOTE: no Lua `--` line comments inside this \directlua block. TeX collapses
 	% the newlines into spaces before Lua sees the chunk, so a `--` comment would
 	% swallow the rest of the code. Keep explanations in TeX `%` comments above.
-	\pbank@lua{
+	\directlua{
 		local function load_engine(name)
 			local path = kpse.find_file(name, "lua")
 			if path and lfs.attributes(path) then dofile(path) return end
@@ -84,6 +83,13 @@
 		load_engine("texlib_synctex.lua")
 		load_engine("problem_engine.lua")
 	}%
+	% The engine no longer pollutes the global Lua namespace: it publishes itself
+	% as the single global table `texlib`. Prepending `local _ENV = texlib` lets
+	% every bank macro below keep calling bare engine names (set_var, get_problem,
+	% vars[...], ...) -- those resolve inside `texlib`, while tex/math/etc. fall
+	% through to _G via texlib's metatable. (Must come AFTER the engine load
+	% above, which runs as raw \directlua because `texlib` doesn't exist yet.)
+	\newcommand{\pbank@lua}[1]{\directlua{local _ENV = texlib;#1}}%
 \else
 	\newcommand{\pbank@lua}[1]{%
 		\PackageError{texlib-problembank}%
@@ -367,12 +373,12 @@
 \newenvironment{problems}{%
 	\problems@begin@hook
 	% ---- inter-problem separator: first problem on a page gets no rule -------
-	\directlua{pbank_first_on_page = true}%
+	\pbank@lua{pbank_first_on_page = true}%
 	% Patch \newpage so crossing a page boundary resets the "first on page" flag.
 	\let\@problems@saved@newpage\newpage
 	\renewcommand{\newpage}{%
 		\@problems@saved@newpage
-		\directlua{pbank_first_on_page = true}%
+		\pbank@lua{pbank_first_on_page = true}%
 	}%
 	% ---- start questions list ------------------------------------------------
 	\begin{questions}%

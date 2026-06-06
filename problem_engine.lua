@@ -41,6 +41,16 @@
 --
 -- Requires LuaLaTeX (texconfig, lua callbacks). Will not work under pdflatex
 -- or xelatex.
+--
+-- Namespacing: LuaTeX runs ONE shared Lua state for the whole document, so the
+-- ~40 names this engine used to define as bare globals (vars, fixed, match,
+-- split_csv, get_var, ...) risked colliding with other packages or user
+-- \directlua. The line below routes every "global" defined in this file into a
+-- private environment table instead of _G; reads of stdlib/tex globals (math,
+-- tex, texconfig, kpse, ...) fall through to _G via the metatable. The whole
+-- engine is then exposed under the single global `texlib` (see end of file), and
+-- texlib-problembank.sty calls in through it (\pbank@lua prepends `_ENV=texlib`).
+local _ENV = setmetatable({}, { __index = _G })
 
 -- Raise LuaTeX's text_input_levels limit early.  The default is 15 (TeX82),
 -- which can be exhausted when autoexam repeatedly calls \input{bank_file.tex}
@@ -757,13 +767,15 @@ function pbank_problem_item(pts_str, stretch_str, query, fix_str)
 	local has_fix = fix_str and fix_str ~= ""
 	if has_fix then
 		pbank_pending_fix = fix_str
-		tex.print("\\directlua{push_scope() pbank_apply_pending_fix()}")
+		-- This \directlua is re-tokenized by TeX and runs in _G, so route it
+		-- through the engine namespace explicitly (the engine is no longer global).
+		tex.print("\\directlua{local _ENV=texlib;push_scope() pbank_apply_pending_fix()}")
 	end
 
 	get_problem(query:match("^%s*(.-)%s*$"), is_multi and pts_list or nil)
 
 	if has_fix then
-		tex.print("\\directlua{pop_scope()}")
+		tex.print("\\directlua{local _ENV=texlib;pop_scope()}")
 	end
 end
 
@@ -1315,7 +1327,7 @@ function autoexam_run_versions()
 		local body = autoexam_read_body()
 		if body then write_score_file(ver, prescan_problems(body)) end
 		tex.sprint("\\gdef\\theExamVersion{" .. ver .. "}")
-		tex.sprint("\\directlua{set_exam_seed('" .. ver .. "')}")
+		tex.sprint("\\directlua{local _ENV=texlib;set_exam_seed('" .. ver .. "')}")
 		return
 	end
 
@@ -1355,7 +1367,7 @@ function autoexam_run_versions()
 		f:close()
 
 		tex.sprint("\\gdef\\theExamVersion{" .. ver .. "}")
-		tex.sprint("\\directlua{set_exam_seed('" .. ver .. "')}")  -- re-seed for TeX
+		tex.sprint("\\directlua{local _ENV=texlib;set_exam_seed('" .. ver .. "')}")  -- re-seed for TeX
 		tex.sprint("\\input{" .. tmpfile_name .. "}")
 		if i < #versions_to_run then
 			tex.sprint("\\clearpage")
@@ -1363,7 +1375,7 @@ function autoexam_run_versions()
 	end
 	-- Re-write the source map now that typeset_problem() has populated the
 	-- tmpfile field for every problem that was actually typeset this run.
-	tex.sprint("\\directlua{autoexam_write_srcmap()}")
+	tex.sprint("\\directlua{local _ENV=texlib;autoexam_write_srcmap()}")
 	tex.sprint("\\enddocument")
 end
 
@@ -1573,3 +1585,9 @@ function autoexam_gradingrow(qno, pts_str)
 	end
 	tex.print('\\noalign{\\addtocounter{autoexamtotal}{' .. total .. '}}')
 end
+
+-- Publish the engine's private namespace as the single global `texlib`. Every
+-- function and state field defined above lives in this table (not _G), so the
+-- bank macros reach them via `texlib.<name>` -- which \pbank@lua arranges by
+-- prepending `local _ENV = texlib` to each \directlua chunk.
+_G.texlib = _ENV
