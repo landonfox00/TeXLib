@@ -65,13 +65,16 @@
 \ExplSyntaxOff
 
 % -- Figure Wrapper --
+% Directory prefix for \fig images. Override per document with
+% \renewcommand{\figdir}{path/to/figs/} (keep the trailing slash).
+\providecommand{\figdir}{Figures/}
 \NewDocumentCommand{\fig}{ s O{} O{} m }{%
-	\begin{figure}[!ht] 
+	\begin{figure}[!ht]
 	\IfBooleanTF{#1}{\raggedleft}{\centering}
 	\if\relax\detokenize{#3}\relax
-		\includegraphics[width=0.5\textwidth,height=0.35\textwidth,keepaspectratio]{Figures/#4}
+		\includegraphics[width=0.5\textwidth,height=0.35\textwidth,keepaspectratio]{\figdir #4}
 	\else
-		\includegraphics[#3]{Figures/#4}
+		\includegraphics[#3]{\figdir #4}
 	\fi
 	\if\relax\detokenize{#2}\relax
 		\AutoLabel{fig}{#4}

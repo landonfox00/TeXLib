@@ -469,7 +469,14 @@ local function typeset_problem(p, stretch)
 		-- single long line; reading the file directly restores the structure.
 		local content_lines = read_problem_lines_from_bank(sm.file, sm.line)
 		if not content_lines then
-			-- File unreadable: fall back to p.content (single-line, no newlines)
+			-- File unreadable: fall back to p.content (single-line, no newlines).
+			-- SyncTeX line attribution then collapses to the \begin{problem} line
+			-- for the whole body; warn so the degraded inverse search isn't a
+			-- silent mystery.
+			texio.write_nl("TeXLib warning: could not read bank file '" ..
+				tostring(sm.file) .. "' for SyncTeX line mapping of problem '" ..
+				tostring(pid) .. "'; inverse search will land on its " ..
+				"\\begin{problem} line.")
 			content_lines = {}
 			local raw = (p.content or '') .. '\n'
 			for ln in raw:gmatch('([^\n]*)\n') do
@@ -957,7 +964,9 @@ local function shuffle_section_body(seg_body)
 	if #all_items == 0 then return seg_body end   -- nothing shuffleable
 	local movable, pinned = {}, {}
 	for _, it in ipairs(all_items) do
-		if it:match("^\\extracredit") then table.insert(pinned, it)
+		-- Frontier %f[%A] requires a non-letter right after \extracredit, so a
+		-- command like \extracreditfoo isn't mistakenly pinned to section end.
+		if it:match("^\\extracredit%f[%A]") then table.insert(pinned, it)
 		else table.insert(movable, it) end
 	end
 	for i = #movable, 2, -1 do                    -- Fisher-Yates
