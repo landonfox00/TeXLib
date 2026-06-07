@@ -189,6 +189,20 @@ def _md5(s):
     return hashlib.md5(s.encode("utf-8")).hexdigest()
 
 
+def _fp(bcf_content, datasources=None):
+    """Expected biber-inputs fingerprint for a .bcf (with optional .bib
+    datasources), mirroring TexlibBuilder._biber_inputs_hash -- including the
+    biber-version suffix when biber is on PATH, so cache-skip tests stay valid
+    on machines with or without biber installed."""
+    parts = [_md5(bcf_content)]
+    for name, content in (datasources or {}).items():
+        parts.append(name + ":" + _md5(content))
+    ver = TexlibBuilder._biber_version()
+    if ver:
+        parts.append("biber:" + ver)
+    return "|".join(parts)
+
+
 _PASS = 0
 _FAIL = 0
 
@@ -307,7 +321,7 @@ def main():
 
     # (j3) biber change-detection
     BCF = "<bcf>cite-keys</bcf>"
-    BCF_HASH = hashlib.md5(BCF.encode("utf-8")).hexdigest()
+    BCF_HASH = _fp(BCF)   # full fingerprint (bcf md5 + biber version if present)
 
     #   first build: .bcf present, no .bbl yet -> biber runs + forced re-pass
     cmds, _ = run_builder(
@@ -551,7 +565,7 @@ def main():
     cmds, _, _ = drive_builder(
         ART,
         seed_files={"doc.bcf": BCF, "doc.bbl": "bbl-v1",
-                    "doc.bcf.texlibhash": _md5(BCF)},
+                    "doc.bcf.texlibhash": _fp(BCF)},
         steps=[{"out": ""}])
     check("seq: unchanged bib rebuild -> 1 pass, biber skipped",
           heads(cmds) == ["pdflatex"], heads(cmds))
@@ -581,7 +595,7 @@ def main():
     cmds, _, _ = drive_builder(
         DOCV, options=["--texlib-mode=allversions"], engine="lualatex",
         seed_files={"doc_A.bcf": "<a>", "doc_A.bbl": "ba",
-                    "doc_A.bcf.texlibhash": _md5("<a>")},
+                    "doc_A.bcf.texlibhash": _fp("<a>")},
         steps=[
             {"out": ""},                          # A pass 1: A is current -> skip
             {"write": {"doc_B.bcf": "<b>"}},      # B pass 1 wrote its .bcf
@@ -752,6 +766,89 @@ def main():
                    "doc_A_autoexam_body_A.tex")))
     check("vsrc: cleanup preserves the output PDF",
           os.path.exists(os.path.join(tmpv, "doc_A.pdf")))
+
+    # ====================================================================== #
+    # (u) biber hash is recorded AFTER the final pass, not mid-build.
+    #     Regression: if the post-biber pass rewrites the .bcf, recording the
+    #     hash right after biber captures the stale (pre-final) .bcf, so the
+    #     NEXT build sees "not current" and re-runs biber needlessly. Recording
+    #     in _postprocess (after the last pass settled the .bcf) fixes it.
+    # ====================================================================== #
+    BCF_V1 = "<bcf>v1</bcf>"
+    BCF_SETTLED = "<bcf>v1-settled</bcf>"   # post-biber pass rewrote the .bcf
+    _, _, tmp = drive_builder(
+        ART,
+        steps=[
+            {"write": {"doc.bcf": BCF_V1}},              # pass 1 wrote the .bcf
+            {"write": {"doc.bbl": "bbl-v1"}},            # biber wrote the .bbl
+            {"out": "Package biblatex Warning: Please rerun LaTeX.",
+             "write": {"doc.bcf": BCF_SETTLED}},         # post-biber pass settles .bcf
+            {"out": ""},                                 # final pass, clean
+        ])
+    nb = TexlibBuilder()
+    nb.tex_dir = tmp
+    nb._aux_target = None
+    check("biber-timing: recorded hash matches the FINAL .bcf "
+          "(no spurious re-run next build)",
+          nb._biber_is_current("doc"),
+          "hash recorded against pre-final .bcf -> next build re-runs biber")
+
+    # ====================================================================== #
+    # (v) PDF split honoring a <base>.spl 'split_page=N' signal.
+    # ====================================================================== #
+    try:
+        from pypdf import PdfReader, PdfWriter
+        _have_pypdf = True
+    except ImportError:
+        _have_pypdf = False
+
+    if _have_pypdf:
+        tmps = tempfile.mkdtemp(prefix="texlib_spl_")
+
+        def _blank_pdf(path, pages):
+            w = PdfWriter()
+            for _ in range(pages):
+                w.add_blank_page(width=72, height=72)
+            with open(path, "wb") as fh:
+                w.write(fh)
+            w.close()
+
+        bp = os.path.join(tmps, "doc")
+        _blank_pdf(bp + ".pdf", 5)
+        with open(bp + ".spl", "w", encoding="utf-8") as fh:
+            fh.write("split_page=2")
+        sb = TexlibBuilder(); sb.tex_dir = tmps; sb._aux_target = None
+        sb._split_pdf_if_signaled(bp)
+        check("split: _Exam.pdf gets the first 2 pages",
+              os.path.exists(bp + "_Exam.pdf")
+              and len(PdfReader(bp + "_Exam.pdf").pages) == 2)
+        check("split: _Solutions.pdf gets the remaining 3 pages",
+              os.path.exists(bp + "_Solutions.pdf")
+              and len(PdfReader(bp + "_Solutions.pdf").pages) == 3)
+        check("split: .spl signal consumed", not os.path.exists(bp + ".spl"))
+
+        bp2 = os.path.join(tmps, "doc2")
+        _blank_pdf(bp2 + ".pdf", 3)
+        with open(bp2 + ".spl", "w", encoding="utf-8") as fh:
+            fh.write("split_page=9")   # out of range
+        sb2 = TexlibBuilder(); sb2.tex_dir = tmps; sb2._aux_target = None
+        sb2._split_pdf_if_signaled(bp2)
+        check("split: out-of-range page -> no split files",
+              not os.path.exists(bp2 + "_Exam.pdf"))
+        check("split: out-of-range page -> warning shown",
+              "out of range" in sb2._displayed, sb2._displayed)
+
+        # aux routing active + .spl only in the aux dir (copy-back failed) -> warn.
+        auxd = tempfile.mkdtemp(prefix="texlib_spl_aux_")
+        bp3 = os.path.join(tmps, "doc3")
+        with open(os.path.join(auxd, "doc3.spl"), "w", encoding="utf-8") as fh:
+            fh.write("split_page=1")
+        sb3 = TexlibBuilder(); sb3.tex_dir = tmps; sb3._aux_target = auxd
+        sb3._split_pdf_if_signaled(bp3)
+        check("split: warns when .spl is in aux but not copied back",
+              "not copied back" in sb3._displayed, sb3._displayed)
+    else:
+        print("  SKIP  pypdf not installed -- PDF split tests skipped")
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL

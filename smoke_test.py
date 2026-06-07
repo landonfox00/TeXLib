@@ -277,11 +277,15 @@ def _compare_pages(ref_png: str, test_png: str) -> int | None:
         )
     except (OSError, subprocess.SubprocessError):
         return None
-    # AE count is printed to stderr (merged into stdout here); may look like
-    # "1234" or "1234 (0.00188)". Dimension mismatch -> non-zero exit + no count.
-    m = re.search(r"\d+", r.stdout or "")
-    if m:
-        return int(m.group())
+    # AE count is printed to stderr (merged into stdout here) as the LAST line,
+    # e.g. "1234" or "1234 (0.00188)". Scan from the end for a line that is
+    # purely the metric, so a leading ImageMagick warning line that happens to
+    # contain a number isn't mistaken for the count. Dimension mismatch ->
+    # non-zero exit + no metric line.
+    for ln in reversed((r.stdout or "").splitlines()):
+        m = re.match(r"^\s*(\d+)(?:\s*\([\d.eE+-]+\))?\s*$", ln)
+        if m:
+            return int(m.group(1))
     return 10**9 if r.returncode != 0 else 0
 
 
@@ -351,7 +355,7 @@ def _png_size(path: str) -> tuple[int, int]:
 def detect_engine(tex_path: str) -> str:
     """Pick lualatex if the documentclass needs it, else pdflatex."""
     try:
-        with open(tex_path, "r", encoding="utf-8", errors="ignore") as f:
+        with open(tex_path, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
     except OSError:
         return "pdflatex"
@@ -394,6 +398,11 @@ def _decode(s) -> str:
 # "1 of ??" you see in a one-shot build -- because the label only reaches the
 # .aux at end of run. Re-running clears it, the way latexmk / the Sublime
 # builder do.
+# Note: unlike the Sublime builder's RERUN_RE (which deliberately EXCLUDES
+# "There were undefined references" to avoid looping on a genuinely-missing
+# label), the smoke test includes it on purpose: it wants fully-settled output
+# for visual diffing, and the re-run loop is hard-capped at max_passes (3), so
+# a never-resolving ref costs at most two extra passes rather than an open loop.
 RERUN_RE = re.compile(
     r"(Rerun to get|Rerun LaTeX|There were undefined references"
     r"|Label\(s\) may have changed)", re.I)
@@ -470,37 +479,14 @@ def build_one(
             if os.path.isfile(src):
                 shutil.copy2(src, tmp)
 
-        # Also copy the TeXLib-root shared files (course-metadata.sty,
-        # texlib-build.sty, basic-utilities.sty, texlib-mathutils.sty,
-        # texlib-theorems.sty, texlib-footer.sty, quiver.sty,
-        # problem_engine.lua, ...) into the build dir so they resolve via
-        # the cwd. This sidesteps a hard kpathsea limitation: a TEXINPUTS
-        # entry containing a COMMA is silently unsearchable, and the TeXLib
-        # root can easily live under one (e.g. a OneDrive folder named
-        # "...University of Nevada, Reno..."). A space in the path is fine;
-        # a comma is not. Module files were copied first and win any name
-        # clash, so we never overwrite them.
-        for entry in os.listdir(TEXLIB_ROOT):
-            src = os.path.join(TEXLIB_ROOT, entry)
-            if os.path.isfile(src) and entry.lower().endswith((".sty", ".lua", ".cls")):
-                dest = os.path.join(tmp, entry)
-                if not os.path.exists(dest):
-                    shutil.copy2(src, dest)
-
-        # Also collect .cls files from each module subdirectory. Without this,
-        # tests living under Test/<Module>/ that do \documentclass{<sibling>}
-        # cannot find the sibling module's class file (the cwd-copy trick
-        # above only covers root-level files). Module .cls files have unique
-        # names so name-clash is not a concern.
-        for entry in os.listdir(TEXLIB_ROOT):
-            sub = os.path.join(TEXLIB_ROOT, entry)
-            if not os.path.isdir(sub):
-                continue
-            for f in os.listdir(sub):
-                if f.lower().endswith(".cls"):
-                    dest = os.path.join(tmp, f)
-                    if not os.path.exists(dest):
-                        shutil.copy2(os.path.join(sub, f), dest)
+        # Copy the TeXLib-root shared files (.sty/.lua/.cls) and every module's
+        # .cls into the build dir so they resolve via the cwd. This sidesteps a
+        # hard kpathsea limitation: a TEXINPUTS entry containing a COMMA is
+        # silently unsearchable, and the TeXLib root can easily live under one
+        # (e.g. a OneDrive folder named "...University of Nevada, Reno..."). The
+        # module's own files were copied first and win any name clash, since
+        # _copy_shared_into never overwrites a file already present.
+        _copy_shared_into(tmp)
 
         # Drop in a stub coursemeta.tex unless the module already ships one.
         # course-metadata.sty auto-loads it from the cwd; without it, any

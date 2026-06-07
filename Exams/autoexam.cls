@@ -82,7 +82,7 @@
 \newcommand{\examversions}[1]{%
 	\def\@autoexam@versions{#1}%
 	\@autoexam@versionedtrue%           % mark that explicit versions were declared
-	\directlua{set_autoexam_versions('\luaescapestring{#1}')}%
+	\directlua{texlib.set_autoexam_versions('\luaescapestring{#1}')}%
 	\typeout{AutoExam: Detected Versions: #1}%
 }
 \let\versions\examversions              % \versions is the preferred short alias
@@ -195,7 +195,7 @@
 %   \newpage layout) are preserved, and \extracredit stays last.  No exam-body
 %   changes are needed — author one canonical order and let each version shuffle.
 \newcommand{\shufflepages}{%
-	\directlua{set_autoexam_shuffle_pages()}%
+	\directlua{texlib.set_autoexam_shuffle_pages()}%
 }
 
 % Multiple-choice option shuffling (used with \shufflepages).  Authors write the
@@ -250,7 +250,7 @@
 % Seed the per-version RNG, then auto-load any course-level bank (the bank
 % resolution itself is shared — see \pbank@load@coursebank in texlib-problembank).
 \AtBeginDocument{%
-	\directlua{set_exam_seed('\theExamVersion')}%
+	\directlua{texlib.set_exam_seed('\theExamVersion')}%
 	\pbank@load@coursebank
 }
 
@@ -264,7 +264,7 @@
 	% side conditional-free avoids an open \ifx on the stack when Lua
 	% sprints \enddocument, which would otherwise produce a benign but
 	% confusing "incomplete \ifx" warning.
-	\directlua{autoexam_run_versions()}%
+	\directlua{texlib.autoexam_run_versions()}%
 }
 
 % ---------------------------------------------------------------------------
@@ -780,7 +780,7 @@
 %   single-part questions.  A grand Total row closes the final page.
 
 \NewDocumentCommand{\scorepage}{O{20}}{%
-	\directlua{autoexam_scorepage(#1)}%
+	\directlua{texlib.autoexam_scorepage(#1)}%
 }
 
 % texlib-pagestyle.sty bundles \pagestyle{headandfoot} + first-page-footer

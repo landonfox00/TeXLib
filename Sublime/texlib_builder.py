@@ -171,12 +171,14 @@ class TexlibBuilder(PdfBuilder):
         tex_dir = self._tex_dir()
         self._aux_target = self._resolve_aux_directory(tex_dir)
         self._version_sources = []
-        base = [engine, "-interaction=nonstopmode", "-synctex=1"]
-        if engine in ("lualatex", "xelatex"):
-            base.append("-shell-escape")
-        if self._aux_target and self._aux_target != tex_dir:
-            base.append(f"-output-directory={self._aux_target}")
-        base += engine_options
+        # Jobnames whose biber ran this build; their input fingerprint is
+        # recorded in _postprocess, AFTER the final engine pass settles the
+        # .bcf (recording mid-build would capture a .bcf the post-biber pass
+        # then rewrites -> a spurious biber re-run on the next build).
+        self._biber_ran = []
+        base = self._base_engine_cmd(
+            engine, self._aux_target, tex_dir, engine_options
+        )
 
         if mode == MODE_ALLVERSIONS:
             versions = self._parse_versions(src)
@@ -250,6 +252,23 @@ class TexlibBuilder(PdfBuilder):
             return []
         return [v.strip() for v in match.group(1).split(",") if v.strip()]
 
+    @staticmethod
+    def _base_engine_cmd(engine, aux_target=None, tex_dir=None, options=()):
+        """Assemble the shared engine command prefix.
+
+        Single source of truth for the base flags so the standalone
+        build_versions.py driver (which imports this class) cannot drift from
+        the interactive builder. Adds -output-directory only when routing to a
+        distinct aux dir; appends any genuine engine options last.
+        """
+        cmd = [engine, "-interaction=nonstopmode", "-synctex=1"]
+        if engine in ("lualatex", "xelatex"):
+            cmd.append("-shell-escape")
+        if aux_target and aux_target != tex_dir:
+            cmd.append(f"-output-directory={aux_target}")
+        cmd += list(options)
+        return cmd
+
     # ------------------------------------------------------------------ #
     # Build steps (each is a sub-coroutine delegated to via `yield from`)
     # ------------------------------------------------------------------ #
@@ -274,7 +293,7 @@ class TexlibBuilder(PdfBuilder):
             self.base_name
         ):
             yield (self._biber_command(self.base_name), "biber...")
-            self._record_biber_hash(self.base_name)
+            self._biber_ran.append(self.base_name)
             run += 1
             yield (cmd, f"{label} rerun {run} (post-biber)...")
 
@@ -301,7 +320,7 @@ class TexlibBuilder(PdfBuilder):
         # a rebuilt version reuses its .bbl when its bibliography is unchanged.
         if self._biber_needed(jobname) and not self._biber_is_current(jobname):
             yield (self._biber_command(jobname), f"biber [{version}]...")
-            self._record_biber_hash(jobname)
+            self._biber_ran.append(jobname)
             run += 1
             yield (cmd, f"version {version} rerun {run} (post-biber)...")
 
@@ -410,9 +429,21 @@ class TexlibBuilder(PdfBuilder):
                 )
                 return None
             return target
-        if os.path.isabs(s):
-            return s
-        return os.path.normpath(os.path.join(tex_dir, s))
+        target = s if os.path.isabs(s) else os.path.normpath(
+            os.path.join(tex_dir, s)
+        )
+        # Create it: TeX Live's -output-directory does not auto-create the dir,
+        # so an explicit aux_directory that doesn't exist yet would make every
+        # pass fail. (<<temp>> above is created the same way.)
+        try:
+            os.makedirs(target, exist_ok=True)
+        except OSError as exc:
+            self.display(
+                f"TeXLib: could not create aux directory {target}: {exc}; "
+                "falling back to building in source dir.\n"
+            )
+            return None
+        return target
 
     def _biber_needed(self, jobname):
         """True if biblatex wrote a .bcf for `jobname`.
@@ -454,6 +485,36 @@ class TexlibBuilder(PdfBuilder):
         except OSError:
             return None
 
+    _biber_version_cache = None
+
+    @classmethod
+    def _biber_version(cls):
+        """biber's version string, or '' if biber can't be probed (cached).
+
+        Folded into the biber-inputs fingerprint so that upgrading the biber
+        binary while the .bcf/.bib are byte-identical still invalidates a stale
+        .bbl (mirroring latexmk). Degrades to '' when biber isn't on PATH, in
+        which case the fingerprint is unchanged from the no-version form.
+        """
+        if cls._biber_version_cache is not None:
+            return cls._biber_version_cache
+        ver = ""
+        try:
+            import subprocess
+
+            exe = shutil.which("biber")
+            if exe:
+                out = subprocess.run(
+                    [exe, "--version"], capture_output=True, text=True,
+                    timeout=10,
+                )
+                first = (out.stdout or "").strip().splitlines()
+                ver = first[0].strip() if first else ""
+        except Exception:  # noqa: BLE001 - probe is best-effort
+            ver = ""
+        cls._biber_version_cache = ver
+        return ver
+
     @staticmethod
     def _force_remove(path):
         """Delete `path` if present, clearing Hidden/ReadOnly first (Windows).
@@ -485,6 +546,27 @@ class TexlibBuilder(PdfBuilder):
         try:
             os.remove(path)
         except OSError:
+            pass
+
+    @staticmethod
+    def _set_hidden(path):
+        """Apply the Hidden attribute on Windows via the Win32 API.
+
+        Uses SetFileAttributesW directly rather than `os.system('attrib +h')`,
+        which would be a shell-quoting hazard for paths with special characters
+        and spawns a console window (ironic in a builder that works to suppress
+        console flashes). No-op off Windows.
+        """
+        if os.name != "nt":
+            return
+        try:
+            import ctypes
+
+            FILE_ATTRIBUTE_HIDDEN = 0x2
+            ctypes.windll.kernel32.SetFileAttributesW(
+                str(path), FILE_ATTRIBUTE_HIDDEN
+            )
+        except Exception:  # noqa: BLE001 - best-effort attribute set
             pass
 
     @staticmethod
@@ -543,6 +625,9 @@ class TexlibBuilder(PdfBuilder):
             if src_hash is None:
                 return None
             parts.append(src.strip() + ":" + src_hash)
+        ver = self._biber_version()
+        if ver:
+            parts.append("biber:" + ver)
         return "|".join(parts)
 
     def _biber_is_current(self, jobname):
@@ -570,9 +655,11 @@ class TexlibBuilder(PdfBuilder):
     def _record_biber_hash(self, jobname):
         """Persist the current biber-inputs fingerprint (best effort).
 
-        Called right after biber runs (biber reads the .bcf + .bib files and
-        writes the .bbl but alters none of them), so this records the exact
-        inputs the new .bbl corresponds to.
+        Called from _postprocess, AFTER the final engine pass has settled the
+        .bcf, so the fingerprint matches the .bcf that will be on disk for the
+        next build's cache check. (Recording right after biber instead would
+        capture the pre-final-pass .bcf, which the post-biber pass can rewrite,
+        causing a spurious biber re-run next time.)
         """
         current = self._biber_inputs_hash(jobname)
         if current is None:
@@ -600,6 +687,14 @@ class TexlibBuilder(PdfBuilder):
     def _postprocess(self):
         tex_dir = self._tex_dir()
         base_path = os.path.join(tex_dir, self.base_name)
+
+        # Record biber-input fingerprints now that the final engine pass has
+        # settled each .bcf, so the next build's cache check compares against
+        # the real on-disk .bcf. (See _record_biber_hash for why mid-build
+        # recording caused spurious biber re-runs.)
+        for jobname in getattr(self, "_biber_ran", []):
+            self._record_biber_hash(jobname)
+        self._biber_ran = []
 
         # The schedule class emits a <base>.schedmap sidecar.  Rewrite the
         # build's .synctex.gz BEFORE copy-back so the user-visible file
@@ -659,11 +754,7 @@ class TexlibBuilder(PdfBuilder):
                     f"TeXLib: could not decompress {os.path.basename(gz)}: {exc}\n"
                 )
                 continue
-            if os.name == "nt":
-                try:
-                    os.system(f'attrib +h "{plain}"')
-                except Exception:
-                    pass
+            self._set_hidden(plain)
 
         # 2. Remove the build-time SyncTeX scratch file(s).
         scratch = glob.glob(os.path.join(tex_dir, self.base_name + "_synctex.tex"))
@@ -908,7 +999,21 @@ class TexlibBuilder(PdfBuilder):
         """Honor a <base>.spl 'split_page=N' signal: split the PDF in two."""
         spl_file = base_path + ".spl"
         pdf_file = base_path + ".pdf"
-        if not os.path.exists(spl_file) or not os.path.exists(pdf_file):
+        if not os.path.exists(spl_file):
+            # A .spl produced in the aux dir but missing next to the source
+            # means the copy-back failed; warn rather than silently skip the
+            # exam/solutions split (the copy-back step logs its own error too).
+            aux = getattr(self, "_aux_target", None)
+            if aux and aux != self._tex_dir():
+                aux_spl = os.path.join(aux, os.path.basename(base_path) + ".spl")
+                if os.path.exists(aux_spl):
+                    self.display(
+                        "TeXLib: a .spl split signal exists in the aux dir but "
+                        "was not copied back to the source, so the PDF was not "
+                        "split. Check the copy-back step above for an error.\n"
+                    )
+            return
+        if not os.path.exists(pdf_file):
             return
         try:
             with open(spl_file, "r", encoding="utf-8") as fh:

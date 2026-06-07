@@ -19,6 +19,19 @@ A consolidation pass: a new user-facing feature on `\problem`, four new shared `
 - **Multi-week clustering under one source line.** Weeks without an explicit directive inherit the most recent directive's line via fallback propagation, so several consecutive weeks may share one attribution (e.g. all weeks between two `\holiday` calls map to the earlier one). Acceptable trade-off; finer per-cell attribution can come later.
 - **Single-file assumption.** If the schedule body is `\input`-ed from a separate file rather than written inline in the main `.tex`, the source-line recording still works but the schedmap maps to lines in the main job file, not the included one. Multi-file support is a follow-up.
 
+### Fixed (this pass)
+
+- **`\scorepage` now finds bracketless `\problem{…}` calls.** `prescan_problems` matched only the two-optional-arg spelling `\problem[pts][stretch]{…}`, so the score-summary page came up empty for the documented, common usage. Replaced the regex with a forward scanner that tolerates 0/1/2 optional args plus a trailing `[fix]` (unit-tested over every spelling).
+- **Biber-skip cache no longer re-runs needlessly.** `texlib_builder.py` records the biber-inputs fingerprint in `_postprocess` (after the final engine pass settles the `.bcf`) instead of mid-build right after biber — recording early captured a `.bcf` the post-biber pass then rewrote, forcing a spurious biber run next build. Verified by the real-toolchain integration test (3-pass build → cache hit on rebuild). The fingerprint also now folds in the biber binary version.
+- **`build_versions.py` scratch cleanup** is delimiter-anchored (`<job>.` / `<job>_`) so version A never sweeps version AB's files (or a real `exam_Answers.pdf`); `merge_pdfs` releases reader handles (no Windows sharing-violation on the post-merge delete); a missing engine reports a clear PATH message.
+- **`build_versions.py` now resolves the shared root `.sty`/`.lua` files itself**, so it builds real autoexam documents standalone instead of failing with `File 'texlib-assessment.sty' not found` unless the caller's shell already exported a suitable `TEXINPUTS`. It sets `TEXINPUTS` per build to a **relative** path up from the document to the repo root — relative so it stays comma-free even when the repo lives under a comma path (e.g. a OneDrive `…University of Nevada, Reno…` folder), which `kpathsea` silently refuses to search — with the absolute root and the default texmf trees appended. The in-document `\versions{...}` loop was a red herring: `autoexam_run_versions()` already honours `\def\Version{X}` and emits a single version per build. A gated real-toolchain test (`test_build_versions.py::real_build_check`, lualatex-guarded, run in CI's integration job) now builds a genuine 2-version autoexam and asserts two distinct single-version PDFs — coverage the fake-engine suite could not provide.
+- **Builder hygiene:** `SetFileAttributesW` replaces `os.system('attrib +h')` (no shell-quoting hazard / console flash); explicit aux directories are created; a `.spl` split signal stranded in the aux dir now warns instead of silently skipping the split. `build_versions.py` and the Sublime builder share one engine-command assembly so they can't drift.
+- **`smoke_test.py`:** robust ImageMagick metric parsing, `errors="replace"` consistency, and the cwd-copy block deduped onto `_copy_shared_into`.
+
+### Tooling
+
+- **`build_versions.py` is documented in the top-level README** (it previously appeared only in `Sublime/README.md`).
+
 ### Added
 
 - **Visual scenario packs (`smoke_test.py --scenarios`).** A tiered visual-test

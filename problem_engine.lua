@@ -41,6 +41,16 @@
 --
 -- Requires LuaLaTeX (texconfig, lua callbacks). Will not work under pdflatex
 -- or xelatex.
+--
+-- Namespacing: LuaTeX runs ONE shared Lua state for the whole document, so the
+-- ~40 names this engine used to define as bare globals (vars, fixed, match,
+-- split_csv, get_var, ...) risked colliding with other packages or user
+-- \directlua. The line below routes every "global" defined in this file into a
+-- private environment table instead of _G; reads of stdlib/tex globals (math,
+-- tex, texconfig, kpse, ...) fall through to _G via the metatable. The whole
+-- engine is then exposed under the single global `texlib` (see end of file), and
+-- texlib-problembank.sty calls in through it (\pbank@lua prepends `_ENV=texlib`).
+local _ENV = setmetatable({}, { __index = _G })
 
 -- Raise LuaTeX's text_input_levels limit early.  The default is 15 (TeX82),
 -- which can be exhausted when autoexam repeatedly calls \input{bank_file.tex}
@@ -66,6 +76,11 @@ fixed_stack = {}
 pbank_pending_fix = nil
 problem_db = {}
 autoexam_versions = {}
+
+-- Part labels for multi-part score/grading rows (a, b, c, ...). Module-level so
+-- the score-table and grading-row renderers share one definition; parts beyond
+-- the 8th fall back to a parenthesized index.
+local part_letters = {'a','b','c','d','e','f','g','h'}
 
 -- ============================================================
 -- SOURCE TRACKING (for SyncTeX / inverse search)
@@ -161,15 +176,28 @@ pbank_stretch_list = {}   -- full stretch list passed in from pbank_problem_item
 -- ============================================================
 -- SEEDING
 -- ============================================================
+-- Optional pinned seed set via \setexamseed{n}. When set, it makes builds
+-- reproducible: the no-version case uses it directly instead of os.time(), and
+-- versioned exams salt their per-version hash with it (so the whole set is
+-- reproducible yet versions stay decorrelated). nil => previous behavior.
+exam_seed_override = nil
+
 function set_exam_seed(ver)
 	local seed_val
+	local pin = tonumber(exam_seed_override)
 	if ver == nil or ver == "" then
-		seed_val = os.time()
+		-- No version context (quizzes, single-version exams): pin if given, else
+		-- a time-based seed (fresh randomization each build).
+		seed_val = pin or os.time()
 	else
 		-- djb2-style string hash: adjacent version letters (A/B/C) must map to
 		-- well-separated seeds, or their shuffles come out correlated (e.g. two
-		-- versions sharing question order).  Deterministic per version.
+		-- versions sharing question order).  Deterministic per version.  When a
+		-- seed is pinned, fold it in first so the set is reproducible.
 		seed_val = 5381
+		if pin then
+			seed_val = (seed_val * 33 + (pin % 2147483647)) % 2147483647
+		end
 		for i = 1, #ver do
 			seed_val = (seed_val * 33 + string.byte(ver, i)) % 2147483647
 		end
@@ -195,7 +223,15 @@ end
 
 function get_var(name)
 	local val = vars[name]
-	if val == nil then tex.print("\\textbf{??}") else tex.print(tostring(val)) end
+	if val == nil then
+		-- Surface the typo in the log -- otherwise a misspelled \get{} ships a
+		-- silent "??" into the PDF with no diagnostic.
+		texio.write_nl("TeXLib warning: \\get{" .. tostring(name) ..
+			"} references an undefined variable; printing '??'.")
+		tex.print("\\textbf{??}")
+	else
+		tex.print(tostring(val))
+	end
 end
 
 function set_rng(name, min, max)
@@ -203,6 +239,12 @@ function set_rng(name, min, max)
 	vars[name] = math.random(min, max)
 end
 
+-- Evaluate `expr` as a Lua expression in a sandbox whose only globals are the
+-- `math` library and the current vars, and store the result in `name`. Despite
+-- the "math expression" framing in the docs, this is a real Lua eval -- so e.g.
+-- `(a^2 + b^2)^0.5` works, but so does any Lua expression over {math, vars}. The
+-- sandbox env deliberately excludes os/io/etc.; the only practical hazard is an
+-- expression that loops forever, which would hang the compile.
 function calc_var(name, expr)
 	if fixed[name] then return end
 	local env = {math = math}
@@ -317,9 +359,17 @@ end
 function get_list(name, sep)
 	sep = sep or ", "
 	local count = tonumber(tostring(vars[name .. "_count"])) or 0
+	if count == 0 then
+		texio.write_nl("TeXLib warning: \\getlist{" .. tostring(name) ..
+			"} references an undefined or empty list; nothing printed.")
+	end
 	local parts = {}
 	for i = 1, count do
 		local v = vars[name .. "_" .. i]
+		if v == nil then
+			texio.write_nl("TeXLib warning: \\getlist{" .. tostring(name) ..
+				"} slot " .. i .. " is missing; printing '??'.")
+		end
 		table.insert(parts, tostring(v ~= nil and v or "??"))
 	end
 	tex.sprint(table.concat(parts, sep))
@@ -419,7 +469,14 @@ local function typeset_problem(p, stretch)
 		-- single long line; reading the file directly restores the structure.
 		local content_lines = read_problem_lines_from_bank(sm.file, sm.line)
 		if not content_lines then
-			-- File unreadable: fall back to p.content (single-line, no newlines)
+			-- File unreadable: fall back to p.content (single-line, no newlines).
+			-- SyncTeX line attribution then collapses to the \begin{problem} line
+			-- for the whole body; warn so the degraded inverse search isn't a
+			-- silent mystery.
+			texio.write_nl("TeXLib warning: could not read bank file '" ..
+				tostring(sm.file) .. "' for SyncTeX line mapping of problem '" ..
+				tostring(pid) .. "'; inverse search will land on its " ..
+				"\\begin{problem} line.")
 			content_lines = {}
 			local raw = (p.content or '') .. '\n'
 			for ln in raw:gmatch('([^\n]*)\n') do
@@ -604,6 +661,10 @@ function get_problem(query_str, pts_list)
 			if ok then table.insert(candidates, id) end
 		end
 		if #candidates > 0 then
+			-- pairs() order over problem_db is unspecified, so sort the
+			-- candidate ids before the random pick -- otherwise a fixed exam
+			-- seed could select a different matching problem run-to-run.
+			table.sort(candidates)
 			match = problem_db[candidates[math.random(1, #candidates)]]
 		end
 	else
@@ -626,6 +687,9 @@ function get_problem(query_str, pts_list)
 	--   |s| = 1  → single trailing stretch after whole problem; no inter-part space
 	--   |s| > 1  → per-part stretch: s[i] below part i, s[k] trailing after last part
 	--              (parts with i > |s| get no stretch; extra s values are ignored)
+	-- Not an off-by-one: inject_part emits s[i] as the gap BELOW part i when the
+	-- NEXT part begins (so s[1..k-1] land between parts), and s[k] is the trailing
+	-- space after part k -- i.e. s[k] *is* "below part k". Every s[i] is used once.
 	local k = match.part_count or 0
 	local trailing = 0
 	if #sl == 0 then
@@ -731,13 +795,15 @@ function pbank_problem_item(pts_str, stretch_str, query, fix_str)
 	local has_fix = fix_str and fix_str ~= ""
 	if has_fix then
 		pbank_pending_fix = fix_str
-		tex.print("\\directlua{push_scope() pbank_apply_pending_fix()}")
+		-- This \directlua is re-tokenized by TeX and runs in _G, so route it
+		-- through the engine namespace explicitly (the engine is no longer global).
+		tex.print("\\directlua{local _ENV=texlib;push_scope() pbank_apply_pending_fix()}")
 	end
 
 	get_problem(query:match("^%s*(.-)%s*$"), is_multi and pts_list or nil)
 
 	if has_fix then
-		tex.print("\\directlua{pop_scope()}")
+		tex.print("\\directlua{local _ENV=texlib;pop_scope()}")
 	end
 end
 
@@ -756,11 +822,32 @@ function autoexam_read_body()
 	f:close()
 	local _, begin_end = content:find("\\begin%s*{document}[^\n]*\n?")
 	if not begin_end then return nil end
+	-- Find the REAL \end{document}: the first occurrence that is NOT inside a TeX
+	-- comment. A raw (non-commented) \end{document} in a problem body would
+	-- itself end the document, so the first non-comment occurrence is always the
+	-- true end. This is robust against a stray \end{document} sitting in a
+	-- trailing comment, which the old "last occurrence" scan mis-sliced (pulling
+	-- the real \end{document} into the returned body).
 	local end_start, pos = nil, begin_end + 1
 	while true do
-		local s = content:find("\\end%s*{document}", pos)
-		if s then end_start = s; pos = s + 1
-		else break end
+		local s, e = content:find("\\end%s*{document}", pos)
+		if not s then break end
+		local line_start = content:sub(1, s):match("()[^\n]*$") or 1
+		local prefix = content:sub(line_start, s - 1)
+		-- Commented out if an unescaped % precedes it on the same line.
+		if not (prefix:find("^%%") or prefix:find("[^\\]%%")) then
+			end_start = s
+			break
+		end
+		pos = e + 1
+	end
+	if not end_start then
+		-- Defensive fallback: original last-occurrence heuristic.
+		pos = begin_end + 1
+		while true do
+			local s = content:find("\\end%s*{document}", pos)
+			if s then end_start = s; pos = s + 1 else break end
+		end
 	end
 	if not end_start then return nil end
 	return content:sub(begin_end + 1, end_start - 1)
@@ -783,31 +870,28 @@ end
 -- Split the inner content of \begin{problems}...\end{problems} on
 -- \newpage commands that appear at brace-depth 0.
 -- Returns a list of non-whitespace-only chunk strings.
-local function split_problems_on_newpage(inner)
-	local chunks = {}
-	local depth  = 0
-	local pos    = 1
-	local len    = #inner
-	local chunk_start = 1
-
+-- Shared low-level scanner used by the four order/choice splitters below.
+-- Walks `s` skipping TeX % comments and tracking { } brace depth; for every
+-- \command at brace depth 0 it calls fn(name, cmd_pos, after_pos), where `name`
+-- is the run of letters after the backslash (so \newpage and \newpageX are
+-- distinguished by name -- the old per-scanner letter-guards fall out for free),
+-- `cmd_pos` is the backslash index, and `after_pos` is the index just past the
+-- name. Replaces five hand-rolled copies of this same comment/brace state
+-- machine; each splitter now just reacts to the command names it cares about.
+local function scan_depth0_commands(s, fn)
+	local depth, pos, len = 0, 1, #s
 	while pos <= len do
-		local c = inner:sub(pos, pos)
-		if c == '%' then
-			local nl = inner:find("\n", pos, true)
+		local c = s:sub(pos, pos)
+		if c == '{' then depth = depth + 1; pos = pos + 1
+		elseif c == '}' then depth = depth - 1; pos = pos + 1
+		elseif c == '%' then
+			local nl = s:find("\n", pos, true)
 			pos = nl and (nl + 1) or (len + 1)
-		elseif c == '{' then
-			depth = depth + 1; pos = pos + 1
-		elseif c == '}' then
-			depth = depth - 1; pos = pos + 1
-		elseif c == '\\' and depth == 0
-				and inner:sub(pos, pos + 7) == "\\newpage" then
-			-- Guard: the char after \newpage must not be a letter
-			-- (to avoid false matches like \newpageX).
-			local after = inner:sub(pos + 8, pos + 8)
-			if after == "" or not after:match("%a") then
-				table.insert(chunks, inner:sub(chunk_start, pos - 1))
-				pos = pos + 8
-				chunk_start = pos
+		elseif c == '\\' and depth == 0 then
+			local name = s:match("^\\(%a+)", pos)
+			if name then
+				fn(name, pos, pos + 1 + #name)
+				pos = pos + 1 + #name
 			else
 				pos = pos + 1
 			end
@@ -815,7 +899,20 @@ local function split_problems_on_newpage(inner)
 			pos = pos + 1
 		end
 	end
-	table.insert(chunks, inner:sub(chunk_start))   -- final chunk
+end
+
+local function split_problems_on_newpage(inner)
+	-- Collect each top-level \newpage boundary, then slice between them.
+	local bounds = {}
+	scan_depth0_commands(inner, function(name, cmd_pos, after)
+		if name == "newpage" then bounds[#bounds + 1] = { cmd_pos, after } end
+	end)
+	local chunks, start = {}, 1
+	for _, b in ipairs(bounds) do
+		table.insert(chunks, inner:sub(start, b[1] - 1))
+		start = b[2]
+	end
+	table.insert(chunks, inner:sub(start))   -- final chunk
 
 	-- Drop whitespace-only chunks (leading/trailing \newpage artefacts).
 	local result = {}
@@ -833,25 +930,10 @@ end
 local function split_section_into_items(body)
 	local cmds = { problem = true, extracredit = true, importproblem = true }
 	local starts = {}
-	local depth, pos, len = 0, 1, #body
-	while pos <= len do
-		local c = body:sub(pos, pos)
-		if c == '{' then depth = depth + 1; pos = pos + 1
-		elseif c == '}' then depth = depth - 1; pos = pos + 1
-		elseif c == '%' then
-			local nl = body:find("\n", pos, true)
-			pos = nl and (nl + 1) or (len + 1)
-		elseif c == '\\' and depth == 0 then
-			local name = body:match("^\\(%a+)", pos)
-			if name and cmds[name] then
-				table.insert(starts, pos); pos = pos + 1 + #name
-			else
-				pos = pos + 1
-			end
-		else
-			pos = pos + 1
-		end
-	end
+	scan_depth0_commands(body, function(name, cmd_pos, after)
+		if cmds[name] then table.insert(starts, cmd_pos) end
+	end)
+	local len = #body
 	local items = {}
 	for i = 1, #starts do
 		local s = starts[i]
@@ -877,7 +959,9 @@ local function shuffle_section_body(seg_body)
 	if #all_items == 0 then return seg_body end   -- nothing shuffleable
 	local movable, pinned = {}, {}
 	for _, it in ipairs(all_items) do
-		if it:match("^\\extracredit") then table.insert(pinned, it)
+		-- Frontier %f[%A] requires a non-letter right after \extracredit, so a
+		-- command like \extracreditfoo isn't mistakenly pinned to section end.
+		if it:match("^\\extracredit%f[%A]") then table.insert(pinned, it)
 		else table.insert(movable, it) end
 	end
 	for i = #movable, 2, -1 do                    -- Fisher-Yates
@@ -943,23 +1027,12 @@ local function shuffle_problems_body(body)
 	local after  = body:sub(s2)
 
 	-- \section / \section* header positions at brace-depth 0 (skip comments).
+	-- Name-exact on "section" (so \section and \section* match, but an unrelated
+	-- \sectionfoo does not -- consistent with the \extracredit/\newpage guards).
 	local marks = {}
-	do
-		local depth, pos, len = 0, 1, #inner
-		while pos <= len do
-			local c = inner:sub(pos, pos)
-			if c == '{' then depth = depth + 1; pos = pos + 1
-			elseif c == '}' then depth = depth - 1; pos = pos + 1
-			elseif c == '%' then
-				local nl = inner:find("\n", pos, true)
-				pos = nl and (nl + 1) or (len + 1)
-			elseif c == '\\' and depth == 0 and inner:sub(pos + 1, pos + 7) == "section" then
-				table.insert(marks, pos); pos = pos + 8
-			else
-				pos = pos + 1
-			end
-		end
-	end
+	scan_depth0_commands(inner, function(name, cmd_pos, after)
+		if name == "section" then table.insert(marks, cmd_pos) end
+	end)
 
 	local body_out
 	if #marks == 0 then
@@ -1003,25 +1076,12 @@ local CHOICE_ENVS = { choices = true, oneparchoices = true }
 local function split_choice_items(inner)
 	local kind = { choice = false, CorrectChoice = false, fixedchoice = true }
 	local starts, fixed = {}, {}
-	local depth, pos, len = 0, 1, #inner
-	while pos <= len do
-		local c = inner:sub(pos, pos)
-		if c == '{' then depth = depth + 1; pos = pos + 1
-		elseif c == '}' then depth = depth - 1; pos = pos + 1
-		elseif c == '%' then
-			local nl = inner:find("\n", pos, true); pos = nl and (nl + 1) or (len + 1)
-		elseif c == '\\' and depth == 0 then
-			local name = inner:match("^\\(%a+)", pos)
-			if name and kind[name] ~= nil then
-				table.insert(starts, pos); table.insert(fixed, kind[name])
-				pos = pos + 1 + #name
-			else
-				pos = pos + 1
-			end
-		else
-			pos = pos + 1
+	scan_depth0_commands(inner, function(name, cmd_pos, after)
+		if kind[name] ~= nil then
+			table.insert(starts, cmd_pos); table.insert(fixed, kind[name])
 		end
-	end
+	end)
+	local len = #inner
 	if #starts == 0 then return inner, {} end
 	local prefix, items = inner:sub(1, starts[1] - 1), {}
 	for i = 1, #starts do
@@ -1118,14 +1178,44 @@ end
 -- SCORE-PAGE PRESCAN
 -- ============================================================
 
--- Scan a body string for all \problem[pts][stretch]{query} calls in order.
--- Returns a list of {qno, pts, pageno} tables where pts is the raw pts CSV
--- string and pageno is the 1-based problem-page number (reset by
--- \begin{problems}).  The page number is derived by splitting the inner
--- \begin{problems}...\end{problems} content on \newpage, so it matches the
--- exam page counter that \begin{problems} resets to 1.
--- Runs on the (possibly shuffled) ver_body so the question order matches
--- the version the student actually sees.
+-- Find every \problem call in a chunk and return its raw pts string in order.
+-- Tolerates all documented spellings: \problem{q}, \problem[pts]{q},
+-- \problem[pts][stretch]{q}, and any of those with a trailing [fix].  The
+-- FIRST optional [..] after \problem is always the pts CSV (per the
+-- \problem[pts][stretch]{filter}[fix] signature); a bracketless \problem{q}
+-- yields pts = '' because its points are resolved from the bank at typeset
+-- time and cannot be known from the source.  Rejects \problemfoo and the
+-- definition macro names that merely start with "problem".
+local function scan_problem_pts(chunk)
+	local out = {}
+	local i, n = 1, #chunk
+	while true do
+		local s, e = chunk:find('\\problem', i, true)
+		if not s then break end
+		i = e + 1
+		-- Must be the \problem retrieval macro: next char is [ , { or space.
+		local nextc = chunk:sub(e + 1, e + 1)
+		if nextc == '[' or nextc == '{' or nextc == '' or nextc:match('%s') then
+			local j = e + 1
+			while j <= n and chunk:sub(j, j):match('%s') do j = j + 1 end
+			local pts = ''
+			if chunk:sub(j, j) == '[' then
+				local close = chunk:find(']', j + 1, true)
+				if close then pts = chunk:sub(j + 1, close - 1) end
+			end
+			out[#out + 1] = pts:match('^%s*(.-)%s*$')
+		end
+	end
+	return out
+end
+
+-- Scan a body string for all \problem calls in order.  Returns a list of
+-- {qno, pts, pageno} tables where pts is the raw pts CSV string and pageno is
+-- the 1-based problem-page number (reset by \begin{problems}).  The page
+-- number is derived by splitting the inner \begin{problems}...\end{problems}
+-- content on \newpage, so it matches the exam page counter that
+-- \begin{problems} resets to 1.  Runs on the (possibly shuffled) ver_body so
+-- the question order matches the version the student actually sees.
 local function prescan_problems(body)
 	-- Extract the content between \begin{problems} and \end{problems}.
 	local inner = body:match('\\begin%s*{problems}(.-)\\end%s*{problems}')
@@ -1133,11 +1223,9 @@ local function prescan_problems(body)
 		-- Fallback: scan whole body without page tracking.
 		local rows = {}
 		local qno  = 0
-		for pts in body:gmatch('\\problem%[([^%]]+)%]%[[^%]]+%]{[^}]+}') do
+		for _, pts in ipairs(scan_problem_pts(body)) do
 			qno = qno + 1
-			table.insert(rows, { qno = tostring(qno),
-									pts = pts:match('^%s*(.-)%s*$'),
-									pageno = '?' })
+			table.insert(rows, { qno = tostring(qno), pts = pts, pageno = '?' })
 		end
 		return rows
 	end
@@ -1151,10 +1239,10 @@ local function prescan_problems(body)
 	local rows = {}
 	local qno  = 0
 	for pageno, chunk in ipairs(pages) do
-		for pts in chunk:gmatch('\\problem%[([^%]]+)%]%[[^%]]+%]{[^}]+}') do
+		for _, pts in ipairs(scan_problem_pts(chunk)) do
 			qno = qno + 1
 			table.insert(rows, { qno    = tostring(qno),
-									pts    = pts:match('^%s*(.-)%s*$'),
+									pts    = pts,
 									pageno = tostring(pageno) })
 		end
 	end
@@ -1261,7 +1349,7 @@ function autoexam_run_versions()
 		local body = autoexam_read_body()
 		if body then write_score_file(ver, prescan_problems(body)) end
 		tex.sprint("\\gdef\\theExamVersion{" .. ver .. "}")
-		tex.sprint("\\directlua{set_exam_seed('" .. ver .. "')}")
+		tex.sprint("\\directlua{local _ENV=texlib;set_exam_seed('" .. ver .. "')}")
 		return
 	end
 
@@ -1301,7 +1389,7 @@ function autoexam_run_versions()
 		f:close()
 
 		tex.sprint("\\gdef\\theExamVersion{" .. ver .. "}")
-		tex.sprint("\\directlua{set_exam_seed('" .. ver .. "')}")  -- re-seed for TeX
+		tex.sprint("\\directlua{local _ENV=texlib;set_exam_seed('" .. ver .. "')}")  -- re-seed for TeX
 		tex.sprint("\\input{" .. tmpfile_name .. "}")
 		if i < #versions_to_run then
 			tex.sprint("\\clearpage")
@@ -1309,7 +1397,7 @@ function autoexam_run_versions()
 	end
 	-- Re-write the source map now that typeset_problem() has populated the
 	-- tmpfile field for every problem that was actually typeset this run.
-	tex.sprint("\\directlua{autoexam_write_srcmap()}")
+	tex.sprint("\\directlua{local _ENV=texlib;autoexam_write_srcmap()}")
 	tex.sprint("\\enddocument")
 end
 
@@ -1331,7 +1419,6 @@ local function render_score_row(qno, pts_str, pageno)
 	end
 	local total   = 0
 	for _, v in ipairs(parts) do total = total + v end
-	local letters = {'a','b','c','d','e','f','g','h'}
 	local pg      = pageno or '?'   -- page number cell (plain, not bold)
 
 	if #parts <= 1 then
@@ -1352,7 +1439,7 @@ local function render_score_row(qno, pts_str, pageno)
 			-- effective for a score table.
 			local pg_cell = (i == 1) and pg or ''
 			local q_cell  = (i == 1) and ('\\textbf{' .. qno .. '}') or ''
-			local lbl = '\\textbf{' .. (letters[i] or ('(' .. i .. ')')) .. '}'
+			local lbl = '\\textbf{' .. (part_letters[i] or ('(' .. i .. ')')) .. '}'
 			tex.print(pg_cell .. ' & ' .. q_cell .. ' & ' .. lbl .. ' & ' .. pts .. ' & \\\\')
 			if i < k then tex.print('\\cline{3-5}') end
 		end
@@ -1500,7 +1587,6 @@ function autoexam_gradingrow(qno, pts_str)
 	end
 	local total = 0
 	for _, v in ipairs(parts) do total = total + v end
-	local letters = {'a','b','c','d','e','f','g','h'}
 
 	if #parts <= 1 then
 		local pts = parts[1] or 0
@@ -1509,7 +1595,7 @@ function autoexam_gradingrow(qno, pts_str)
 	else
 		for i, pts in ipairs(parts) do
 			local q_cell = (i == 1) and ('\\textbf{' .. qno .. '}') or ''
-			local lbl = letters[i] or ('(' .. i .. ')')
+			local lbl = part_letters[i] or ('(' .. i .. ')')
 			tex.print(q_cell .. ' & ' .. lbl .. ' & ' .. pts .. ' & \\\\')
 			if i < #parts then tex.print('\\cline{2-4}') end
 		end
@@ -1519,3 +1605,9 @@ function autoexam_gradingrow(qno, pts_str)
 	end
 	tex.print('\\noalign{\\addtocounter{autoexamtotal}{' .. total .. '}}')
 end
+
+-- Publish the engine's private namespace as the single global `texlib`. Every
+-- function and state field defined above lives in this table (not _G), so the
+-- bank macros reach them via `texlib.<name>` -- which \pbank@lua arranges by
+-- prepending `local _ENV = texlib` to each \directlua chunk.
+_G.texlib = _ENV

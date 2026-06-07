@@ -67,11 +67,10 @@
 % the \directlua primitive itself, because other packages probe
 % \ifdefined\directlua to detect LuaTeX.
 \ifdefined\directlua
-	\let\pbank@lua\directlua
 	% NOTE: no Lua `--` line comments inside this \directlua block. TeX collapses
 	% the newlines into spaces before Lua sees the chunk, so a `--` comment would
 	% swallow the rest of the code. Keep explanations in TeX `%` comments above.
-	\pbank@lua{
+	\directlua{
 		local function load_engine(name)
 			local path = kpse.find_file(name, "lua")
 			if path and lfs.attributes(path) then dofile(path) return end
@@ -84,6 +83,13 @@
 		load_engine("texlib_synctex.lua")
 		load_engine("problem_engine.lua")
 	}%
+	% The engine no longer pollutes the global Lua namespace: it publishes itself
+	% as the single global table `texlib`. Prepending `local _ENV = texlib` lets
+	% every bank macro below keep calling bare engine names (set_var, get_problem,
+	% vars[...], ...) -- those resolve inside `texlib`, while tex/math/etc. fall
+	% through to _G via texlib's metatable. (Must come AFTER the engine load
+	% above, which runs as raw \directlua because `texlib` doesn't exist yet.)
+	\newcommand{\pbank@lua}[1]{\directlua{local _ENV = texlib;#1}}%
 \else
 	\newcommand{\pbank@lua}[1]{%
 		\PackageError{texlib-problembank}%
@@ -100,6 +106,15 @@
 
 % \setrng{name}{min}{max}  — store a single random integer in [min, max]
 \newcommand{\setrng}[3]{\pbank@lua{set_rng('#1', #2, #3)}}
+
+% \setexamseed{n}  — pin the RNG to integer n for reproducible builds. Put it in
+% the preamble. Without it, an exam WITH \versions{...} is already deterministic
+% per version, but a quiz / single-version doc reseeds from the clock each build
+% (fresh randomization). With it, both become reproducible: versioned exams fold
+% n into each per-version seed (so the set is reproducible yet versions stay
+% decorrelated), and the no-version case uses n directly. Seeds immediately so it
+% also covers quizzes, which never call the per-version seeder.
+\newcommand{\setexamseed}[1]{\pbank@lua{exam_seed_override = #1 set_exam_seed('')}}
 
 % \calcvar{name}{lua-expr}  — compute an expression using stored vars
 \newcommand{\calcvar}[2]{\pbank@lua{calc_var('#1', '#2')}}
@@ -191,7 +206,26 @@
 }
 
 % Public environment: \begin{problem}{id}[meta] ... \end{problem}
+%
+% Misuse guard: `\problem` names two different things -- this DEFINITION
+% environment everywhere, and (inside \begin{problems}, where it is \let to the
+% retrieval item) a RETRIEVAL command. A user who writes a bare \problem{filter}
+% OUTSIDE {problems} expecting retrieval actually invokes this environment's
+% begin-code, which would then run away scanning for \end{problem}. \begin sets
+% \@currenvir to "problem"; if it isn't, we were not entered via \begin{problem},
+% so raise a targeted error instead. Fail-safe: only errors when we can prove the
+% environment opener was reached outside a \begin{problem}.
 \newenvironment{problem}[1]{%
+	\def\@texlib@penv{problem}%
+	\ifx\@currenvir\@texlib@penv\else
+		\PackageError{texlib-problembank}%
+			{\protect\problem\space used outside \protect\begin{problems}}%
+			{To DEFINE a bank problem, use the environment:^^J%
+			 \space\space\string\begin{problem}{id} ... \string\end{problem}.^^J%
+			 To RETRIEVE one, use \string\getproblem{filter} anywhere, or^^J%
+			 \space\space\string\problem[pts]{filter} INSIDE \string\begin{problems}.^^J%
+			 It looks like you wrote a bare \string\problem outside {problems}.}%
+	\fi
 	\def\@problem@id{#1}%
 	% Record the bank-file line number NOW (before \Collect@Body reads ahead to
 	% \end{problem}).  By the time define_problem_from_env() runs, \inputlineno
@@ -367,12 +401,12 @@
 \newenvironment{problems}{%
 	\problems@begin@hook
 	% ---- inter-problem separator: first problem on a page gets no rule -------
-	\directlua{pbank_first_on_page = true}%
+	\pbank@lua{pbank_first_on_page = true}%
 	% Patch \newpage so crossing a page boundary resets the "first on page" flag.
 	\let\@problems@saved@newpage\newpage
 	\renewcommand{\newpage}{%
 		\@problems@saved@newpage
-		\directlua{pbank_first_on_page = true}%
+		\pbank@lua{pbank_first_on_page = true}%
 	}%
 	% ---- start questions list ------------------------------------------------
 	\begin{questions}%

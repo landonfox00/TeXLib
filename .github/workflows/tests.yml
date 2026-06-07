@@ -22,10 +22,21 @@ jobs:
       - name: Parallel version-builder tests
         run: python test_build_versions.py
 
-  # Real end-to-end: drives the actual builder coroutine against real
-  # pdflatex + biber on a biblatex fixture, proving the biber-skip cache and
-  # rerun handling work against the genuine toolchain. The test soft-skips if
-  # the tools are missing, so an apt hiccup degrades gracefully.
+  # Real end-to-end: drives the actual builder coroutines against a genuine
+  # toolchain. Two proofs run here:
+  #   * test_biber_integration.py -- pdflatex + biber on a biblatex fixture,
+  #     proving the biber-skip cache and rerun handling.
+  #   * test_build_versions.py    -- its gated real_build_check() does a genuine
+  #     2-version autoexam build with LUALATEX, proving the parallel driver
+  #     resolves the shared root .sty files (the comma-safe TEXINPUTS) and emits
+  #     two distinct single-version PDFs. This is the one check the fake-engine
+  #     suite cannot exercise, so it must run somewhere with a real toolchain.
+  # Both tests soft-skip if their tools are missing, so an apt hiccup degrades
+  # gracefully rather than failing the job.
+  #
+  # texlive-luatex provides lualatex (autoexam's engine); pictures/fonts/science
+  # cover the class's deps (tikz/pgfplots, lmodern, mathtools). pypdf is needed
+  # by the version builder's merge + the real check's PDF page/text assertions.
   biber-integration:
     runs-on: ubuntu-latest
     steps:
@@ -41,6 +52,14 @@ jobs:
             texlive-latex-recommended \
             texlive-latex-extra \
             texlive-bibtex-extra \
+            texlive-luatex \
+            texlive-pictures \
+            texlive-fonts-recommended \
+            texlive-science \
             biber
+      - name: Install pypdf (version-builder merge + PDF assertions)
+        run: python -m pip install --quiet pypdf
       - name: Real biber integration test
         run: python Sublime/test_biber_integration.py
+      - name: Real autoexam version-builder test (lualatex)
+        run: python test_build_versions.py
