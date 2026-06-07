@@ -58,9 +58,11 @@ class _StubPdfBuilder:
         self._displayed += str(msg)
 
 
+TEXLIB_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+
 def _import_builder():
-    here = os.path.dirname(os.path.abspath(__file__))
-    sublime_dir = os.path.join(here, "Sublime")
+    sublime_dir = os.path.join(TEXLIB_ROOT, "Sublime")
     for name in (
         "LaTeXTools",
         "LaTeXTools.plugins",
@@ -78,6 +80,40 @@ TexlibBuilder = _import_builder()
 
 
 # --- One version build ------------------------------------------------------
+def _texinputs_env(tex_dir):
+    """Env for the engine, with TEXINPUTS extended so the TeXLib-root shared
+    files (texlib-assessment.sty, texlib-problembank.sty, problem_engine.lua,
+    ...) resolve even though the document lives in a subdir (e.g. Exams/).
+
+    This is what makes the driver standalone: without it the build only works
+    if the caller's shell already exports a suitable TEXINPUTS.
+
+    The root is added as a RELATIVE path (from tex_dir), not absolute, because
+    kpathsea SILENTLY refuses to search any TEXINPUTS entry containing a comma
+    -- and the repo can sit under one (a OneDrive 'University of Nevada, Reno'
+    folder). Going up via '..' has no comma when the document is inside the
+    repo (the normal case). The absolute root is appended too as a fallback for
+    comma-free hosts / documents outside the tree, mirroring smoke_test.py.
+    Forward slashes are forced ('//' = recursive search, literal on every
+    platform); a trailing separator keeps the default texmf trees searchable.
+    """
+    env = os.environ.copy()
+    sep = ";" if os.name == "nt" else ":"
+    root = TEXLIB_ROOT.replace(os.sep, "/")
+    parts = [".", root + "//"]
+    try:
+        rel = os.path.relpath(TEXLIB_ROOT, tex_dir).replace(os.sep, "/")
+        parts.insert(1, rel + "//")
+    except ValueError:
+        # Different Windows drive: no relative path exists. Fall back to the
+        # absolute root alone (works unless that path also contains a comma).
+        pass
+    # Trailing separator (existing may be empty) keeps the default texmf trees
+    # searchable -- without it kpathsea would stop finding standard packages.
+    env["TEXINPUTS"] = sep.join(parts) + sep + env.get("TEXINPUTS", "")
+    return env
+
+
 def _aux_dir_for(tex_root, version):
     """Persistent per-(document, version) aux dir, so the biber cache survives
     across runs (mirrors the Sublime builder's <<temp>> scheme)."""
@@ -109,6 +145,8 @@ def build_one_version(tex_root, base, version, engine, timeout, verbose):
     # distinct temp dir, so this adds -output-directory.
     base_cmd = TexlibBuilder._base_engine_cmd(engine, aux, tex_dir)
 
+    env = _texinputs_env(tex_dir)
+
     t0 = time.monotonic()
     heads, log = [], []
     try:
@@ -121,6 +159,7 @@ def build_one_version(tex_root, base, version, engine, timeout, verbose):
             proc = subprocess.run(
                 cmd, cwd=tex_dir, capture_output=True, text=True,
                 encoding="utf-8", errors="replace", timeout=timeout,
+                env=env,
             )
             out = (proc.stdout or "") + (proc.stderr or "")
             log.append(out)

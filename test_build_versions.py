@@ -5,13 +5,17 @@ Tests for build_versions.py (the parallel multi-version exam builder).
 Most checks use a FAKE subprocess so the driver's orchestration -- per-version
 source copy, coroutine drive, PDF collection, scratch cleanup, parallel fan-out,
 and merge -- is exercised deterministically with no TeX toolchain. A final
-gated check does a real 2-version autoexam build if the class is resolvable
-(soft-skips otherwise).
+gated check does a real 2-version autoexam build with lualatex if it (and the
+autoexam class) are present, asserting two distinct single-version PDFs come
+out (soft-skips otherwise). That real build is what guards the TEXINPUTS /
+comma-path resolution that the fake engine cannot exercise.
 
 Run:  python test_build_versions.py     (exit code = number of failures)
 """
 
+import glob
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -101,6 +105,61 @@ def make_fixture(versions="A, B", src_extra=""):
                  r"\versions{" + versions + "}\n" + src_extra +
                  r"\begin{document}q\end{document}" "\n")
     return d, tex
+
+
+def real_build_check():
+    """A genuine 2-version autoexam build via lualatex, asserting two distinct
+    single-version PDFs. Soft-skips unless lualatex, the autoexam class, and
+    pypdf are all available.
+
+    The fixture is written INSIDE the repo (under Exams/, next to autoexam.cls)
+    rather than a system temp dir, deliberately: build_versions resolves the
+    shared root .sty/.lua files via a comma-free RELATIVE TEXINPUTS path up from
+    the document, which only stays comma-free when the document lives in the
+    tree. A /tmp fixture would re-introduce the comma this whole mechanism
+    exists to dodge -- so testing from /tmp would not exercise the real path.
+    """
+    exams = os.path.join(bv.TEXLIB_ROOT, "Exams")
+    cls = os.path.join(exams, "autoexam.cls")
+    if not shutil.which("lualatex") or not os.path.isfile(cls) or not _have_pypdf():
+        why = ("lualatex not on PATH" if not shutil.which("lualatex")
+               else "Exams/autoexam.cls not found" if not os.path.isfile(cls)
+               else "pypdf not installed")
+        print(f"  SKIP  real 2-version autoexam build ({why})")
+        return
+
+    from pypdf import PdfReader
+    base = "_bv_realtest"
+    tex = os.path.join(exams, base + ".tex")
+    with open(tex, "w", encoding="utf-8") as fh:
+        fh.write(r"\documentclass{autoexam}" "\n"
+                 r"\versions{A, B}" "\n"
+                 r"\examsetup{number = 1, date = {Jan 1, 2026}}" "\n"
+                 r"\begin{document}" "\n"
+                 r"This is version \theExamVersion." "\n"
+                 r"\end{document}" "\n")
+    try:
+        rc = bv.main([tex, "--separate"])
+        pdfs = {v: os.path.join(exams, f"{base}_{v}.pdf") for v in ("A", "B")}
+        check("real build: exit 0", rc == 0, f"rc={rc}")
+        check("real build: both per-version PDFs produced",
+              all(os.path.exists(p) for p in pdfs.values()),
+              [os.path.basename(p) for p in pdfs.values() if not os.path.exists(p)])
+        if all(os.path.exists(p) for p in pdfs.values()):
+            texts = {v: " ".join(PdfReader(p).pages[0].extract_text().split())
+                     for v, p in pdfs.items()}
+            check("real build: each PDF is a single version (1 page)",
+                  all(len(PdfReader(p).pages) == 1 for p in pdfs.values()))
+            check("real build: version A PDF shows version A",
+                  "version A" in texts["A"], texts["A"][:70])
+            check("real build: version B PDF shows version B",
+                  "version B" in texts["B"], texts["B"][:70])
+            check("real build: the two versions differ",
+                  texts["A"] != texts["B"])
+    finally:
+        for pat in (base + ".*", base + "_*"):
+            for f in glob.glob(os.path.join(exams, pat)):
+                bv.TexlibBuilder._force_remove(f)
 
 
 def main():
@@ -199,6 +258,9 @@ def main():
                        lambda: bv.main([tex6]))  # no flag -> combined default
         check("driver default: produces combined exam.pdf (no flag)",
               rc == 0 and os.path.exists(os.path.join(d6, "exam.pdf")), f"rc={rc}")
+
+    # --- real toolchain: genuine 2-version autoexam build (gated) -----------
+    real_build_check()
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL
