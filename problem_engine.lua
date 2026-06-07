@@ -870,31 +870,28 @@ end
 -- Split the inner content of \begin{problems}...\end{problems} on
 -- \newpage commands that appear at brace-depth 0.
 -- Returns a list of non-whitespace-only chunk strings.
-local function split_problems_on_newpage(inner)
-	local chunks = {}
-	local depth  = 0
-	local pos    = 1
-	local len    = #inner
-	local chunk_start = 1
-
+-- Shared low-level scanner used by the four order/choice splitters below.
+-- Walks `s` skipping TeX % comments and tracking { } brace depth; for every
+-- \command at brace depth 0 it calls fn(name, cmd_pos, after_pos), where `name`
+-- is the run of letters after the backslash (so \newpage and \newpageX are
+-- distinguished by name -- the old per-scanner letter-guards fall out for free),
+-- `cmd_pos` is the backslash index, and `after_pos` is the index just past the
+-- name. Replaces five hand-rolled copies of this same comment/brace state
+-- machine; each splitter now just reacts to the command names it cares about.
+local function scan_depth0_commands(s, fn)
+	local depth, pos, len = 0, 1, #s
 	while pos <= len do
-		local c = inner:sub(pos, pos)
-		if c == '%' then
-			local nl = inner:find("\n", pos, true)
+		local c = s:sub(pos, pos)
+		if c == '{' then depth = depth + 1; pos = pos + 1
+		elseif c == '}' then depth = depth - 1; pos = pos + 1
+		elseif c == '%' then
+			local nl = s:find("\n", pos, true)
 			pos = nl and (nl + 1) or (len + 1)
-		elseif c == '{' then
-			depth = depth + 1; pos = pos + 1
-		elseif c == '}' then
-			depth = depth - 1; pos = pos + 1
-		elseif c == '\\' and depth == 0
-				and inner:sub(pos, pos + 7) == "\\newpage" then
-			-- Guard: the char after \newpage must not be a letter
-			-- (to avoid false matches like \newpageX).
-			local after = inner:sub(pos + 8, pos + 8)
-			if after == "" or not after:match("%a") then
-				table.insert(chunks, inner:sub(chunk_start, pos - 1))
-				pos = pos + 8
-				chunk_start = pos
+		elseif c == '\\' and depth == 0 then
+			local name = s:match("^\\(%a+)", pos)
+			if name then
+				fn(name, pos, pos + 1 + #name)
+				pos = pos + 1 + #name
 			else
 				pos = pos + 1
 			end
@@ -902,7 +899,20 @@ local function split_problems_on_newpage(inner)
 			pos = pos + 1
 		end
 	end
-	table.insert(chunks, inner:sub(chunk_start))   -- final chunk
+end
+
+local function split_problems_on_newpage(inner)
+	-- Collect each top-level \newpage boundary, then slice between them.
+	local bounds = {}
+	scan_depth0_commands(inner, function(name, cmd_pos, after)
+		if name == "newpage" then bounds[#bounds + 1] = { cmd_pos, after } end
+	end)
+	local chunks, start = {}, 1
+	for _, b in ipairs(bounds) do
+		table.insert(chunks, inner:sub(start, b[1] - 1))
+		start = b[2]
+	end
+	table.insert(chunks, inner:sub(start))   -- final chunk
 
 	-- Drop whitespace-only chunks (leading/trailing \newpage artefacts).
 	local result = {}
@@ -920,25 +930,10 @@ end
 local function split_section_into_items(body)
 	local cmds = { problem = true, extracredit = true, importproblem = true }
 	local starts = {}
-	local depth, pos, len = 0, 1, #body
-	while pos <= len do
-		local c = body:sub(pos, pos)
-		if c == '{' then depth = depth + 1; pos = pos + 1
-		elseif c == '}' then depth = depth - 1; pos = pos + 1
-		elseif c == '%' then
-			local nl = body:find("\n", pos, true)
-			pos = nl and (nl + 1) or (len + 1)
-		elseif c == '\\' and depth == 0 then
-			local name = body:match("^\\(%a+)", pos)
-			if name and cmds[name] then
-				table.insert(starts, pos); pos = pos + 1 + #name
-			else
-				pos = pos + 1
-			end
-		else
-			pos = pos + 1
-		end
-	end
+	scan_depth0_commands(body, function(name, cmd_pos, after)
+		if cmds[name] then table.insert(starts, cmd_pos) end
+	end)
+	local len = #body
 	local items = {}
 	for i = 1, #starts do
 		local s = starts[i]
@@ -1032,23 +1027,12 @@ local function shuffle_problems_body(body)
 	local after  = body:sub(s2)
 
 	-- \section / \section* header positions at brace-depth 0 (skip comments).
+	-- Name-exact on "section" (so \section and \section* match, but an unrelated
+	-- \sectionfoo does not -- consistent with the \extracredit/\newpage guards).
 	local marks = {}
-	do
-		local depth, pos, len = 0, 1, #inner
-		while pos <= len do
-			local c = inner:sub(pos, pos)
-			if c == '{' then depth = depth + 1; pos = pos + 1
-			elseif c == '}' then depth = depth - 1; pos = pos + 1
-			elseif c == '%' then
-				local nl = inner:find("\n", pos, true)
-				pos = nl and (nl + 1) or (len + 1)
-			elseif c == '\\' and depth == 0 and inner:sub(pos + 1, pos + 7) == "section" then
-				table.insert(marks, pos); pos = pos + 8
-			else
-				pos = pos + 1
-			end
-		end
-	end
+	scan_depth0_commands(inner, function(name, cmd_pos, after)
+		if name == "section" then table.insert(marks, cmd_pos) end
+	end)
 
 	local body_out
 	if #marks == 0 then
@@ -1092,25 +1076,12 @@ local CHOICE_ENVS = { choices = true, oneparchoices = true }
 local function split_choice_items(inner)
 	local kind = { choice = false, CorrectChoice = false, fixedchoice = true }
 	local starts, fixed = {}, {}
-	local depth, pos, len = 0, 1, #inner
-	while pos <= len do
-		local c = inner:sub(pos, pos)
-		if c == '{' then depth = depth + 1; pos = pos + 1
-		elseif c == '}' then depth = depth - 1; pos = pos + 1
-		elseif c == '%' then
-			local nl = inner:find("\n", pos, true); pos = nl and (nl + 1) or (len + 1)
-		elseif c == '\\' and depth == 0 then
-			local name = inner:match("^\\(%a+)", pos)
-			if name and kind[name] ~= nil then
-				table.insert(starts, pos); table.insert(fixed, kind[name])
-				pos = pos + 1 + #name
-			else
-				pos = pos + 1
-			end
-		else
-			pos = pos + 1
+	scan_depth0_commands(inner, function(name, cmd_pos, after)
+		if kind[name] ~= nil then
+			table.insert(starts, cmd_pos); table.insert(fixed, kind[name])
 		end
-	end
+	end)
+	local len = #inner
 	if #starts == 0 then return inner, {} end
 	local prefix, items = inner:sub(1, starts[1] - 1), {}
 	for i = 1, #starts do
