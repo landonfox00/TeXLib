@@ -1,12 +1,30 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesClass{autoexam}[2025/02/13 AutoExam Class (Merged)]
 
-% Pass any options to the base exam class
-\DeclareOption*{\PassOptionsToClass{\CurrentOption}{exam}}
+% Per-document metadata may be passed in the class option list, e.g.
+%   \documentclass[exam-number=5, exam-date={May 2, 2026}]{autoexam}
+% Any option containing "=" is a metadata key=value pair (applied below, once the
+% exam-meta keys and coursemeta have loaded, so document options win); every
+% other option is forwarded to the base exam class. Metadata is read from
+% \@raw@classoptionslist so values keep their spaces. \DeclareOption* only
+% forwards the non-metadata options; the key=value ones pass through it (a no-op)
+% so the kernel marks them used. Safe because no exam-class option uses key=value.
+\DeclareOption*{%
+	\@expandtwoargs\in@{=}{\CurrentOption}%
+	\ifin@\else
+		\PassOptionsToClass{\CurrentOption}{exam}%
+	\fi
+}
 \ProcessOptions\relax
 
 % Load the base class
 \LoadClass[11pt]{exam}
+
+% A class-option value containing a comma (e.g. exam-date={May 2, 2026}) is split
+% by the kernel's option parser into a stray fragment ("2026") with no "=", which
+% would be reported as an "unused global option". The real values are consumed
+% from \@raw@classoptionslist below, so discard those spurious leftovers.
+\AtEndOfClass{\global\let\@unusedoptionlist\@empty}
 
 % Shared assessment setup (texlib-corepkg, texlib-build, course-metadata, the
 % common aux packages, and the unified problem/part labels). Shared with quiz.
@@ -586,6 +604,17 @@
 	date                    .code:n = { \renewcommand{\theExamDate}{#1}   },
 	ps                      .code:n = { \renewcommand{\thePS}{#1}         },
 	instructions-file       .code:n = { \renewcommand{\@autoexam@instructions@file}{#1} },
+}
+
+% Apply document metadata from the class option list now that the exam-meta keys
+% above and coursemeta.tex are loaded (so document options override coursemeta).
+% Read \@raw@classoptionslist, not \CurrentOption, to keep spaces in values.
+\cs_if_exist:cT { @raw@classoptionslist } {
+	\tl_set:Nv    \l_tmpa_tl    { @raw@classoptionslist }
+	\clist_set:NV \l_tmpa_clist \l_tmpa_tl
+	\clist_map_inline:Nn \l_tmpa_clist {
+		\tl_if_in:nnT { #1 } { = } { \keys_set:nn { meta } { #1 } }
+	}
 }
 \ExplSyntaxOff
 

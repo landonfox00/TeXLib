@@ -1,0 +1,12 @@
+% coursemeta.tex - fixture for the metadata auto-vivification smoke build.
+% office-hours is NOT a predefined key: it exercises course-metadata.sty's
+% catch-all, which must absorb it and mint \GetOfficeHours.  \MetaAllowCustomKeys
+% marks the custom key as intentional so the build stays quiet (log-only note).
+\MetaAllowCustomKeys
+\metasetup{
+	institution     = {Smoke Test University},
+	instructor      = {Test Instructor},
+	course-subject  = Math,
+	course-number   = 101,
+	office-hours    = {MWF 2-3pm CMOFFICEHOURSMARK},
+}

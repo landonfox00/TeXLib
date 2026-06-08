@@ -4,11 +4,31 @@
 \ProvidesClass{didactic}[2026/05/09 v3.1 UNR Lecture Notes (TeXLib)]
 
 % ==============================================================================
-% 0. OPTIONS PASSED TO ARTICLE
+% 0. OPTIONS
 % ==============================================================================
-\DeclareOption*{\PassOptionsToClass{\CurrentOption}{article}}
+% Per-document metadata may be passed in the class option list, e.g.
+%   \documentclass[unit-number=3, unit-title={Limits}, instructor=true]{didactic}
+% Any option containing "=" is a metadata key=value pair; every other option
+% (11pt, twoside, ...) is forwarded to article. Metadata is applied at the end
+% of section 3 (after coursemeta.tex loads, so document options win) by reading
+% \@raw@classoptionslist directly — that list preserves spaces in values, which
+% the \CurrentOption seen here does not. \DeclareOption* therefore only forwards
+% the non-metadata options; the key=value ones still pass through it (a no-op)
+% so the kernel marks them used. Safe because no base-class option uses key=value.
+\DeclareOption*{%
+	\@expandtwoargs\in@{=}{\CurrentOption}%
+	\ifin@\else
+		\PassOptionsToClass{\CurrentOption}{article}%
+	\fi
+}
 \ProcessOptions\relax
 \LoadClass[11pt]{article}
+
+% A class-option value containing a comma (e.g. a date like {May 2, 2026}) is
+% split by the kernel's option parser into a stray fragment with no "=", which
+% would be reported as an "unused global option". The real values are consumed
+% from \@raw@classoptionslist below, so discard those spurious leftovers.
+\AtEndOfClass{\global\let\@unusedoptionlist\@empty}
 
 % ==============================================================================
 % 1. PACKAGES
@@ -96,6 +116,19 @@
 			}
 	}
 	\NewExpandableDocumentCommand{\GetOverview}{}{ \tl_use:N \g__didactic_overview_tl }
+\ExplSyntaxOff
+
+% Apply document metadata from the class option list now that the keys above and
+% coursemeta.tex are loaded (so document options override coursemeta defaults).
+% Read \@raw@classoptionslist, not \CurrentOption, to keep spaces in values.
+\ExplSyntaxOn
+\cs_if_exist:cT { @raw@classoptionslist } {
+	\tl_set:Nv    \l_tmpa_tl    { @raw@classoptionslist }
+	\clist_set:NV \l_tmpa_clist \l_tmpa_tl
+	\clist_map_inline:Nn \l_tmpa_clist {
+		\tl_if_in:nnT { #1 } { = } { \keys_set:nn { meta } { #1 } }
+	}
+}
 \ExplSyntaxOff
 
 % ==============================================================================

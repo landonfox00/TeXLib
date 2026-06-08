@@ -3,20 +3,20 @@
 % =============================================================================
 %
 % Compile with:
-%   lualatex template.tex
+%   lualatex schedule-template.tex
 %
 % Requires coursemeta.tex at an ancestor directory providing:
 %   institution, course-subject, course-number, course-title, course-section,
 %   season, year, start-date, end-date, final-date, final-time, lecture-days.
 
-\documentclass{schedule}
-
-\meta{
+\documentclass[
 	landscape    = true,
-	lecture-caps = {1.0, 1.0},   % equal weight for each lecture-days bucket
-	quiz-days    = T,            % weekly Tuesday quiz
-	% month-pages = true,        % one table per month, each on its own page
-}
+	lecture-caps = {1.0, 1.0},
+	quiz-days    = T,
+]{schedule}
+% lecture-caps weights each lecture-days bucket equally; quiz-days sets a weekly
+% Tuesday quiz. Add  month-pages = true  to the options for one table per
+% calendar month, each on its own page.
 
 \begin{document}
 \maketitle

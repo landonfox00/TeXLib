@@ -29,7 +29,7 @@ Setting up TeXLib on a new machine or for a new course.
    ```
    python smoke_test.py
    ```
-   Exit code 0 means every module's `template.tex` built cleanly.
+   Exit code 0 means every module's template built cleanly.
 
 ### Per-course setup
 
@@ -73,7 +73,7 @@ Setting up TeXLib on a new machine or for a new course.
 
 ### Tooling
 
-- [`smoke_test.py`](smoke_test.py) — builds every per-module `template.tex` and reports pass/fail. Safety net for refactors that touch shared `.sty`/`.cls` files. Usage:
+- [`smoke_test.py`](smoke_test.py) — builds every per-module template and reports pass/fail. Safety net for refactors that touch shared `.sty`/`.cls` files. Usage:
 
   ```
   python smoke_test.py                 # all modules, default mode
@@ -95,7 +95,7 @@ Setting up TeXLib on a new machine or for a new course.
 
 ### Modules
 
-Each module is a document class plus a canonical `template.tex` and a README. `smoke_test.py` builds every module's `template.tex` to catch regressions in the shared `.sty` files.
+Each module is a document class plus a canonical `<module>-template.tex` and a README. `smoke_test.py` builds every module's template to catch regressions in the shared `.sty` files.
 
 | Module | Class | Purpose |
 |---|---|---|
@@ -106,7 +106,7 @@ Each module is a document class plus a canonical `template.tex` and a README. `s
 | [`Quizzes/`](Quizzes/) | `quiz.cls` | Short-form quiz class. |
 | [`Report Cards/`](Report%20Cards/) | `report-card.cls` | Per-section report-card class for end-of-term grade summaries. |
 | [`Schedule/`](Schedule/) | `schedule.cls` | Course-schedule / calendar class. Uses `calendar.lua`, `date.lua`, and `schedule.lua` for date math. |
-| [`Syllabi/`](Syllabi/) | `syllabus.cls` | Course-syllabus class. `Syllabus_Template.tex` is the canonical filled-in example; `template.tex` is the minimal smoke-test variant. |
+| [`Syllabi/`](Syllabi/) | `syllabus.cls` | Course-syllabus class. `Syllabus_Template.tex` is the canonical filled-in example; `syllabus-template.tex` is the minimal smoke-test variant. |
 
 ## Build modes
 
@@ -139,7 +139,8 @@ The Sublime build system surfaces these as palette entries; `smoke_test.py` inje
 ├── Schedule/              # schedule.cls + lua helpers + template
 ├── Syllabi/               # syllabus.cls + Syllabus_Template + template
 ├── Sublime/               # editor build system + settings
-├── examples/              # end-to-end course examples (Math181-Fall2026, ...)
+├── examples/              # end-to-end course examples (Math181-Fall2026, ...), smoke-built
+├── tests/                 # smoke-test assets: fixtures/ (fast path) + scenarios/ & visual_refs/ (visual)
 ├── coursemeta.example.tex # copy-paste starter for per-course metadata
 ├── CHANGELOG.md
 ├── TODO.md

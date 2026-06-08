@@ -7,13 +7,20 @@
 
 \ExplSyntaxOn
 
-\cs_new_protected:Npn \meta_create_var:nn #1 #2 {
-	\tl_new:c { g__meta_#1_tl }
-	\cs_if_exist:cF { Get#2 } {
-		\exp_args:Nc \NewExpandableDocumentCommand { Get#2 } { } {
-			\tl_use:c { g__meta_#1_tl }
+% #1 = CamelCase getter suffix, #2 = raw key name.  The key name is baked into
+% the body here, so the getter never depends on \l_keys_key_tl being live.
+\cs_new_protected:Npn \meta_create_getter:nn #1 #2 {
+	\cs_if_exist:cF { Get#1 } {
+		\exp_args:Nc \NewExpandableDocumentCommand { Get#1 } { } {
+			\tl_use:c { g__meta_#2_tl }
 		}
 	}
+}
+\cs_generate_variant:Nn \meta_create_getter:nn { VV }
+
+\cs_new_protected:Npn \meta_create_var:nn #1 #2 {
+	\tl_new:c { g__meta_#1_tl }
+	\meta_create_getter:nn {#2} {#1}
 }
 
 \NewExpandableDocumentCommand{\GetTerm}{ } {
@@ -40,6 +47,7 @@
 \meta_create_var:nn { final-time }     { FinalTime }
 \meta_create_var:nn { bank-path }      { BankPath }
 \meta_create_var:nn { quiz-instructions-file } { QuizInstructionsFile }
+\meta_create_var:nn { bingo-instructions-file } { BingoInstructionsFile }
 
 \keys_define:nn { meta } {
 	institution     .tl_gset:c = { g__meta_institution_tl },
@@ -60,25 +68,49 @@
 	final-time      .tl_gset:c = { g__meta_final-time_tl },
 	bank-path       .tl_gset:c = { g__meta_bank-path_tl },
 	quiz-instructions-file .tl_gset:c = { g__meta_quiz-instructions-file_tl },
+	bingo-instructions-file .tl_gset:c = { g__meta_bingo-instructions-file_tl },
 }
 
+% Warn on terminal when a field is auto-created (catches typos like instuctor=).
+% Documents that use custom keys deliberately call \MetaAllowCustomKeys to
+% downgrade this to a log-only note.
+\bool_new:N \g__meta_warn_custom_bool
+\bool_gset_true:N \g__meta_warn_custom_bool
+
+% Catch-all: any key not listed above auto-vivifies a g__meta_<key>_tl store
+% and a matching \Get<Key> getter.  Must be `unknown`, not `.unknown` — the
+% leading-dot form is silently inert and never registers as the handler.
 \keys_define:nn { meta } {
-	.unknown .code:n = {
-		\tl_if_exist:cF { g__meta_ \l_keys_key_tl _tl } {
-			\tl_new:c { g__meta_ \l_keys_key_tl _tl }
+	unknown .code:n = {
+		% \l_tmpa_tl holds the raw key value (my-custom-field); keep it intact
+		% for the store name.  \l_tmpb_tl is mangled into the CamelCase getter.
+		\tl_set:NV \l_tmpa_tl \l_keys_key_tl
+		\tl_if_exist:cF { g__meta_ \l_tmpa_tl _tl } {
+			\tl_new:c { g__meta_ \l_tmpa_tl _tl }
+			% Loud by default so a typo'd key surfaces; quiet (log-only) once the
+			% document has opted in to custom keys.  Either way it stays traceable.
+			\bool_if:NTF \g__meta_warn_custom_bool
+				{ \PackageWarning{course-metadata}
+					{Auto-creating~metadata~field~'\l_tmpa_tl'.
+					 \MessageBreak If~this~is~a~typo,~fix~it;~if~intentional,~call
+					 \MessageBreak \string\MetaAllowCustomKeys\space to~silence~this} }
+				{ \PackageInfo{course-metadata}
+					{Auto-creating~metadata~field~'\l_tmpa_tl'} }
 		}
-		\tl_gset:cn { g__meta_ \l_keys_key_tl _tl } { #1 }
-		\tl_set:Nn \l_tmpa_tl { \l_keys_key_tl }
-		\regex_replace_all:nnN { - } { \  } \l_tmpa_tl
-		\tl_set:Nf \l_tmpb_tl { \text_titlecase_all:n { \l_tmpa_tl } }
+		\tl_gset:cn { g__meta_ \l_tmpa_tl _tl } { #1 }
+		\tl_set:NV \l_tmpb_tl \l_tmpa_tl
+		\regex_replace_all:nnN { - } { \  } \l_tmpb_tl
+		\tl_set:Nf \l_tmpb_tl { \text_titlecase_all:n { \l_tmpb_tl } }
 		\regex_replace_all:nnN { \s } { } \l_tmpb_tl
-		\cs_if_exist:cF { Get \l_tmpb_tl } {
-			\exp_args:Nc \NewExpandableDocumentCommand { Get \l_tmpb_tl } { } {
-				\tl_use:c { g__meta_ \l_keys_key_tl _tl }
-			}
-		}
+		% Pass values (not tokens) so the key name is baked into the getter body.
+		\meta_create_getter:VV \l_tmpb_tl \l_tmpa_tl
 	}
 }
+
+% Custom-key warning toggle.  Call \MetaAllowCustomKeys before the \metasetup
+% calls that introduce custom keys (e.g. atop coursemeta.tex).
+\NewDocumentCommand{\MetaAllowCustomKeys}{}{ \bool_gset_false:N \g__meta_warn_custom_bool }
+\NewDocumentCommand{\MetaWarnCustomKeys}{}{ \bool_gset_true:N \g__meta_warn_custom_bool }
 
 \NewDocumentCommand{\metasetup}{ +m } {
 	\tl_set:Nn \l_tmpa_tl { #1 }

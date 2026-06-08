@@ -3,9 +3,29 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesClass{quiz}[2026/05/07 v1.0 UNR In-Class Quizzes (TeXLib)]
 
-\DeclareOption*{\PassOptionsToClass{\CurrentOption}{exam}}
+% Per-document metadata may be passed in the class option list, e.g.
+%   \documentclass[quiz-number=3, quiz-title={Pop Quiz}]{quiz}
+% Any option containing "=" is a metadata key=value pair; every other option is
+% forwarded to exam. Metadata is applied below (after the quiz keys and
+% coursemeta load, so document options win) by reading \@raw@classoptionslist
+% directly — that list preserves spaces in values, unlike the \CurrentOption
+% seen here. \DeclareOption* only forwards the non-metadata options; the
+% key=value ones still pass through it (a no-op) so the kernel marks them used.
+% Safe because no base-class option uses key=value form.
+\DeclareOption*{%
+	\@expandtwoargs\in@{=}{\CurrentOption}%
+	\ifin@\else
+		\PassOptionsToClass{\CurrentOption}{exam}%
+	\fi
+}
 \ProcessOptions\relax
 \LoadClass[11pt]{exam}
+
+% A class-option value containing a comma (e.g. a date like {May 2, 2026}) is
+% split by the kernel's option parser into a stray fragment with no "=", which
+% would be reported as an "unused global option". The real values are consumed
+% from \@raw@classoptionslist below, so discard those spurious leftovers.
+\AtEndOfClass{\global\let\@unusedoptionlist\@empty}
 
 % Shared assessment setup (texlib-corepkg, texlib-build, course-metadata, the
 % common aux packages, and the unified problem/part labels). Shared with autoexam.
@@ -59,6 +79,19 @@
 	\tl_if_empty:NTF \g__quiz_instructions_tl { #2 } { #1 }
 }
 
+\ExplSyntaxOff
+
+% Apply document metadata from the class option list now that the quiz keys
+% above and coursemeta.tex are loaded (so document options override coursemeta).
+% Read \@raw@classoptionslist, not \CurrentOption, to keep spaces in values.
+\ExplSyntaxOn
+\cs_if_exist:cT { @raw@classoptionslist } {
+	\tl_set:Nv    \l_tmpa_tl    { @raw@classoptionslist }
+	\clist_set:NV \l_tmpa_clist \l_tmpa_tl
+	\clist_map_inline:Nn \l_tmpa_clist {
+		\tl_if_in:nnT { #1 } { = } { \keys_set:nn { meta } { #1 } }
+	}
+}
 \ExplSyntaxOff
 
 % Default boxed instructions are \input from a real file so SyncTeX inverse

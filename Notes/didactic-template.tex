@@ -3,18 +3,21 @@
 % =============================================================================
 %
 % Build instructor copy:
-%   lualatex --jobname=lecture01_Instructor template.tex
+%   lualatex --jobname=lecture01_Instructor didactic-template.tex
 % Build student copy:
-%   lualatex --jobname=lecture01_Student    template.tex
+%   lualatex --jobname=lecture01_Student    didactic-template.tex
 %
 % (or pass \def\ShowSolutions{} / \def\StudentMode{} on the command line)
 
-\documentclass{didactic}
+\documentclass[
+	unit   = Lecture,
+	number = 1,
+	title  = Sample Lecture,
+]{didactic}
 
-\meta{
-	unit     = Lecture,
-	number   = 1,
-	title    = Sample Lecture,
+% Overview is long-form prose, so keep it as a preamble setter rather than
+% cramming it into the class option list.
+\metasetup{
 	overview = {%
 		A one-line summary of what this lecture covers; rendered
 		as an abstract after the title block.

@@ -19,4 +19,4 @@ lualatex lecture-01-limits.tex
 lualatex quiz-01.tex
 ```
 
-These examples are **not** built by the CI smoke test — `smoke_test.py` only covers the canonical `template.tex` in each module. The intent here is illustrative: if the underlying classes change in a breaking way, the corresponding module template will fail in CI before an example diverges.
+These examples **are** built by the CI smoke test — `smoke_test.py` registers `lecture-01-limits.tex` and `quiz-01.tex` as build fixtures, so a class change that breaks the documented workflow fails CI instead of leaving the docs to silently rot. The check is build-only (no text assertion): the two documents share one `coursemeta.tex`, so there's no single per-module token to assert. Their illustrative role is unchanged — they're still the place to point someone at a real end-to-end course folder.

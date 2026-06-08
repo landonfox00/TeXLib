@@ -3,20 +3,18 @@
 % =============================================================================
 %
 % Build hand-out (clean problem set):
-%   lualatex template.tex
+%   lualatex pset-template.tex
 %
 % Build student worksheet (blank boxes for handwriting):
-%   lualatex \def\StudentMode{}\input{template.tex}
+%   lualatex \def\StudentMode{}\input{pset-template.tex}
 %
 % Build answer key:
-%   lualatex \def\ShowKey{}\input{template.tex}
+%   lualatex \def\ShowKey{}\input{pset-template.tex}
 
-\documentclass{pset}
-
-\meta{
+\documentclass[
 	pset-number = 3,
 	pset-due    = {Friday, May 15, 2026},
-}
+]{pset}
 
 \begin{document}
 

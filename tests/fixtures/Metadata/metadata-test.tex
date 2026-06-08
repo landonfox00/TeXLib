@@ -1,0 +1,24 @@
+% Smoke build for course-metadata.sty's arbitrary-key auto-vivification.
+%
+% Each custom key below must (a) be absorbed by the catch-all without erroring
+% and (b) mint a working \Get<Key> getter.  Rendering all three markers proves
+% both halves: a regressed catch-all (.unknown) errors under -halt-on-error, and
+% a regressed getter derivation leaves \Get... undefined -> also a build error.
+% Asserted by EXPECT_TEXT["Test/Metadata"] in smoke_test.py.
+\documentclass{article}
+\usepackage{course-metadata}
+
+% Loud branch: warnings ON -> the auto-create note is a \PackageWarning (.log,
+% non-fatal). Must not halt the build.
+\MetaWarnCustomKeys
+\metasetup{lecture-hall = {Room 7 CMLECTHALLMARK}}
+
+% Quiet branch: same machinery, warning downgraded to \PackageInfo.
+\MetaAllowCustomKeys
+\metasetup{ta-name = {Pat CMTANAMEMARK}}
+
+\begin{document}
+Office: \GetOfficeHours\par   % custom key from coursemeta
+Hall:   \GetLectureHall\par   % inline custom key, loud branch
+TA:     \GetTaName\par        % inline custom key, quiet branch
+\end{document}
