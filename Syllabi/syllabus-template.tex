@@ -1,52 +1,73 @@
 % =============================================================================
-% syllabus template — single-page-or-more course syllabus
+% syllabus template — course syllabus
 % =============================================================================
 %
 % Compile with:
 %   lualatex syllabus-template.tex
+%
+% Fill in the metadata in the class options below and replace the placeholder
+% prose in each section. Course-level fields (institution, instructor, term,
+% course title / number) can instead come from a coursemeta.tex up the
+% directory tree. Delete any sections you don't need.
 
 \documentclass[
-	course-title   = Math 126EE Precalculus I,
-	course-section = 1008,
-	short-title    = Math 126EE Precalc,
-	instructor     = Landon Fox,
-	email          = instructor@university.edu,
-	office         = 146F NLLC,
-	office-hours   = MWF 10:00--10:50am,
-	class-time     = MWF 9:00--9:50am,
-	course-room    = AB 206,
+	course-title    = Course Title,
+	short-title     = Short Title,        % shown in the running header
+	course-section  = 0000,
+	term            = Term Year,
+	instructor      = Instructor Name,
+	email           = you@university.edu,
+	office          = Building 000,
+	office-hours    = Days 0:00--0:00,
+	class-time      = Days 0:00--0:00,
+	% class-time-alt  = Days 0:00--0:00,  % uncomment for a second meeting line
+	course-room     = Building 000,
 ]{syllabus}
 
 \begin{document}
 \maketitle
 
 \syllabussection{Office Hours}
-Walk-in office hours are listed above, or by appointment, at the
-Nevada Learning Living Community (NLLC) 146F.
+Office hours are listed above, or by appointment. Add your location and any
+scheduling notes here.
 
 \syllabussection{Communication}
-Canvas (WebCampus) Inbox is my preferred mode of contact.
-I will try to respond to messages within 48 hours.
+State your preferred mode of contact (e.g.\ the course LMS inbox) and the
+turnaround students can expect for messages.
 
 \syllabussection{Course Description}
-The following topics will be covered in this course:
+A short paragraph describing the course. The following topics will be covered:
 \begin{itemize}
-	\item Fundamentals of algebra
-	\item Polynomial, rational, exponential, and logarithmic functions
-	\item Complex numbers
-	\item Polynomial and rational inequalities
-	\item Systems of equations
+	\item First topic
+	\item Second topic
+	\item Third topic
 \end{itemize}
+
+\syllabussection{Student Learning Outcomes}
+Upon completion of this course, students will be able to:
+\begin{enumerate}
+	\item First outcome.
+	\item Second outcome.
+	\item Third outcome.
+\end{enumerate}
+
+\syllabussection{Prerequisites}
+List the prerequisites for this course and any concurrent-enrollment
+requirements.
+
+\syllabussection{Textbook}
+\textit{Title} by Author, Nth ed., Publisher. Note whether a copy is required
+and how students obtain it.
 
 \syllabussection{Grade Scale}
 Course grades will be determined as follows:
 
 \gradetables{
-	Homework     & 15\% \\ \hline
-	Quizzes      & 10\% \\ \hline
-	Exams        & 50\% \\ \hline
-	Final Exam   & 25\% \\ \hline
-	Extra Credit & 15\%
+	Component One   & 00\% \\ \hline
+	Component Two   & 00\% \\ \hline
+	Component Three & 00\% \\ \hline
+	Final Exam      & 00\% \\ \hline
+	Extra Credit    & 00\%
 }{
 	A & $90 \leq x$       \\ \hline
 	B & $80 \leq x < 90$  \\ \hline
@@ -56,6 +77,25 @@ Course grades will be determined as follows:
 }
 
 \syllabussection{Course Schedule}
-See \texttt{Schedule.pdf} on the Syllabus page of our Canvas course.
+Point students to your schedule document, or list the key dates here.
+
+% --- Policy statements -------------------------------------------------------
+% Replace the placeholders below with your institution's required language
+% (academic support resources, disability accommodations, academic integrity).
+% \href{url}{text} makes a clickable link.
+
+\syllabussection{Academic Support Services}
+Describe the tutoring, writing, and other support resources available to
+students, e.g.\ \href{https://example.edu/tutoring}{the Tutoring Center}.
+
+\syllabussection{Disability Services}
+Any student with a disability needing academic adjustments or accommodations is
+requested to speak with me or the
+\href{https://example.edu/disability}{Disability Resource Center} as soon as
+possible to arrange appropriate accommodations.
+
+\syllabussection{Academic Integrity}
+State your institution's academic-integrity policy and the consequences of
+violations, with a link to the official policy where available.
 
 \end{document}

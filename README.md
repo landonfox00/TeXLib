@@ -106,7 +106,7 @@ Each module is a document class plus a canonical `<module>-template.tex` and a R
 | [`Quizzes/`](Quizzes/) | `quiz.cls` | Short-form quiz class. |
 | [`Report Cards/`](Report%20Cards/) | `report-card.cls` | Per-section report-card class for end-of-term grade summaries. |
 | [`Schedule/`](Schedule/) | `schedule.cls` | Course-schedule / calendar class. Uses `calendar.lua`, `date.lua`, and `schedule.lua` for date math. |
-| [`Syllabi/`](Syllabi/) | `syllabus.cls` | Course-syllabus class. `Syllabus_Template.tex` is the canonical filled-in example; `syllabus-template.tex` is the minimal smoke-test variant. |
+| [`Syllabi/`](Syllabi/) | `syllabus.cls` | Course-syllabus class. `syllabus-template.tex` is a complete example syllabus — course info, learning outcomes, grading, and policy statements. |
 
 ## Build modes
 
@@ -137,7 +137,7 @@ The Sublime build system surfaces these as palette entries; `smoke_test.py` inje
 ├── Quizzes/               # quiz.cls + preamble + template
 ├── Report Cards/          # report-card.cls + template
 ├── Schedule/              # schedule.cls + lua helpers + template
-├── Syllabi/               # syllabus.cls + Syllabus_Template + template
+├── Syllabi/               # syllabus.cls + template
 ├── Sublime/               # editor build system + settings
 ├── examples/              # end-to-end course examples (Math181-Fall2026, ...), smoke-built
 ├── tests/                 # smoke-test assets: fixtures/ (fast path) + scenarios/ & visual_refs/ (visual)
