@@ -178,9 +178,9 @@
 	% so their headers/footers must be set with \global (\gdef / \global\def).
 	% First-page slots (\@lhead etc.) are only needed for Q1, which ships via
 	% the first \newpage inside the group, so local \def is fine there.
-	\def\@lhead{Math \theCourseNumber\ \theCourseTitle}%
+	\def\@lhead{\bfseries\GetExamTitle}%
 	\def\@chead{}%
-	\def\@rhead{Exam \theExamNumber}%
+	\def\@rhead{\GetTermSection}%
 	\global\@headruletrue%
 	\def\@cfoot{%
 		\thepage\ of\ \@ifundefined{r@@lastqpage}{\numpages}{\pageref*{@lastqpage}}%
@@ -554,10 +554,11 @@
 	\par
 }
 
-% --- Document-specific metadata: set via \renewcommand in each .tex file ---
-\newcommand{\theExamNumber}{\todo}
-\newcommand{\theExamDate}{\todo}
-\newcommand{\thePS}{}              % Optional postscript shown on title page
+% --- Document-specific metadata ---
+% Storage lives in expl3 tls set by the meta keys below; read via the
+% \GetExamNumber / \GetExamDate / \GetExamPostscript getters (defined with the
+% keys).  The legacy \theExamNumber / \theExamDate / \thePS names survive as
+% deprecated \let aliases of those getters.
 
 % Course-metadata aliases (\theCourseNumber, \theCourseTitle, \theCourseSection,
 % \theSeason, \theYear, \theSchool, ...) are provided by course-metadata.sty
@@ -594,16 +595,39 @@
 % command remains supported as a thin alias that prefixes bare keys with
 % "exam-" so old documents continue to work.
 \ExplSyntaxOn
+\tl_new:N \g__autoexam_number_tl
+\tl_new:N \g__autoexam_title_tl
+\tl_new:N \g__autoexam_date_tl
+\tl_new:N \g__autoexam_postscript_tl
 \keys_define:nn { meta } {
-	exam-number             .code:n = { \renewcommand{\theExamNumber}{#1} },
-	exam-date               .code:n = { \renewcommand{\theExamDate}{#1}   },
-	exam-postscript         .code:n = { \renewcommand{\thePS}{#1}         },
+	exam-number             .tl_gset:N = \g__autoexam_number_tl,
+	exam-title              .tl_gset:N = \g__autoexam_title_tl,
+	exam-date               .tl_gset:N = \g__autoexam_date_tl,
+	exam-postscript         .tl_gset:N = \g__autoexam_postscript_tl,
 	exam-instructions-file  .code:n = { \renewcommand{\@autoexam@instructions@file}{#1} },
 	% Backward-compat aliases (bare names available via \examsetup or \meta)
-	number                  .code:n = { \renewcommand{\theExamNumber}{#1} },
-	date                    .code:n = { \renewcommand{\theExamDate}{#1}   },
-	ps                      .code:n = { \renewcommand{\thePS}{#1}         },
+	number                  .tl_gset:N = \g__autoexam_number_tl,
+	title                   .tl_gset:N = \g__autoexam_title_tl,
+	date                    .tl_gset:N = \g__autoexam_date_tl,
+	ps                      .tl_gset:N = \g__autoexam_postscript_tl,
 	instructions-file       .code:n = { \renewcommand{\@autoexam@instructions@file}{#1} },
+}
+% Canonical expandable getters (the \Get... convention shared with every other
+% TeXLib class).  Number/date keep autoexam's historical \todo default when
+% unset; postscript defaults to empty.
+\NewExpandableDocumentCommand{\GetExamNumber}{}{
+	\tl_if_empty:NTF \g__autoexam_number_tl { \todo } { \tl_use:N \g__autoexam_number_tl }
+}
+\NewExpandableDocumentCommand{\GetExamDate}{}{
+	\tl_if_empty:NTF \g__autoexam_date_tl { \todo } { \tl_use:N \g__autoexam_date_tl }
+}
+\NewExpandableDocumentCommand{\GetExamPostscript}{}{ \tl_use:N \g__autoexam_postscript_tl }
+% \GetExamTitle -- left-header title; defaults to "Exam <n>" (cf. \GetPsetTitle
+% -> "Problem Set <n>", \GetQuizTitle -> "Quiz <n>"), overridable via exam-title.
+\NewExpandableDocumentCommand{\GetExamTitle}{}{
+	\tl_if_empty:NTF \g__autoexam_title_tl
+		{ Exam~\GetExamNumber }
+		{ \tl_use:N \g__autoexam_title_tl }
 }
 
 % Apply document metadata from the class option list now that the exam-meta keys
@@ -617,6 +641,15 @@
 	}
 }
 \ExplSyntaxOff
+
+% Deprecated aliases: \theExamNumber / \theExamDate / \thePS were the storage
+% and the public names before the \Get... normalization.  Kept as thin
+% expandable aliases so existing exam documents that reference them keep
+% rendering.  New code should use \GetExamNumber / \GetExamDate /
+% \GetExamPostscript.
+\let\theExamNumber\GetExamNumber
+\let\theExamDate\GetExamDate
+\let\thePS\GetExamPostscript
 
 % \examsetup{...}: backward-compat alias for \meta{...}. Old exam files
 % can keep using \examsetup{number=5, date=May 2 2026, ps=...}; these
@@ -823,7 +856,7 @@
 \firstpagefooter{\GetCourse}{%
 	\thepage\ of\ \@ifundefined{r@@lastqpage}{\numpages}{\pageref*{@lastqpage}}%
 }{\GetInstitution}
-\runningheader{Math \theCourseNumber\ \theCourseTitle}{}{Exam \theExamNumber}
+\runningheader{\bfseries\GetExamTitle}{}{\GetTermSection}
 \runningfooter{\GetCourse}{%
 	\thepage\ of\ \@ifundefined{r@@lastqpage}{\numpages}{\pageref*{@lastqpage}}%
 }{\GetInstitution}
@@ -847,10 +880,10 @@
 	\thispagestyle{headandfoot}%
 	% ---- title block ---------------------------------------------------------
 	\begin{center}
-		\huge Exam \theExamNumber \\
+		\huge Exam \GetExamNumber \\
 		\LARGE Math \theCourseNumber\ \theCourseTitle \\
 		\vspace{0.1em}
-		\large \theExamDate
+		\large \GetExamDate
 		% Build-mode label: shown in red when solutions and/or rubrics are on.
 		\ifsolutions
 			\if@autoexam@rubric
@@ -881,9 +914,9 @@
 		Name: \underline{\hspace{4in}}
 		\vfill
 
-		\ifthenelse{\equal{}{\thePS}}%
+		\ifthenelse{\equal{}{\GetExamPostscript}}%
 			{}%
-			{\textit{\thePS}}%
+			{\textit{\GetExamPostscript}}%
 	\end{center}
 	% Title page is complete.  The user adds \blankpage after \maketitle to produce
 	% a pre-problem scratch leaf.  \blankpage ships this page via \clearpage, sets
