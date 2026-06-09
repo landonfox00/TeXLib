@@ -101,7 +101,12 @@ Options pass through to `article`. Default base size is 11pt.
 | `pset-number`        | Used in the title (e.g. "Problem Set 3")                  |
 | `pset-title`         | Override the title (defaults to `Problem Set <number>`)   |
 | `pset-due`           | Due-date string shown under the title                     |
-| `pset-instructions`  | Override the boxed instructions paragraph                 |
+| `pset-instructions`  | Inline instructions text (boxed); overrides the default file |
+| `pset-instructions-file` | Filename (no `.tex`) for instructions, `\input` unboxed and overriding inline; default file `pset-instructions`. Settable course-wide in `coursemeta.tex`. |
+
+Instructions resolve **file > inline > default** (the default wording lives in
+`pset-instructions.tex` so it is a SyncTeX inverse-search target), shared with
+the other assessment classes via `texlib-instructions`.
 
 The bare alias `due` is also accepted for `pset-due`. (`number` and
 `title` are already taken by `didactic`'s legacy aliases, so they are

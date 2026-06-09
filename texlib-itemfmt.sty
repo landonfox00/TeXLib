@@ -37,7 +37,7 @@
 %   with it, "(Extra Credit, N points)".
 \NewDocumentCommand{\extracredit}{ o +m }{%
 	\stepcounter{question}%
-	\item[\textbf{\thequestion.}]%
+	\item[\questionlabel]%
 	\IfValueTF{#1}
 		{(\textbf{Extra Credit}, #1 points)~}
 		{(\textbf{Extra Credit})~}%

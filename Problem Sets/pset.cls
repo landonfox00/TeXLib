@@ -19,9 +19,29 @@
 % ==============================================================================
 % 0. OPTIONS
 % ==============================================================================
-\DeclareOption*{\PassOptionsToClass{\CurrentOption}{article}}
+% Per-document metadata may be passed in the class option list, e.g.
+%   \documentclass[pset-number=3, pset-title={Weekly Set}, due=2026-06-15]{pset}
+% Any option containing "=" is a metadata key=value pair; every other option
+% (11pt, twoside, ...) is forwarded to article. Metadata is applied at the end
+% of section 3 (after coursemeta.tex loads, so document options win) by reading
+% \@raw@classoptionslist directly — that list preserves spaces in values, which
+% the \CurrentOption seen here does not. \DeclareOption* therefore only forwards
+% the non-metadata options; the key=value ones still pass through it (a no-op)
+% so the kernel marks them used. Safe because no base-class option uses key=value.
+\DeclareOption*{%
+	\@expandtwoargs\in@{=}{\CurrentOption}%
+	\ifin@\else
+		\PassOptionsToClass{\CurrentOption}{article}%
+	\fi
+}
 \ProcessOptions\relax
 \LoadClass[11pt]{article}
+
+% A class-option value containing a comma (e.g. a date like {May 2, 2026}) is
+% split by the kernel's option parser into a stray fragment with no "=", which
+% would be reported as an "unused global option". The real values are consumed
+% from \@raw@classoptionslist below, so discard those spurious leftovers.
+\AtEndOfClass{\global\let\@unusedoptionlist\@empty}
 
 % ==============================================================================
 % 1. PACKAGES
@@ -41,6 +61,11 @@
 \RequirePackage[capitalise,nameinlink]{cleveref}
 \RequirePackage{xstring}            % for \IfInteger in problem's optional arg
 \RequirePackage{course-metadata}
+
+% Shared document-instructions mechanism (inline / file / default, file > inline
+% > default). \TeXLibDeclareInstructions{pset} below mints \GetPsetInstructions,
+% \IfPsetInstructions{File,Inline}, and \pset@input@userinstructions.
+\RequirePackage{texlib-instructions}
 
 % Bibliography: biblatex with the biber backend. Loaded last so it can hook
 % into hyperref/cleveref/amsmath. The \printreferences command below is a
@@ -73,13 +98,11 @@
 \tl_new:N \g__pset_number_tl
 \tl_new:N \g__pset_title_tl
 \tl_new:N \g__pset_due_tl
-\tl_new:N \g__pset_instructions_tl
 
 \keys_define:nn { meta } {
 	pset-number       .tl_gset:N = \g__pset_number_tl,
 	pset-title        .tl_gset:N = \g__pset_title_tl,
 	pset-due          .tl_gset:N = \g__pset_due_tl,
-	pset-instructions .tl_gset:N = \g__pset_instructions_tl,
 	% Bare keys also accepted (no risk of cross-class collision because
 	% no other class defines `pset-due`, etc.; the bare `number`/`title`
 	% already collide with didactic, so we only namespace those.)
@@ -93,13 +116,27 @@
 		{ Problem~Set~\GetPsetNumber }
 		{ \tl_use:N \g__pset_title_tl }
 }
-\NewExpandableDocumentCommand{\GetPsetInstructions}{}{
-	\tl_if_empty:NTF \g__pset_instructions_tl
-		{ Show~all~work~for~full~credit.~ Box~or~circle~final~answers.~
-			Late~submissions~lose~10\%~per~day. }
-		{ \tl_use:N \g__pset_instructions_tl }
-}
 
+\ExplSyntaxOff
+
+% Instructions: mints the pset-instructions inline key, \GetPsetInstructions,
+% \IfPsetInstructions{File,Inline}, and \pset@input@userinstructions. The default
+% wording now lives in pset-instructions.tex (so it is a SyncTeX inverse-search
+% target); pset-instructions-file lives in course-metadata.sty (set per set via
+% \meta or course-wide in coursemeta.tex).
+\TeXLibDeclareInstructions{pset}
+
+% Apply document metadata from the class option list now that the keys above and
+% coursemeta.tex are loaded (so document options override coursemeta defaults).
+% Read \@raw@classoptionslist, not \CurrentOption, to keep spaces in values.
+\ExplSyntaxOn
+\cs_if_exist:cT { @raw@classoptionslist } {
+	\tl_set:Nv    \l_tmpa_tl    { @raw@classoptionslist }
+	\clist_set:NV \l_tmpa_clist \l_tmpa_tl
+	\clist_map_inline:Nn \l_tmpa_clist {
+		\tl_if_in:nnT { #1 } { = } { \keys_set:nn { meta } { #1 } }
+	}
+}
 \ExplSyntaxOff
 
 % ==============================================================================
@@ -109,10 +146,10 @@
 \setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
-% Header: L = pset title  C = build badge  R = term. (R was \GetCourse, which
-% duplicated the footer-left course; term removes that redundancy.)
+% Header: L = pset title  C = build badge  R = term + section. (R was \GetCourse,
+% which duplicated the footer-left course; term/section removes that redundancy.)
 \SetTeXLibBuildBadge{\ifkey Answer Key\fi}
-\SetTeXLibHeader{\bfseries\GetPsetTitle}{\TeXLibBuildBadge}{\GetTerm}
+\SetTeXLibHeader{\bfseries\GetPsetTitle}{\TeXLibBuildBadge}{\GetTermSection}
 \SetTeXLibFooter
 \TeXLibRuleBleed                  % symmetric rule length, matching didactic
 
@@ -143,9 +180,15 @@
 		\fi
 	\end{center}
 	\medskip
-	\noindent\fbox{\fbox{\parbox{\dimexpr\textwidth-2\fboxsep-2\fboxrule\relax}{%
-		\centering\footnotesize \GetPsetInstructions
-	}}}
+	% Instructions: a user-set pset-instructions-file controls its own layout (no
+	% box); inline text and the default pset-instructions.tex are boxed.
+	\IfPsetInstructionsFile{%
+		\pset@input@userinstructions
+	}{%
+		\noindent\fbox{\fbox{\parbox{\dimexpr\textwidth-2\fboxsep-2\fboxrule\relax}{%
+			\centering\footnotesize \TeXLibInstructionsInlineOrDefault{pset}%
+		}}}%
+	}%
 	\medskip
 }
 
@@ -204,64 +247,26 @@
 % ==============================================================================
 % 7. THEOREM-LIKE ENVIRONMENTS (boxed via tcolorbox, shared TeXLib styling)
 % ==============================================================================
-% The tcolorbox styles live in texlib-theorems.sty. As of the May 2026
-% consolidation pass, pset uses the canonical TeXLib colored-thin-rule look
-% (the old sharp-black-frame `psetstyle` is retired). This class keeps its
-% own \newtheorem taxonomy and flat numbering.
+% The tcolorbox styles live in texlib-theorems.sty; the \TeXLibTheorems enabler
+% that binds environments to them lives in texlib-thmenv.sty. As of the May 2026
+% consolidation pass, pset uses the canonical TeXLib colored-thin-rule look (the
+% old sharp-black-frame `psetstyle` is retired). This class opts into a subset
+% of the shared taxonomy with FLAT numbering (one shared counter, not section-
+% based) and no four-letter aliases.
 \RequirePackage{texlib-theorems}
+\RequirePackage{texlib-thmenv}
 
-\theoremstyle{plain}
-\newtheorem{theorem}{Theorem}
-\newtheorem{definition}[theorem]{Definition}
-\newtheorem{corollary}[theorem]{Corollary}
-\newtheorem{proposition}[theorem]{Proposition}
-\newtheorem{lemma}[theorem]{Lemma}
-
-\theoremstyle{remark}
-\newtheorem{example}[theorem]{Example}
-\newtheorem{remark}[theorem]{Remark}
-\newtheorem{note}[theorem]{Note}
-\newtheorem{recall}[theorem]{Recall}
-
-% Bind each boxed environment to a shared style. note/recall carry the gray
-% note rule (matching didactic, where notation/recall use texlibnote); remark
-% stays plain inline (no box), also matching didactic.
-\tcolorboxenvironment{theorem}{texlibtheorem}
-\tcolorboxenvironment{definition}{texlibdefinition}
-\tcolorboxenvironment{corollary}{texlibtheorem}
-\tcolorboxenvironment{proposition}{texlibproposition}
-\tcolorboxenvironment{lemma}{texlibtheorem}
-\tcolorboxenvironment{example}{texlibexample}
-\tcolorboxenvironment{note}{texlibnote}
-\tcolorboxenvironment{recall}{texlibnote}
-
-% Unnumbered (starred) twins of every environment above. Same headings, styles,
-% and tcolorbox styling (remark*/note*/recall* left plain, like their numbered
-% counterparts). Use e.g. \begin{theorem*} ... \end{theorem*}; the starred forms
-% take no shared-counter argument. (note* is also defined, guarded, in the
-% Category Theory preamble; its \ifcsname check skips that copy when this one is
-% already present, so there is no double-definition.)
-\theoremstyle{plain}
-\newtheorem*{theorem*}{Theorem}
-\newtheorem*{definition*}{Definition}
-\newtheorem*{corollary*}{Corollary}
-\newtheorem*{proposition*}{Proposition}
-\newtheorem*{lemma*}{Lemma}
-
-\theoremstyle{remark}
-\newtheorem*{example*}{Example}
-\newtheorem*{remark*}{Remark}
-\newtheorem*{note*}{Note}
-\newtheorem*{recall*}{Recall}
-
-\tcolorboxenvironment{theorem*}{texlibtheorem}
-\tcolorboxenvironment{definition*}{texlibdefinition}
-\tcolorboxenvironment{corollary*}{texlibtheorem}
-\tcolorboxenvironment{proposition*}{texlibproposition}
-\tcolorboxenvironment{lemma*}{texlibtheorem}
-\tcolorboxenvironment{example*}{texlibexample}
-\tcolorboxenvironment{note*}{texlibnote}
-\tcolorboxenvironment{recall*}{texlibnote}
+% One declaration per environment (and its unnumbered `*` twin), each with the
+% canonical TeXLib styling and a flat shared counter (master: theorem). The
+% catalog (env -> amsthm style + tcolorbox style) lives in texlib-thmenv.sty,
+% so `definition` is definition-style and `example` definition-style here too,
+% matching didactic. note/recall carry the gray note rule; remark stays plain
+% inline (no box). (note* is also defined, guarded, in the Category Theory
+% preamble; its \ifcsname check skips that copy when this one is present.)
+\TeXLibTheorems[numbering=flat]{
+	theorem, definition, corollary, proposition, lemma,
+	example, remark, note, recall
+}
 
 % ==============================================================================
 % 8. SOLUTION ENVIRONMENT — gated on \ShowKey/\ShowSolutions/\StudentMode

@@ -22,7 +22,10 @@ syllabi that used command-style metadata (`\instructor{}`, `\email{}`,
 \documentclass{syllabus}
 
 \meta{
-	course-title   = Math 126EE Precalculus I,
+	course-subject = Math,
+	course-number  = 126EE,
+	course-title   = Precalculus I,             % bare title; the footer/cover
+	                                            % compose "Math 126EE Precalculus I"
 	course-section = 1008,
 	short-title    = Math 126EE Precalc,        % used in running header
 	instructor     = Landon Fox,
@@ -108,6 +111,30 @@ etc. compile-time toggles are defined for consistency. Source toggles:
 Renders the title block: course title, section, term, then the
 contact-info table inside two horizontal rules.
 
+`\setsyllabusinfo[columns=N]{entries}`
+Customize the contact-info table. The body is a list of
+`\syllabusentry{Label}{Value}` pairs; `[columns=N]` sets the number of
+label/value pairs per row (default `2`). The class ships these six as
+the default, so **omitting `\setsyllabusinfo` reproduces today's table**:
+
+```latex
+\setsyllabusinfo[columns=2]{
+	\syllabusentry{Instructor}{\GetInstructor}
+	\syllabusentry{Class Time}{\GetClassTime}
+	\syllabusentry{Email}{\GetEmail}
+	\syllabusentry{Classroom}{\GetCourseRoom}
+	\syllabusentry{Office}{\GetOffice}
+	\syllabusentry{Office Hours}{\GetOfficeHours}
+}
+```
+
+An entry whose value expands to empty (e.g.\ an unset `\Get…` field) is
+**dropped**, and the remaining entries reflow to fill the grid — so
+unused fields never leave a blank cell. If *every* value is empty, the
+entire block (table, minipage, and both rules) is suppressed. Use any
+expandable getter as a value; robust markup such as the `mailto:` link
+is fine (the default `Email` value carries it).
+
 `\syllabussection{Title}`
 Bold-titled paragraph break for a policy or info block. Title is
 followed by a period.
@@ -133,17 +160,20 @@ underscored variable name (`class_time`, `office_hours`, …).
 
 - Headers use `fancyplain`: left = `\GetShortTitle`, right =
 	`\GetTerm`.
-- Center footer: `<page> of <total>`.
+- Footer: left = `\GetCourse` (full name, e.g. "Math 181 Calculus I"),
+	center = `<page> of <total>`, right = `\GetInstitution`.
 - Footnotes use the `\fnsymbol` series.
 
 ---
 
 ## Tips
 
-- **Title-block fields auto-hide:** if you don't set `email`, the email
-	row disappears from the title block. Same for `office`, `office-hours`,
-	`class-time`, `organizer`, `course-room`. The branching is implemented
-	with `\IfMetaSet` and `\IfSyllSet`.
+- **Title-block fields auto-hide and reflow:** if you don't set `email`,
+	the email entry is dropped from the title block and the entries after it
+	shift up to fill the gap. Same for `office`, `office-hours`,
+	`class-time`, `organizer`, `course-room`. This is driven by
+	`\setsyllabusinfo` (see Reference); each value is expansion-tested for
+	emptiness.
 - **Two-line class times:** use `class-time-alt` for the continuation,
 	e.g. `class-time = MWF 9:00am`, `class-time-alt = TTh 9:00--10:15am`.
 - **Hyperref colors:** the class loads hyperref with `urlcolor=darkblue`,

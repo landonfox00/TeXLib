@@ -1,0 +1,101 @@
+% !TeX program = lualatex
+% =============================================================================
+% bingo template — math-bingo cards
+% =============================================================================
+%
+% Requires LuaLaTeX (the randomizer runs in Lua):
+%   lualatex bingo-template.tex
+
+% All options are class options. Card identity (course-*, institution,
+% bingo-title) fills the header/footer; without it the slots show placeholders or
+% are populated from a coursemeta.tex up the directory tree. show-instructions
+% prints the how-to-play block on every card (default wording in
+% bingo-instructions.tex; override with bingo-instructions={...} for boxed inline
+% text or bingo-instructions-file=my-notes for an \input'd file).
+\documentclass[
+	course-subject    = Math,
+	course-number     = 181,
+	course-title      = {Calculus I},
+	institution       = {University of Nevada, Reno},
+	bingo-title       = {Exam 3 Bingo},
+	show-instructions = true,
+]{bingo}
+
+% The answer pool — a comma-separated list, one entry per line. Cells are math
+% mode automatically (no $ needed). The list may hold more than 25 entries; \free
+% is the free space. Brace an entry that itself contains a top-level comma.
+\bingobank{
+	xe^{-x},
+	\pi,
+	\alpha,
+	24x-12,
+	e^x,
+	\tfrac{5x}{e^{5x}},
+	4\sqrt{5},
+	\free,
+	x\ln x,
+	\beta,
+	7xe^x(2+x),
+	\sin x,
+	x^3,
+	\delta,
+	\tfrac{1}{x},
+	\frac{\ln(e^x+x)}{x},
+	\frac{x^2}{\sin(2x)},
+	x+\frac{7500}{x},
+	\frac{e^x+1}{e^x+x},
+	\frac{18}{\sqrt[3]{9}},
+	\frac{15}{4},
+	\epsilon,
+	2\pi r^2+\frac{324\pi}{r},
+	12x^2(x-1),
+	\ln x-1,
+	\gamma,
+	\sqrt{\frac{13}{3}},
+	3\sqrt[3]{3},
+	x^2,
+	50\sqrt{3}
+}
+
+\begin{document}
+
+% With show-instructions=true (above), the how-to-play block prints on every
+% card below. For a single instructions cover page instead, drop that option and
+% call \bingoinstructions here followed by \newpage.
+
+% A one-off card: place entries by hand in a 5x5 grid (& between cells, \\
+% between rows). Cells are math mode automatically.
+\begin{bingocard}
+	\beta & \pm & \Omega & \mu & \mathbb{R} \\
+	\to & \int & \neq & \notin & \psi \\
+	\exists & \forall & \free & \frac{d}{dx} & \sqrt{x} \\
+	\theta & \circ & \pi & \prod & \gamma \\
+	\alpha & \infty & \sigma & \sum & \Delta \\
+\end{bingocard}
+
+\newpage
+
+% A randomized set from the pool — one card per page. Fixed across builds; set
+% `seed` to deal a fresh set. `keepfree` (default) guarantees one free space.
+\bingocards[copies=3, randomize]
+
+\end{document}
+
+% =============================================================================
+% More options (see README.md):
+%
+%	% reshuffle: cards are fixed across builds; set seed to deal a new set:
+%	\bingocards[copies=30, randomize, seed=2]
+%
+%	% free space as an ordinary pool entry (a large pool may then drop it):
+%	\bingocards[copies=30, randomize, keepfree=false]
+%
+%	% a second named pool, emitted by name:
+%	\bingobank[final]{ ... }
+%	\bingocards[copies=23, randomize, bank=final]
+%
+%	% more class options (add to the \documentclass list above):
+%	%   cell-size=3.0cm, free-symbol=\cdot, show-headers=false, show-title=true
+%	%   bingo-instructions={Mark answers as they are read; five in a row wins.}
+%	%   bingo-instructions-file=my-instructions   % unboxed file, full control
+% =============================================================================

@@ -1,0 +1,51 @@
+% =============================================================================
+% report-card template — per-student grade reports
+% =============================================================================
+%
+% Compile with:
+%   lualatex report-card-template.tex
+
+% Course-level fields are scalars, so they ride in the class option list.
+% (Real card sets usually inherit these from a coursemeta.tex up the tree.)
+\documentclass[
+	report-date    = {May 7, 2026},
+	institution    = {University of Nevada, Reno},
+	instructor     = {Your Name},
+	season         = Spring,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 181,
+	course-title   = {Calculus I},
+	gradebook-path = {gradebook.xlsx},
+]{report-card}
+
+\begin{document}
+
+% One report card per student, each with its own cover. Grades — and all the
+% arithmetic — live in the gradebook sheet; gradebook.csv is its report-view
+% export (the only tab this document reads). Columns follow the naming
+% convention "<Category> Weight/Score/Points", "Current Total/Points", and
+% "Need <letter>"; a "---" column inserts a midrule in the breakdown table.
+%
+% Bare \gradebook resolves the path from coursemeta's gradebook-path above
+% (here gradebook.xlsx, mapped to the gradebook.csv the builder exports),
+% falling back to a sibling gradebook.csv. Pass \gradebook[other.csv] to
+% override.
+\gradebook
+
+\end{document}
+
+% ----------------------------------------------------------------------------
+% Manual escape hatch — type a single card by hand without the gradebook:
+%
+% \begin{reportcard}{Another Student}
+%     \section*{Current Grade Calculation}
+%     \gradebreakdown{
+%         Homework Avg. & 15\% & 85.0\% & +12.8 \\
+%         \midrule
+%         Exam 1        & 10\% & 78\%   & +7.8  \\
+%     }{75\% (+15\% E.C.) & \fbox{\textbf{86.0\%}} & 64.5}
+%     \standingbar{10.75}{7.5}{8.75}{10}{11.25}
+%     \scenarios{ To earn a C & C 70\% & \textbf{22.0\%} \\ }
+%     \signoff{Thank you for attending my course!}
+% \end{reportcard}

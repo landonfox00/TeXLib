@@ -1,0 +1,29 @@
+% Scenario: syllabi / info-none   (tier: core)
+% None of the six info fields are set, so every default entry has an empty value.
+% The entire framed block -- tabular, minipage, and both rules -- must vanish,
+% leaving only the title/term above the body. Asserted by the absence of every
+% field label (no label can appear if no block was emitted).
+\documentclass{syllabus}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	season         = Fall,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 100,
+}
+
+% No instructor, email, office, office-hours, class-time, or course-room.
+\meta{
+	course-title   = Orientation,
+	short-title    = Math 100,
+}
+
+\begin{document}
+\maketitle
+
+\syllabussection{Course Description}
+A one-credit orientation seminar. This syllabus sets none of the contact-info
+fields, so no info table appears under the title.
+
+\end{document}

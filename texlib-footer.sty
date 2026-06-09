@@ -24,8 +24,9 @@
 %         \renewcommand{\headrulewidth}{0pt}%
 %     }
 %
-% course-metadata.sty must be loaded before \SetTeXLibFooter is invoked,
-% so that \GetCourse and \GetInstitution are defined.
+% The left slot shows \GetCourse, the full "<Subject> <Number> <Title>" name
+% (e.g. "Math 181 Calculus I"). course-metadata.sty must be loaded before
+% \SetTeXLibFooter is invoked, so \GetCourse and \GetInstitution exist.
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesPackage{texlib-footer}[2026/05/10 v1.0 Shared TeXLib footer]
 

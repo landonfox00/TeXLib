@@ -1,0 +1,117 @@
+% =============================================================================
+% syllabus template — course syllabus
+% =============================================================================
+%
+% Compile with:
+%   lualatex syllabus-template.tex
+%
+% Fill in the metadata in the class options below and replace the placeholder
+% prose in each section. Course-level fields (institution, instructor, term,
+% course title / number) can instead come from a coursemeta.tex up the
+% directory tree. Delete any sections you don't need.
+
+\documentclass[
+	course-subject  = Subject,            % e.g. Math
+	course-number   = 000,                % e.g. 181
+	course-title    = Course Title,       % bare title, e.g. Calculus I
+	short-title     = Short Title,        % shown in the running header
+	course-section  = 0000,
+	term            = Term Year,
+	instructor      = Instructor Name,
+	email           = you@university.edu,
+	office          = Building 000,
+	office-hours    = Days 0:00--0:00,
+	class-time      = Days 0:00--0:00,
+	% class-time-alt  = Days 0:00--0:00,  % uncomment for a second meeting line
+	course-room     = Building 000,
+]{syllabus}
+
+% The title's info table is fully customizable. Omit \setsyllabusinfo entirely
+% to get the default (Instructor/Time, Email/Classroom, Office/Office Hours in
+% two columns). Uncomment to choose your own rows, labels, and column count: an
+% entry whose value is empty is dropped and the rest reflow; if every value is
+% empty the whole framed block (rules included) disappears.
+% \setsyllabusinfo[columns=2]{
+% 	\syllabusentry{Instructor}{\GetInstructor}
+% 	\syllabusentry{Class Time}{\GetClassTime}
+% 	\syllabusentry{Email}{\GetEmail}
+% 	\syllabusentry{Classroom}{\GetCourseRoom}
+% 	\syllabusentry{Office}{\GetOffice}
+% 	\syllabusentry{Office Hours}{\GetOfficeHours}
+% }
+
+\begin{document}
+\maketitle
+
+\syllabussection{Office Hours}
+Office hours are listed above, or by appointment. Add your location and any
+scheduling notes here.
+
+\syllabussection{Communication}
+State your preferred mode of contact (e.g.\ the course LMS inbox) and the
+turnaround students can expect for messages.
+
+\syllabussection{Course Description}
+A short paragraph describing the course. The following topics will be covered:
+\begin{itemize}
+	\item First topic
+	\item Second topic
+	\item Third topic
+\end{itemize}
+
+\syllabussection{Student Learning Outcomes}
+Upon completion of this course, students will be able to:
+\begin{enumerate}
+	\item First outcome.
+	\item Second outcome.
+	\item Third outcome.
+\end{enumerate}
+
+\syllabussection{Prerequisites}
+List the prerequisites for this course and any concurrent-enrollment
+requirements.
+
+\syllabussection{Textbook}
+\textit{Title} by Author, Nth ed., Publisher. Note whether a copy is required
+and how students obtain it.
+
+\syllabussection{Grade Scale}
+Course grades will be determined as follows:
+
+\gradetables{
+	Component One   & 00\% \\ \hline
+	Component Two   & 00\% \\ \hline
+	Component Three & 00\% \\ \hline
+	Final Exam      & 00\% \\ \hline
+	Extra Credit    & 00\%
+}{
+	A & $90 \leq x$       \\ \hline
+	B & $80 \leq x < 90$  \\ \hline
+	C & $70 \leq x < 80$  \\ \hline
+	D & $60 \leq x < 70$  \\ \hline
+	F & $x < 60$
+}
+
+\syllabussection{Course Schedule}
+Point students to your schedule document, or list the key dates here.
+
+% --- Policy statements -------------------------------------------------------
+% Replace the placeholders below with your institution's required language
+% (academic support resources, disability accommodations, academic integrity).
+% \href{url}{text} makes a clickable link.
+
+\syllabussection{Academic Support Services}
+Describe the tutoring, writing, and other support resources available to
+students, e.g.\ \href{https://example.edu/tutoring}{the Tutoring Center}.
+
+\syllabussection{Disability Services}
+Any student with a disability needing academic adjustments or accommodations is
+requested to speak with me or the
+\href{https://example.edu/disability}{Disability Resource Center} as soon as
+possible to arrange appropriate accommodations.
+
+\syllabussection{Academic Integrity}
+State your institution's academic-integrity policy and the consequences of
+violations, with a link to the official policy where available.
+
+\end{document}

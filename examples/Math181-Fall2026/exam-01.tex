@@ -1,0 +1,32 @@
+% Exam 01 — Limits, an example randomized multi-version exam.
+%
+% Course metadata (title, course number, section, term) is picked up from
+% coursemeta.tex in this directory; only the per-exam fields are set below.
+%
+% Build the collated A/B/C exam:   lualatex exam-01.tex
+% Build one version (instructor):  lualatex "\def\Version{A}\input{exam-01.tex}"
+% Build the answer key:            lualatex "\def\ShowKey{}\input{exam-01.tex}"
+
+\documentclass[
+	exam-number = 1,
+	exam-date   = {October 9, 2026},
+]{autoexam}
+
+% Three labeled versions. \shufflepages reorders the questions independently
+% per version (seeded by the version letter), so one authored order below yields
+% A/B/C with the same problems in different sequence — no per-version files.
+\versions{A, B, C}
+\shufflepages
+
+\loadbank{bank.tex}
+
+\begin{document}
+\maketitle
+
+\begin{problems}
+	\problem{topic=limit}
+	\problem{topic=continuity}
+	\problem{topic=ivt}
+\end{problems}
+
+\end{document}

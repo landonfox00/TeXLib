@@ -65,7 +65,7 @@ def _install_latextools_stub():
 _install_latextools_stub()
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from texlib_builder import TexlibBuilder  # noqa: E402
+from texlib_builder import TexlibBuilder, GRADEBOOK_SHEETS  # noqa: E402
 
 
 # --- 2. Harness ------------------------------------------------------------
@@ -849,6 +849,107 @@ def main():
               "not copied back" in sb3._displayed, sb3._displayed)
     else:
         print("  SKIP  pypdf not installed -- PDF split tests skipped")
+
+    # ====================================================================== #
+    # (w) gradebook xlsx -> report-view CSV conversion (report-card class).
+    # ====================================================================== #
+    import zipfile as _zip
+    MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    PREL = "http://schemas.openxmlformats.org/package/2006/relationships"
+    OREL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+    def _mini_xlsx(path):
+        """A 2-sheet workbook: Roster + Report View. The Report View 'Score'
+        cell is a FORMULA carrying a cached <v>, and the name cell is a shared
+        string -- so the test exercises both the cached-value and shared-string
+        read paths."""
+        wb = (f'<workbook xmlns="{MAIN}" xmlns:r="{OREL}"><sheets>'
+              '<sheet name="Roster" sheetId="1" r:id="rId1"/>'
+              '<sheet name="Report View" sheetId="2" r:id="rId2"/>'
+              '</sheets></workbook>')
+        rels = (f'<Relationships xmlns="{PREL}">'
+                f'<Relationship Id="rId1" Type="{OREL}/worksheet" '
+                'Target="worksheets/sheet1.xml"/>'
+                f'<Relationship Id="rId2" Type="{OREL}/worksheet" '
+                'Target="worksheets/sheet2.xml"/></Relationships>')
+        sst = (f'<sst xmlns="{MAIN}" count="1" uniqueCount="1">'
+               '<si><t>Tester</t></si></sst>')
+        sheet1 = (f'<worksheet xmlns="{MAIN}"><sheetData>'
+                  '<row r="1"><c r="A1" t="inlineStr"><is><t>Name</t></is></c>'
+                  '</row></sheetData></worksheet>')
+        sheet2 = (f'<worksheet xmlns="{MAIN}"><sheetData>'
+                  '<row r="1">'
+                  '<c r="A1" t="inlineStr"><is><t>Name</t></is></c>'
+                  '<c r="B1" t="inlineStr"><is><t>Homework Avg. Weight</t></is></c>'
+                  '<c r="C1" t="inlineStr"><is><t>Homework Avg. Score</t></is></c>'
+                  '<c r="D1" t="inlineStr"><is><t>Current Total</t></is></c>'
+                  '</row>'
+                  '<row r="2">'
+                  '<c r="A2" t="s"><v>0</v></c>'
+                  '<c r="B2"><v>15</v></c>'
+                  '<c r="C2"><f>AVERAGE(Roster!B2:D2)</f><v>85</v></c>'
+                  '<c r="D2"><v>86</v></c>'
+                  '</row></sheetData></worksheet>')
+        ct = (f'<Types xmlns="{PREL.replace("relationships","content-types")}">'
+              '<Default Extension="rels" ContentType="application/vnd.'
+              'openxmlformats-package.relationships+xml"/>'
+              '<Default Extension="xml" ContentType="application/xml"/></Types>')
+        root_rels = (f'<Relationships xmlns="{PREL}"><Relationship Id="rIdW" '
+                     f'Type="{OREL}/officeDocument" Target="xl/workbook.xml"/>'
+                     '</Relationships>')
+        with _zip.ZipFile(path, "w") as z:
+            z.writestr("[Content_Types].xml", ct)
+            z.writestr("_rels/.rels", root_rels)
+            z.writestr("xl/workbook.xml", wb)
+            z.writestr("xl/_rels/workbook.xml.rels", rels)
+            z.writestr("xl/sharedStrings.xml", sst)
+            z.writestr("xl/worksheets/sheet1.xml", sheet1)
+            z.writestr("xl/worksheets/sheet2.xml", sheet2)
+
+    tmpg = tempfile.mkdtemp(prefix="texlib_gb_")
+    xlsx = os.path.join(tmpg, "gradebook.xlsx")
+    _mini_xlsx(xlsx)
+
+    # _xlsx_rows picks "Report View" and reads cached values + shared strings.
+    rows = TexlibBuilder._xlsx_rows(xlsx, GRADEBOOK_SHEETS)
+    check("gradebook: picks the Report View sheet (not Roster)",
+          rows and rows[0] == ["Name", "Homework Avg. Weight",
+                               "Homework Avg. Score", "Current Total"], rows)
+    check("gradebook: shared string read for the name cell",
+          len(rows) > 1 and rows[1][0] == "Tester", rows)
+    check("gradebook: cached formula value read (Score=85, not the formula)",
+          len(rows) > 1 and rows[1][2] == "85", rows)
+    check("gradebook: plain numeric cell read (Current Total=86)",
+          len(rows) > 1 and rows[1][3] == "86", rows)
+
+    # _convert_gradebooks writes a sibling CSV for a report-card document.
+    gb = TexlibBuilder()
+    gb.tex_dir = tmpg
+    gb._convert_gradebooks(r"\documentclass{report-card}\begin{document}\end{document}")
+    csv_out = os.path.join(tmpg, "gradebook.csv")
+    check("gradebook: report-card doc -> sibling gradebook.csv written",
+          os.path.exists(csv_out), csv_out)
+    if os.path.exists(csv_out):
+        with open(csv_out, encoding="utf-8") as fh:
+            text = fh.read()
+        check("gradebook: CSV contains the student row",
+              "Tester" in text and "85" in text and "86" in text, text)
+
+    # Non-gradebook class -> no conversion (article must not get a CSV).
+    tmgn = tempfile.mkdtemp(prefix="texlib_gbn_")
+    _mini_xlsx(os.path.join(tmgn, "gradebook.xlsx"))
+    gn = TexlibBuilder()
+    gn.tex_dir = tmgn
+    gn._convert_gradebooks(r"\documentclass{article}\begin{document}\end{document}")
+    check("gradebook: non-report-card class -> no CSV emitted",
+          not os.path.exists(os.path.join(tmgn, "gradebook.csv")))
+
+    # report-card is in the lualatex-forced set (it uses \directlua).
+    cmds, _ = run_builder(
+        r"\documentclass{report-card}\begin{document}\end{document}",
+        engine="pdflatex")
+    check("report-card + pdflatex -> overridden to lualatex",
+          bool(cmds) and cmds[0][0][0] == "lualatex", cmds)
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL

@@ -3,7 +3,7 @@
 % =============================================================================
 %
 % Compile with:
-%   lualatex template.tex
+%   lualatex quiz-template.tex
 %
 % This template demonstrates BOTH styles in one file:
 %   1. Inline \question text (the original quiz pattern)
@@ -11,15 +11,10 @@
 %
 % Keep whichever you prefer; mix and match if useful.
 
-\documentclass{quiz}
-
-\meta{
-	quiz-number = 1,
-
-	% Optional: replace boxed instructions with a separate file, e.g.
-	%   quiz-instructions-file = group-quiz-instructions
-	% (filename without .tex; \input'd at \maketitle.)
-}
+\documentclass[quiz-number = 1]{quiz}
+% Optional: replace the boxed instructions with a separate file by adding
+%   quiz-instructions-file = group-quiz-instructions
+% to the options above (filename without .tex; \input'd at \maketitle).
 
 % ---- Inline bank entries (or move into a separate `quiz_bank.tex` and
 % ---- \loadbank{quiz_bank} below) -------------------------------------

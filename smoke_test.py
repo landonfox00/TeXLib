@@ -2,7 +2,7 @@
 """
 TeXLib smoke test harness.
 
-Builds every per-module template.tex and reports pass/fail. Intended as the
+Builds every module's template (<module>-template.tex) and reports pass/fail. Intended as the
 safety net for refactors that touch shared .sty/.cls files (e.g. consolidating
 course-metadata.sty, extracting math utilities, deduping the autoexam engine).
 
@@ -104,23 +104,55 @@ SCENARIO_AREA_MODULE = {
 
 # Modules and their template files. Engine is auto-detected from \documentclass.
 MODULES = [
-    ("Bingo",        "template.tex"),
-    ("Exams",        "template.tex"),
-    ("Notes",        "template.tex"),
-    ("Quizzes",      "template.tex"),
-    ("Report Cards", "template.tex"),
-    ("Schedule",     "template.tex"),
-    ("Syllabi",      "template.tex"),
-    ("Problem Sets", "template.tex"),
-    # Feature-test entries (live under Test/<Module>/). Each is a self-contained
-    # .tex that exercises something the canonical template doesn't — e.g. the
-    # fix-overrides syntax \problem{id}[a=1,b=2]. Treated like any other module
-    # by build_one (it copies siblings + collects root + module .cls files).
-    ("Test/Exams",   "fix-test.tex"),
+    ("Bingo",        "bingo-template.tex"),
+    ("Exams",        "autoexam-template.tex"),
+    ("Notes",        "didactic-template.tex"),
+    ("Quizzes",      "quiz-template.tex"),
+    ("Report Cards", "report-card-template.tex"),
+    ("Schedule",     "schedule-template.tex"),
+    ("Syllabi",      "syllabus-template.tex"),
+    ("Problem Sets", "pset-template.tex"),
+    # Feature-test fixtures (live under tests/fixtures/<Module>/). Each is a
+    # self-contained .tex that exercises something the canonical template
+    # doesn't — e.g. the fix-overrides syntax \problem{id}[a=1,b=2]. Treated
+    # like any other module by build_one (it copies siblings + collects root +
+    # module .cls files), so they run on every push alongside the modules.
+    ("tests/fixtures/Exams",   "fix-test.tex"),
+    # course-metadata.sty's catch-all: arbitrary (non-predefined) keys must be
+    # absorbed and mint a working \Get<Key> getter. A regressed catch-all errors
+    # under -halt-on-error; a regressed getter leaves \Get... undefined.
+    ("tests/fixtures/Metadata", "metadata-test.tex"),
+    # The end-to-end examples (examples/<Course>/) double as build fixtures so
+    # the documented course folder can't silently rot when a class changes.
+    # Build-only (no EXPECT_TEXT key): they share one coursemeta.tex across
+    # several documents, so there's no single per-module text token to assert.
+    # build_one copies each doc's class home-module assets in (CLASS_HOME_MODULE),
+    # so e.g. the {quiz} doc gets quiz-instructions.tex even though it lives here.
+    ("examples/Math181-Fall2026", "lecture-01-limits.tex"),
+    ("examples/Math181-Fall2026", "quiz-01.tex"),
+    ("examples/Math181-Fall2026", "exam-01.tex"),
+    ("examples/Math181-Fall2026", "syllabus.tex"),
+    ("examples/Math181-Fall2026", "schedule.tex"),
 ]
 
-# Classes that require lualatex (use \directlua, luaotfload, or sibling .lua files).
-LUALATEX_CLASSES = {"autoexam", "quiz", "schedule"}
+# Classes that require lualatex (use \directlua, luaotfload, or sibling .lua
+# files; report-card's \gradebook reads its CSV via lualatex).
+LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "bingo", "report-card"}
+
+# Maps a \documentclass to the module dir shipping its .cls and default include
+# files (instructions, title). Used to give a build whose source lives OUTSIDE
+# that module — e.g. an examples/ course folder using {quiz} — the class's
+# library assets in cwd, the comma-safe way (mirrors build_scenario's copy).
+CLASS_HOME_MODULE = {
+    "didactic":    "Notes",
+    "quiz":        "Quizzes",
+    "autoexam":    "Exams",
+    "schedule":    "Schedule",
+    "syllabus":    "Syllabi",
+    "report-card": "Report Cards",
+    "bingo":       "Bingo",
+    "pset":        "Problem Sets",
+}
 
 # Build-flag toggles. Each maps a CLI flag to a TeX macro define.
 MODES = {
@@ -169,19 +201,26 @@ STUB_COURSEMETA = r"""% coursemeta.tex - auto-generated stub for TeXLib smoke te
 # Keep the strings to durable, content-level tokens (column headers, directive
 # output, instruction boilerplate), NOT layout/font-sensitive details.
 EXPECT_TEXT = {
-    # Bingo renders the banner as spaced letters ("B  I  N  G  O"), so match the
-    # always-present grid cell coordinates instead.
-    "Bingo":        ["B1", "O5"],
+    # The bingo template renders math symbols (not text labels) in its cells, so
+    # match the always-present banner title and the how-to-play boilerplate
+    # instead of grid coordinates.
+    "Bingo":        ["Bingo", "Mark the free space"],
     "Exams":        ["Problem 1", "Problem 2"],
     "Notes":        ["Introduction", "Theorem"],
     "Quizzes":      ["Quiz"],
     "Report Cards": ["Report Card"],
-    "Schedule":     ["MONDAY", "WEEK", "Quiz 1", "Final Exam"],
+    "Schedule":     ["MONDAY", "WEEK", "Quiz 1", "Finals Week"],
     # Syllabi/template.tex carries its own metadata (not the stub), so key on
     # the template's stable section headings.
     "Syllabi":      ["Course Description", "Office Hours"],
     "Problem Sets": ["Problem 1"],
-    "Test/Exams":   ["Problem 1"],
+    "tests/fixtures/Exams":   ["Problem 1"],
+    # One marker per auto-vivified getter (coursemeta key, inline-loud, inline-
+    # quiet). All three present == every custom key minted a working getter.
+    # SETCMDMARK == \SetCourseTitle round-tripped through \GetCourseTitle;
+    # METAALIASMARK == the \meta->\metasetup alias still sets (and mints) a key.
+    "tests/fixtures/Metadata": ["CMOFFICEHOURSMARK", "CMLECTHALLMARK", "CMTANAMEMARK",
+                                "SETCMDMARK", "METAALIASMARK"],
 }
 
 # Generated sidecar files that must exist AND be non-empty after a build. A
@@ -201,7 +240,7 @@ DOCCLASS_RE = re.compile(r"\\documentclass(?:\[[^\]]*\])?\{(\w[\w-]*)\}")
 
 
 def safe_name(module: str) -> str:
-    """Filesystem-safe slug for a module name (e.g. 'Test/Exams' -> 'Test_Exams')."""
+    """Filesystem-safe slug for a module name (e.g. 'tests/fixtures/Exams' -> 'tests_fixtures_Exams')."""
     return re.sub(r"[^\w.-]+", "_", module)
 
 
@@ -352,17 +391,20 @@ def _png_size(path: str) -> tuple[int, int]:
     return (1100, 850)
 
 
-def detect_engine(tex_path: str) -> str:
-    """Pick lualatex if the documentclass needs it, else pdflatex."""
+def detect_class(tex_path: str) -> str | None:
+    """Return the document's \\documentclass name, or None if unreadable/absent."""
     try:
         with open(tex_path, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
     except OSError:
-        return "pdflatex"
+        return None
     m = DOCCLASS_RE.search(content)
-    if m and m.group(1) in LUALATEX_CLASSES:
-        return "lualatex"
-    return "pdflatex"
+    return m.group(1) if m else None
+
+
+def detect_engine(tex_path: str) -> str:
+    """Pick lualatex if the documentclass needs it, else pdflatex."""
+    return "lualatex" if detect_class(tex_path) in LUALATEX_CLASSES else "pdflatex"
 
 
 def extract_tex_errors(log_text: str, max_lines: int = 6) -> str:
@@ -478,6 +520,19 @@ def build_one(
             src = os.path.join(module_dir, entry)
             if os.path.isfile(src):
                 shutil.copy2(src, tmp)
+
+        # If the source lives outside its document class's home module (e.g. an
+        # examples/ course folder using {quiz}), copy that module's files in too
+        # — the class's default includes (quiz-instructions.tex, title.tex) must
+        # resolve in cwd because the comma-path TEXINPUTS fallback can't find
+        # them. The source's own files were copied first and win; never overwrite.
+        home = CLASS_HOME_MODULE.get(detect_class(tex_src) or "")
+        if home and home != module:
+            home_dir = os.path.join(TEXLIB_ROOT, home)
+            for entry in os.listdir(home_dir):
+                src = os.path.join(home_dir, entry)
+                if os.path.isfile(src) and not os.path.exists(os.path.join(tmp, entry)):
+                    shutil.copy2(src, tmp)
 
         # Copy the TeXLib-root shared files (.sty/.lua/.cls) and every module's
         # .cls into the build dir so they resolve via the cwd. This sidesteps a
@@ -636,10 +691,10 @@ def _copy_shared_into(tmp: str) -> None:
                     shutil.copy2(os.path.join(sub, f), dest)
 
 
-def _read_expect_text(sdir: str) -> list[str]:
-    """A scenario's optional `expect-text` file: substrings (one per line) that
-    must appear in the rendered PDF. Blank lines and '#' comments are ignored."""
-    path = os.path.join(sdir, "expect-text")
+def _read_expect_lines(sdir: str, name: str) -> list[str]:
+    """Read a scenario's `name` file: substrings, one per line. Blank lines and
+    '#' comments are ignored. Missing file -> []."""
+    path = os.path.join(sdir, name)
     if not os.path.isfile(path):
         return []
     out: list[str] = []
@@ -652,6 +707,19 @@ def _read_expect_text(sdir: str) -> list[str]:
     except OSError:
         return []
     return out
+
+
+def _read_expect_text(sdir: str) -> list[str]:
+    """A scenario's optional `expect-text` file: substrings that MUST appear in
+    the rendered PDF."""
+    return _read_expect_lines(sdir, "expect-text")
+
+
+def _read_expect_absent(sdir: str) -> list[str]:
+    """A scenario's optional `expect-absent` file: substrings that must NOT appear
+    in the rendered PDF (e.g. a relabelled/omitted field's old label). The mirror
+    of expect-text, for asserting a configuration removed something."""
+    return _read_expect_lines(sdir, "expect-absent")
 
 
 def build_scenario(scen: dict, timeout: int, verbose: bool,
@@ -716,13 +784,15 @@ def build_scenario(scen: dict, timeout: int, verbose: bool,
             problems += cp
             skipped = skipped or tskip
 
-        # Optional per-scenario text assertion: an `expect-text` file lists
-        # substrings (one per line; blank lines and '#' comments ignored) that
-        # MUST appear in the rendered PDF. Lets a scenario assert content
-        # directly (e.g. that the right instructions file was resolved),
-        # independent of pixel references.
+        # Optional per-scenario text assertions: `expect-text` lists substrings
+        # that MUST appear in the rendered PDF; `expect-absent` lists substrings
+        # that must NOT (one per line; blank lines and '#' comments ignored).
+        # Together they let a scenario assert content directly (the right
+        # instructions file resolved; a relabelled/omitted field's old label is
+        # gone) independent of pixel references.
         text_expects = _read_expect_text(sdir)
-        if text_expects:
+        text_absent = _read_expect_absent(sdir)
+        if text_expects or text_absent:
             text = extract_pdf_text(pdf)
             if text is None:
                 skipped = True  # pdftotext unavailable -> soft skip
@@ -732,13 +802,17 @@ def build_scenario(scen: dict, timeout: int, verbose: bool,
                 if missing:
                     problems.append(
                         "missing text: " + ", ".join(repr(s) for s in missing))
+                present = [s for s in text_absent if s.lower() in low]
+                if present:
+                    problems.append(
+                        "unexpected text: " + ", ".join(repr(s) for s in present))
 
         # Visual diff: the assertion for visual scenarios. Skipped for a
-        # text-only scenario (ships `expect-text`, carries no reference PNGs) so
-        # it needn't commit a pixel ref.
+        # text-only scenario (ships expect-text/expect-absent, carries no
+        # reference PNGs) so it needn't commit a pixel ref.
         has_refs = bool(glob.glob(
             os.path.join(VISUAL_REF_DIR, f"{safe_name(slug)}-*.png")))
-        if has_refs or not text_expects:
+        if has_refs or not (text_expects or text_absent):
             vp, vskip = check_visual(slug, tmp, pdf, update=(visual == "update"))
             problems += vp
             skipped = skipped or vskip

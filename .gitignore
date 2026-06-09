@@ -32,6 +32,8 @@ course-metadata_old.sty
 # autoexam / SyncTeX build scratch (generated next to the source by a
 # command-line build that bypassed the Sublime builder's cleanup).
 *.key
+*.sco
+*_autoexam_body_*.tex
 *.srcmap
 *_synctex.tex
 *_synctex_*.tex

@@ -1,24 +1,21 @@
 # `bingo` — Math Bingo Cards
 
-A LaTeX class for printing math-symbol bingo cards. Two layouts are
-supported:
-
-1. **Standard cards.** Each cell contains a math symbol or expression
-	(e.g. $\beta$, $\int$, $\mathbb{R}$). Different students get
-	different cards.
-2. **Labeled cards + legend.** Each cell shows its grid label (B1, B2,
-	…, O5); a separate `\bingolegend{...}` table maps labels to math
-	expressions. This is the layout I use for exam-review bingo, where
-	the student picks the answer matching the question I read aloud.
+A LuaLaTeX class for printing math bingo cards. You write one 5×5 grid of cell
+contents; the class draws the grid, scales each cell to fit, and (optionally)
+shuffles the entries into a reproducible set of randomized cards.
 
 ## What it gives you
 
-- A `bingocard` environment that draws the 5×5 grid, optional
-	B-I-N-G-O headers, and the free-space symbol at center.
-- `\bcell{col}{row}{math}` and `\bcelltext{col}{row}{text}` for
-	placing content in cells.
-- `\labelcells` and `\bingolegend{...}` for the labeled layout.
-- An optional metadata-driven title block above each card.
+- A `\bingobank` command: list the answer pool once, then stamp out cards with
+  `\bingocards[...]` — no per-card body.
+- A `bingocard` environment for one-off cards whose body *is* the grid — cells
+  separated by `&`, rows by `\\`, exactly like a `matrix`.
+- Built-in randomization: `[copies=N, randomize]` emits `N` cards, each a
+  different shuffle of the pool.
+- Auto-scaling cells: short symbols print large and uniform; long expressions
+  shrink to fit. No separate legend.
+- A footer that numbers each card; the number is also the card's random seed, so
+  the set is reproducible and any sheet can be regenerated.
 
 ---
 
@@ -30,35 +27,61 @@ supported:
 \begin{document}
 
 \begin{bingocard}
-	\bcell{B}{1}{\beta}     \bcell{I}{1}{\pm}      \bcell{N}{1}{\Omega}        \bcell{G}{1}{\mu}     \bcell{O}{1}{\mathbb{R}}
-	\bcell{B}{2}{\to}       \bcell{I}{2}{\int}     \bcell{N}{2}{\neq}          \bcell{G}{2}{\notin}  \bcell{O}{2}{\psi}
-	\bcell{B}{3}{\exists}   \bcell{I}{3}{\forall}                              \bcell{G}{3}{\frac{d}{dx}} \bcell{O}{3}{\sqrt{x}}
-	\bcell{B}{4}{\theta}    \bcell{I}{4}{\circ}    \bcell{N}{4}{\pi}           \bcell{G}{4}{\prod}   \bcell{O}{4}{\gamma}
-	\bcell{B}{5}{\alpha}    \bcell{I}{5}{\infty}   \bcell{N}{5}{\sigma}        \bcell{G}{5}{\sum}    \bcell{O}{5}{\Delta}
+  \beta   & \pm     & \Omega & \mu          & \mathbb{R} \\
+  \to     & \int    & \neq   & \notin       & \psi       \\
+  \exists & \forall & \free  & \frac{d}{dx} & \sqrt{x}   \\
+  \theta  & \circ   & \pi    & \prod        & \gamma     \\
+  \alpha  & \infty  & \sigma & \sum         & \Delta     \\
 \end{bingocard}
-
-\newpage
-
-% Another card with different symbols ...
 
 \end{document}
 ```
 
-(The center cell `(N, 3)` is auto-filled with the free-space symbol —
-`\star` by default — so you skip it in your `\bcell` calls.)
+Each cell is typeset in math mode automatically — write `\frac{d}{dx}`, not
+`$\frac{d}{dx}$` (a `$...$` wrapper is allowed and stripped, e.g. to keep a
+linter quiet). `\free` is the free space — an ordinary entry, shuffled and
+placed like any other (there is no reserved center cell). A blank cell renders
+empty. Cards are centered vertically on the page.
 
-For the labeled-card layout used in exam-review bingo:
+### Randomized exam-review cards (declare a pool, stamp out cards)
+
+The original use case: take the answers to an exam review and turn them into
+bingo cards, a different shuffle per student. List the pool once with
+`\bingobank` (in the preamble or before the cards), then emit with `\bingocards`:
 
 ```latex
-\begin{bingocard}
-	\labelcells          % auto-fills B1..O5 in every cell
-\end{bingocard}
-
-\bingolegend{
-	$\text{B}1$ : $\beta$ & $\text{I}1$ : $\pm$ & $\text{N}1$ : $\Omega$ & $\text{G}1$ : $\mu$ & $\text{O}1$ : $\mathbb{R}$ \\
-	$\text{B}2$ : $\to$   & $\text{I}2$ : $\int$ & $\text{N}2$ : $\neq$  & $\text{G}2$ : $\notin$ & $\text{O}2$ : $\psi$ \\
-	...
+\bingobank{
+  \frac{\ln(e^x+x)}{x},
+  xe^{-x},
+  \pi,
+  \free,
+  % ... one entry per line; a comma-separated list, may exceed 25 entries
 }
+
+\begin{document}
+\bingocards[copies=30, randomize]
+\end{document}
+```
+
+With `randomize`, the pool is shuffled and the first 25 entries are placed, once
+per copy. A pool of exactly 25 is a pure permutation (every card has the same
+entries in different spots); a larger pool samples 25 of them per card. With
+`keepfree` (on by default), `\free` is always among the placed 25, so every card
+has a free space.
+
+The randomization is **fixed across builds** — recompiling the same source
+always produces the same cards (seeded by each card's number). To deal a fresh
+set from the same pool, set `seed=` to any number; it stays fixed until you
+change it again. This mirrors `autoexam`, whose versioned shuffles are likewise
+deterministic per version.
+
+You can also pass the pool inline to `bingocard` instead of declaring a bank —
+useful for a single quick card:
+
+```latex
+\begin{bingocard}[randomize]
+  ... 5x5 of entries ...
+\end{bingocard}
 ```
 
 ---
@@ -68,84 +91,103 @@ For the labeled-card layout used in exam-review bingo:
 ### Document class
 
 `\documentclass[options]{bingo}`
-Options pass through to `article`. Default base size is 12pt. The
-class sets `\pagestyle{empty}` so cards print without page numbers.
+Options pass through to `article` (base size 11pt). Requires **LuaLaTeX** (the
+randomizer runs in Lua). Page geometry uses 1in margins, matching the other
+TeXLib classes.
 
-### Metadata keys (set via `\meta{...}`)
+### Pools and cards
 
-| Key            | Default | Effect                                       |
-|----------------|---------|----------------------------------------------|
-| `cell-size`    | 2.8cm   | Side length of each grid cell.               |
-| `free-symbol`  | `\star` | Symbol placed at center cell (N, 3).         |
-| `show-headers` | `true`  | Show the B-I-N-G-O letters above the grid.   |
-| `show-title`   | `false` | Render `\bingotitle` above each card.        |
+`\bingobank[<name>]{ <comma-separated entries> }`
+Declare an answer pool (default `name` is `default`). Usable in the preamble.
+The argument is a plain comma-separated list (any length, one entry per line is
+tidy); brace an entry that itself contains a top-level comma. `\free` renders the
+free symbol. For multi-word or wide answers, stack them with
+`\substack{line one\\ line two}` so they fit the cell.
 
-All standard `course-metadata` keys also work — useful when
-`show-title=true`.
+`\bingocards[<options>]`
+Emit cards from a declared pool — no body. Set `bank=<name>` in the options to
+pick a non-default pool.
 
-### Build flags (TeXLib unified CLI)
+`\begin{bingocard}[<options>] <grid body> \end{bingocard}`
+A self-contained card whose body is the grid (for one-offs); takes the same
+options as `\bingocards`.
 
-`\ifsolutions`, `\ifkey`, `\ifdraft`, `\ifstudent`, `\ifinstructor`
-and the matching compile-time toggles. The `\ifkey` flag adds an
-"Answer Key" annotation to the title block when `show-title=true`.
+| Option      | Default   | Effect                                                       |
+|-------------|-----------|--------------------------------------------------------------|
+| `copies=N`  | `1`       | Emit `N` cards, each on its own page.                        |
+| `randomize` | off       | Shuffle the pool (and sample to 25 if longer) for each copy. |
+| `keepfree`  | on        | Always place `\free` (if in the pool) so every card has a free space. |
+| `seed=K`    | `0`       | Reshuffle salt. Randomization is fixed across builds; change `seed` to deal a new (still build-stable) set from the same pool. |
+| `bank=name` | `default` | (`\bingocards` only) which declared pool to use.             |
 
-### Commands and environments
+> **Free-space note.** With `keepfree` (the default), `\free` is always among the
+> placed 25, at a random cell. Set `keepfree=false` to treat `\free` as an
+> ordinary pool entry, in which case a pool larger than 25 may by chance place
+> zero or two free spaces on a card.
 
-`\begin{bingocard}[<options>] ... \end{bingocard}`
-Draw a 5×5 grid with B-I-N-G-O headers (if enabled) and the free-space
-symbol at center. The optional argument is forwarded to `\metasetup` —
-useful for per-card overrides like `[show-title=true]`.
+### Cell scaling
 
-`\bcell{col}{row}{math}`
-Place math-mode content in cell `(col, row)`. `col` is one of `B`,
-`I`, `N`, `G`, `O`; `row` is `1` (top) through `5` (bottom).
+Each cell is typeset at a large base size and shrunk only if it overflows, so
+single symbols stay big and uniform while wide expressions scale down. If a cell
+would shrink below ~40% it raises an error naming the cell — shorten it, split
+the bank, or raise `cell-size`.
 
-`\bcelltext{col}{row}{text}`
-Same but text-mode content (no `$...$` wrapping).
+### Class options (`\documentclass[...]{bingo}`)
 
-`\labelcells`
-Inside a `bingocard`, fill all 24 non-free cells with their grid
-labels (B1, B2, …, O5).
+Set as comma-separated key-values in the class option list, e.g.
+`\documentclass[bingo-title={Exam 3 Bingo}, show-instructions=true]{bingo}`.
 
-`\bingolegend{rows}`
-Render a 5-column legend tabular outside (typically below) the card.
-Cells are separated by `&`, rows by `\\`. Used with `\labelcells` to
-build the answer-bingo style.
+| Key            | Default | Effect                                      |
+|----------------|---------|---------------------------------------------|
+| `cell-size`    | 3.1cm   | Side length of each grid cell.              |
+| `free-symbol`  | `\star` | Symbol `\free` renders.                     |
+| `show-headers` | `true`  | Show the B-I-N-G-O letters above the grid.  |
+| `show-title`   | `false` | Render `\bingotitle` above each card.       |
+| `show-instructions` | `false` | Print the instructions block on every card. |
+| `bingo-title`  | `Bingo` | Running-header title (e.g. `Exam 3 Bingo`). |
+| `bingo-instructions` | — | Inline how-to-play text (boxed).            |
+| `bingo-instructions-file` | — | A file `\input` (unboxed) for the instructions instead. |
 
-`\bingotitle` / `\maketitle`
-Auto title block (course + term, plus "Answer Key" if `\ifkey`).
-`\maketitle` is an alias for `\bingotitle` so the unified TeXLib
-title pattern works here too. Inside each `\bingocard` the title is
-emitted only if `show-title=true`.
+All standard `course-metadata` keys also work and populate the header/footer.
 
-### Coordinate convention
+### Instructions
 
-Internally, the grid is drawn with `tikzpicture[x=cell-size, y=cell-size]`:
+A how-to-play block, mirroring the quiz class: a boxed, small-font paragraph.
+Two ways to place it:
 
-- Columns: B → x = 0.5, I → 1.5, N → 2.5, G → 3.5, O → 4.5
-- Rows:    row 1 → y = 4.5 (top), row 5 → y = 0.5 (bottom)
-- Free space at (N, 3) → (2.5, 2.5)
+- **On every card** — set `show-instructions=true` (the block prints above each
+  grid).
+- **As a cover page** — call `\bingoinstructions` once (with a centered title)
+  before `\bingocards`, then `\newpage`.
 
-If you want to drop in a custom node, use those coordinates inside the
-environment.
+Content resolves file > inline > default:
+
+- `bingo-instructions-file = my-notes` — `\input` the file verbatim (it controls
+  its own layout, no box);
+- `bingo-instructions = {short text}` — boxed inline text;
+- otherwise the default wording in `bingo-instructions.tex` (a real file, so
+  SyncTeX inverse-search jumps to it; edit there to change the default for every
+  card set).
+
+### Footer number
+
+Every card carries the unified TeXLib footer (course left, institution right);
+the center field is the card's sequential number — `1`, `2`, `3`, … — one per
+page. That number is also the random seed for the card, so the printed sheets
+are reproducible: recompiling the same pool regenerates the same cards, and the
+number on a sheet identifies exactly which card it is.
 
 ---
 
-## Tips
+## Migrating from the old API
 
-- **Per-student randomization:** the class deliberately doesn't shuffle
-	cells — you typically want each student's card to differ in known
-	ways. Generate a sequence of `bingocard` environments with shuffled
-	`\bcell` orderings (a small Lua script outside LaTeX is the easiest
-	approach), or copy/paste with manual permutations.
-- **Free-space override:** set `free-symbol = \cdot` (or any math token)
-	to change the centerpiece per card.
-- **Larger or smaller cards:** adjust `cell-size`. The page geometry
-	uses `margin=1in`; a `cell-size` larger than ~3.4cm may overflow.
-- **Two cards per page:** call `\begin{bingocard}...\end{bingocard}`
-	twice with `\newpage` between them — the standard pattern.
+Earlier versions used coordinate placement (`\bcell{col}{row}{}`), `\labelcells`,
+and a separate `\bingolegend{...}`. Those still compile (a `bingocard` body that
+calls `\labelcells`/`\bcell` is routed to the legacy renderer), but new cards
+should use the grid body above — it removes the legend entirely by scaling long
+expressions into the cells.
 
 ## Related
 
-- `course-metadata.md` — for any course/title metadata you want
-	rendered in `\bingotitle`.
+- `course-metadata.md` — course/title metadata for the header, footer, and
+  `\bingotitle`.

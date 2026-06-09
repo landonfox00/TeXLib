@@ -1,0 +1,112 @@
+% texlib-instructions.sty
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-instructions}[2026/06/09 v1.0 TeXLib shared document-instructions mechanism]
+
+% Unifies the "document instructions" mechanism (inline text / instructions file
+% / built-in default, resolved file > inline > default) across the assessment
+% classes. ONE call,
+%   \TeXLibDeclareInstructions[<default-file>]{<prefix>}
+% mints, for that <prefix>, the inline key, getter, the two If-conditionals, and
+% the coursemeta-relative file loader; \TeXLibInstructionsBox /
+% \TeXLibInstructionsInlineOrDefault / \TeXLibInstructions render them.
+%
+% The <prefix>-instructions-file key itself lives in course-metadata.sty (next to
+% bank-path), so it can be set course-wide in coursemeta.tex; this package only
+% consumes its getter \Get<Prefix>InstructionsFile and \IfMetaSet.
+
+\RequirePackage{course-metadata}
+
+% \TeXLibInputInstructions{<path>} — \input an instructions file, resolving its
+% path coursemeta-relative FIRST (\GetCourseMetaDir + path), then literal. The
+% coursemeta-relative try comes first so a bare basename like "quiz-instructions"
+% picks the COURSE copy rather than the library default of the same name sitting
+% on TEXINPUTS. Classic catcodes so the @-named scratch macros are reachable.
+\newcommand{\TeXLibInputInstructions}[1]{%
+	\edef\@texlibinstr@path{#1}%
+	\@ifundefined{GetCourseMetaDir}{%
+		\input{\@texlibinstr@path}%
+	}{%
+		\edef\@texlibinstr@pathcm{\GetCourseMetaDir\@texlibinstr@path}%
+		\IfFileExists{\@texlibinstr@pathcm}{%
+			\input{\@texlibinstr@pathcm}%
+		}{%
+			\input{\@texlibinstr@path}%
+		}%
+	}%
+}
+
+\ExplSyntaxOn
+
+% Shared boxed style for inline/default instructions: the double-fbox, 6.25in
+% centered footnotesize block used by quiz and bingo.
+\NewDocumentCommand \TeXLibInstructionsBox { +m } {
+	\fbox { \fbox { \parbox { 6.25in } { \centering \footnotesize #1 } } }
+}
+
+% \TeXLibInstructionsInlineOrDefault{<prefix>} — the boxed-branch content: the
+% inline text when set, else the default file \input (so the default stays a real
+% SyncTeX inverse-search target).
+\NewDocumentCommand \TeXLibInstructionsInlineOrDefault { m } {
+	\tl_if_empty:cTF { g__texlibinstr_ #1 _tl }
+		{ \input { \tl_use:c { g__texlibinstr_ #1 _deffile_tl } } }
+		{ \tl_use:c { g__texlibinstr_ #1 _tl } }
+}
+
+% \TeXLibInstructions{<prefix>} — full renderer, file > inline > default. A
+% user-set instructions file controls its own layout (no box); inline/default
+% are boxed and centered.
+\NewDocumentCommand \TeXLibInstructions { m } {
+	\IfMetaSet { #1 -instructions-file }
+		{ \use:c { #1 @input@userinstructions } }
+		{ \begin{center}
+			\TeXLibInstructionsBox { \TeXLibInstructionsInlineOrDefault {#1} }
+		  \end{center} }
+}
+
+% \TeXLibDeclareInstructions[<default-file>]{<prefix>}
+%   <prefix>       lowercase class prefix (quiz, exam, bingo, pset)
+%   <default-file> instructions file \input'd when neither a -file nor inline
+%                  text is set (no .tex; default <prefix>-instructions)
+\NewDocumentCommand \TeXLibDeclareInstructions { O{} m } {
+	\tl_set:Nx \l__texlibinstr_cc_tl { \text_titlecase_first:n {#2} }
+	\tl_set:Nn \l__texlibinstr_deffile_tl {#1}
+	\tl_if_blank:nT {#1}
+		{ \tl_set:Nn \l__texlibinstr_deffile_tl { #2 -instructions } }
+	\__texlibinstr_declare:nVV {#2} \l__texlibinstr_cc_tl \l__texlibinstr_deffile_tl
+}
+
+\tl_new:N \l__texlibinstr_cc_tl
+\tl_new:N \l__texlibinstr_deffile_tl
+
+% #1 = prefix (lowercase), #2 = CamelCase prefix, #3 = default file basename.
+\cs_new_protected:Npn \__texlibinstr_declare:nnn #1#2#3 {
+	% inline text store + key (in the shared `meta` family)
+	\tl_new:c { g__texlibinstr_ #1 _tl }
+	\keys_define:nn { meta } {
+		#1 -instructions .tl_gset:c = { g__texlibinstr_ #1 _tl }
+	}
+	% default file, remembered for the shared renderer
+	\tl_new:c { g__texlibinstr_ #1 _deffile_tl }
+	\tl_gset:cn { g__texlibinstr_ #1 _deffile_tl } { #3 }
+	% getter: \Get<CC>Instructions (expandable, empty default)
+	\exp_args:Nc \NewExpandableDocumentCommand { Get #2 Instructions } { } {
+		\tl_use:c { g__texlibinstr_ #1 _tl }
+	}
+	% \If<CC>InstructionsFile{t}{f} — true when a -file was set (\meta or coursemeta)
+	\exp_args:Nc \NewDocumentCommand { If #2 InstructionsFile } { +m +m } {
+		\IfMetaSet { #1 -instructions-file } {##1} {##2}
+	}
+	% \If<CC>InstructionsInline{t}{f} — true when inline text was set
+	\exp_args:Nc \NewDocumentCommand { If #2 InstructionsInline } { +m +m } {
+		\tl_if_empty:cTF { g__texlibinstr_ #1 _tl } {##2} {##1}
+	}
+	% internal: \input the user file (coursemeta-relative first, then literal)
+	\cs_new_protected:cpn { #1 @input@userinstructions } {
+		\TeXLibInputInstructions { \use:c { Get #2 InstructionsFile } }
+	}
+}
+\cs_generate_variant:Nn \__texlibinstr_declare:nnn { nVV }
+
+\ExplSyntaxOff
+
+\endinput

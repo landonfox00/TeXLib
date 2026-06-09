@@ -4,11 +4,31 @@
 \ProvidesClass{didactic}[2026/05/09 v3.1 UNR Lecture Notes (TeXLib)]
 
 % ==============================================================================
-% 0. OPTIONS PASSED TO ARTICLE
+% 0. OPTIONS
 % ==============================================================================
-\DeclareOption*{\PassOptionsToClass{\CurrentOption}{article}}
+% Per-document metadata may be passed in the class option list, e.g.
+%   \documentclass[unit-number=3, unit-title={Limits}, instructor=true]{didactic}
+% Any option containing "=" is a metadata key=value pair; every other option
+% (11pt, twoside, ...) is forwarded to article. Metadata is applied at the end
+% of section 3 (after coursemeta.tex loads, so document options win) by reading
+% \@raw@classoptionslist directly — that list preserves spaces in values, which
+% the \CurrentOption seen here does not. \DeclareOption* therefore only forwards
+% the non-metadata options; the key=value ones still pass through it (a no-op)
+% so the kernel marks them used. Safe because no base-class option uses key=value.
+\DeclareOption*{%
+	\@expandtwoargs\in@{=}{\CurrentOption}%
+	\ifin@\else
+		\PassOptionsToClass{\CurrentOption}{article}%
+	\fi
+}
 \ProcessOptions\relax
 \LoadClass[11pt]{article}
+
+% A class-option value containing a comma (e.g. a date like {May 2, 2026}) is
+% split by the kernel's option parser into a stray fragment with no "=", which
+% would be reported as an "unused global option". The real values are consumed
+% from \@raw@classoptionslist below, so discard those spurious leftovers.
+\AtEndOfClass{\global\let\@unusedoptionlist\@empty}
 
 % ==============================================================================
 % 1. PACKAGES
@@ -98,16 +118,48 @@
 	\NewExpandableDocumentCommand{\GetOverview}{}{ \tl_use:N \g__didactic_overview_tl }
 \ExplSyntaxOff
 
+% \overview{...} -- content-setter for the lecture's abstract prose. The overview
+% is long-form text, so it cannot live in the class option list; this lets a
+% document set it without a raw \metasetup call. Routes through the unit-overview
+% key (overview is its backward-compat alias).
+\NewDocumentCommand{\overview}{ +m }{ \metasetup{ unit-overview = {#1} } }
+
+% Apply document metadata from the class option list now that the keys above and
+% coursemeta.tex are loaded (so document options override coursemeta defaults).
+% Read \@raw@classoptionslist, not \CurrentOption, to keep spaces in values.
+\ExplSyntaxOn
+\cs_if_exist:cT { @raw@classoptionslist } {
+	\tl_set:Nv    \l_tmpa_tl    { @raw@classoptionslist }
+	\clist_set:NV \l_tmpa_clist \l_tmpa_tl
+	\clist_map_inline:Nn \l_tmpa_clist {
+		\tl_if_in:nnT { #1 } { = } { \keys_set:nn { meta } { #1 } }
+	}
+}
+\ExplSyntaxOff
+
 % ==============================================================================
 % 4. PAGE LAYOUT -- METADATA-DRIVEN HEADERS
 % ==============================================================================
 \setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
-% Header: L = unit title  C = build badge  R = section. Shared mechanism;
-% the badge wording is class-specific (lecture notes -> "Instructor Version").
+% Header: L = unit title  C = build badge  R = current (sub)section. Shared
+% mechanism; the badge wording is class-specific (lecture notes -> "Instructor
+% Version").
 \SetTeXLibBuildBadge{\ifsolutions Instructor Version\fi}
-\SetTeXLibHeader{\bfseries\GetUnitTitle}{\TeXLibBuildBadge}{Section \thesection}
+\SetTeXLibHeader{\bfseries\GetUnitTitle}{\TeXLibBuildBadge}{\rightmark}
+% Right header tracks the current (sub)section: number + full title, e.g.
+% "2.1 Differentiation Rules". Every level routes its number+title into
+% \rightmark, so the header reflects whichever (sub)section is in effect at the
+% top of the page. Subsubsections are unnumbered at the class default
+% (secnumdepth=2 below), so only a numbered one updates the mark -- otherwise an
+% unnumbered subsubsection would show a bogus "2.1.0" instead of leaving its
+% parent subsection showing. Raise secnumdepth to 3 to get "2.1.4 <title>" in
+% both the header and the document body.
+\renewcommand{\sectionmark}[1]{\markright{\thesection\ #1}}
+\renewcommand{\subsectionmark}[1]{\markright{\thesubsection\ #1}}
+\renewcommand{\subsubsectionmark}[1]{%
+	\ifnum\c@secnumdepth>\tw@ \markright{\thesubsubsection\ #1}\fi}
 % Footer is the shared TeXLib layout (course | page | institution)
 \SetTeXLibFooter
 
@@ -160,102 +212,30 @@
 % 6. THEOREM-LIKE ENVIRONMENTS  (colored thin left rule + 2% bg tint)
 % ==============================================================================
 % The tcolorbox styles (texlibbase + the texlib* family overlays) live in
-% texlib-theorems.sty. This class keeps its own \newtheorem taxonomy and
-% section-based numbering, and binds each environment to a shared style.
+% texlib-theorems.sty; the \TeXLibTheorems enabler that binds environments to
+% them lives in texlib-thmenv.sty. This class opts into the full taxonomy with
+% section-based numbering and the four-letter aliases.
 \RequirePackage{texlib-theorems}
+\RequirePackage{texlib-thmenv}
 
 % Problem-bank engine -- so didactic-class documents (e.g. exam-review
 % handouts) can \getproblem{id} from the course's bank without each file
 % needing its own \usepackage{texlib-problembank} + \loadbank boilerplate.
 \RequirePackage{texlib-problembank}
 
-% Theorem-family declarations (italic body via theoremstyle plain)
-\theoremstyle{plain}
-\newtheorem{theorem}{Theorem}[section]
-\newtheorem{corollary}[theorem]{Corollary}
-\newtheorem{lemma}[theorem]{Lemma}
-\newtheorem{conjecture}[theorem]{Conjecture}
-\newtheorem{proposition}[theorem]{Proposition}
-
-% Definition family (roman body, term being defined italicized inline)
-\theoremstyle{definition}
-\newtheorem{definition}[theorem]{Definition}
-\newtheorem{convention}[theorem]{Convention}
-\newtheorem{procedure}[theorem]{Procedure}
-\newtheorem{challenge}[theorem]{Challenge}
-
-% Exercise / Example / Notation (italic label, roman body, decoration via boxes below).
-% Note: prior versions of this class used `example` as the env name for
-% Exercise content. As of 2026-05-09, `example` prints "Example" and
-% `exercise` prints "Exercise" -- migrate any \begin{example} that meant
-% Exercise to \begin{exercise}.
-\theoremstyle{definition}
-\newtheorem{exercise}[theorem]{Exercise}
-\newtheorem{example}[theorem]{Example}
-\newtheorem{notation}[theorem]{Notation}
-
-\theoremstyle{remark}
-\newtheorem{remark}[theorem]{Remark}
-\newtheorem{question}[theorem]{Question}
-\newtheorem{recall}[theorem]{Recall}
-
-% Apply per-family tcolorbox styles (defined in texlib-theorems.sty)
-\tcolorboxenvironment{theorem}    {texlibtheorem}
-\tcolorboxenvironment{lemma}      {texlibtheorem}
-\tcolorboxenvironment{corollary}  {texlibtheorem}
-\tcolorboxenvironment{conjecture} {texlibtheorem}
-\tcolorboxenvironment{proposition}{texlibproposition}
-\tcolorboxenvironment{definition} {texlibdefinition}
-\tcolorboxenvironment{convention} {texlibdefinition}
-\tcolorboxenvironment{procedure}  {texlibprocedure}
-\tcolorboxenvironment{challenge}  {texlibquestion}
-\tcolorboxenvironment{exercise} {texlibexample}
-\tcolorboxenvironment{example}  {texlibexample}
-\tcolorboxenvironment{notation} {texlibnote}
-\tcolorboxenvironment{question}   {texlibquestion}
-\tcolorboxenvironment{recall}     {texlibnote}
-% (remark deliberately left as plain inline, no rule/tint)
-
-% Unnumbered (starred) twins of every environment above. Same headings, same
-% theorem styles, and the same tcolorbox styling (remark* left plain, like
-% remark). Use \begin{theorem*} ... \end{theorem*} for a result that consumes
-% no number; the starred forms take no shared-counter argument.
-\theoremstyle{plain}
-\newtheorem*{theorem*}{Theorem}
-\newtheorem*{corollary*}{Corollary}
-\newtheorem*{lemma*}{Lemma}
-\newtheorem*{conjecture*}{Conjecture}
-\newtheorem*{proposition*}{Proposition}
-
-\theoremstyle{definition}
-\newtheorem*{definition*}{Definition}
-\newtheorem*{convention*}{Convention}
-\newtheorem*{procedure*}{Procedure}
-\newtheorem*{challenge*}{Challenge}
-\newtheorem*{exercise*}{Exercise}
-\newtheorem*{example*}{Example}
-\newtheorem*{notation*}{Notation}
-
-\theoremstyle{remark}
-\newtheorem*{remark*}{Remark}
-\newtheorem*{question*}{Question}
-\newtheorem*{recall*}{Recall}
-
-\tcolorboxenvironment{theorem*}    {texlibtheorem}
-\tcolorboxenvironment{lemma*}      {texlibtheorem}
-\tcolorboxenvironment{corollary*}  {texlibtheorem}
-\tcolorboxenvironment{conjecture*} {texlibtheorem}
-\tcolorboxenvironment{proposition*}{texlibproposition}
-\tcolorboxenvironment{definition*} {texlibdefinition}
-\tcolorboxenvironment{convention*} {texlibdefinition}
-\tcolorboxenvironment{procedure*}  {texlibprocedure}
-\tcolorboxenvironment{challenge*}  {texlibquestion}
-\tcolorboxenvironment{exercise*} {texlibexample}
-\tcolorboxenvironment{example*}  {texlibexample}
-\tcolorboxenvironment{notation*} {texlibnote}
-\tcolorboxenvironment{question*}   {texlibquestion}
-\tcolorboxenvironment{recall*}     {texlibnote}
-% (remark* deliberately left as plain inline, no rule/tint)
+% One declaration per environment (and its unnumbered `*` twin), each with the
+% canonical TeXLib styling, section-based shared numbering (master counter:
+% theorem), and the four-letter aliases (defn, conv, ques, exer, exam, notn,
+% chal + their `*` forms). The catalog mapping each name to its amsthm style
+% (plain/definition/remark) and tcolorbox style lives in texlib-thmenv.sty.
+% `remark`/`remark*` stay plain inline (no box); `recall`/`notation` use the
+% gray note rule.
+\TeXLibTheorems[numbering=section, aliases=true]{
+	theorem, corollary, lemma, conjecture, proposition,
+	definition, convention, procedure, challenge,
+	exercise, example, notation,
+	remark, question, recall
+}
 
 % ==============================================================================
 % 6b. CONTEXT-SENSITIVE ENUMERATE LABELS
@@ -339,71 +319,19 @@
 \newcommand{\answer}{\par\bigskip\noindent\textit{Answer.}\space}
 
 % ==============================================================================
-% 7.5. FOUR-LETTER ENVIRONMENT ALIASES
+% 7.5. ENVIRONMENT ALIASES
 % ==============================================================================
-% Compact synonyms that let authors write e.g. \begin{defn}...\end{defn}
-% as a drop-in synonym for \begin{definition}...\end{definition}.
+% The four-letter theorem synonyms (defn, conv, ques, exer, exam, notn, chal
+% and their `*` twins) are generated by \TeXLibTheorems[aliases=true] in
+% section 6 -- each a thin \NewDocumentEnvironment wrapping \begin{<real>} so
+% the tcolorbox hooks (keyed by env name) still fire. Only the solution-box
+% synonym is class-local, so it lives here.
 %
-% IMPLEMENTATION NOTE.  These cannot be \let-aliases of \definition /
-% \enddefinition (etc.).  The theorem-family environments above are wrapped via
-% \tcolorboxenvironment, which installs \BeforeBeginEnvironment /
-% \AfterEndEnvironment hooks keyed by the environment NAME string.  Those hooks
-% only fire when LaTeX sees \begin{definition} / \end{definition}; a \let copy
-% executes the bare amsthm theorem macros and bypasses the tcolorbox entirely.
-% So each alias is a thin \NewDocumentEnvironment that internally calls
-% \begin{<real>} ... \end{<real>}, which lets the hooks fire and the box
-% appear.  The optional [<note>] argument that amsthm theorems accept is
-% passed through unchanged.
-\NewDocumentEnvironment{defn}{o}
-  {\IfNoValueTF{#1}{\begin{definition}}{\begin{definition}[#1]}}
-  {\end{definition}}
-\NewDocumentEnvironment{conv}{o}
-  {\IfNoValueTF{#1}{\begin{convention}}{\begin{convention}[#1]}}
-  {\end{convention}}
-\NewDocumentEnvironment{ques}{o}
-  {\IfNoValueTF{#1}{\begin{question}}{\begin{question}[#1]}}
-  {\end{question}}
-\NewDocumentEnvironment{exer}{o}
-  {\IfNoValueTF{#1}{\begin{exercise}}{\begin{exercise}[#1]}}
-  {\end{exercise}}
-\NewDocumentEnvironment{exam}{o}
-  {\IfNoValueTF{#1}{\begin{example}}{\begin{example}[#1]}}
-  {\end{example}}
-\NewDocumentEnvironment{notn}{o}
-  {\IfNoValueTF{#1}{\begin{notation}}{\begin{notation}[#1]}}
-  {\end{notation}}
-\NewDocumentEnvironment{chal}{o}
-  {\IfNoValueTF{#1}{\begin{challenge}}{\begin{challenge}[#1]}}
-  {\end{challenge}}
-% Starred (unnumbered) synonyms, mirroring the starred theorem environments in
-% section 6 -- same \begin{<real>*} indirection so the tcolorbox hooks fire, and
-% the same passthrough of the optional [<note>] argument. (No \soln*: the
-% solution box has no unnumbered variant.)
-\NewDocumentEnvironment{defn*}{o}
-  {\IfNoValueTF{#1}{\begin{definition*}}{\begin{definition*}[#1]}}
-  {\end{definition*}}
-\NewDocumentEnvironment{conv*}{o}
-  {\IfNoValueTF{#1}{\begin{convention*}}{\begin{convention*}[#1]}}
-  {\end{convention*}}
-\NewDocumentEnvironment{ques*}{o}
-  {\IfNoValueTF{#1}{\begin{question*}}{\begin{question*}[#1]}}
-  {\end{question*}}
-\NewDocumentEnvironment{exer*}{o}
-  {\IfNoValueTF{#1}{\begin{exercise*}}{\begin{exercise*}[#1]}}
-  {\end{exercise*}}
-\NewDocumentEnvironment{exam*}{o}
-  {\IfNoValueTF{#1}{\begin{example*}}{\begin{example*}[#1]}}
-  {\end{example*}}
-\NewDocumentEnvironment{notn*}{o}
-  {\IfNoValueTF{#1}{\begin{notation*}}{\begin{notation*}[#1]}}
-  {\end{notation*}}
-\NewDocumentEnvironment{chal*}{o}
-  {\IfNoValueTF{#1}{\begin{challenge*}}{\begin{challenge*}[#1]}}
-  {\end{challenge*}}
 % \solution is built with \NewTColorBox (not \tcolorboxenvironment), so the
 % box machinery lives directly inside the \solution / \endsolution macros and
 % a \let-alias would in principle work.  We use the same wrapper pattern for
 % consistency and to pass the optional [<height>] argument through cleanly.
+% (No \soln*: the solution box has no unnumbered variant.)
 \NewDocumentEnvironment{soln}{O{3cm}}
   {\begin{solution}[#1]}
   {\end{solution}}

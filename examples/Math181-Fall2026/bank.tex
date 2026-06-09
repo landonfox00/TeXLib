@@ -1,0 +1,47 @@
+% bank.tex — problem bank for exam-01.tex (Math 181, Exam 1: Limits).
+%
+% Each \problem carries a topic so the exam can retrieve it by filter
+% (\problem{topic=limit}). Solutions render only in answer-key / solutions
+% builds. See Exams/bank.tex for the production patterns (\byversion, columns,
+% TikZ graphs) this minimal bank is modeled on.
+
+% --- topic: limit -----------------------------------------------------------
+\begin{problem}{lim-poly-factor}[topic=limit, section=2.3, source=example]
+	Evaluate the limit
+	\[ \lim_{x \to 3} \frac{x^2 - 9}{x - 3}. \]
+	\begin{parts}
+		\part[4] Compute the limit algebraically.
+			\vspace{\stretch{2}}
+		\part[2] Explain why the function is undefined at $x = 3$ even
+			though the limit exists.
+			\vspace{\stretch{1}}
+	\end{parts}
+	\solution
+	Factor the numerator: $\frac{(x-3)(x+3)}{x-3} = x + 3$ for $x \neq 3$,
+	so the limit is $6$. The function is undefined at $x = 3$ because the
+	original denominator is $0$ there; the limit ignores the single point.
+\end{problem}
+
+% --- topic: continuity ------------------------------------------------------
+\begin{problem}{cont-piecewise}[topic=continuity, section=2.5, source=example]
+	Let
+	\[ f(x) = \begin{cases} x^2 + 1 & x < 1 \\ 3x - 1 & x \ge 1. \end{cases} \]
+	Determine whether $f$ is continuous at $x = 1$, justifying with the
+	definition of continuity.
+	\vspace{\stretch{2}}
+	\solution
+	$\lim_{x \to 1^-} f(x) = 2$, $\lim_{x \to 1^+} f(x) = 2$, and
+	$f(1) = 2$. All three agree, so $f$ is continuous at $x = 1$.
+\end{problem}
+
+% --- topic: ivt -------------------------------------------------------------
+\begin{problem}{ivt-root}[topic=ivt, section=2.5, source=example]
+	Use the Intermediate Value Theorem to show that
+	\[ x^3 - x - 1 = 0 \]
+	has a solution in the interval $(1, 2)$.
+	\vspace{\stretch{2}}
+	\solution
+	Let $g(x) = x^3 - x - 1$, continuous on $[1,2]$. Then $g(1) = -1 < 0$
+	and $g(2) = 5 > 0$, so by the IVT there is a $c \in (1,2)$ with
+	$g(c) = 0$.
+\end{problem}

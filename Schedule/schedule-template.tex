@@ -1,0 +1,97 @@
+% =============================================================================
+% schedule template — Math 181 (Calculus I) tentative semester schedule
+% =============================================================================
+%
+% A complete, realistic example you can copy and adapt. Compile with:
+%   lualatex schedule-template.tex
+%
+% Lecture days, term dates, and final-exam info are NOT set here — they are
+% shared course metadata read from coursemeta.tex in this directory (or any
+% ancestor up to three levels up). This template assumes:
+%
+%   lecture-days = MWF      start-date = 8-24     end-date  = 12-8
+%   final-date   = 12-15    final-time = 9:45-11:45am
+%
+% so the grid has three lecture columns: Monday, Wednesday, Friday. To run a
+% different schedule (e.g. TR), change lecture-days in coursemeta.tex, not here.
+% If lecture-days is missing the build stops with "schedule: no lecture days set".
+
+\documentclass[
+	landscape    = true,
+	lecture-caps = {1.0, 1.0, 1.0},
+	quiz-days    = F,
+]{schedule}
+% lecture-caps gives one weight per lecture day (M, W, F) — how much material a
+% day absorbs. Equal {1,1,1} packs one \section per class. Make a day lighter to
+% leave room, e.g. {1.0, 1.0, 0.5} for a short Friday. quiz-days = F layers a
+% weekly quiz onto Fridays. Add  month-pages = true  to split the grid into one
+% page per calendar month.
+
+\begin{document}
+\maketitle
+\begin{schedule}
+
+	% --- Fall 2026 holidays / no-class days --------------------------
+	\holiday{9-7}{Labor Day}
+	\holiday{11-25}[11-27]{Thanksgiving Break}
+	\holiday{12-11}{Prep Day}
+
+	% --- Quiz overrides ----------------------------------------------
+	% \noquiz{date} cancels the auto quiz on a quiz-day; \quiz[date=MM-DD]
+	% adds a one-off quiz on any lecture day (must fall on a lecture column).
+	\noquiz{8-28}                 % no quiz the first Friday
+
+	% --- Unit 1: Limits & Continuity ---------------------------------
+	\syllabus
+	\section{2.1 Tangents and Velocity}
+	\section{2.2 Limit of a Function}
+	\section{2.3 Limit Laws}
+	\section{2.5 Continuity}
+	\section[2]{2.6 Limits at Infinity}   % spans two class days
+	\section{2.7 Derivatives and Rates}
+	\examreview
+	\exam[noquiz]
+
+	% --- Unit 2: Differentiation -------------------------------------
+	\section{3.1 Derivatives of Polynomials}
+	\section{3.2 Product and Quotient Rules}
+	\section{3.3 Trig Derivatives}
+	\section[2]{3.4 The Chain Rule}
+	\section{3.5 Implicit Differentiation}
+	\section{3.6 Logarithmic Derivatives}
+	\section{3.9 Related Rates}
+	\section{3.10 Linear Approximation}
+	\examreview
+	\exam[noquiz]
+
+	% --- Unit 3: Applications of Derivatives --------------------------
+	\section{4.1 Maxima and Minima}
+	\section{4.2 Mean Value Theorem}
+	\section[2]{4.3 Derivatives and Graphs}
+	\section{4.4 L'Hospital's Rule}
+	\section{4.5 Curve Sketching}
+	\section{4.7 Optimization}
+	\section{4.8 Newton's Method}
+	\examreview
+	\exam[noquiz]
+
+	% --- Unit 4: Integration -----------------------------------------
+	\section{4.9 Antiderivatives}
+	\section{5.1 Areas and Distances}
+	\section{5.2 The Definite Integral}
+	\section{5.3 Fundamental Theorem}
+	\section{5.4 Indefinite Integrals}
+	\section{5.5 The Substitution Rule}
+	\section{6.1 Areas Between Curves}
+	\section{6.2 Volumes}
+	\topic{Catch-up and Review}
+	\topic{Semester Review}
+	\topic{Practice Final}
+
+	% --- Final week ---------------------------------------------------
+	\finalreview[2]
+	\finalsweek[12-14][5]
+	\winterbreak
+
+\end{schedule}
+\end{document}

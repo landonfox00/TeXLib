@@ -1,0 +1,13 @@
+# ChkTeX configuration for the TeXLib classes.
+#
+# Treat the content environments that hold bare math as math mode — exactly as
+# ChkTeX already does for align, equation, gather, ... — so math written inside
+# them (\ln x, 7xe^x(2+x), 4\sqrt5) is checked with math-mode rules instead of
+# text-mode rules. This silences the text-mode false positives ("Command
+# terminated with space", "space in front of parenthesis") while keeping every
+# real check active. No '=' => APPEND, preserving ChkTeX's built-in defaults.
+#
+# ChkTeX (TeXLive/Windows) discovers this file in the CURRENT DIRECTORY. Point
+# your editor's ChkTeX linter at it explicitly so it applies everywhere, e.g.:
+#   chktex -l "<...>/TeXLib/chktexrc" file.tex
+MathEnvir { bingobank bingocard }

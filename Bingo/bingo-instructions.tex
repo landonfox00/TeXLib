@@ -1,0 +1,16 @@
+% bingo-instructions.tex — default math-bingo instructions.
+%
+% bingo.cls \input's this file (boxed) via \bingoinstructions whenever a
+% document sets neither \meta{bingo-instructions-file=...} nor
+% \meta{bingo-instructions={...}}. Because it is a real file, SyncTeX inverse
+% search works: double-clicking the instructions in the PDF jumps here
+% (mirrors quiz-instructions.tex / autoexam-instructions.tex).
+%
+% Edit the wording below to change the default for every card set, or override
+% per document via:
+%   \meta{bingo-instructions-file = my-instructions}   % unboxed, full control
+%   \meta{bingo-instructions      = {short inline text}} % boxed, inline
+Mark the free space to start. As each answer is read aloud, find the matching
+cell on your card and mark it. Call \textbf{Bingo!} when you have five marked
+cells in a row --- horizontally, vertically, or diagonally --- and be ready to
+read back the answers in your winning line to confirm.

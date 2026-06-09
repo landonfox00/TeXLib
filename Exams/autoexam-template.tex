@@ -3,30 +3,27 @@
 % =============================================================================
 %
 % Build instructor copy (single version):
-%   lualatex \def\Version{A}\input{template.tex}
+%   lualatex \def\Version{A}\input{autoexam-template.tex}
 %
 % Build full collated multi-version PDF (no \Version):
-%   lualatex template.tex
+%   lualatex autoexam-template.tex
 %
 % Build answer key:
-%   lualatex \def\ShowKey{}\input{template.tex}
+%   lualatex \def\ShowKey{}\input{autoexam-template.tex}
 %
 % Build with rubric overlays:
-%   lualatex \def\ShowRubric{}\input{template.tex}
+%   lualatex \def\ShowRubric{}\input{autoexam-template.tex}
 
-\documentclass{autoexam}
+\documentclass[
+	exam-number     = 5,
+	exam-date       = {May 2, 2026},
+	exam-postscript = {Good luck!},
+]{autoexam}
 
 % -- Versions ------------------------------------------------------------------
 % Declare the per-exam letter labels. The Python builder (if used) parses
 % this line via regex to discover versions.
 \versions{A, B, C}
-
-% -- Per-exam metadata ---------------------------------------------------------
-\examsetup{
-	number = 5,
-	date   = {May 2, 2026},
-	ps     = {Good luck!},
-}
 
 % -- Problem bank --------------------------------------------------------------
 % \loadbank pulls in problem definitions; alternatively, you can put
@@ -34,6 +31,14 @@
 \loadbank{bank.tex}
 
 \begin{document}
+
+% -- Cover page ----------------------------------------------------------------
+% \maketitle emits the exam cover: the title (Exam <number>), course and date,
+% the version circle (shown when \versions is declared), the boxed instructions
+% (from autoexam-instructions.tex unless overridden), and the student name line.
+% \begin{problems} issues a \clearpage after it, so Q1 starts on a fresh page.
+% Add \blankpage here for a pre-problem scratch-work leaf.
+\maketitle
 
 % -- Body ----------------------------------------------------------------------
 % Problems are grouped via \begin{problems} ... \end{problems}, which

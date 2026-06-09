@@ -105,7 +105,8 @@ backward-compat alias (it forwards to `\meta` internally).
 | `exam-number`            | `number`              | Stored as `\theExamNumber`                   |
 | `exam-date`              | `date`                | Stored as `\theExamDate`                     |
 | `exam-postscript`        | `ps`                  | Postscript shown on the title page           |
-| `exam-instructions-file` | `instructions-file`   | Filename for boxed instructions (default `autoexam-instructions`) |
+| `exam-instructions`      | —                     | Inline instructions text (boxed); overrides the default file |
+| `exam-instructions-file` | `instructions-file`   | Filename (no `.tex`) for instructions, `\input` unboxed and overriding inline; default file `autoexam-instructions`. Settable course-wide in `coursemeta.tex`. |
 
 Plus all `course-metadata` keys (`course-title`, `course-section`,
 `institution`, `term`, …) — set them in `coursemeta.tex` once and
@@ -190,9 +191,9 @@ called directly).
 
 `\maketitle` (overridden by the class)
 Renders the standardized title page: course/term/instructor block,
-exam number/date, version letter (if versioned), instructions box
-(loaded from `\@autoexam@instructions@file`), and the postscript
-(if set).
+exam number/date, version letter (if versioned), the instructions
+(file > inline > the default `autoexam-instructions.tex`, via
+`texlib-instructions`), and the postscript (if set).
 
 `\blankpage`
 Force a blank page between sections.
