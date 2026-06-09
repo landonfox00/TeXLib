@@ -3,16 +3,17 @@
 % Build:  lualatex lecture-01-limits.tex
 % Picks up coursemeta.tex from this directory automatically.
 
-\documentclass{didactic}
+\documentclass[
+	unit   = Lecture,
+	number = 1,
+	title  = {Limits and Continuity},
+]{didactic}
 
-\meta{
-	unit     = Lecture,
-	number   = 1,
-	title    = {Limits and Continuity},
-	overview = {%
-		Intuitive definition of the limit, one-sided limits, and a
-		first look at continuity via the Intermediate Value Theorem.
-	},
+% Overview is prose, so it can't ride in the class option list — set it with the
+% \overview content-setter instead.
+\overview{%
+	Intuitive definition of the limit, one-sided limits, and a
+	first look at continuity via the Intermediate Value Theorem.
 }
 
 \begin{document}

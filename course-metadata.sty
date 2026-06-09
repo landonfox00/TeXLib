@@ -9,10 +9,20 @@
 
 % #1 = CamelCase getter suffix, #2 = raw key name.  The key name is baked into
 % the body here, so the getter never depends on \l_keys_key_tl being live.
+% Each field gets a symmetric pair: \Get<Camel> reads it and \Set<Camel>{v} sets
+% it. \Set... is a thin \metasetup wrapper, so every field-setter routes through
+% the one canonical entry point. It forward-references \metasetup (defined below)
+% — fine, the body is only expanded at use time. Both halves are guarded so a
+% hand-rolled \Get.../\Set... (e.g. the derived \GetTerm) is never clobbered.
 \cs_new_protected:Npn \meta_create_getter:nn #1 #2 {
 	\cs_if_exist:cF { Get#1 } {
 		\exp_args:Nc \NewExpandableDocumentCommand { Get#1 } { } {
 			\tl_use:c { g__meta_#2_tl }
+		}
+	}
+	\cs_if_exist:cF { Set#1 } {
+		\exp_args:Nc \NewDocumentCommand { Set#1 } { +m } {
+			\metasetup { #2 = {##1} }
 		}
 	}
 }
@@ -118,13 +128,12 @@
 	\keys_set:nV { meta } \l_tmpa_tl
 }
 
-\cs_if_exist:NF \meta {
-	\cs_new_protected:Npn \meta #1 {
-		\tl_set:Nn \l_tmpa_tl { #1 }
-		\regex_replace_all:nnN { \c{par} } { } \l_tmpa_tl
-		\keys_set:nV { meta } \l_tmpa_tl
-	}
-}
+% \meta is just an alias of \metasetup, the canonical setter — defined here
+% (after \metasetup) so it copies the real command, not a duplicate of its body.
+% Caveat: doc/ltxdoc also define \meta; a class or document that loads either
+% AFTER this package shadows the alias, in which case call \metasetup directly.
+% No internal TeXLib code depends on \meta, so that shadowing is harmless.
+\NewCommandCopy \meta \metasetup
 
 \NewExpandableDocumentCommand{\GetCourse}{ } {
 	\cs_if_exist:NT \GetCourseSubject { \GetCourseSubject \space }

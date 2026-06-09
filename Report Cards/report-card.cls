@@ -98,6 +98,12 @@
 
 \ExplSyntaxOff
 
+% \disclaimer{...} -- content-setter for the boilerplate disclaimer prose, which
+% is too long to ride in the class option list; lets a document override the
+% default without a raw \metasetup. Routes through the rc-disclaimer key (the
+% bare `disclaimer` key alias keeps working independently).
+\NewDocumentCommand{\disclaimer}{ +m }{ \metasetup{ rc-disclaimer = {#1} } }
+
 % Apply document metadata from the class option list now that the keys above and
 % coursemeta.tex are loaded (so document options override coursemeta defaults).
 % Read \@raw@classoptionslist, not \CurrentOption, to keep spaces in values.

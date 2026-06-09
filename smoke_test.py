@@ -211,7 +211,10 @@ EXPECT_TEXT = {
     "tests/fixtures/Exams":   ["Problem 1"],
     # One marker per auto-vivified getter (coursemeta key, inline-loud, inline-
     # quiet). All three present == every custom key minted a working getter.
-    "tests/fixtures/Metadata": ["CMOFFICEHOURSMARK", "CMLECTHALLMARK", "CMTANAMEMARK"],
+    # SETCMDMARK == \SetCourseTitle round-tripped through \GetCourseTitle;
+    # METAALIASMARK == the \meta->\metasetup alias still sets (and mints) a key.
+    "tests/fixtures/Metadata": ["CMOFFICEHOURSMARK", "CMLECTHALLMARK", "CMTANAMEMARK",
+                                "SETCMDMARK", "METAALIASMARK"],
 }
 
 # Generated sidecar files that must exist AND be non-empty after a build. A

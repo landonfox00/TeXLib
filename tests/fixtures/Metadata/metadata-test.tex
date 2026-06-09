@@ -17,8 +17,18 @@
 \MetaAllowCustomKeys
 \metasetup{ta-name = {Pat CMTANAMEMARK}}
 
+% \Set<Field> command-setter: minted alongside every \Get<Field> getter. Setting
+% a predefined field this way must round-trip back through its \Get<Field>.
+\SetCourseTitle{Calculus SETCMDMARK}
+
+% \meta is now a thin alias of \metasetup; it must still set metadata (here a
+% custom key, absorbed by the quiet branch above) and mint its getter.
+\meta{exam-room = {Gym METAALIASMARK}}
+
 \begin{document}
 Office: \GetOfficeHours\par   % custom key from coursemeta
 Hall:   \GetLectureHall\par   % inline custom key, loud branch
 TA:     \GetTaName\par        % inline custom key, quiet branch
+Title:  \GetCourseTitle\par   % predefined field set via \SetCourseTitle
+Room:   \GetExamRoom\par      % custom key set via the \meta alias
 \end{document}

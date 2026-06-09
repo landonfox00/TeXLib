@@ -118,6 +118,12 @@
 	\NewExpandableDocumentCommand{\GetOverview}{}{ \tl_use:N \g__didactic_overview_tl }
 \ExplSyntaxOff
 
+% \overview{...} -- content-setter for the lecture's abstract prose. The overview
+% is long-form text, so it cannot live in the class option list; this lets a
+% document set it without a raw \metasetup call. Routes through the unit-overview
+% key (overview is its backward-compat alias).
+\NewDocumentCommand{\overview}{ +m }{ \metasetup{ unit-overview = {#1} } }
+
 % Apply document metadata from the class option list now that the keys above and
 % coursemeta.tex are loaded (so document options override coursemeta defaults).
 % Read \@raw@classoptionslist, not \CurrentOption, to keep spaces in values.
