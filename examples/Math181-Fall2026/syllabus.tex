@@ -1,0 +1,54 @@
+% Syllabus — example course syllabus.
+%
+% Course-wide values (title, course number, section, instructor, term, room)
+% come from coursemeta.tex in this directory. The keys below are the ones the
+% syllabus class adds on top: instructor contact details and the short header
+% title. Build:  lualatex syllabus.tex
+
+\documentclass[
+	short-title  = {Math 181},
+	email        = {instructor@unr.edu},
+	office       = {DMSC 220},
+	office-hours = {MWF 10:00--10:50am, or by appointment},
+	class-time   = {MWF 9:00--9:50am},
+]{syllabus}
+
+\begin{document}
+\maketitle
+
+\syllabussection{Office Hours}
+Walk-in office hours are listed above, held in DMSC 220, or by appointment.
+
+\syllabussection{Communication}
+Canvas (WebCampus) Inbox is my preferred mode of contact. I aim to respond to
+messages within 48 hours on weekdays.
+
+\syllabussection{Course Description}
+A first course in differential and integral calculus of one variable:
+\begin{itemize}
+	\item Limits and continuity
+	\item The derivative: definition, rules, and the chain rule
+	\item Applications of the derivative (related rates, optimization)
+	\item The definite integral and the Fundamental Theorem of Calculus
+\end{itemize}
+
+\syllabussection{Grade Scale}
+Course grades will be determined as follows:
+
+\gradetables{
+	Homework   & 10\% \\ \hline
+	Quizzes    & 15\% \\ \hline
+	Exams      & 50\% \\ \hline
+	Final Exam & 25\%
+}{
+	A & $90 \leq x$       \\ \hline
+	B & $80 \leq x < 90$  \\ \hline
+	C & $70 \leq x < 80$  \\ \hline
+	D & $60 \leq x < 70$  \\ \hline
+	F & $x < 60$
+}
+
+\syllabussection{Course Schedule}
+See \texttt{schedule.pdf} on the Syllabus page of our Canvas course.
+
+\end{document}

@@ -143,10 +143,23 @@
 \setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
-% Header: L = unit title  C = build badge  R = section. Shared mechanism;
-% the badge wording is class-specific (lecture notes -> "Instructor Version").
+% Header: L = unit title  C = build badge  R = current (sub)section. Shared
+% mechanism; the badge wording is class-specific (lecture notes -> "Instructor
+% Version").
 \SetTeXLibBuildBadge{\ifsolutions Instructor Version\fi}
-\SetTeXLibHeader{\bfseries\GetUnitTitle}{\TeXLibBuildBadge}{Section \thesection}
+\SetTeXLibHeader{\bfseries\GetUnitTitle}{\TeXLibBuildBadge}{\rightmark}
+% Right header tracks the current (sub)section: number + full title, e.g.
+% "2.1 Differentiation Rules". Every level routes its number+title into
+% \rightmark, so the header reflects whichever (sub)section is in effect at the
+% top of the page. Subsubsections are unnumbered at the class default
+% (secnumdepth=2 below), so only a numbered one updates the mark -- otherwise an
+% unnumbered subsubsection would show a bogus "2.1.0" instead of leaving its
+% parent subsection showing. Raise secnumdepth to 3 to get "2.1.4 <title>" in
+% both the header and the document body.
+\renewcommand{\sectionmark}[1]{\markright{\thesection\ #1}}
+\renewcommand{\subsectionmark}[1]{\markright{\thesubsection\ #1}}
+\renewcommand{\subsubsectionmark}[1]{%
+	\ifnum\c@secnumdepth>\tw@ \markright{\thesubsubsection\ #1}\fi}
 % Footer is the shared TeXLib layout (course | page | institution)
 \SetTeXLibFooter
 

@@ -30,4 +30,8 @@
 	% autoexam.cls and quiz.cls prepend \GetCourseMetaDir so the same
 	% string works at any document depth.
 	bank-path       = {Bank/bank.tex},
+	% gradebook-path lets bare \gradebook (report-card.cls) find the course
+	% gradebook. Resolved like bank-path; an .xlsx value is mapped to the
+	% .csv the TeXLib builder exports from it.
+	gradebook-path  = {gradebook.xlsx},
 }

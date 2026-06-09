@@ -124,14 +124,20 @@ MODULES = [
     ("tests/fixtures/Metadata", "metadata-test.tex"),
     # The end-to-end examples (examples/<Course>/) double as build fixtures so
     # the documented course folder can't silently rot when a class changes.
-    # Build-only (no EXPECT_TEXT key): they share one coursemeta.tex across two
-    # documents, so there's no single per-module text token to assert.
+    # Build-only (no EXPECT_TEXT key): they share one coursemeta.tex across
+    # several documents, so there's no single per-module text token to assert.
+    # build_one copies each doc's class home-module assets in (CLASS_HOME_MODULE),
+    # so e.g. the {quiz} doc gets quiz-instructions.tex even though it lives here.
     ("examples/Math181-Fall2026", "lecture-01-limits.tex"),
     ("examples/Math181-Fall2026", "quiz-01.tex"),
+    ("examples/Math181-Fall2026", "exam-01.tex"),
+    ("examples/Math181-Fall2026", "syllabus.tex"),
+    ("examples/Math181-Fall2026", "schedule.tex"),
 ]
 
-# Classes that require lualatex (use \directlua, luaotfload, or sibling .lua files).
-LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "bingo"}
+# Classes that require lualatex (use \directlua, luaotfload, or sibling .lua
+# files; report-card's \gradebook reads its CSV via lualatex).
+LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "bingo", "report-card"}
 
 # Maps a \documentclass to the module dir shipping its .cls and default include
 # files (instructions, title). Used to give a build whose source lives OUTSIDE
@@ -203,7 +209,7 @@ EXPECT_TEXT = {
     "Notes":        ["Introduction", "Theorem"],
     "Quizzes":      ["Quiz"],
     "Report Cards": ["Report Card"],
-    "Schedule":     ["MONDAY", "WEEK", "Quiz 1", "Final Exam"],
+    "Schedule":     ["MONDAY", "WEEK", "Quiz 1", "Finals Week"],
     # Syllabi/template.tex carries its own metadata (not the stub), so key on
     # the template's stable section headings.
     "Syllabi":      ["Course Description", "Office Hours"],
@@ -685,10 +691,10 @@ def _copy_shared_into(tmp: str) -> None:
                     shutil.copy2(os.path.join(sub, f), dest)
 
 
-def _read_expect_text(sdir: str) -> list[str]:
-    """A scenario's optional `expect-text` file: substrings (one per line) that
-    must appear in the rendered PDF. Blank lines and '#' comments are ignored."""
-    path = os.path.join(sdir, "expect-text")
+def _read_expect_lines(sdir: str, name: str) -> list[str]:
+    """Read a scenario's `name` file: substrings, one per line. Blank lines and
+    '#' comments are ignored. Missing file -> []."""
+    path = os.path.join(sdir, name)
     if not os.path.isfile(path):
         return []
     out: list[str] = []
@@ -701,6 +707,19 @@ def _read_expect_text(sdir: str) -> list[str]:
     except OSError:
         return []
     return out
+
+
+def _read_expect_text(sdir: str) -> list[str]:
+    """A scenario's optional `expect-text` file: substrings that MUST appear in
+    the rendered PDF."""
+    return _read_expect_lines(sdir, "expect-text")
+
+
+def _read_expect_absent(sdir: str) -> list[str]:
+    """A scenario's optional `expect-absent` file: substrings that must NOT appear
+    in the rendered PDF (e.g. a relabelled/omitted field's old label). The mirror
+    of expect-text, for asserting a configuration removed something."""
+    return _read_expect_lines(sdir, "expect-absent")
 
 
 def build_scenario(scen: dict, timeout: int, verbose: bool,
@@ -765,13 +784,15 @@ def build_scenario(scen: dict, timeout: int, verbose: bool,
             problems += cp
             skipped = skipped or tskip
 
-        # Optional per-scenario text assertion: an `expect-text` file lists
-        # substrings (one per line; blank lines and '#' comments ignored) that
-        # MUST appear in the rendered PDF. Lets a scenario assert content
-        # directly (e.g. that the right instructions file was resolved),
-        # independent of pixel references.
+        # Optional per-scenario text assertions: `expect-text` lists substrings
+        # that MUST appear in the rendered PDF; `expect-absent` lists substrings
+        # that must NOT (one per line; blank lines and '#' comments ignored).
+        # Together they let a scenario assert content directly (the right
+        # instructions file resolved; a relabelled/omitted field's old label is
+        # gone) independent of pixel references.
         text_expects = _read_expect_text(sdir)
-        if text_expects:
+        text_absent = _read_expect_absent(sdir)
+        if text_expects or text_absent:
             text = extract_pdf_text(pdf)
             if text is None:
                 skipped = True  # pdftotext unavailable -> soft skip
@@ -781,13 +802,17 @@ def build_scenario(scen: dict, timeout: int, verbose: bool,
                 if missing:
                     problems.append(
                         "missing text: " + ", ".join(repr(s) for s in missing))
+                present = [s for s in text_absent if s.lower() in low]
+                if present:
+                    problems.append(
+                        "unexpected text: " + ", ".join(repr(s) for s in present))
 
         # Visual diff: the assertion for visual scenarios. Skipped for a
-        # text-only scenario (ships `expect-text`, carries no reference PNGs) so
-        # it needn't commit a pixel ref.
+        # text-only scenario (ships expect-text/expect-absent, carries no
+        # reference PNGs) so it needn't commit a pixel ref.
         has_refs = bool(glob.glob(
             os.path.join(VISUAL_REF_DIR, f"{safe_name(slug)}-*.png")))
-        if has_refs or not text_expects:
+        if has_refs or not (text_expects or text_absent):
             vp, vskip = check_visual(slug, tmp, pdf, update=(visual == "update"))
             problems += vp
             skipped = skipped or vskip

@@ -52,6 +52,37 @@
 % ==============================================================================
 \RequirePackage{texlib-build}
 
+% ==============================================================================
+% 2b. GRADEBOOK ENGINE — Lua bridge for \gradebook (section 10)
+% ==============================================================================
+% report_card_engine.lua reads a report-view CSV and emits one \rcRenderStudent
+% call per student. Located via kpse (installed tree), then next to this .cls
+% (canonical layout), then the cwd (standalone). LuaLaTeX only; a non-Lua engine
+% leaves \rc@lua as a clear error so merely loading the class still works.
+\ifdefined\directlua
+	\directlua{
+		local function rc_load(name)
+			local path = kpse.find_file(name, "lua")
+			if path and lfs.attributes(path) then dofile(path) return end
+			local cls = kpse.find_file("report-card.cls")
+			local dir = cls and cls:match("(.*[/\\])") or ""
+			path = dir .. name
+			if lfs.attributes(path) then dofile(path) return end
+			dofile(name)
+		end
+		rc_load("report_card_engine.lua")
+	}%
+	\newcommand{\rc@lua}[1]{\directlua{#1}}%
+\else
+	\newcommand{\rc@lua}[1]{%
+		\ClassError{report-card}%
+			{The \string\gradebook\space command requires LuaLaTeX}%
+			{\string\gradebook\space drives a Lua engine through
+			 \string\directlua, which only exists under LuaLaTeX. Compile this
+			 document with lualatex.}%
+	}%
+\fi
+
 
 % ==============================================================================
 % 3. CLASS-LOCAL METADATA KEYS
@@ -63,6 +94,7 @@
 \tl_new:N \g__rc_accent_color_tl
 \tl_new:N \g__rc_disclaimer_tl
 \tl_new:N \g__rc_signature_tl
+\tl_new:N \g__rc_title_tl
 
 \tl_gset:Nn \g__rc_brand_color_tl  { 003366 }     % UNR navy by default
 \tl_gset:Nn \g__rc_accent_color_tl { 808080 }     % silver
@@ -73,7 +105,8 @@
 }
 
 \keys_define:nn { meta } {
-	report-date    .tl_gset:N = \g__rc_report_date_tl,
+	report-date      .tl_gset:N = \g__rc_report_date_tl,
+	report-card-title .tl_gset:N = \g__rc_title_tl,
 	brand-color    .tl_gset:N = \g__rc_brand_color_tl,
 	accent-color   .tl_gset:N = \g__rc_accent_color_tl,
 	rc-disclaimer  .tl_gset:N = \g__rc_disclaimer_tl,
@@ -84,6 +117,11 @@
 }
 
 \NewExpandableDocumentCommand{\GetReportDate} {}{ \tl_use:N \g__rc_report_date_tl }
+\NewExpandableDocumentCommand{\GetReportCardTitle}{}{
+	\tl_if_empty:NTF \g__rc_title_tl
+		{ \GetCourseShort\ \GetCourseTitle }
+		{ \tl_use:N \g__rc_title_tl }
+}
 \NewExpandableDocumentCommand{\GetDisclaimer} {}{ \tl_use:N \g__rc_disclaimer_tl }
 \NewExpandableDocumentCommand{\GetSignature}  {}{
 	\tl_if_empty:NTF \g__rc_signature_tl
@@ -124,10 +162,18 @@
 \setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
-% Header: L = course short + title  C = (none)  R = term.
-\SetTeXLibHeader{\bfseries\GetCourseShort\ \GetCourseTitle}{}{\GetTerm}
+% Header: L = report-card title  C = (none)  R = term + section.
+\SetTeXLibHeader{\bfseries\GetReportCardTitle}{}{\GetTermSection}
 \SetTeXLibFooter
 \TeXLibRuleBleed                  % symmetric rule length, matching didactic
+
+% Title-page style: same footer as `fancy`, but header + rule suppressed so the
+% \maketitle block sits cleanly at the top of page 1 (matches pset/syllabus).
+\fancypagestyle{firstpage}{%
+	\fancyhf{}%
+	\SetTeXLibFooter
+	\renewcommand{\headrulewidth}{0pt}%
+}
 
 % ==============================================================================
 % 5. TITLE BLOCKS
@@ -135,10 +181,11 @@
 % \maketitle: course-level cover page (no student name).
 % \studenttitle{Name}: per-student cover (called via the reportcard env).
 \renewcommand{\maketitle}{%
+	\thispagestyle{firstpage}%
 	\begin{center}
-		{\huge \GetCourseShort\ \GetCourseTitle\ Report Cards} \\
-		\vspace{8pt}
-		{\Large \GetReportDate}
+		{\LARGE \bfseries Report Cards} \\[0.4em]
+		{\Large \GetCourse \space\textendash\space \GetTerm} \\[0.2em]
+		{\large \GetReportDate}
 	\end{center}
 	\newpage
 }
@@ -248,6 +295,121 @@
 	#1\par\medskip
 	\noindent Sincerely, \\
 	\GetSignature
+}
+
+% ==============================================================================
+% 10. GRADEBOOK-DRIVEN RENDERING
+% ==============================================================================
+% \gradebook{report-view.csv} reads one row per student and renders a full
+% report card for each — exactly one cover per student — via \rcRenderStudent.
+% All grade math lives in the gradebook sheet; the engine only formats values.
+
+% Letter-grade cutoffs (used for the standing-bar thresholds and the scenario
+% "Required Letter Grade" column). The scenario "what you need" cells themselves
+% come pre-computed from the sheet.
+\newcommand{\rc@cut@a}{90}
+\newcommand{\rc@cut@b}{80}
+\newcommand{\rc@cut@c}{70}
+\newcommand{\rc@cut@d}{60}
+
+% Default sign-off body (override per document with \renewcommand if desired).
+\newcommand{\rc@default@signoff}{%
+	Thank you for attending my course! I wish you a successful academic and
+	professional career.%
+}
+
+% Per-student cover — the \maketitle title card, specialised with the name.
+% One \newpage (no trailing blank), so each student gets precisely one cover.
+\NewDocumentCommand{\rc@cover}{ m }{%
+	\thispagestyle{firstpage}%
+	\begin{center}
+		{\LARGE \bfseries #1} \\[0.4em]
+		{\Large \GetReportCardTitle\ Report Card} \\[0.2em]
+		{\large \GetTerm \quad \GetReportDate}
+	\end{center}
+	\newpage
+}
+
+% Standing bar from a running percentage: maps 0..100% onto the 0..12.5 axis
+% (×0.125) and places the cutoff thresholds. tikz evaluates the coordinate
+% expressions, so the arithmetic happens at draw time.
+\NewDocumentCommand{\rc@standingfromtotal}{ m }{%
+	\standingbar{#1*0.125}{\rc@cut@d*0.125}{\rc@cut@c*0.125}%
+		{\rc@cut@b*0.125}{\rc@cut@a*0.125}%
+}
+
+% \rcRenderStudent{name}{current-total%}{current-points}{breakdown-body}%
+%                 {total-row}{scenarios-body}
+% Emitted by the Lua engine, once per student. Owns all layout and prose; the
+% arguments are pure data.
+\NewDocumentCommand{\rcRenderStudent}{ m m m +m m +m }{%
+	\rc@cover{#1}%
+	\GetDisclaimer\par\medskip
+	\section*{Current Grade Calculation}
+	Based on the syllabus, here is your current grade breakdown prior to the
+	Final Exam.
+	\gradebreakdown{#4}{#5}
+	\section*{Visual Standing}
+	\rc@standingfromtotal{#2}
+	\section*{Final Exam Scenarios}
+	Based on your current standing of \textbf{#3 points}, here is what you must
+	score on the Final Exam to achieve each letter grade.
+	\scenarios{#6}
+	\signoff{\rc@default@signoff}%
+	\newpage
+}
+
+% Core: render every student in the report-view CSV at <path>.
+\NewDocumentCommand{\rc@gradebook@render}{ m }{%
+	\rc@lua{rc_set_cutoffs(\rc@cut@a, \rc@cut@b, \rc@cut@c, \rc@cut@d)}%
+	\rc@lua{rc_read_gradebook('\luaescapestring{#1}')}%
+}
+
+% Map a trailing .xlsx to .csv. The class reads the CSV the builder exports
+% from the gradebook workbook, so a coursemeta gradebook-path pointing at the
+% .xlsx source of truth still resolves to the readable .csv.
+\def\rc@chopxlsx#1.xlsx#2\@nil{#1.csv}
+% \in@ does not expand its argument, so feed it the expanded candidate.
+\newcommand{\rc@mapcand}{\expandafter\rc@mapcand@\expandafter{\rc@gb@cand}}
+\def\rc@mapcand@#1{%
+	\in@{.xlsx}{#1}%
+	\ifin@ \edef\rc@gb@cand{\rc@chopxlsx#1\@nil}\fi
+}
+
+\newcommand{\rc@gb@missing}{%
+	\ClassWarning{report-card}{%
+		No~gradebook~found~(looked~for~`\rc@gb@cand').~Set~gradebook-path~in~
+		coursemeta,~place~a~gradebook.csv~beside~the~document,~or~call~
+		\string\gradebook[path]}%
+}
+
+% \rc@load@coursegradebook — resolve the gradebook path from coursemeta's
+% gradebook-path (falling back to a sibling gradebook.csv) and render it. Tries
+% the path literally first, then relative to the coursemeta directory (so a
+% document below coursemeta finds a course-level gradebook), mirroring the
+% problem-bank \pbank@load@coursebank resolution.
+\newcommand{\rc@load@coursegradebook}{%
+	\@ifundefined{GetGradebookPath}%
+		{\def\rc@gb@cand{gradebook.csv}}%
+		{\edef\rc@gb@cand{\GetGradebookPath}%
+		 \ifx\rc@gb@cand\empty \def\rc@gb@cand{gradebook.csv}\fi}%
+	\rc@mapcand
+	\IfFileExists{\rc@gb@cand}%
+		{\rc@gradebook@render{\rc@gb@cand}}%
+		{\@ifundefined{GetCourseMetaDir}%
+			{\rc@gb@missing}%
+			{\edef\rc@gb@resolved{\GetCourseMetaDir\rc@gb@cand}%
+			 \IfFileExists{\rc@gb@resolved}%
+				{\rc@gradebook@render{\rc@gb@resolved}}%
+				{\rc@gb@missing}}}%
+}
+
+% \gradebook[path] — render a report-view CSV.
+%   \gradebook[file.csv]  explicit path
+%   \gradebook            path from coursemeta gradebook-path, else a sibling
+%                         gradebook.csv (an .xlsx value maps to its .csv)
+\NewDocumentCommand{\gradebook}{ o }{%
+	\IfValueTF{#1}{\rc@gradebook@render{#1}}{\rc@load@coursegradebook}%
 }
 
 \endinput

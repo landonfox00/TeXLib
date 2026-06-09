@@ -56,8 +56,16 @@
 \meta_create_var:nn { final-date }     { FinalDate }
 \meta_create_var:nn { final-time }     { FinalTime }
 \meta_create_var:nn { bank-path }      { BankPath }
-\meta_create_var:nn { quiz-instructions-file } { QuizInstructionsFile }
+\meta_create_var:nn { gradebook-path } { GradebookPath }
+% Per-class instructions-file keys. They live here (not in each class) so a
+% course can point every quiz/exam/card-set/pset at one file course-wide from
+% coursemeta.tex — coursemeta is read at this package's load, before any class
+% body, so a key defined only in the class would miss it. texlib-instructions.sty
+% consumes the matching \Get<Prefix>InstructionsFile getters.
+\meta_create_var:nn { quiz-instructions-file }  { QuizInstructionsFile }
+\meta_create_var:nn { exam-instructions-file }  { ExamInstructionsFile }
 \meta_create_var:nn { bingo-instructions-file } { BingoInstructionsFile }
+\meta_create_var:nn { pset-instructions-file }  { PsetInstructionsFile }
 
 \keys_define:nn { meta } {
 	institution     .tl_gset:c = { g__meta_institution_tl },
@@ -77,8 +85,11 @@
 	final-date      .tl_gset:c = { g__meta_final-date_tl },
 	final-time      .tl_gset:c = { g__meta_final-time_tl },
 	bank-path       .tl_gset:c = { g__meta_bank-path_tl },
-	quiz-instructions-file .tl_gset:c = { g__meta_quiz-instructions-file_tl },
+	gradebook-path  .tl_gset:c = { g__meta_gradebook-path_tl },
+	quiz-instructions-file  .tl_gset:c = { g__meta_quiz-instructions-file_tl },
+	exam-instructions-file  .tl_gset:c = { g__meta_exam-instructions-file_tl },
 	bingo-instructions-file .tl_gset:c = { g__meta_bingo-instructions-file_tl },
+	pset-instructions-file  .tl_gset:c = { g__meta_pset-instructions-file_tl },
 }
 
 % Warn on terminal when a field is auto-created (catches typos like instuctor=).
@@ -135,9 +146,13 @@
 % No internal TeXLib code depends on \meta, so that shadowing is harmless.
 \NewCommandCopy \meta \metasetup
 
+% \GetCourse -- the full course name "<Subject> <Number> <Title>", e.g.
+% "Math 181 Calculus I". The convention is a bare course-title ("Calculus I")
+% with subject/number separate; \GetCourse composes them with plain spaces (no
+% colon) so the same string serves titles, headers, and footers uniformly.
 \NewExpandableDocumentCommand{\GetCourse}{ } {
 	\cs_if_exist:NT \GetCourseSubject { \GetCourseSubject \space }
-	\cs_if_exist:NT \GetCourseNumber  { \GetCourseNumber :~ }
+	\cs_if_exist:NT \GetCourseNumber  { \GetCourseNumber \space }
 	\cs_if_exist:NT \GetCourseTitle   { \GetCourseTitle }
 }
 
@@ -150,6 +165,20 @@
 	\tl_if_exist:cTF { g__meta_#1_tl }
 		{ \tl_if_empty:cTF { g__meta_#1_tl } { #3 } { #2 } }
 		{ #3 }
+}
+
+% \GetTermSection -- shared right-header content for the term-keyed classes
+% (syllabus, pset, report-card, autoexam): the term, then "Section <n>" when a
+% course-section is set. Either part is omitted when empty, with a single space
+% between them only when both are present.
+\tl_new:N \l__meta_termsec_tl
+\NewDocumentCommand{\GetTermSection}{}{
+	\tl_set:Ne \l__meta_termsec_tl { \GetTerm }
+	\tl_if_blank:VF \l__meta_termsec_tl { \tl_use:N \l__meta_termsec_tl }
+	\IfMetaSet{course-section}{
+		\tl_if_blank:VF \l__meta_termsec_tl { \space }
+		Section~\GetCourseSection
+	}{}
 }
 
 \bool_new:N \g__meta_found_bool

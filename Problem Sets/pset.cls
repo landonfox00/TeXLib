@@ -62,6 +62,11 @@
 \RequirePackage{xstring}            % for \IfInteger in problem's optional arg
 \RequirePackage{course-metadata}
 
+% Shared document-instructions mechanism (inline / file / default, file > inline
+% > default). \TeXLibDeclareInstructions{pset} below mints \GetPsetInstructions,
+% \IfPsetInstructions{File,Inline}, and \pset@input@userinstructions.
+\RequirePackage{texlib-instructions}
+
 % Bibliography: biblatex with the biber backend. Loaded last so it can hook
 % into hyperref/cleveref/amsmath. The \printreferences command below is a
 % \maketitle-style wrapper that prints the cited references with a clean
@@ -93,13 +98,11 @@
 \tl_new:N \g__pset_number_tl
 \tl_new:N \g__pset_title_tl
 \tl_new:N \g__pset_due_tl
-\tl_new:N \g__pset_instructions_tl
 
 \keys_define:nn { meta } {
 	pset-number       .tl_gset:N = \g__pset_number_tl,
 	pset-title        .tl_gset:N = \g__pset_title_tl,
 	pset-due          .tl_gset:N = \g__pset_due_tl,
-	pset-instructions .tl_gset:N = \g__pset_instructions_tl,
 	% Bare keys also accepted (no risk of cross-class collision because
 	% no other class defines `pset-due`, etc.; the bare `number`/`title`
 	% already collide with didactic, so we only namespace those.)
@@ -113,14 +116,15 @@
 		{ Problem~Set~\GetPsetNumber }
 		{ \tl_use:N \g__pset_title_tl }
 }
-\NewExpandableDocumentCommand{\GetPsetInstructions}{}{
-	\tl_if_empty:NTF \g__pset_instructions_tl
-		{ Show~all~work~for~full~credit.~ Box~or~circle~final~answers.~
-			Late~submissions~lose~10\%~per~day. }
-		{ \tl_use:N \g__pset_instructions_tl }
-}
 
 \ExplSyntaxOff
+
+% Instructions: mints the pset-instructions inline key, \GetPsetInstructions,
+% \IfPsetInstructions{File,Inline}, and \pset@input@userinstructions. The default
+% wording now lives in pset-instructions.tex (so it is a SyncTeX inverse-search
+% target); pset-instructions-file lives in course-metadata.sty (set per set via
+% \meta or course-wide in coursemeta.tex).
+\TeXLibDeclareInstructions{pset}
 
 % Apply document metadata from the class option list now that the keys above and
 % coursemeta.tex are loaded (so document options override coursemeta defaults).
@@ -142,10 +146,10 @@
 \setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
-% Header: L = pset title  C = build badge  R = term. (R was \GetCourse, which
-% duplicated the footer-left course; term removes that redundancy.)
+% Header: L = pset title  C = build badge  R = term + section. (R was \GetCourse,
+% which duplicated the footer-left course; term/section removes that redundancy.)
 \SetTeXLibBuildBadge{\ifkey Answer Key\fi}
-\SetTeXLibHeader{\bfseries\GetPsetTitle}{\TeXLibBuildBadge}{\GetTerm}
+\SetTeXLibHeader{\bfseries\GetPsetTitle}{\TeXLibBuildBadge}{\GetTermSection}
 \SetTeXLibFooter
 \TeXLibRuleBleed                  % symmetric rule length, matching didactic
 
@@ -176,9 +180,15 @@
 		\fi
 	\end{center}
 	\medskip
-	\noindent\fbox{\fbox{\parbox{\dimexpr\textwidth-2\fboxsep-2\fboxrule\relax}{%
-		\centering\footnotesize \GetPsetInstructions
-	}}}
+	% Instructions: a user-set pset-instructions-file controls its own layout (no
+	% box); inline text and the default pset-instructions.tex are boxed.
+	\IfPsetInstructionsFile{%
+		\pset@input@userinstructions
+	}{%
+		\noindent\fbox{\fbox{\parbox{\dimexpr\textwidth-2\fboxsep-2\fboxrule\relax}{%
+			\centering\footnotesize \TeXLibInstructionsInlineOrDefault{pset}%
+		}}}%
+	}%
 	\medskip
 }
 

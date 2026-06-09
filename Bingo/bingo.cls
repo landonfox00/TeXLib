@@ -42,6 +42,11 @@
 
 \RequirePackage{course-metadata}
 
+% Shared document-instructions mechanism (inline / file / default, file > inline
+% > default). \TeXLibDeclareInstructions{bingo} below mints \GetBingoInstructions,
+% \IfBingoInstructions{File,Inline}, and \bingo@input@userinstructions.
+\RequirePackage{texlib-instructions}
+
 % ==============================================================================
 % 2. BUILD FLAGS — UNIFIED TeXLib CLI
 % ==============================================================================
@@ -72,15 +77,10 @@
 \tl_new:N \g__bingo_title_tl
 \tl_gset:Nn \g__bingo_title_tl { Bingo }
 
-% Inline instruction text (set via \meta{bingo-instructions={...}}); empty by
-% default — the default wording lives in bingo-instructions.tex (mirrors quiz).
-\tl_new:N \g__bingo_instructions_tl
-
 \keys_define:nn { meta } {
 	cell-size      .code:n  = { \dim_gset:Nn \g__bingo_cell_size_dim { #1 } },
 	free-symbol    .tl_gset:N = \g__bingo_free_symbol_tl,
 	bingo-title    .tl_gset:N = \g__bingo_title_tl,
-	bingo-instructions .tl_gset:N = \g__bingo_instructions_tl,
 	show-headers   .choice:,
 	show-headers / true   .code:n = { \bingo@headerstrue  },
 	show-headers / false  .code:n = { \bingo@headersfalse },
@@ -95,17 +95,6 @@
 \NewExpandableDocumentCommand{\GetBingoTitle}{}{
 	\tl_use:N \g__bingo_title_tl
 }
-\NewExpandableDocumentCommand{\GetBingoInstructions}{}{
-	\tl_use:N \g__bingo_instructions_tl
-}
-% \IfBingoInstructionsFile{true}{false} — true when a -file was set anywhere.
-\NewDocumentCommand{\IfBingoInstructionsFile}{ +m +m }{
-	\IfMetaSet{bingo-instructions-file}{ #1 }{ #2 }
-}
-% \IfBingoInstructionsInline{true}{false} — branch on inline text being set.
-\NewDocumentCommand{\IfBingoInstructionsInline}{ +m +m }{
-	\tl_if_empty:NTF \g__bingo_instructions_tl { #2 } { #1 }
-}
 \NewExpandableDocumentCommand{\GetBingoFreeSymbol}{}{
 	\tl_use:N \g__bingo_free_symbol_tl
 }
@@ -114,6 +103,12 @@
 }
 
 \ExplSyntaxOff
+
+% Instructions: mints the bingo-instructions inline key, \GetBingoInstructions,
+% \IfBingoInstructions{File,Inline}, and \bingo@input@userinstructions (default
+% file bingo-instructions.tex). bingo-instructions-file lives in
+% course-metadata.sty (set per document via \meta or course-wide in coursemeta.tex).
+\TeXLibDeclareInstructions{bingo}
 
 % Apply document metadata from the class option list now that the keys above and
 % coursemeta.tex are loaded (so document options override coursemeta defaults).
@@ -385,39 +380,11 @@
 % 8. INSTRUCTIONS  (mirrors quiz.cls: file > inline > default, boxed)
 % ==============================================================================
 % \bingoinstructions emits a how-to-play block — typically once, on a cover page
-% before \bingocards. Resolution: a \meta{bingo-instructions-file=...} (input
-% verbatim, controls its own layout) overrides \meta{bingo-instructions={...}}
-% (boxed inline text), which overrides the default wording in
-% bingo-instructions.tex. The default is a real file so SyncTeX inverse search
-% (double-click in the PDF) jumps to its source, mirroring quiz-instructions.tex.
-\newcommand{\@bingo@instructions@file}{bingo-instructions}
-
-% \input the user-specified file: try its path as given, then relative to the
-% coursemeta directory, mirroring quiz@input@userinstructions.
-\newcommand{\bingo@input@userinstructions}{%
-	\edef\@bingo@ipath{\GetBingoInstructionsFile}%
-	\IfFileExists{\@bingo@ipath}{%
-		\input{\@bingo@ipath}%
-	}{%
-		\edef\@bingo@ipathcm{\GetCourseMetaDir\@bingo@ipath}%
-		\IfFileExists{\@bingo@ipathcm}{%
-			\input{\@bingo@ipathcm}%
-		}{%
-			\input{\@bingo@ipath}%
-		}%
-	}%
-}
-
-% The boxed inline/default instruction block (no title), reused by the standalone
-% cover and the per-card renderer.
-\newcommand{\bingo@instructionbox}{%
-	\fbox{\fbox{\parbox{6.25in}{%
-		\centering\footnotesize
-		\IfBingoInstructionsInline
-			{\GetBingoInstructions}%
-			{\input{\@bingo@instructions@file}}%
-	}}}%
-}
+% before \bingocards. Resolution (via texlib-instructions): a
+% \meta{bingo-instructions-file=...} (input verbatim, controls its own layout)
+% overrides \meta{bingo-instructions={...}} (boxed inline text), which overrides
+% the default wording in bingo-instructions.tex. The default is a real file so
+% SyncTeX inverse search (double-click in the PDF) jumps to its source.
 
 % \bingoinstructions — a standalone how-to-play block (title + box), e.g. on a
 % cover page before \bingocards.
@@ -427,16 +394,13 @@
 		\begin{center}{\LARGE \GetBingoTitle}\end{center}%
 		\bingo@input@userinstructions
 	}{%
-		\begin{center}{\LARGE \GetBingoTitle}\par\medskip\bingo@instructionbox\end{center}%
+		\begin{center}{\LARGE \GetBingoTitle}\par\medskip
+			\TeXLibInstructionsBox{\TeXLibInstructionsInlineOrDefault{bingo}}\end{center}%
 	}%
 }
 
 % The per-card block (no big title — the running header already shows it),
 % emitted above each grid when show-instructions=true.
-\newcommand{\bingo@cardinstructions}{%
-	\IfBingoInstructionsFile
-		{\bingo@input@userinstructions}%
-		{\begin{center}\bingo@instructionbox\end{center}}%
-}
+\newcommand{\bingo@cardinstructions}{\TeXLibInstructions{bingo}}
 
 \endinput

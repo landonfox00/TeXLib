@@ -1,0 +1,52 @@
+% Schedule — example semester schedule grid.
+%
+% Reads start-date / end-date / final-date / final-time / lecture-days /
+% season / year from coursemeta.tex in this directory (Math 181, Fall 2026,
+% MWF). Build:  lualatex schedule.tex
+
+\documentclass[
+	landscape    = true,
+	lecture-caps = {1.0},
+	quiz-days    = F,
+]{schedule}
+% lecture-caps = one section per MWF cell; quiz-days = F puts a weekly Friday
+% quiz in the Friday column. Add  month-pages = true  for one table per month.
+
+\begin{document}
+\maketitle
+\begin{schedule}
+
+	% --- Holidays (Fall 2026) ----------------------------------------
+	\holiday{9-7}{Labor Day}
+	\holiday{11-25}[11-27]{Thanksgiving Break}
+	\holiday{12-11}{Prep Day}
+
+	% --- First-week quiz override ------------------------------------
+	\noquiz{8-28}          % no quiz the opening Friday
+
+	% --- Unit 1 — Limits & Continuity --------------------------------
+	\syllabus
+	\section{2.1}          % the tangent and velocity problems
+	\section{2.2}          % the limit of a function
+	\section[2]{2.3}       % limit laws (two days)
+	\section{2.5}          % continuity
+	\examreview
+	\exam[noquiz]
+
+	% --- Unit 2 — Derivatives ----------------------------------------
+	\section{2.7}          % derivatives and rates of change
+	\section{3.1}          % derivatives of polynomials & exponentials
+	\section[2]{3.4}       % the chain rule (two days)
+	\section{3.9}          % related rates
+	\examreview
+	\exam
+
+	% --- Unit 3 — Integration ----------------------------------------
+	\section{4.9}          % antiderivatives
+	\section{5.3}          % the Fundamental Theorem of Calculus
+	\finalreview
+	\finalsweek[12-14][5]
+	\winterbreak
+
+\end{schedule}
+\end{document}

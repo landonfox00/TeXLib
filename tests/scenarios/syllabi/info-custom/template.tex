@@ -1,0 +1,43 @@
+% Scenario: syllabi / info-custom   (tier: core)
+% \setsyllabusinfo with author-chosen labels and a 3-column layout. Verifies the
+% info table is fully relabel-able and honours `columns`. Text-only (expect-text
+% + expect-absent): the custom labels appear, the default labels do not.
+\documentclass{syllabus}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	season         = Fall,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 182,
+}
+
+\meta{
+	course-title   = Calculus II,
+	course-section = 2002,
+	short-title    = Math 182 Calc II,
+	instructor     = Ada Lovelace,
+	email          = ada@example.edu,
+	office         = 200 NLLC,
+	office-hours   = TTh 1:00--2:00pm,
+	class-time     = TTh 9:30--10:45am,
+	course-room    = BPB 105,
+}
+
+\setsyllabusinfo[columns=3]{
+	\syllabusentry{Lead}{\GetInstructor}
+	\syllabusentry{Reach}{\GetEmail}
+	\syllabusentry{Den}{\GetOffice}
+	\syllabusentry{Meets}{\GetClassTime}
+	\syllabusentry{Room}{\GetCourseRoom}
+	\syllabusentry{Hours}{\GetOfficeHours}
+}
+
+\begin{document}
+\maketitle
+
+\syllabussection{Course Description}
+A continuation of Calculus I covering techniques and applications of
+integration, sequences, and series.
+
+\end{document}

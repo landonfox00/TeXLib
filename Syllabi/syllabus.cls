@@ -88,6 +88,7 @@
 	class-time      .tl_gset:N = \g__syll_class_time_tl,
 	class-time-alt  .tl_gset:N = \g__syll_class_time_alt_tl,
 	short-title     .tl_gset:N = \g__syll_short_title_tl,
+	syllabus-title  .tl_gset:N = \g__syll_short_title_tl,
 }
 
 \NewExpandableDocumentCommand{\GetEmail}        {}{ \tl_use:N \g__syll_email_tl }
@@ -96,7 +97,33 @@
 \NewExpandableDocumentCommand{\GetOrganizer}    {}{ \tl_use:N \g__syll_organizer_tl }
 \NewExpandableDocumentCommand{\GetClassTime}    {}{ \tl_use:N \g__syll_class_time_tl }
 \NewExpandableDocumentCommand{\GetClassTimeAlt} {}{ \tl_use:N \g__syll_class_time_alt_tl }
+
+% Composite accessors for the default info table. Each is fully expandable and
+% yields nothing when its underlying field(s) are unset, so the info-table
+% emptiness filter (expansion + \tl_if_blank) drops the entry and reflows.
+\NewExpandableDocumentCommand{\GetInstructorOrOrganizer}{}{
+	\tl_if_empty:cTF { g__meta_instructor_tl }
+		{ \tl_use:N \g__syll_organizer_tl }
+		{ \GetInstructor }
+}
+\NewExpandableDocumentCommand{\GetClassTimeFull}{}{
+	\tl_if_empty:NF \g__syll_class_time_tl {
+		\GetClassTime
+		\tl_if_empty:NF \g__syll_class_time_alt_tl { ~/~\GetClassTimeAlt }
+	}
+}
+\NewExpandableDocumentCommand{\GetEmailLinked}{}{
+	\tl_if_empty:NF \g__syll_email_tl { \href{mailto:\GetEmail}{\GetEmail} }
+}
+
 \NewExpandableDocumentCommand{\GetShortTitle}   {}{
+	\tl_if_empty:NTF \g__syll_short_title_tl
+		{ \GetCourse }
+		{ \tl_use:N \g__syll_short_title_tl }
+}
+% \GetSyllabusTitle -- canonical \Get<class>Title name (mirrors \GetPsetTitle,
+% \GetUnitTitle, ...); \GetShortTitle is kept as the original alias.
+\NewExpandableDocumentCommand{\GetSyllabusTitle}{}{
 	\tl_if_empty:NTF \g__syll_short_title_tl
 		{ \GetCourse }
 		{ \tl_use:N \g__syll_short_title_tl }
@@ -144,9 +171,9 @@
 \setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
-% Header: L = short title  C = (none)  R = term.
-\SetTeXLibHeader{\bfseries\GetShortTitle}{}{\GetTerm}
-\SetTeXLibFooter
+% Header: L = syllabus title  C = (none)  R = term + section.
+\SetTeXLibHeader{\bfseries\GetSyllabusTitle}{}{\GetTermSection}
+\SetTeXLibFooter                  % L = \GetCourse (shared default)
 \TeXLibRuleBleed                  % symmetric rule length, matching didactic
 
 % Title page (\maketitle uses \thispagestyle{plain}): keep the shared footer,
@@ -162,10 +189,155 @@
 % ==============================================================================
 % 6. TITLE BLOCK
 % ==============================================================================
+% The course-info table under the title is fully customizable via
+% \setsyllabusinfo. An entry whose value expands to empty is dropped and the
+% remaining entries reflow into the grid; if every value is empty the whole
+% framed block -- rules included -- is suppressed.
+\ExplSyntaxOn
+
+\seq_new:N \g__syll_info_seq
+\seq_new:N \g__syll_info_kept_seq
+\int_new:N \g__syll_info_cols_int
+
+\keys_define:nn { syll / info } {
+	columns .int_gset:N = \g__syll_info_cols_int,
+}
+
+% \setsyllabusinfo[columns=N]{ \syllabusentry{Label}{Value} ... } redefines the
+% info table. \syllabusentry is live only inside this argument; labels and values
+% are stored unexpanded and the values are evaluated at \maketitle time. Each
+% call resets columns to the default of 2 unless [columns=N] overrides it.
+\NewDocumentCommand{\setsyllabusinfo}{ O{} +m }{
+	\seq_gclear:N \g__syll_info_seq
+	\int_gset:Nn \g__syll_info_cols_int { 2 }
+	\keys_set:nn { syll / info } { #1 }
+	\group_begin:
+		\cs_set:Npn \syllabusentry ##1 ##2 {
+			\seq_gput_right:Nn \g__syll_info_seq { { ##1 } { ##2 } }
+		}
+		#2
+	\group_end:
+}
+
+% Keep only entries whose value is non-empty.  The test expands the value with
+% \protected@edef, not a raw e-expansion: that fully expands the (expandable)
+% \Get... accessors -- so an unset field reads as blank -- while leaving robust
+% commands like \href intact instead of executing them mid-test.
+\cs_new_eq:Nc \__syll_protected_edef:N { protected@edef }
+\tl_new:N \l__syll_probe_tl
+\cs_new_protected:Npn \__syll_filter_info: {
+	\seq_gclear:N \g__syll_info_kept_seq
+	\seq_map_inline:Nn \g__syll_info_seq { \__syll_filter_one:nn ##1 }
+}
+\cs_new_protected:Npn \__syll_filter_one:nn #1 #2 {
+	\__syll_protected_edef:N \l__syll_probe_tl { #2 }
+	\tl_if_blank:VF \l__syll_probe_tl
+		{ \seq_gput_right:Nn \g__syll_info_kept_seq { { #1 } { #2 } } }
+}
+
+\tl_new:N  \l__syll_pre_tl
+\tl_new:N  \l__syll_rows_tl
+\tl_new:N  \l__syll_table_tl
+\int_new:N \l__syll_cols_int
+\int_new:N \l__syll_n_int
+
+\cs_new:Npn \__syll_cell:nn #1 #2 { \textbf{#1:} & #2 }
+
+% Pad a partial final row out to a full set of column pairs (two empty tabular
+% columns per missing entry) so the alignment never ends ragged.
+\cs_new_protected:Npn \__syll_pad_row:n #1 {
+	\int_set:Nn \l_tmpa_int { \int_mod:nn { #1 } { \l__syll_cols_int } }
+	\int_step_inline:nn { 2 * ( \l__syll_cols_int - \l_tmpa_int ) }
+		{ \tl_put_right:Nn \l__syll_rows_tl { & } }
+}
+
+% Assemble \l__syll_table_tl: \begin{tabular}{<spec>} <rows> \end{tabular} for the
+% kept entries laid out in \g__syll_info_cols_int columns of label/value pairs.
+\cs_new_protected:Npn \__syll_build_table: {
+	\int_set:Nn \l__syll_cols_int { \g__syll_info_cols_int }
+	\int_compare:nNnT { \l__syll_cols_int } < { 1 }
+		{ \int_set:Nn \l__syll_cols_int { 1 } }
+	\int_set:Nn \l__syll_n_int { \seq_count:N \g__syll_info_kept_seq }
+	% column spec: @{}ll@{\hspace{3em}}ll...@{}
+	\tl_clear:N \l__syll_pre_tl
+	\tl_put_right:Nn \l__syll_pre_tl { @{} }
+	\int_step_inline:nn { \l__syll_cols_int } {
+		\int_compare:nNnT { ##1 } > { 1 }
+			{ \tl_put_right:Nn \l__syll_pre_tl { @{\hspace{3em}} } }
+		\tl_put_right:Nn \l__syll_pre_tl { ll }
+	}
+	\tl_put_right:Nn \l__syll_pre_tl { @{} }
+	% rows: a \\ closes each full row; a partial final row is padded first
+	\tl_clear:N \l__syll_rows_tl
+	\seq_map_indexed_inline:Nn \g__syll_info_kept_seq {
+		\tl_put_right:Nn \l__syll_rows_tl { \__syll_cell:nn ##2 }
+		\int_compare:nNnTF { \int_mod:nn { ##1 } { \l__syll_cols_int } } = { 0 }
+			{ \tl_put_right:Nn \l__syll_rows_tl { \\ } }
+			{
+				\int_compare:nNnTF { ##1 } = { \l__syll_n_int }
+					{ \__syll_pad_row:n { ##1 }
+					  \tl_put_right:Nn \l__syll_rows_tl { \\ } }
+					{ \tl_put_right:Nn \l__syll_rows_tl { & } }
+			}
+	}
+	\tl_set:Ne \l__syll_table_tl {
+		\exp_not:N \begin { tabular } { \exp_not:V \l__syll_pre_tl }
+			\exp_not:V \l__syll_rows_tl
+		\exp_not:N \end { tabular }
+	}
+}
+
+% Bridges to the expl3 logic above, with all-letter names so the typesetting
+% wrapper (\syllabusinfotable) can stay in normal catcodes -- markup like
+% \begin{center} misbehaves if tokenized under \ExplSyntaxOn (ignored spaces).
+\NewDocumentCommand{\syllInfoCompute}{}{
+	\__syll_filter_info:
+	\seq_if_empty:NF \g__syll_info_kept_seq { \__syll_build_table: }
+}
+\NewDocumentCommand{\syllInfoIfPresent}{ +m }{
+	\seq_if_empty:NF \g__syll_info_kept_seq { #1 }
+}
+\NewExpandableDocumentCommand{\syllInfoTable}{}{ \tl_use:N \l__syll_table_tl }
+
+\ExplSyntaxOff
+
+% Emit the framed info block, or nothing at all if no entry has a value. The
+% inter-element newlines (spaces) below are load-bearing: inside center they let
+% the rules and minipage stack vertically. Ending those lines with % would glue
+% all three onto one overfull line.
+\newcommand{\syllabusinfotable}{%
+	\syllInfoCompute
+	\syllInfoIfPresent{%
+		\vspace{-0.98cm}
+		\begin{center}
+			\rule{6.5in}{0.4pt}
+			\begin{minipage}[t]{0.8\textwidth}
+			\renewcommand{\arraystretch}{1.0}%
+			\syllInfoTable
+			\end{minipage}
+			\rule{6.5in}{0.4pt}
+		\end{center}
+		\vspace{-0.55cm}
+	}%
+}
+
+% Built-in default: reproduces the historical 3x2 grid (Instructor/Time,
+% Email/Classroom, Office/Office Hours). Instructor falls back to Organizer
+% (relabelled) when unset; an alternate class time is appended to Time. Override
+% by calling \setsyllabusinfo in the preamble.
+\setsyllabusinfo{
+	\syllabusentry{\IfMetaSet{instructor}{Instructor}{Organizer}}{\GetInstructorOrOrganizer}
+	\syllabusentry{Time}{\GetClassTimeFull}
+	\syllabusentry{Email}{\GetEmailLinked}
+	\syllabusentry{Classroom}{\GetCourseRoom}
+	\syllabusentry{Office}{\GetOffice}
+	\syllabusentry{Office Hours}{\GetOfficeHours}
+}
+
 \renewcommand{\maketitle}{%
 	\thispagestyle{plain}%
 	\begin{center}
-		{\LARGE \GetCourseTitle} \\[0.2cm]
+		{\LARGE \GetCourse} \\[0.2cm]
 		% Section line renders only if course-section is set to a non-empty
 		% value. For courses without a section number, leave course-section
 		% out of coursemeta.tex (and don't call \coursesection{...}).
@@ -174,42 +346,7 @@
 		}{}%
 		{\large \GetTerm}
 	\end{center}
-	\vspace{-0.98cm}
-	\begin{center}
-		\rule{6.5in}{0.4pt}
-		\begin{minipage}[t]{0.8\textwidth}
-		\begin{tabular}{llcccll}
-			\IfMetaSet{instructor}{%
-				\textbf{Instructor:} & \GetInstructor & & & &
-				\IfSyllSet{organizer}{\textbf{Organizer:} & \GetOrganizer}{%
-					\IfSyllSet{class_time}{\textbf{Time:} & \GetClassTime}{}}
-			}{%
-				\IfSyllSet{organizer}{& & & & & \textbf{Organizer:} & \GetOrganizer}{%
-					\IfSyllSet{class_time}{& & & & & \textbf{Time:} & \GetClassTime}{}}
-			} \\
-			\IfSyllSet{email}{%
-				\textbf{Email:} & \href{mailto:\GetEmail}{\GetEmail} & & & &
-				\IfSyllSet{organizer}{%
-					\IfSyllSet{class_time}{\textbf{Time:} & \GetClassTime}{}}{%
-					\IfMetaSet{course-room}{\textbf{Classroom:} & \GetCourseRoom}{}}
-			}{& & & & & &} \\
-			\IfSyllSet{class_time_alt}{ & & & & & & \GetClassTimeAlt \\ }{}
-			\IfSyllSet{office}{%
-				\textbf{Office:} & \GetOffice & & & &
-				\IfMetaSet{course-room}{\textbf{Classroom:} & \GetCourseRoom}{}
-			}{%
-				\IfMetaSet{course-room}{& & & & & \textbf{Classroom:} & \GetCourseRoom}{}
-			}%
-			% NB: the `\\` separator now lives INSIDE the office_hours
-			% conditional. If office_hours isn't set the previous row is the
-			% last visible row, no trailing `\\`, and the tabular doesn't end
-			% with a blank row before \end{tabular}.
-			\IfSyllSet{office_hours}{\\ & & & & & \textbf{Office Hours:} & \GetOfficeHours}{}
-		\end{tabular}
-		\end{minipage}
-		\rule{6.5in}{0.4pt}
-	\end{center}
-	\vspace{-0.55cm}
+	\syllabusinfotable
 	\setlength{\unitlength}{1in}
 	\renewcommand{\arraystretch}{2}
 }

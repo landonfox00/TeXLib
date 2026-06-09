@@ -216,7 +216,12 @@ function init_scheduler(start_str, end_str, lec_days, rec_days, q_days, cap_str,
 	-- 4. Capacities & Columns
 	local cap_list = parse_csv(cap_str)
 	local l_list = parse_weekdays(lec_days)
-	if #l_list == 0 then tex.error("Error: No lecture days.") return end
+	if #l_list == 0 then
+		L_warn("No 'lecture-days' set; defaulting to MTWRF (all weekdays). "
+			.. "Set lecture-days in coursemeta.tex (e.g. MWF, TR) to control "
+			.. "which weekday columns the grid draws.")
+		l_list = parse_weekdays("MTWRF")
+	end
 
 	for i, idx in ipairs(l_list) do
 		calendar_mgr:register_column_type_by_idx(idx, "Lecture")

@@ -30,6 +30,12 @@
 % common aux packages, and the unified problem/part labels). Shared with quiz.
 \RequirePackage{texlib-assessment}
 
+% Shared document-instructions mechanism (inline / file / default, file > inline
+% > default). \TeXLibDeclareInstructions[autoexam-instructions]{exam} below mints
+% \GetExamInstructions, \IfExamInstructions{File,Inline}, and
+% \exam@input@userinstructions.
+\RequirePackage{texlib-instructions}
+
 % autoexam-only packages. enumitem is intentionally absent: it patches \list and
 % breaks exam.cls's questions/parts.
 \RequirePackage[export]{adjustbox}
@@ -584,12 +590,11 @@
 \RequirePackage{texlib-thmenv}
 \TeXLibStarredThms
 
-% \@autoexam@instructions@file: path (without .tex) of the instructions file
-%   loaded into the cover-page box.  Override via \examsetup{instructions-file=…}
-%   or in coursemeta.tex.
-\newcommand{\@autoexam@instructions@file}{autoexam-instructions}
-% \autoexam@load@instructions: inputs the instructions file.
-\newcommand{\autoexam@load@instructions}{\input{\@autoexam@instructions@file}}
+% Instructions: mints the exam-instructions inline key, \GetExamInstructions,
+% \IfExamInstructions{File,Inline}, and \exam@input@userinstructions (default
+% file autoexam-instructions.tex). exam-instructions-file lives in
+% course-metadata.sty (set per exam via \meta or course-wide in coursemeta.tex).
+\TeXLibDeclareInstructions[autoexam-instructions]{exam}
 
 % Exam metadata is set via the unified \meta{...} command, sharing the
 % same keys family as every other TeXLib class. Use \meta{exam-number=5,
@@ -606,13 +611,14 @@
 	exam-title              .tl_gset:N = \g__autoexam_title_tl,
 	exam-date               .tl_gset:N = \g__autoexam_date_tl,
 	exam-postscript         .tl_gset:N = \g__autoexam_postscript_tl,
-	exam-instructions-file  .code:n = { \renewcommand{\@autoexam@instructions@file}{#1} },
+	% exam-instructions-file lives in course-metadata.sty (so a course can set it
+	% course-wide); the bare `instructions-file` alias below writes the same store.
 	% Backward-compat aliases (bare names available via \examsetup or \meta)
 	number                  .tl_gset:N = \g__autoexam_number_tl,
 	title                   .tl_gset:N = \g__autoexam_title_tl,
 	date                    .tl_gset:N = \g__autoexam_date_tl,
 	ps                      .tl_gset:N = \g__autoexam_postscript_tl,
-	instructions-file       .code:n = { \renewcommand{\@autoexam@instructions@file}{#1} },
+	instructions-file       .tl_gset:c = { g__meta_exam-instructions-file_tl },
 }
 % Canonical expandable getters (the \Get... convention shared with every other
 % TeXLib class).  Number/date keep autoexam's historical \todo default when
@@ -855,6 +861,7 @@
 % Center footer shows "X of N" where N = last problem page via \label{@lastqpage}
 % (placed by \blankpage on first call).  Falls back to \numpages until that label
 % exists, and for exams without \blankpage at the end.
+% Footer L: full course name via the shared \GetCourse ("Math 181 Calculus I").
 \firstpagefooter{\GetCourse}{%
 	\thepage\ of\ \@ifundefined{r@@lastqpage}{\numpages}{\pageref*{@lastqpage}}%
 }{\GetInstitution}
@@ -907,10 +914,16 @@
 		\fi
 		\vfill
 
-		\fbox{\fbox{\parbox{\dimexpr\linewidth-4\fboxsep-4\fboxrule\relax}{%
-			\noindent{\large\bf Instructions:}
-			\autoexam@load@instructions
-		}}}
+		% Instructions: a user-set exam-instructions-file controls its own layout
+		% (no box); inline text and the default autoexam-instructions.tex are boxed.
+		\IfExamInstructionsFile{%
+			\exam@input@userinstructions
+		}{%
+			\fbox{\fbox{\parbox{\dimexpr\linewidth-4\fboxsep-4\fboxrule\relax}{%
+				\noindent{\large\bf Instructions:}
+				\TeXLibInstructionsInlineOrDefault{exam}%
+			}}}%
+		}%
 		\vfill
 
 		Name: \underline{\hspace{4in}}

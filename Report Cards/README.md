@@ -6,8 +6,15 @@ split and email out (or print and hand back).
 
 ## What it gives you
 
+- **`\gradebook{file.csv}` — the recommended path.** Point it at a
+	report-view CSV (one row per student) and the class renders a full,
+	auto-computed card for every student: one cover each, the breakdown
+	table, the standing bar, and the final-exam scenarios. All the
+	arithmetic lives in your gradebook spreadsheet; the class only
+	typesets. See [Gradebook-driven workflow](#gradebook-driven-workflow-recommended).
 - A `reportcard` environment that wraps each student's section with a
-	title page, a disclaimer, and a trailing page break.
+	title page, a disclaimer, and a trailing page break (the manual path,
+	when you want to hand-write one card).
 - A `\gradebreakdown{...}` table for the per-category point breakdown.
 - A `\standingbar{...}` TikZ visualization showing earned vs. possible
 	points with grade-threshold markers.
@@ -17,6 +24,95 @@ split and email out (or print and hand back).
 
 The header and footer are driven by `coursemeta.tex`; the brand color
 defaults to UNR navy but is overridable.
+
+---
+
+## Gradebook-driven workflow (recommended)
+
+Keep **one `gradebook.xlsx` per course-semester** (e.g. inside a
+`Math 181 Spring 2026/` directory) as your single source of truth.
+Build it in Google Sheets, do all the grade math there with formulas,
+and let the build turn it into report cards.
+
+### The two tabs
+
+1. **`Roster`** — your workspace: one column per assignment (HW1, HW2,
+	…, Quiz1, …, Exam 1–5, EC…), plus whatever formulas you like
+	(drop-lowest, averages, weighted totals).
+2. **`Report View`** — formula columns that reference `Roster` and
+	produce exactly the values a card prints. **This is the only tab the
+	class reads.** Editing `Roster` updates it automatically.
+
+`make_starter_gradebook.py` generates a working two-tab starter
+(`gradebook.xlsx`) you can import into Google Sheets
+(`File → Import → Upload`) and adapt — the Report View formulas are
+already wired to the Roster.
+
+### Report View column convention
+
+Columns are matched **by name** (order defines the breakdown row order):
+
+| Column header            | Meaning                                            |
+|--------------------------|----------------------------------------------------|
+| `Name`                   | Student name (the cover + section)                  |
+| `<Category> Weight`      | Category weight, e.g. `Homework Avg. Weight` → 15  |
+| `<Category> Score`       | The student's % in that category                   |
+| `<Category> Points`      | Points earned (weight × score / 100)               |
+| `---`                    | A column literally named `---` inserts a `\midrule` |
+| `Current Total`          | Running percentage (boxed in the total row)        |
+| `Current Points`         | Running points earned                              |
+| `Weight Summary`         | Left cell of the total row, e.g. `75% (+15% E.C.)` |
+| `Need <letter>`          | Scenario cell: `22.0%`, `Already secured`, …        |
+
+Each `<Category>` contributes one breakdown row from its
+`Weight`/`Score`/`Points` triplet. A blank `Score`/`Points` cell prints
+an em dash (not-yet-graded). The standing-bar thresholds use the class
+cutoffs (`\rc@cut@a..d`, default A90/B80/C70/D60).
+
+### How the file reaches the build
+
+The class reads **CSV**; `gradebook.csv` is the Report View tab exported
+from `gradebook.xlsx`. You get that CSV one of two ways:
+
+- **Automatically (Sublime / TeXLib builder).** Building a
+	`report-card` document converts every `*.xlsx` in the document's
+	directory to a sibling `.csv` (its Report View tab) first — so you
+	only ever maintain the one `.xlsx`. (Dependency-free; no openpyxl.)
+- **Manually / plain `lualatex`.** Run the standalone converter:
+
+	```
+	python gradebook_to_csv.py gradebook.xlsx        # -> gradebook.csv
+	python gradebook_to_csv.py gb.xlsx out.csv --sheet "Report View"
+	```
+
+### Pointing at the gradebook
+
+Set the path **once in `coursemeta.tex`** (or the class options) with the
+`gradebook-path` key, then call **bare `\gradebook`** — it resolves the
+path for you, falling back to a sibling `gradebook.csv`:
+
+```latex
+\documentclass[
+	report-date = {May 7, 2026}, institution = {University of Nevada, Reno},
+	instructor  = {Your Name}, season = Spring, year = 2026,
+	course-subject = Math, course-number = 181, course-title = {Calculus I},
+	gradebook-path = {gradebook.xlsx},   % or set this in coursemeta.tex
+]{report-card}
+\begin{document}
+\gradebook            % uses gradebook-path (falls back to sibling gradebook.csv)
+\end{document}
+```
+
+Resolution order, mirroring the problem bank's `\loadbank`:
+
+1. `\gradebook[explicit.csv]` — an explicit argument always wins.
+2. else `gradebook-path` from coursemeta/class options. A `.xlsx` value is
+	mapped to its `.csv` sibling (the file the builder exports), tried
+	literally first, then relative to the coursemeta directory.
+3. else a sibling `gradebook.csv`.
+
+> Requires LuaLaTeX (the engine reads the CSV via `\directlua`). The
+> TeXLib builder forces lualatex for `report-card` automatically.
 
 ---
 
@@ -84,12 +180,15 @@ Options pass through to `article`. Default base size is 11pt.
 | Key            | Default              | Effect                                |
 |----------------|----------------------|---------------------------------------|
 | `report-date`  |                      | Date string in title pages and headers |
+| `report-card-title` | `\GetCourseShort \GetCourseTitle` | Title shown on covers + header |
 | `brand-color`  | `003366` (UNR navy)  | HTML hex for tables, bars, rules      |
 | `accent-color` | `808080` (silver)    | Reserved for future styling            |
 | `rc-disclaimer`| UNR-style boilerplate| Renders below the per-student title. Legacy alias: `disclaimer`. |
 | `rc-signature` | `\GetInstructor`     | Used in `\signoff`. Legacy alias: `signature`. |
 
-Plus all `course-metadata` keys.
+Plus all `course-metadata` keys — including **`gradebook-path`**, the
+report-view CSV (or `.xlsx`, mapped to its `.csv`) that bare `\gradebook`
+loads. Set it in `coursemeta.tex` to share one gradebook course-wide.
 
 ### Build flags (TeXLib unified CLI)
 
@@ -97,6 +196,14 @@ Plus all `course-metadata` keys.
 toggles. Source: `\drafts`.
 
 ### Commands and environments
+
+`\gradebook[file.csv]`
+Render one report card per row of a report-view CSV (see
+[Gradebook-driven workflow](#gradebook-driven-workflow-recommended)).
+Each student gets one cover plus an auto-filled breakdown, standing bar,
+and scenarios table. The argument is **optional**: with no argument the
+path comes from the `gradebook-path` metadata key (then a sibling
+`gradebook.csv`). LuaLaTeX only.
 
 `\maketitle`
 Course-level cover page (course title, term, report date) — no
@@ -142,11 +249,14 @@ Direct getters.
 
 ### Page header / footer
 
-- Header L: `\GetCourseShort \GetCourseTitle`
-- Header R: `Report Card, \GetReportDate`
-- Footer L: `Section <n>`
+- Header L: `\GetReportCardTitle` (bold)
+- Header R: `\GetTermSection`
+- Footer L: `\GetCourseTitle`
 - Footer R: `\GetInstitution`
 - Footer C: `<page> of <total>`
+
+The first page of each card uses the `firstpage` style (header rule
+suppressed, footer kept) so the cover sits cleanly at the top.
 
 ### Color setup
 
@@ -159,9 +269,10 @@ from the metadata (so users can override them via `\meta{brand-color
 
 ## Tips
 
-- **One file per term:** I keep one `Math <code> <term>.tex` file with
-	all students. It's verbose but easy to grep, diff, and re-run when a
-	grade changes.
+- **One gradebook per term:** keep a single `gradebook.xlsx` per
+	course-semester directory and drive the cards with `\gradebook`
+	(see above). Change a grade in the sheet, rebuild — no LaTeX edits.
+	The manual `reportcard` environment below is for one-offs.
 - **Disclaimer override:** if your department has standard wording,
 	set `disclaimer = {...}` in the document preamble (or per-student
 	via a `\meta{disclaimer=...}` inside the `reportcard` environment).

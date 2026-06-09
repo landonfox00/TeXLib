@@ -54,6 +54,7 @@
 # modern location (plugins/builder/) first, then the legacy one (builders/).
 # ============================================================================
 
+import csv
 import glob
 import gzip
 import hashlib
@@ -61,6 +62,8 @@ import os
 import re
 import shutil
 import tempfile
+import zipfile
+from xml.etree import ElementTree as ET
 
 # Note on the brief Windows console flash during builds: LaTeXTools' build
 # path runs lualatex through `subprocess.Popen` (via its own external_command
@@ -91,7 +94,14 @@ except ImportError:
 # --- Configuration ----------------------------------------------------------
 
 # Document classes that must be compiled with lualatex.
-LUALATEX_CLASSES = {"autoexam", "quiz", "schedule"}
+# report-card uses \directlua (the gradebook engine), so it belongs here too.
+LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "report-card"}
+
+# Document classes whose gradebook.xlsx is auto-converted to a report-view CSV
+# before the build (see _convert_gradebooks). The report-view tab name tried in
+# order; falls back to the first sheet.
+GRADEBOOK_CLASSES = {"report-card"}
+GRADEBOOK_SHEETS = ("Report View", "Report Cards")
 
 # Build mode  ->  the compile-time macro the TeXLib classes respond to.
 # texlib-build.sty turns these \def's into the \ifsolutions / \ifkey / ...
@@ -162,6 +172,11 @@ class TexlibBuilder(PdfBuilder):
 
         mode, engine_options = self._extract_mode(self.options or [])
         engine = self._select_engine(src)
+
+        # Report cards: turn the one gradebook.xlsx (source of truth) into the
+        # report-view CSV the class reads. Done in-process before the engine
+        # runs so the build always sees fresh grades.
+        self._convert_gradebooks(src)
 
         # Resolve LaTeXTools' aux_directory setting (typically <<temp>>) and
         # add -output-directory if needed. On TeX Live there's no separate
@@ -251,6 +266,141 @@ class TexlibBuilder(PdfBuilder):
         if not match:
             return []
         return [v.strip() for v in match.group(1).split(",") if v.strip()]
+
+    # ------------------------------------------------------------------ #
+    # Gradebook xlsx -> report-view CSV  (report-card class)
+    # ------------------------------------------------------------------ #
+    def _convert_gradebooks(self, src):
+        """For report-card documents, convert each *.xlsx in the source dir to a
+        sibling .csv (its report-view tab) before the engine runs.
+
+        Best-effort: a malformed/locked workbook logs a warning and is skipped
+        rather than failing the build. Mirrors the standalone
+        Report Cards/gradebook_to_csv.py — kept inline because the deployed
+        builder lives in Sublime's Packages/User, detached from the TeXLib tree,
+        so it can't import that module at runtime.
+        """
+        match = DOCCLASS_RE.search(src)
+        docclass = match.group(1) if match else ""
+        if docclass not in GRADEBOOK_CLASSES:
+            return
+        tex_dir = self._tex_dir()
+        for xlsx in sorted(glob.glob(os.path.join(tex_dir, "*.xlsx"))):
+            csv_path = xlsx[:-5] + ".csv"
+            try:
+                rows = self._xlsx_rows(xlsx, GRADEBOOK_SHEETS)
+                self._write_csv(csv_path, rows)
+                self.display(
+                    "TeXLib: gradebook %s -> %s (%d student row(s)).\n"
+                    % (os.path.basename(xlsx), os.path.basename(csv_path),
+                       max(len(rows) - 1, 0))
+                )
+            except Exception as exc:  # noqa: BLE001 - never fail a build on this
+                self.display(
+                    "TeXLib: could not convert gradebook %s: %s\n"
+                    % (os.path.basename(xlsx), exc)
+                )
+
+    @staticmethod
+    def _xlsx_local(tag):
+        """Strip the XML namespace from an ElementTree tag."""
+        return tag.rsplit("}", 1)[-1]
+
+    @staticmethod
+    def _xlsx_col_index(ref):
+        """'B7' -> 2 (1-based column index)."""
+        m = re.match(r"[A-Za-z]+", ref or "")
+        if not m:
+            return None
+        n = 0
+        for ch in m.group(0).upper():
+            n = n * 26 + (ord(ch) - 64)
+        return n
+
+    @classmethod
+    def _xlsx_rows(cls, xlsx_path, preferred_sheets=()):
+        """Read a worksheet to a list of row lists, preferring the named sheets.
+
+        Reads each cell's cached value (the <v> element next to any formula),
+        so a report-view tab built from formulas converts correctly.
+        """
+        loc = cls._xlsx_local
+        with zipfile.ZipFile(xlsx_path) as zf:
+            shared = []
+            try:
+                sroot = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+                for si in sroot:
+                    shared.append("".join(
+                        t.text or "" for t in si.iter() if loc(t.tag) == "t"))
+            except KeyError:
+                pass
+            wb = ET.fromstring(zf.read("xl/workbook.xml"))
+            rels = ET.fromstring(zf.read("xl/_rels/workbook.xml.rels"))
+            rid_to_target = {}
+            for rel in rels:
+                tgt = rel.attrib.get("Target", "")
+                tgt = (tgt.lstrip("/") if tgt.startswith("/")
+                       else "xl/" + tgt.lstrip("/"))
+                rid_to_target[rel.attrib.get("Id")] = tgt
+            sheets = []
+            for el in wb.iter():
+                if loc(el.tag) != "sheet":
+                    continue
+                rid = next((v for k, v in el.attrib.items()
+                            if loc(k) == "id"), None)
+                sheets.append((el.attrib.get("name", ""), rid_to_target.get(rid)))
+            target = None
+            for pref in preferred_sheets:
+                for name, tgt in sheets:
+                    if name.strip().lower() == pref.lower():
+                        target = tgt
+                        break
+                if target:
+                    break
+            if target is None and sheets:
+                target = sheets[0][1]
+            if target is None:
+                return []
+            root = ET.fromstring(zf.read(target))
+            rows = []
+            for row in root.iter():
+                if loc(row.tag) != "row":
+                    continue
+                cells, maxc = {}, 0
+                for c in row:
+                    if loc(c.tag) != "c":
+                        continue
+                    ci = cls._xlsx_col_index(c.attrib.get("r", "")) or (maxc + 1)
+                    t = c.attrib.get("t")
+                    if t == "inlineStr":
+                        val = "".join(x.text or "" for x in c.iter()
+                                      if loc(x.tag) == "t")
+                    else:
+                        v = next((ch.text for ch in c
+                                  if loc(ch.tag) == "v"), None)
+                        if v is None:
+                            val = ""
+                        elif t == "s":
+                            try:
+                                val = shared[int(v)]
+                            except (ValueError, IndexError):
+                                val = ""
+                        else:
+                            val = v
+                    cells[ci] = val
+                    maxc = max(maxc, ci)
+                rows.append([cells.get(i, "") for i in range(1, maxc + 1)])
+        while rows and not any(s.strip() for s in rows[-1]):
+            rows.pop()
+        return rows
+
+    @staticmethod
+    def _write_csv(path, rows):
+        width = max((len(r) for r in rows), default=0)
+        with open(path, "w", newline="", encoding="utf-8") as fh:
+            w = csv.writer(fh)
+            for r in rows:
+                w.writerow(list(r) + [""] * (width - len(r)))
 
     @staticmethod
     def _base_engine_cmd(engine, aux_target=None, tex_dir=None, options=()):

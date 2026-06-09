@@ -1,0 +1,33 @@
+% Scenario: syllabi / info-reflow   (tier: core)
+% The built-in default info table (no \setsyllabusinfo) with `instructor` and
+% `office` deliberately unset. Their entries must drop and the remaining four
+% reflow to fill the 2-column grid -- no blank cells, no orphaned labels.
+\documentclass{syllabus}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	season         = Fall,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 283,
+}
+
+% instructor, organizer, and office are intentionally absent.
+\meta{
+	course-title   = Calculus III,
+	course-section = 3003,
+	short-title    = Math 283 Calc III,
+	email          = staff@example.edu,
+	office-hours   = MW 3:00--4:00pm,
+	class-time     = MWF 10:00--10:50am,
+	course-room    = LEG 212,
+}
+
+\begin{document}
+\maketitle
+
+\syllabussection{Course Description}
+Vectors, functions of several variables, partial derivatives, and multiple
+integrals.
+
+\end{document}

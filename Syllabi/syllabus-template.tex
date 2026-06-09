@@ -11,7 +11,9 @@
 % directory tree. Delete any sections you don't need.
 
 \documentclass[
-	course-title    = Course Title,
+	course-subject  = Subject,            % e.g. Math
+	course-number   = 000,                % e.g. 181
+	course-title    = Course Title,       % bare title, e.g. Calculus I
 	short-title     = Short Title,        % shown in the running header
 	course-section  = 0000,
 	term            = Term Year,
@@ -23,6 +25,20 @@
 	% class-time-alt  = Days 0:00--0:00,  % uncomment for a second meeting line
 	course-room     = Building 000,
 ]{syllabus}
+
+% The title's info table is fully customizable. Omit \setsyllabusinfo entirely
+% to get the default (Instructor/Time, Email/Classroom, Office/Office Hours in
+% two columns). Uncomment to choose your own rows, labels, and column count: an
+% entry whose value is empty is dropped and the rest reflow; if every value is
+% empty the whole framed block (rules included) disappears.
+% \setsyllabusinfo[columns=2]{
+% 	\syllabusentry{Instructor}{\GetInstructor}
+% 	\syllabusentry{Class Time}{\GetClassTime}
+% 	\syllabusentry{Email}{\GetEmail}
+% 	\syllabusentry{Classroom}{\GetCourseRoom}
+% 	\syllabusentry{Office}{\GetOffice}
+% 	\syllabusentry{Office Hours}{\GetOfficeHours}
+% }
 
 \begin{document}
 \maketitle

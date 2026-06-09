@@ -5,63 +5,47 @@
 % Compile with:
 %   lualatex report-card-template.tex
 
-\documentclass[report-date = {May 7, 2026}]{report-card}
+% Course-level fields are scalars, so they ride in the class option list.
+% (Real card sets usually inherit these from a coursemeta.tex up the tree.)
+\documentclass[
+	report-date    = {May 7, 2026},
+	institution    = {University of Nevada, Reno},
+	instructor     = {Your Name},
+	season         = Spring,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 181,
+	course-title   = {Calculus I},
+	gradebook-path = {gradebook.xlsx},
+]{report-card}
 
 \begin{document}
 
-\begin{reportcard}{Sample Student}
-
-	\section*{Current Grade Calculation}
-
-	Based on the syllabus, here is your grade breakdown prior to the
-	Final Exam. Homework and Quiz averages reflect the
-	``drop lowest 5'' policy.
-
-	\gradebreakdown{
-		Homework Avg. & 15\% & 85.0\% & +12.8 \\
-		Quiz Avg.     & 10\% & 80.0\% & +8.0  \\
-		\midrule
-		Exam 1        & 10\% & 78\%   & +7.8  \\
-		Exam 2        & 10\% & 75\%   & +7.5  \\
-		Exam 3        & 10\% & 80\%   & +8.0  \\
-		Exam 4        & 10\% & 76\%   & +7.6  \\
-		Exam 5        & 10\% & 78\%   & +7.8  \\
-		\midrule
-		Exam 1 E.C.   & 3\%  & 50\%   & +1.5  \\
-		Exam 2 E.C.   & 3\%  & 33\%   & +1.0  \\
-		Exam 3 E.C.   & 3\%  & 0\%    & +0.0  \\
-		Exam 4 E.C.   & 3\%  & 33\%   & +1.0  \\
-		Exam 5 E.C.   & 3\%  & 50\%   & +1.5  \\
-	}{75\% (+15\% E.C.) & \fbox{\textbf{86.0\%}} & 64.5}
-
-	\section*{Visual Standing}
-
-	\standingbar{10.75}{7.5}{8.75}{10}{11.25}
-
-	\section*{Final Exam Scenarios}
-
-	The Final Exam is worth 25\% of your grade. Based on your current
-	standing of \textbf{64.5 points}, here is what you must score on
-	the Final Exam to achieve specific letter grades.
-
-	\scenarios{
-		To Pass     & D 60\% & \textbf{Already secured} \\
-		To earn a C & C 70\% & \textbf{22.0\%} \\
-		To earn a B & B 80\% & \textbf{62.0\%} \\
-		To earn an A & A 90\% & \textbf{102.0\% (just out of reach)} \\
-	}
-
-	\signoff{%
-		Thank you for attending my course! I wish you a successful
-		academic and professional career.
-	}
-
-\end{reportcard}
-
-% Add more students by repeating the reportcard environment:
+% One report card per student, each with its own cover. Grades — and all the
+% arithmetic — live in the gradebook sheet; gradebook.csv is its report-view
+% export (the only tab this document reads). Columns follow the naming
+% convention "<Category> Weight/Score/Points", "Current Total/Points", and
+% "Need <letter>"; a "---" column inserts a midrule in the breakdown table.
 %
-% \begin{reportcard}{Another Student}
-%     ...
-% \end{reportcard}
+% Bare \gradebook resolves the path from coursemeta's gradebook-path above
+% (here gradebook.xlsx, mapped to the gradebook.csv the builder exports),
+% falling back to a sibling gradebook.csv. Pass \gradebook[other.csv] to
+% override.
+\gradebook
 
 \end{document}
+
+% ----------------------------------------------------------------------------
+% Manual escape hatch — type a single card by hand without the gradebook:
+%
+% \begin{reportcard}{Another Student}
+%     \section*{Current Grade Calculation}
+%     \gradebreakdown{
+%         Homework Avg. & 15\% & 85.0\% & +12.8 \\
+%         \midrule
+%         Exam 1        & 10\% & 78\%   & +7.8  \\
+%     }{75\% (+15\% E.C.) & \fbox{\textbf{86.0\%}} & 64.5}
+%     \standingbar{10.75}{7.5}{8.75}{10}{11.25}
+%     \scenarios{ To earn a C & C 70\% & \textbf{22.0\%} \\ }
+%     \signoff{Thank you for attending my course!}
+% \end{reportcard}
