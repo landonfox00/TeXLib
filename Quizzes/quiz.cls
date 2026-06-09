@@ -149,8 +149,10 @@
 % Math macros (\mbb, \abs, \lrp, \dd, \deriv, \inte, \todo, ...) are provided
 % by texlib-mathutils.sty, loaded in section 1 above.
 
-% Theorem environments come from texlib-thmenv.sty (shared with autoexam.cls).
+% Theorem environments come from texlib-thmenv.sty (shared with autoexam.cls):
+% the lightweight unboxed `thm* / defn* / cor* / ...` family.
 \RequirePackage{texlib-thmenv}
+\TeXLibStarredThms
 
 % \questionlabel / \partlabel are set in texlib-assessment (shared with autoexam).
 

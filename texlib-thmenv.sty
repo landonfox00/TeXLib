@@ -1,47 +1,212 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{texlib-thmenv}[2026/05/26 v1.0 TeXLib unstarred-theorem environment set]
+\ProvidesPackage{texlib-thmenv}[2026/06/09 v2.0 TeXLib theorem-environment enabler]
 
 % ==============================================================================
-% texlib-thmenv.sty — \newtheorem* declarations shared by autoexam and quiz
+% texlib-thmenv.sty — single source of truth for TeXLib theorem environments
 % ==============================================================================
 %
-% The exam-class-based TeXLib classes (autoexam, quiz) use plain amsthm
-% \newtheorem* declarations for in-text mathematical statements — i.e. the
-% lighter-weight `thm* / defn* / cor* / ...` family that ships unnumbered
-% and unboxed.  This is distinct from the tcolorbox-decorated theorem styles
-% in texlib-theorems.sty, which the heavier classes (didactic, pset) use for
-% emphasised statements.
+% Two public entry points, both opt-in (requiring the package declares nothing):
 %
-% Both classes used to declare overlapping subsets of these environments —
-% quiz declared 14, autoexam declared 3, with one name divergence
-% (autoexam's `ex*` vs quiz's `exam*` for the Example environment).  Both
-% spellings are exposed below so existing documents using either continue
-% to build.
+%   \TeXLibTheorems[numbering=section|flat, aliases=true|false]{theorem, ...}
+%       Defines each named environment ONCE — with its canonical amsthm style,
+%       the canonical TeXLib tcolorbox look (from texlib-theorems.sty), the
+%       chosen shared-counter numbering, an unnumbered `<name>*` twin, and
+%       (optionally) the four-letter aliases. Used by the heavier "boxed"
+%       classes (didactic, pset), which opt into the subset they want.
 %
-% Required: amsthm (provided transitively by texlib-corepkg).
+%   \TeXLibStarredThms
+%       Declares the lighter-weight `thm* / defn* / cor* / ...` family —
+%       unnumbered, unboxed amsthm statements for in-text use. Used by the
+%       exam-class classes (autoexam, quiz). Kept separate from the boxed
+%       catalog: the names (thm*, not theorem*) and the no-box behaviour are
+%       deliberately different, and folding them together would clash with the
+%       boxed `theorem*` / alias `defn*` a {didactic} document defines.
+%
+% The catalog below — env name -> {label}{amsthm style}{tcolorbox style}{alias}
+% — is the one place the full taxonomy lives. `box=none` means "no tcolorbox"
+% (remark stays plain inline). `alias` empty means "no four-letter synonym".
+%
+% \TeXLibTheorems leans on texlib-theorems.sty for the box styles and loads it
+% on demand, so a class that only calls \TeXLibStarredThms never pulls in
+% tcolorbox.
 
-% --- plain style: bold heading, italic body (the amsthm default) ----------
-\newtheorem*{thm*}      {Theorem}
-\newtheorem*{defn*}     {Definition}
-\newtheorem*{cor*}      {Corollary}
-\newtheorem*{prop*}     {Proposition}
-\newtheorem*{lem*}      {Lemma}
-\newtheorem*{conj*}     {Conjecture}
-\newtheorem*{ques*}     {Question}
-\newtheorem*{prob*}     {Problem}
-\newtheorem*{exam*}     {Example}
-\newtheorem*{ex*}       {Example}    % legacy short-name spelling
-\newtheorem*{notn*}     {Notation}
+\RequirePackage{amsthm}
 
-% --- remark style: bold heading, upright body ----------------------------
-\theoremstyle{remark}
-\newtheorem*{rmk*}        {Remark}
-\newtheorem*{recall*}     {Recall}
-\newtheorem*{case*}       {Case}
-\newtheorem*{desiderata*} {Desiderata}
+% ------------------------------------------------------------------------------
+% Alias builder (traditional catcodes: needs raw #/## for the env's optional arg)
+% ------------------------------------------------------------------------------
+% A four-letter alias cannot be a \let-copy of the real environment: the boxed
+% environments are wrapped via \tcolorboxenvironment, whose hooks fire only when
+% LaTeX sees \begin{<real>} / \end{<real>}. So each alias is a thin wrapper that
+% calls \begin{<real>} ... \end{<real>}, passing the optional [<note>] through.
+\newcommand{\texlib@thm@mkalias}[2]{% #1 = alias name, #2 = real env name
+	\NewDocumentEnvironment{#1}{o}
+		{\IfNoValueTF{##1}{\begin{#2}}{\begin{#2}[##1]}}
+		{\end{#2}}%
+}
 
-% Restore the default style so anything the class declares later (numbered
-% environments, etc.) starts from a clean plain-style baseline.
-\theoremstyle{plain}
+\ExplSyntaxOn
+
+% ------------------------------------------------------------------------------
+% Catalog
+% ------------------------------------------------------------------------------
+\prop_new:N \g__texlib_thm_label_prop
+\prop_new:N \g__texlib_thm_style_prop
+\prop_new:N \g__texlib_thm_box_prop
+\prop_new:N \g__texlib_thm_alias_prop
+
+% \__texlib_thm_entry:nnnnn {env}{label}{amsthm style}{tcolorbox style|none}{alias|}
+\cs_new_protected:Npn \__texlib_thm_entry:nnnnn #1#2#3#4#5 {
+	\prop_gput:Nnn \g__texlib_thm_label_prop {#1} {#2}
+	\prop_gput:Nnn \g__texlib_thm_style_prop {#1} {#3}
+	\prop_gput:Nnn \g__texlib_thm_box_prop   {#1} {#4}
+	\prop_gput:Nnn \g__texlib_thm_alias_prop {#1} {#5}
+}
+
+%                          env           label         style       box                alias
+\__texlib_thm_entry:nnnnn {theorem}     {Theorem}     {plain}      {texlibtheorem}     {}
+\__texlib_thm_entry:nnnnn {corollary}   {Corollary}   {plain}      {texlibtheorem}     {}
+\__texlib_thm_entry:nnnnn {lemma}       {Lemma}       {plain}      {texlibtheorem}     {}
+\__texlib_thm_entry:nnnnn {conjecture}  {Conjecture}  {plain}      {texlibtheorem}     {}
+\__texlib_thm_entry:nnnnn {proposition} {Proposition} {plain}      {texlibproposition} {}
+\__texlib_thm_entry:nnnnn {definition}  {Definition}  {definition} {texlibdefinition}  {defn}
+\__texlib_thm_entry:nnnnn {convention}  {Convention}  {definition} {texlibdefinition}  {conv}
+\__texlib_thm_entry:nnnnn {procedure}   {Procedure}   {definition} {texlibprocedure}   {}
+\__texlib_thm_entry:nnnnn {challenge}   {Challenge}   {definition} {texlibquestion}    {chal}
+\__texlib_thm_entry:nnnnn {exercise}    {Exercise}    {definition} {texlibexample}     {exer}
+\__texlib_thm_entry:nnnnn {example}     {Example}     {definition} {texlibexample}     {exam}
+\__texlib_thm_entry:nnnnn {notation}    {Notation}    {definition} {texlibnote}        {notn}
+\__texlib_thm_entry:nnnnn {question}    {Question}    {remark}     {texlibquestion}    {ques}
+\__texlib_thm_entry:nnnnn {remark}      {Remark}      {remark}     {none}              {}
+\__texlib_thm_entry:nnnnn {recall}      {Recall}      {remark}     {texlibnote}        {}
+\__texlib_thm_entry:nnnnn {note}        {Note}        {remark}     {texlibnote}        {}
+
+% ------------------------------------------------------------------------------
+% Options
+% ------------------------------------------------------------------------------
+\bool_new:N \l__texlib_thm_section_bool   % numbering: section (true) vs flat (false)
+\bool_new:N \l__texlib_thm_aliases_bool
+\bool_new:N \l__texlib_thm_first_bool      % next env declared is the master counter
+\tl_new:N   \l__texlib_thm_master_tl       % name of the master counter
+\tl_new:N   \l__texlib_thm_label_tl
+\tl_new:N   \l__texlib_thm_style_tl
+\tl_new:N   \l__texlib_thm_box_tl
+\tl_new:N   \l__texlib_thm_alias_tl
+
+\keys_define:nn { texlib/thm } {
+	numbering .choice:,
+	numbering / section .code:n = { \bool_set_true:N  \l__texlib_thm_section_bool },
+	numbering / flat    .code:n = { \bool_set_false:N \l__texlib_thm_section_bool },
+	aliases   .bool_set:N = \l__texlib_thm_aliases_bool,
+	aliases   .default:n  = { true },
+}
+
+% ------------------------------------------------------------------------------
+% Per-environment declaration
+% ------------------------------------------------------------------------------
+% Declares one environment from the catalog: amsthm \newtheorem (master counter
+% the first time, sharing it thereafter), its unnumbered `<name>*` twin, and the
+% tcolorbox wrap on both (unless box=none). Label/style/box are x-expanded into
+% the calls so amsthm/tcolorbox receive literal values — the lookup scratch tls
+% are overwritten on the next iteration.
+\cs_new_protected:Npn \__texlib_thm_declare:n #1 {
+	\prop_get:NnNTF \g__texlib_thm_label_prop {#1} \l__texlib_thm_label_tl {
+		\prop_get:NnN \g__texlib_thm_style_prop {#1} \l__texlib_thm_style_tl
+		\prop_get:NnN \g__texlib_thm_box_prop   {#1} \l__texlib_thm_box_tl
+		\exp_args:NV \theoremstyle \l__texlib_thm_style_tl
+		\bool_if:NTF \l__texlib_thm_first_bool {
+			\tl_set:Nn \l__texlib_thm_master_tl {#1}
+			\bool_set_false:N \l__texlib_thm_first_bool
+			\bool_if:NTF \l__texlib_thm_section_bool {
+				\use:x { \exp_not:N \newtheorem { \exp_not:n {#1} }
+					{ \l__texlib_thm_label_tl } [ section ] }
+			}{
+				\use:x { \exp_not:N \newtheorem { \exp_not:n {#1} }
+					{ \l__texlib_thm_label_tl } }
+			}
+		}{
+			\use:x { \exp_not:N \newtheorem { \exp_not:n {#1} }
+				[ \l__texlib_thm_master_tl ] { \l__texlib_thm_label_tl } }
+		}
+		% Unnumbered twin (same style; no \theoremstyle change in between).
+		\use:x { \exp_not:N \newtheorem * { \exp_not:n {#1} * }
+			{ \l__texlib_thm_label_tl } }
+		\str_if_eq:VnF \l__texlib_thm_box_tl { none } {
+			\use:x { \exp_not:N \tcolorboxenvironment { \exp_not:n {#1} }
+				{ \l__texlib_thm_box_tl } }
+			\use:x { \exp_not:N \tcolorboxenvironment { \exp_not:n {#1} * }
+				{ \l__texlib_thm_box_tl } }
+		}
+	}{
+		\msg_error:nnn { texlib-thmenv } { unknown-env } {#1}
+	}
+}
+
+% Builds the four-letter alias (and its starred twin) for one environment, if
+% the catalog assigns it one.
+\cs_new_protected:Npn \__texlib_thm_alias:n #1 {
+	\prop_get:NnNT \g__texlib_thm_alias_prop {#1} \l__texlib_thm_alias_tl {
+		\tl_if_empty:NF \l__texlib_thm_alias_tl {
+			\use:x { \exp_not:N \texlib@thm@mkalias
+				{ \l__texlib_thm_alias_tl } { \exp_not:n {#1} } }
+			\use:x { \exp_not:N \texlib@thm@mkalias
+				{ \l__texlib_thm_alias_tl * } { \exp_not:n {#1} * } }
+		}
+	}
+}
+
+\msg_new:nnn { texlib-thmenv } { unknown-env }
+	{ Unknown~theorem~environment~'#1'~requested~in~\token_to_str:N
+		\TeXLibTheorems. ~ Add~it~to~the~catalog~in~texlib-thmenv.sty. }
+
+% ------------------------------------------------------------------------------
+% Public: \TeXLibTheorems[options]{comma list of env names}
+% ------------------------------------------------------------------------------
+\NewDocumentCommand \TeXLibTheorems { O{} m } {
+	\@ifpackageloaded { texlib-theorems } { } { \RequirePackage { texlib-theorems } }
+	\bool_set_true:N  \l__texlib_thm_section_bool   % defaults: numbering=section,
+	\bool_set_false:N \l__texlib_thm_aliases_bool   %           aliases=false
+	\keys_set:nn { texlib/thm } {#1}
+	\bool_set_true:N \l__texlib_thm_first_bool
+	\clist_map_function:nN {#2} \__texlib_thm_declare:n
+	\bool_if:NT \l__texlib_thm_aliases_bool {
+		\clist_map_function:nN {#2} \__texlib_thm_alias:n
+	}
+	\theoremstyle { plain }   % leave amsthm at a clean baseline for later code
+}
+
+\ExplSyntaxOff
+
+% ------------------------------------------------------------------------------
+% Public: \TeXLibStarredThms — the lightweight unboxed short-name family
+% ------------------------------------------------------------------------------
+% Plain amsthm \newtheorem* declarations shared by autoexam and quiz: the
+% `thm* / defn* / cor* / ...` statements that ship unnumbered and unboxed, for
+% in-text mathematical statements. Distinct from the tcolorbox-decorated boxed
+% taxonomy above. autoexam's `ex*` and quiz's `exam*` both name the Example
+% environment, so both spellings are exposed for backward compatibility.
+\newcommand{\TeXLibStarredThms}{%
+	% plain style: bold heading, italic body (the amsthm default)
+	\theoremstyle{plain}%
+	\newtheorem*{thm*}      {Theorem}%
+	\newtheorem*{defn*}     {Definition}%
+	\newtheorem*{cor*}      {Corollary}%
+	\newtheorem*{prop*}     {Proposition}%
+	\newtheorem*{lem*}      {Lemma}%
+	\newtheorem*{conj*}     {Conjecture}%
+	\newtheorem*{ques*}     {Question}%
+	\newtheorem*{prob*}     {Problem}%
+	\newtheorem*{exam*}     {Example}%
+	\newtheorem*{ex*}       {Example}%    legacy short-name spelling
+	\newtheorem*{notn*}     {Notation}%
+	% remark style: bold heading, upright body
+	\theoremstyle{remark}%
+	\newtheorem*{rmk*}        {Remark}%
+	\newtheorem*{recall*}     {Recall}%
+	\newtheorem*{case*}       {Case}%
+	\newtheorem*{desiderata*} {Desiderata}%
+	% Restore the default style so later class code starts clean.
+	\theoremstyle{plain}%
+}
 
 \endinput

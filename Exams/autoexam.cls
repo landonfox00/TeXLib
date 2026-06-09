@@ -579,8 +579,10 @@
 % \encircle (and \extracredit, available if needed) come from texlib-itemfmt.
 \RequirePackage{texlib-itemfmt}
 
-% Theorem environments come from texlib-thmenv.sty (shared with quiz.cls).
+% Theorem environments come from texlib-thmenv.sty (shared with quiz.cls):
+% the lightweight unboxed `thm* / defn* / cor* / ...` family.
 \RequirePackage{texlib-thmenv}
+\TeXLibStarredThms
 
 % \@autoexam@instructions@file: path (without .tex) of the instructions file
 %   loaded into the cover-page box.  Override via \examsetup{instructions-file=…}

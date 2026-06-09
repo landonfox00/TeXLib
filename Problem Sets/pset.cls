@@ -237,64 +237,26 @@
 % ==============================================================================
 % 7. THEOREM-LIKE ENVIRONMENTS (boxed via tcolorbox, shared TeXLib styling)
 % ==============================================================================
-% The tcolorbox styles live in texlib-theorems.sty. As of the May 2026
-% consolidation pass, pset uses the canonical TeXLib colored-thin-rule look
-% (the old sharp-black-frame `psetstyle` is retired). This class keeps its
-% own \newtheorem taxonomy and flat numbering.
+% The tcolorbox styles live in texlib-theorems.sty; the \TeXLibTheorems enabler
+% that binds environments to them lives in texlib-thmenv.sty. As of the May 2026
+% consolidation pass, pset uses the canonical TeXLib colored-thin-rule look (the
+% old sharp-black-frame `psetstyle` is retired). This class opts into a subset
+% of the shared taxonomy with FLAT numbering (one shared counter, not section-
+% based) and no four-letter aliases.
 \RequirePackage{texlib-theorems}
+\RequirePackage{texlib-thmenv}
 
-\theoremstyle{plain}
-\newtheorem{theorem}{Theorem}
-\newtheorem{definition}[theorem]{Definition}
-\newtheorem{corollary}[theorem]{Corollary}
-\newtheorem{proposition}[theorem]{Proposition}
-\newtheorem{lemma}[theorem]{Lemma}
-
-\theoremstyle{remark}
-\newtheorem{example}[theorem]{Example}
-\newtheorem{remark}[theorem]{Remark}
-\newtheorem{note}[theorem]{Note}
-\newtheorem{recall}[theorem]{Recall}
-
-% Bind each boxed environment to a shared style. note/recall carry the gray
-% note rule (matching didactic, where notation/recall use texlibnote); remark
-% stays plain inline (no box), also matching didactic.
-\tcolorboxenvironment{theorem}{texlibtheorem}
-\tcolorboxenvironment{definition}{texlibdefinition}
-\tcolorboxenvironment{corollary}{texlibtheorem}
-\tcolorboxenvironment{proposition}{texlibproposition}
-\tcolorboxenvironment{lemma}{texlibtheorem}
-\tcolorboxenvironment{example}{texlibexample}
-\tcolorboxenvironment{note}{texlibnote}
-\tcolorboxenvironment{recall}{texlibnote}
-
-% Unnumbered (starred) twins of every environment above. Same headings, styles,
-% and tcolorbox styling (remark*/note*/recall* left plain, like their numbered
-% counterparts). Use e.g. \begin{theorem*} ... \end{theorem*}; the starred forms
-% take no shared-counter argument. (note* is also defined, guarded, in the
-% Category Theory preamble; its \ifcsname check skips that copy when this one is
-% already present, so there is no double-definition.)
-\theoremstyle{plain}
-\newtheorem*{theorem*}{Theorem}
-\newtheorem*{definition*}{Definition}
-\newtheorem*{corollary*}{Corollary}
-\newtheorem*{proposition*}{Proposition}
-\newtheorem*{lemma*}{Lemma}
-
-\theoremstyle{remark}
-\newtheorem*{example*}{Example}
-\newtheorem*{remark*}{Remark}
-\newtheorem*{note*}{Note}
-\newtheorem*{recall*}{Recall}
-
-\tcolorboxenvironment{theorem*}{texlibtheorem}
-\tcolorboxenvironment{definition*}{texlibdefinition}
-\tcolorboxenvironment{corollary*}{texlibtheorem}
-\tcolorboxenvironment{proposition*}{texlibproposition}
-\tcolorboxenvironment{lemma*}{texlibtheorem}
-\tcolorboxenvironment{example*}{texlibexample}
-\tcolorboxenvironment{note*}{texlibnote}
-\tcolorboxenvironment{recall*}{texlibnote}
+% One declaration per environment (and its unnumbered `*` twin), each with the
+% canonical TeXLib styling and a flat shared counter (master: theorem). The
+% catalog (env -> amsthm style + tcolorbox style) lives in texlib-thmenv.sty,
+% so `definition` is definition-style and `example` definition-style here too,
+% matching didactic. note/recall carry the gray note rule; remark stays plain
+% inline (no box). (note* is also defined, guarded, in the Category Theory
+% preamble; its \ifcsname check skips that copy when this one is present.)
+\TeXLibTheorems[numbering=flat]{
+	theorem, definition, corollary, proposition, lemma,
+	example, remark, note, recall
+}
 
 % ==============================================================================
 % 8. SOLUTION ENVIRONMENT — gated on \ShowKey/\ShowSolutions/\StudentMode
