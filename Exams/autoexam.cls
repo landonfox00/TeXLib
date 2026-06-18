@@ -113,6 +113,43 @@
 
 % Source-level toggles \solutions, \keys, \rubrics, \drafts, \studentmode,
 % \instructormode are provided by texlib-build (loaded above).
+%
+% Exam solution-build modes (override texlib-build's \solutions for exams).
+% \AutoExamSolMode is read by the Lua version loop (collated single-file build,
+% autoexam_run_versions) and by build_versions.py (parallel builder):
+%   none -> student copies only (default)
+%   dual -> student AND instructor copy of each version
+%           (e.g. A, B, C, A-sol, B-sol, C-sol)
+%   only -> instructor copies only
+% \solutions / \justsolutions set the mode but do NOT force \solutionstrue: the
+% version loop toggles \ifsolutions per copy and the builder passes \ShowSolutions
+% per instructor job, so a student copy never leaks solutions.
+\newif\if@ax@src@dual   % source \solutions seen
+\newif\if@ax@src@only   % source \justsolutions seen
+\def\AutoExamSolMode{none}
+% \solutions always wins over \justsolutions, regardless of the order they are
+% given: \justsolutions only sets `only' when \solutions has not been (and
+% \solutions, whenever it runs, forces `dual').
+\renewcommand{\solutions}{\@ax@src@dualtrue\def\AutoExamSolMode{dual}}
+\newcommand{\justsolutions}{%
+	\@ax@src@onlytrue
+	\if@ax@src@dual\else \def\AutoExamSolMode{only}\fi
+}
+% Compile-time flags for the builders. \ShowSolutions already set \solutionstrue
+% via texlib-build; record the matching mode. \ShowJustSolutions is the
+% instructor-only compile-time flag.
+\ifdefined\ShowSolutions     \def\AutoExamSolMode{dual}\fi
+\ifdefined\ShowJustSolutions \def\AutoExamSolMode{only}\solutionstrue\fi
+% If BOTH source commands were used, warn and keep dual (\justsolutions ignored).
+\AtBeginDocument{%
+	\if@ax@src@dual\if@ax@src@only
+		\ClassWarning{autoexam}{%
+			Both \string\solutions\space and \string\justsolutions\space were
+			given.\MessageBreak \string\justsolutions\space is ignored:
+			building student AND instructor copies%
+		}%
+	\fi\fi
+}
 
 % texlib-problembank.sty loads problem_engine.lua and defines the shared
 % machinery: \setvar/\setrng/\calcvar/\get, \pick* commands, \getlist/\geti/
@@ -123,85 +160,70 @@
 % two classes can't drift.  See texlib-problembank.sty for the full API.
 \RequirePackage{texlib-problembank}
 
-% \begin{problems} ... \end{problems}
-%   The environment itself is defined once in texlib-problembank.sty (shared
-%   with quiz.cls).  autoexam supplies its page policy through the two hooks the
-%   shared environment calls:
+% \begin{problems} / \begin{mcproblems} ... (repeatable Part sections)
+%   The environments are defined once in texlib-problembank.sty (shared with
+%   quiz.cls): each is an auto-numbered "Part N" section, used in any order/count,
+%   threading the question number continuously.  autoexam supplies its page policy
+%   through the two hooks the shared core calls:
 %
-%   \problems@begin@hook (on entry):
-%     - a single-use guard (warns if {problems} is opened twice in one version)
-%     - \clearpage, then resets the page counter to 1 so Q1 lands on "page 1"
-%     - restores the problem-style first-page and running header/footer slots
+%   \problems@begin@hook (on entry, after the Part counter is stepped):
+%     - \clearpage so every Part starts on a fresh page
+%     - at the FIRST section only (texlibpartno=1): reset the page counter to 1 so
+%       Q1 lands on "page 1", step the per-copy footer id, install header/footer
+%       slots; later sections continue the page number
 %
 %   \problems@end@hook (on exit):
-%     - places \label{@lastqpage} on the last problem page (read by the "X of N"
-%       footer once \blankpage ships that page)
+%     - places \label{@lastqpage@<copy>} on the section's last page; the last
+%       section's placement wins, giving the true denominator for the "X of N"
+%       footer once \blankpage ships that page
 %
-%   The shared environment handles the parts common to both classes: the
-%   inter-problem separator flag, the \newpage patch, opening {questions}, and
-%   swapping \problem <-> \@problem@item.
+%   The shared core handles the parts common to both classes: the Part heading,
+%   continuous question numbering, the inter-problem separator flag, the \newpage
+%   patch, opening {questions}, and swapping \problem <-> \@problem@item.
 
-% \@problems@lastver: the \theExamVersion under which {problems} was last
-% opened.  Empty until first use; consulted by the single-use guard below.
-\gdef\@problems@lastver{}
+% Per-copy id for the "X of N" footer.  Every typeset copy (each version, and in
+% \solutions builds each student/instructor copy) gets a unique number, stepped
+% once per copy (at the FIRST problem-section), so its last-page label
+% \label{@lastqpage@<n>} is never overwritten by a different-length copy -- which
+% previously made the denominator wrong (e.g. a 9-page copy showing "9 of 10").
+\newcounter{autoexamcopyno}
 
+% Multi-section page policy.  An exam may contain several problem-sections
+% ({mcproblems}, {problems}, ...) in document order.  The shared core steps
+% \texlibpartno BEFORE calling this hook, so texlibpartno=1 marks the FIRST
+% section of the copy.  The first section resets the page counter to 1 and
+% installs the per-copy footer; EVERY section \clearpages so each Part starts on
+% a fresh page, while the page NUMBER runs continuously across all sections.
 \renewcommand{\problems@begin@hook}{%
-	% ---- single-use guard ----------------------------------------------------
-	% {problems} resets the page counter and issues \clearpage on entry, so it
-	% is designed to wrap the entire problem section ONCE per version.  Opening
-	% it again under the same version orphans the preceding heading onto its own
-	% page and restarts the "X of N" footer.  Compare against \theExamVersion so
-	% the per-version replay of a correct multi-version exam stays silent (the
-	% engine re-inputs the body once per version, each with a new \theExamVersion).
-	\edef\@problems@curver{\theExamVersion}%
-	\ifx\@problems@curver\@problems@lastver
-		\ClassWarning{autoexam}{%
-			Two or more {problems} environments in version
-			"\@problems@curver".\MessageBreak
-			{problems} is single-use: it issues \string\clearpage\space and
-			resets the\MessageBreak
-			page counter on entry, orphaning any preceding heading and\MessageBreak
-			restarting the page footer.  Use ONE {problems} block with\MessageBreak
-			\string\section* / \string\subsection* headings inside it and
-			\string\newpage\MessageBreak
-			between groups (see template.tex or Math 127 exam1.tex).\MessageBreak
-			Reported%
-		}%
-	\else
-		\global\let\@problems@lastver\@problems@curver
-	\fi
-	% ---- ship any pending page (e.g. pre-problem scratch page from \blankpage) -
+	% Ship any pending page (the title page, a \blankpage scratch leaf, or the
+	% previous section's last page).
 	\clearpage
-	% ---- page counter & header/footer ----------------------------------------
-	\setcounter{page}{1}%
-	% Q1 is "page 1" and receives the first-page style (\@fullhead / \@fullfoot).
-	% Restore those slots to match the running header so Q1 looks identical to
-	% every subsequent problem page.
-	%
-	% IMPORTANT: this hook runs inside the {problems} environment group, so a
-	% plain \def here is LOCAL and reverts when \end{problems} closes the group.
-	% The last problem page and the \scorepage both ship AFTER the group closes,
-	% so their headers/footers must be set with \global (\gdef / \global\def).
-	% First-page slots (\@lhead etc.) are only needed for Q1, which ships via
-	% the first \newpage inside the group, so local \def is fine there.
-	\def\@lhead{\bfseries\GetExamTitle}%
-	\def\@chead{}%
-	\def\@rhead{\GetTermSection}%
-	\global\@headruletrue%
-	\def\@cfoot{%
-		\thepage\ of\ \@ifundefined{r@@lastqpage}{\numpages}{\pageref*{@lastqpage}}%
-	}%
-	% Running slots for Q2+ — MUST be global so they survive \end{problems}.
-	\gdef\run@chead{}%
-	\global\def\run@cfoot{%
-		\thepage\ of\ \@ifundefined{r@@lastqpage}{\numpages}{\pageref*{@lastqpage}}%
-	}%
+	\ifnum\value{texlibpartno}=\@ne
+		% ---- first section of the copy: reset numbering + install header/foot --
+		\setcounter{page}{1}%
+		% Q1 is "page 1"; restore the first-page header slots to match the running
+		% header.  These \def's run inside the environment group (local), but the
+		% running slots below are \global so they survive \end{...} and apply to
+		% every later section of the copy.
+		\def\@lhead{\bfseries\GetExamTitle}%
+		\def\@chead{}%
+		\def\@rhead{\GetTermSection}%
+		\global\@headruletrue%
+		% Per-copy "X of N": freeze THIS copy's id into the footer denominator.
+		\stepcounter{autoexamcopyno}%
+		\edef\@cfoot{%
+			\noexpand\thepage\noexpand\space of\noexpand\space\noexpand\@ifundefined{r@@lastqpage@\theautoexamcopyno}{\noexpand\numpages}{\noexpand\pageref*{@lastqpage@\theautoexamcopyno}}%
+		}%
+		\gdef\run@chead{}%
+		\global\let\run@cfoot\@cfoot
+	\fi
 }
 
+% Place the last-page label at EVERY section end.  autoexamcopyno is constant
+% within a copy (stepped only at the first section), so the FINAL section's
+% placement wins and records the true last problem page for "X of N".
 \renewcommand{\problems@end@hook}{%
-	% Place the label on the last problem page.  \blankpage (which follows) ships
-	% that page via \clearpage, recording the correct page number for "X of N".
-	\label{@lastqpage}%
+	\label{@lastqpage@\theautoexamcopyno}%
 }
 
 % \loadbank is provided by texlib-problembank.sty.  Multi-version mode is
@@ -222,22 +244,49 @@
 	\directlua{texlib.set_autoexam_shuffle_pages()}%
 }
 
-% Multiple-choice option shuffling (used with \shufflepages).  Authors write the
-% exam-class \begin{choices}/\begin{oneparchoices} with \choice/\CorrectChoice;
-% the Lua shuffler reorders the options per version (\CorrectChoice travels with
-% its option, so the key auto-follows).  These definitions make the pinning
-% markers compile in EVERY build mode (with or without shuffle):
-%   \fixedchoice            -- an option the shuffler pins in place ("None of
-%                              the above"); renders exactly like \choice.
-%   \begin{choices}[fixed]  -- keep this block in authored order (ordered
-%                              numeric answers); the [..] tag is read by the
-%                              shuffler and ignored at render time.
-\newcommand{\fixedchoice}{\choice}
-\let\@ax@choices\choices            \let\@ax@endchoices\endchoices
-\renewenvironment{choices}[1][]{\@ax@choices}{\@ax@endchoices}
-\@ifundefined{oneparchoices}{}{%
-	\let\@ax@opc\oneparchoices      \let\@ax@endopc\endoneparchoices
-	\renewenvironment{oneparchoices}[1][]{\@ax@opc}{\@ax@endopc}%
+% ---------------------------------------------------------------------------
+% Multiple-choice rendering (the {mcproblems} section).
+%
+% The engine selects and orders the options per version and emits exam-class
+% \choice / \CorrectChoice bracketed by the \@mcframe@* hooks (defaults in
+% texlib-problembank.sty).  Here autoexam overrides those hooks for the
+% instructor key — the solution sits BESIDE the choices ("option B": stem full
+% width, choices left, solution right) — and shifts the choices left.
+% ---------------------------------------------------------------------------
+
+% Shift the choices list left.  The exam class indents choices by
+% width("W.")+labelsep+2.5em (deliberately wide); narrow that to a tidy hang that
+% still clears the "(A)" labels.
+\renewcommand{\choiceshook}{%
+	\setlength{\leftmargin}{2em}%
+	\setlength{\labelwidth}{\dimexpr\leftmargin-\labelsep\relax}%
+}
+
+% Side-by-side instructor key.  The stem is emitted full width by the engine;
+% then (solution builds only) the choices go in a left column and the solution in
+% a right column.  A student build stays full width with a blank answer rule.
+\newlength{\@mc@choicew}  \setlength{\@mc@choicew}{0.54\linewidth}
+\newlength{\@mc@solw}     \setlength{\@mc@solw}{0.42\linewidth}
+\renewcommand{\@mcframe@begin}[1]{%
+	\def\@mc@letter{#1}%
+	\par
+	\ifsolutions \noindent\begin{minipage}[t]{\@mc@choicew}\fi
+}
+\renewcommand{\@mcframe@answer}{%
+	% Right-aligned answer line at the foot of the choices column (instructor) or
+	% under the choices (student); the letter is filled in for the key.  \noindent
+	% leaves vertical mode before \hfill (which would otherwise error there).
+	\par\nobreak\medskip
+	\noindent\hfill\textbf{Answer:}~%
+	\ifsolutions\fbox{\strut\@mc@letter}\else\rule{2.4cm}{0.4pt}\fi
+	\par
+}
+\renewcommand{\@mcframe@mid}{%
+	\ifsolutions \end{minipage}\hfill\begin{minipage}[t]{\@mc@solw}\fi
+}
+\renewcommand{\@mcframe@end}{%
+	\ifsolutions \end{minipage}\fi
+	\par
 }
 
 % \byversion{A content}{B content}{C content}
@@ -880,12 +929,21 @@
 	% version's \blankpage.  \begin{problems} resets the counter again to 1, so
 	% Q1 is always page 1 of the problem section.
 	\setcounter{page}{1}%
+	% Reset the per-copy Part counter and the cross-section question carry so each
+	% version/copy renumbers its Parts from I and its questions from 1.
+	\setcounter{texlibpartno}{0}%
+	\setcounter{@texlib@qcarry}{0}%
 	% Clear first-page header slots so nothing appears above the title block.
 	\def\@lhead{}\def\@chead{}\def\@rhead{}%
 	\@headrulefalse%
-	% Clear center footer to prevent page-number bleed from the previous version's
-	% \begin{problems} (which sets \@cfoot to the "X of N" formula).
+	% Clear BOTH center-footer slots to prevent page-number bleed from the previous
+	% version's \begin{problems} (which sets \@cfoot/\run@cfoot to the "X of N"
+	% formula): \@cfoot for the title page (page 1), and \run@cfoot (global) for any
+	% pre-problem pages such as a series-reference sheet (Exam 3 / the Final).
 	\def\@cfoot{}%
+	\gdef\run@cfoot{}%
+	\gdef\run@chead{}%   % also drop a "Scratch Work" running header leaked from a
+	                     % previous copy's trailing \blankpage (e.g. onto a series sheet)
 	\thispagestyle{headandfoot}%
 	% ---- title block ---------------------------------------------------------
 	\begin{center}
@@ -938,3 +996,12 @@
 	% scratch style, and outputs \null.  \begin{problems} then resets the page
 	% counter and restores problem headers.
 }
+
+% ==============================================================================
+% Structural hang: the \section* / \subsection* headings used inside the
+% problems environment hang onto the shared TeXLib left edge, matching the
+% other classes. The exam-class headandfoot rules are untouched (fancyhdr is
+% not loaded, so the package's header/footer offset is a no-op here).
+% Loaded LAST so its redefinitions land on top of the article defaults.
+% ==============================================================================
+\RequirePackage{texlib-sectionhang}

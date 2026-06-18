@@ -125,10 +125,14 @@ Compile-time toggles: `\ShowSolutions`, `\ShowKey`, `\ShowRubric`,
 Load a problem bank from a file. Equivalent to `\input{bank.tex}` but
 tracks load order for diagnostics.
 
-`\begin{problem}{id}[key=val,...] ... \solution ... \end{problem}`
-Define a problem. Body text before `\solution` is the problem; text after
-is the (optional) solution. May sit in the bank file, in the document
-preamble, or in the body. Inverse search (double-click in the PDF) jumps
+`\begin{problem}{id}[key=val,...] ... \end{problem}`
+Define a problem. The body is region-delimited: an optional
+`\begin{choices}...\end{choices}` (its presence marks the problem multiple
+choice) and an optional `\begin{solution}...\end{solution}`; everything else is
+the stem. In a choices block, `\cchoice` marks the correct option, `\fchoice[i]`
+forces an always-present option into slot `i` (negative = from the end), and
+`[choose=m]` presents only `m` of the options (per version). May sit in the bank
+file, the preamble, or the body. Inverse search (double-click in the PDF) jumps
 back to the `\begin{problem}` block in its source file.
 
 `\getproblem{query}` (aliases: `\useproblem`, `\reqproblem`)

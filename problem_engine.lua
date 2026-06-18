@@ -162,6 +162,13 @@ end
 autoexam_shuffle_pages = false  -- set true by \shufflepages in the preamble
 pbank_first_on_page = true   -- reset by \begin{problems} and patched \newpage;
 								-- read by pbank_problem_item to decide separator
+-- Render mode of the active problem-section: 'mc' inside {mcproblems}, 'fr'
+-- inside {problems} (and by default).  Set by the section environment.  Only an
+-- MC problem (one with a \begin{choices} block) inside an {mcproblems} section
+-- gets the multiple-choice frame (selection, per-version option ordering, answer
+-- line, side-by-side key); the same problem in a {problems} section renders its
+-- choices as a plain authored-order list.
+pbank_section_mode = 'fr'
 
 -- Per-part point/stretch injection state
 -- pbank_stretch_list: set by pbank_problem_item before calling get_problem.
@@ -422,8 +429,14 @@ local function read_problem_lines_from_bank(bank_file, start_line)
 		if lineno == start_line then
 			active = true          -- next line is first body line
 		elseif active then
-			-- Stop at \solution or \end{problem}
-			if raw_line:match('^%s*\\solution') or
+			-- Stop at the first region boundary: \begin{choices}, \begin{solution},
+			-- or \end{problem}.  This yields the LEADING region (the stem, plus any
+			-- \begin{parts} for free-response problems) that we attribute to the bank
+			-- file via \@@input.  Choices and the solution are emitted separately as
+			-- engine-generated tokens (selected/shuffled per version), so they are not
+			-- part of the file-served region.
+			if raw_line:match('^%s*\\begin%s*{choices}') or
+				raw_line:match('^%s*\\begin%s*{solution}') or
 				raw_line:match('^%s*\\end%s*{problem}') then
 				break
 			end
@@ -432,6 +445,282 @@ local function read_problem_lines_from_bank(bank_file, start_line)
 	end
 	f:close()
 	return lines
+end
+
+-- ============================================================
+-- PROBLEM REGIONS + MULTIPLE-CHOICE PLAN
+-- ============================================================
+-- The bank authoring model is region-delimited:
+--
+--   \begin{problem}{id}[meta]
+--       <stem>                       -- prose (and \begin{parts} for free response)
+--       \begin{choices}[opts] ... \end{choices}   -- OPTIONAL; presence => MC
+--       \begin{solution} ... \end{solution}        -- OPTIONAL
+--   \end{problem}
+--
+-- define_problem_from_env isolates the three regions from the collected body
+-- string (\Collect@Body has already stripped % comments and collapsed newlines
+-- to spaces, so a brace-depth scan over the string is sufficient — no comment
+-- handling needed here, unlike the source-level shuffler scanners below).
+
+-- Emit a one-line diagnostic for a bank problem, tagged with id and source.
+local function pbank_warn(id, src_file, src_line, msg)
+	local loc = (src_file and src_file ~= '')
+		and (' @ ' .. src_file .. ':' .. tostring(src_line)) or ''
+	texio.write_nl('TeXLib bank warning [' .. tostring(id) .. loc .. ']: ' .. msg)
+end
+
+-- Locate the first \begin{env}[opts]...\end{env} at brace depth 0 in s.
+-- Returns: begin_start, inner_start, inner_end, end_finish, opts (or nil).
+-- inner = s:sub(inner_start, inner_end).  Returns nil when not found.
+local function find_env_block(s, env)
+	local bpat = '^\\begin%s*{' .. env .. '}'
+	local epat = '^\\end%s*{' .. env .. '}'
+	local depth, pos, len = 0, 1, #s
+	local bs, inner_start, opts
+	while pos <= len do
+		local c = s:sub(pos, pos)
+		if c == '{' then depth = depth + 1; pos = pos + 1
+		elseif c == '}' then depth = depth - 1; pos = pos + 1
+		elseif c == '\\' then
+			local _, be = s:find(bpat, pos)
+			if be and depth == 0 then
+				bs = pos
+				-- optional [opts] immediately after \begin{env}
+				local _, oe, cap = s:find('^%s*%[([^%]]*)%]', be + 1)
+				if oe then opts = cap; inner_start = oe + 1
+				else opts = nil; inner_start = be + 1 end
+				pos = inner_start
+				break
+			end
+			local nm = s:match('^\\(%a+)', pos)
+			pos = pos + 1 + (nm and #nm or 0)
+		else pos = pos + 1 end
+	end
+	if not bs then return nil end
+	depth = 0
+	while pos <= len do
+		local c = s:sub(pos, pos)
+		if c == '{' then depth = depth + 1; pos = pos + 1
+		elseif c == '}' then depth = depth - 1; pos = pos + 1
+		elseif c == '\\' then
+			local es, ef = s:find(epat, pos)
+			if es and depth == 0 then
+				return bs, inner_start, es - 1, ef, opts
+			end
+			local nm = s:match('^\\(%a+)', pos)
+			pos = pos + 1 + (nm and #nm or 0)
+		else pos = pos + 1 end
+	end
+	return nil   -- \begin without matching \end
+end
+
+-- Split a choices inner string into option items at depth-0 \choice / \cchoice /
+-- \fchoice.  Returns a list of { kind = 'pool'|'correct'|'forced', index, text }.
+-- \fchoice may carry a leading [i] (forced placement index); only a clean
+-- [integer] is consumed as the index, so option text beginning with a bracketed
+-- non-integer (e.g. an interval) is left intact.
+local function parse_choice_items(inner)
+	local marks = {}
+	local depth, pos, len = 0, 1, #inner
+	while pos <= len do
+		local c = inner:sub(pos, pos)
+		if c == '{' then depth = depth + 1; pos = pos + 1
+		elseif c == '}' then depth = depth - 1; pos = pos + 1
+		elseif c == '\\' then
+			local nm = inner:match('^\\(%a+)', pos)
+			if nm and depth == 0
+					and (nm == 'choice' or nm == 'cchoice' or nm == 'fchoice') then
+				marks[#marks + 1] = { kind = nm, cmd = pos, after = pos + 1 + #nm }
+				pos = pos + 1 + #nm
+			else
+				pos = pos + 1 + (nm and #nm or 0)
+			end
+		else pos = pos + 1 end
+	end
+	local items = {}
+	for i, m in ipairs(marks) do
+		local stop = (i < #marks) and (marks[i + 1].cmd - 1) or len
+		local seg  = inner:sub(m.after, stop)
+		local kind = (m.kind == 'choice') and 'pool'
+				or (m.kind == 'cchoice') and 'correct' or 'forced'
+		local index
+		if m.kind == 'fchoice' then
+			local num, rest = seg:match('^%s*%[%s*(%-?%d+)%s*%](.*)$')
+			if num then index = tonumber(num); seg = rest end
+		end
+		items[#items + 1] = {
+			kind  = kind,
+			index = index,
+			text  = (seg:gsub('^%s+', ''):gsub('%s+$', '')),
+		}
+	end
+	return items
+end
+
+-- Validate a parsed choices block and normalise it into a render plan.  All
+-- structural warnings fire here, ONCE, at bank-load time (with id + file:line);
+-- only the random selection/shuffle is deferred to typeset time.
+--   plan.fixed_block : present all options in authored order (no select/shuffle)
+--   plan.m           : number of options to present
+--   plan.pinned      : forced items with a resolved slot  { slot, text, is_correct }
+--   plan.floating    : always-present items without a fixed slot (the \cchoice and
+--                      bare \fchoice) — selected, then shuffled into free slots
+--   plan.pool        : ordinary \choice items — sampled to fill remaining slots
+local function build_choice_plan(items, opts, has_solution, id, sf, sl)
+	local plan = { items = items, fixed_block = false }
+	if opts then
+		if opts:find('fixed') then plan.fixed_block = true end
+		local mm = opts:match('choose%s*=%s*(%d+)')
+		if mm then plan.m_opt = tonumber(mm) end
+	end
+	local n = #items
+	local nc = 0
+	local pinned, floating, pool = {}, {}, {}
+	for _, it in ipairs(items) do
+		if it.kind == 'correct' then
+			nc = nc + 1
+			if nc == 1 then it.is_correct = true end
+			table.insert(floating, it)
+		elseif it.kind == 'forced' then
+			if it.index ~= nil then table.insert(pinned, it)
+			else table.insert(floating, it) end
+		else
+			table.insert(pool, it)
+		end
+	end
+	if nc > 1 then
+		pbank_warn(id, sf, sl, 'multiple \\cchoice given; only the first counts as correct.')
+	end
+	local m = plan.m_opt or n
+	if plan.m_opt and plan.m_opt > n then
+		pbank_warn(id, sf, sl, 'choose=' .. plan.m_opt .. ' exceeds ' .. n
+			.. ' available choices; using ' .. n .. '.')
+		m = n
+	end
+	if has_solution and n > 0 and nc == 0 then
+		pbank_warn(id, sf, sl, 'choices and a solution are present but no \\cchoice marks the answer.')
+	end
+	if n > m and nc == 0 then
+		pbank_warn(id, sf, sl, 'presenting ' .. m .. ' of ' .. n
+			.. ' choices but no \\cchoice is marked; the answer may be dropped.')
+	end
+	local nf = #pinned + #floating
+	if nf > m then
+		pbank_warn(id, sf, sl, nf .. ' always-present choices exceed choose=' .. m
+			.. '; presenting all ' .. nf .. '.')
+		m = nf
+	end
+	-- Resolve forced-placement indices against the final m.
+	local used = {}
+	for _, it in ipairs(pinned) do
+		local i = it.index
+		if i == 0 then
+			pbank_warn(id, sf, sl, '\\fchoice[0]: choices are 1-indexed; using 1.'); i = 1
+		end
+		if math.abs(i) > m then
+			pbank_warn(id, sf, sl, '\\fchoice[' .. i .. '] out of range for ' .. m
+				.. ' shown; clamping.')
+			i = (i < 0) and -m or m
+		end
+		local slot = (i < 0) and (m + 1 + i) or i
+		if used[slot] then
+			pbank_warn(id, sf, sl, '\\fchoice slot ' .. slot
+				.. ' already taken; moving to the next free slot.')
+			local s = 1
+			while used[s] and s <= m do s = s + 1 end
+			slot = s
+		end
+		if slot >= 1 and slot <= m then used[slot] = true; it.slot = slot
+		else table.insert(floating, it) end   -- no room: demote to floating
+	end
+	plan.m, plan.n, plan.nc = m, n, nc
+	plan.pinned = {}
+	for _, it in ipairs(pinned) do if it.slot then table.insert(plan.pinned, it) end end
+	plan.floating, plan.pool = floating, pool
+	return plan
+end
+
+-- Per-version: produce the ordered list of presented options.  Pinned options
+-- occupy their slots; the \cchoice and bare \fchoice are always included; the
+-- remaining free slots are filled by a random sample of the \choice pool, and
+-- all non-pinned selected options are shuffled across the free slots.  Uses
+-- math.random (the version loop seeds it per version before each copy).
+local function resolve_mc_order(plan)
+	if plan.fixed_block then
+		local out = {}
+		for _, it in ipairs(plan.items) do table.insert(out, it) end
+		return out
+	end
+	local m = plan.m
+	local slots = {}
+	for _, it in ipairs(plan.pinned) do slots[it.slot] = it end
+	local free = {}
+	for s = 1, m do if not slots[s] then table.insert(free, s) end end
+	local selected = {}
+	for _, it in ipairs(plan.floating) do table.insert(selected, it) end
+	local poolcopy = {}
+	for _, it in ipairs(plan.pool) do table.insert(poolcopy, it) end
+	local need = #free - #selected
+	for _ = 1, need do
+		if #poolcopy == 0 then break end
+		local j = math.random(1, #poolcopy)
+		table.insert(selected, poolcopy[j]); table.remove(poolcopy, j)
+	end
+	for i = #selected, 2, -1 do
+		local j = math.random(1, i)
+		selected[i], selected[j] = selected[j], selected[i]
+	end
+	local si = 1
+	for _, s in ipairs(free) do slots[s] = selected[si]; si = si + 1 end
+	local out = {}
+	for s = 1, m do if slots[s] then table.insert(out, slots[s]) end end
+	return out
+end
+
+-- Emit the multiple-choice tail: the selected/shuffled choices, the answer line,
+-- and (instructor builds) the solution, all bracketed by the \@mcframe@* layout
+-- hooks (default layout in texlib-problembank.sty; autoexam overrides them for
+-- the side-by-side instructor key).  The stem has already been emitted (via the
+-- bank \@@input) before this is called.
+local function emit_mc_tail(p)
+	local out = resolve_mc_order(p.choices_plan)
+	local letter = '?'
+	for i, it in ipairs(out) do
+		if it.is_correct then letter = string.char(64 + i) end
+	end
+	-- @ is catcode-12 (other) in the document body, so a literal \@mcframe@begin
+	-- would tokenise as \@ (end-of-sentence) + stray text.  Build the control
+	-- sequences by name via \csname...\endcsname instead (same guard the engine
+	-- uses for \@@input and autoexam@problem@sep).
+	tex.print('\\csname @mcframe@begin\\endcsname{' .. letter .. '}')
+	tex.print('\\begin{choices}')
+	for _, it in ipairs(out) do
+		if it.is_correct then tex.print('\\CorrectChoice ' .. it.text)
+		else tex.print('\\choice ' .. it.text) end
+	end
+	tex.print('\\end{choices}')
+	tex.print('\\csname @mcframe@answer\\endcsname')
+	tex.print('\\csname @mcframe@mid\\endcsname')
+	if p.solution and p.solution:match('%S') then
+		tex.print('\\begin{solution}')
+		tex.print(p.solution)
+		tex.print('\\end{solution}')
+	end
+	tex.print('\\csname @mcframe@end\\endcsname')
+end
+
+-- Emit an MC problem's choices as a plain authored-order list — no selection,
+-- no shuffle, no answer line, no side-by-side.  Used when an MC problem lands in
+-- a free-response {problems} section (the choices become ordinary content; the
+-- separate solution box still shows the answer).
+local function emit_choices_plain(p)
+	tex.print('\\begin{choices}')
+	for _, it in ipairs(p.choices_plan.items) do
+		if it.is_correct then tex.print('\\CorrectChoice ' .. it.text)
+		else tex.print('\\choice ' .. it.text) end
+	end
+	tex.print('\\end{choices}')
 end
 
 local function typeset_problem(p, stretch)
@@ -478,7 +767,9 @@ local function typeset_problem(p, stretch)
 				tostring(pid) .. "'; inverse search will land on its " ..
 				"\\begin{problem} line.")
 			content_lines = {}
-			local raw = (p.content or '') .. '\n'
+			-- For MC, the served region is the stem only (choices/solution are
+			-- emitted separately); for FR it is the full content (stem + parts).
+			local raw = ((p.is_mc and p.stem or p.content) or '') .. '\n'
 			for ln in raw:gmatch('([^\n]*)\n') do
 				table.insert(content_lines, ln)
 			end
@@ -531,12 +822,15 @@ local function typeset_problem(p, stretch)
 		tex.print("\\csname @@input\\endcsname " .. bank_path)
 		tex.print("\\endgroup")
 	else
-		-- Fallback: write a named per-problem temp file and \input it.
+		-- Fallback: write a named per-problem temp file and \input it.  MC serves
+		-- the stem only (choices/solution come from emit_mc_tail); FR serves the
+		-- full content (stem + parts).
 		local tmpfile = tex.jobname .. '_prob_' .. sanitize_id(pid) .. '.tex'
+		local leading = (p.is_mc and p.stem or p.content) or ''
 		local fout    = io.open(tmpfile, 'w')
 		if fout then
-			fout:write(p.content)
-			if not p.content:match('\n$') then fout:write('\n') end
+			fout:write(leading)
+			if not leading:match('\n$') then fout:write('\n') end
 			fout:close()
 			if sm then sm.tmpfile = tmpfile end
 		end
@@ -544,13 +838,21 @@ local function typeset_problem(p, stretch)
 		tex.print("\\input{" .. tmpfile .. "}")
 		tex.print("\\endgroup")
 	end
-	if p.solution and p.solution:match('%S') then
-		tex.print("\\begin{solution}")
-		tex.print(p.solution)
-		tex.print("\\end{solution}")
-	end
-	if stretch and stretch ~= 0 then
-		tex.print("\\workbox{" .. tostring(stretch) .. "}")
+	if p.is_mc and pbank_section_mode == 'mc' then
+		-- Full MC frame: choices + answer line + solution are emitted as
+		-- engine-generated tokens (selected/shuffled per version).  The stem above
+		-- came from the bank \@@input; the choices/solution intentionally do not.
+		emit_mc_tail(p)
+	else
+		if p.is_mc then emit_choices_plain(p) end   -- MC problem in an FR section
+		if p.solution and p.solution:match('%S') then
+			tex.print("\\begin{solution}")
+			tex.print(p.solution)
+			tex.print("\\end{solution}")
+		end
+		if stretch and stretch ~= 0 then
+			tex.print("\\workbox{" .. tostring(stretch) .. "}")
+		end
 	end
 end
 
@@ -561,73 +863,66 @@ local function problem_not_found(query_str)
 	tex.print("\\textbf{[AutoExam: " .. msg .. "]}")
 end
 
--- ---- Environment interface (\begin{problem}...\solution...\end{problem}) ----
--- body_str is the full captured body string from \luaescapestring{\unexpanded\BODY}.
--- Everything before the first \solution token is content; the rest is solution.
+-- ---- Environment interface (\begin{problem}{id}[meta] ... \end{problem}) ----
+-- body_str is the full captured body from \luaescapestring{\unexpanded\BODY}.
+-- The body is region-delimited: an optional \begin{choices}..\end{choices}
+-- (its presence marks the problem multiple-choice) and an optional
+-- \begin{solution}..\end{solution}; everything else is the stem.
 function define_problem_from_env(id, meta_str, body_str)
 	local meta = parse_meta(meta_str)
 	meta.id = id
-
-	-- Split on the first occurrence of \solution (appears as \solution in the string).
-	local split_pos = body_str:find("\\solution", 1, true)
-	local content, solution
-	if split_pos then
-		content  = body_str:sub(1, split_pos - 1)
-		solution = body_str:sub(split_pos + #"\\solution")
-	else
-		content  = body_str
-		solution = ""
-	end
-
-	-- Count \ppart occurrences in the content (not solution) for per-part validation.
-	-- Append a space so \ppart at end-of-content also matches the [^%a] guard.
-	local _, part_count = (content .. " "):gsub("\\ppart[^%a]", "")
 
 	if problem_db[id] ~= nil then
 		texio.write_nl("AutoExam WARNING: problem '" .. id .. "' redefined.")
 	end
 
-	-- Capture source location.
-	-- pbank_problem_start_line is set by \begin{problem} in autoexam.cls
-	-- BEFORE \Collect@Body reads ahead to \end{problem}, so it is the true
-	-- \begin{problem} line in the bank file.  tex.inputlineno here would be
-	-- the \end{problem} line (too far ahead).  current_bank_file is set by \loadbank.
+	-- Capture source location FIRST so choice-plan warnings can cite file:line.
+	-- pbank_problem_start_line is set by \begin{problem} BEFORE \Collect@Body
+	-- reads ahead to \end{problem}, so it is the true \begin{problem} line;
+	-- tex.inputlineno here would be the \end{problem} line.  A \loadbank'd problem
+	-- is attributed to its bank file; a problem written directly in the doc is
+	-- attributed to status.filename (excluding transient body-replay files, which
+	-- vanish after the build and would break inverse search).
 	local src_line = pbank_problem_start_line or tex.inputlineno or 0
-
-	-- Source file for inverse search.
-	--   * A \loadbank'd problem is attributed to its bank file.
-	--   * A problem written directly in the exam/quiz with no bank is
-	--     attributed to the file it lives in (status.filename, the file LuaTeX
-	--     is reading at \end{problem} — the same file as \begin{problem}, since
-	--     the environment can't span files).  Double-clicking it in the PDF
-	--     then jumps to its \begin{problem} block in that source, through the
-	--     same single-scratch-file redirect — no per-problem _prob_ file.
-	-- Transient multi-version body-replay files (<jobname>_autoexam_body_*,
-	-- deleted after the build) are excluded so inverse search never points at a
-	-- vanished file; problems defined in the body of such a build fall back to
-	-- the per-problem temp file.  (Problems defined in the preamble are read
-	-- from the real source, so they redirect normally even multi-version.)
 	local src_file = current_bank_file
 	if not src_file or src_file == '' then
 		local cf = (status and status.filename or ''):gsub('^%./', '')
 		if cf ~= '' and not cf:find('_autoexam_body_', 1, true) then
 			src_file = cf
-			-- Activate the redirect helper for documents that define problems
-			-- inline with no \loadbank (which is the only other path that calls
-			-- setup).  Idempotent — the first call registers the open_read_file
-			-- callback, later ones are no-ops.  Without this, a bank-less quiz
-			-- or exam would fall back to per-problem _prob_ temp files.
 			texlib_synctex_setup()
 		else
 			src_file = ''
 		end
 	end
 
-	problem_db[id] = { meta = meta, content = content, solution = solution,
-						part_count = part_count,
-						source_file = src_file, source_line = src_line }
+	-- Region isolation.  `content` is the leading region served to SyncTeX via
+	-- the bank \@@input: stem + any \begin{parts} for FR, stem alone for MC.
+	local solution, content = '', body_str
+	local sb, sis, sie, sef = find_env_block(body_str, 'solution')
+	if sb then
+		solution = body_str:sub(sis, sie)
+		content  = body_str:sub(1, sb - 1) .. body_str:sub(sef + 1)
+	end
 
-	-- Register in the source map; tmpfile name is resolved at typeset time.
+	local is_mc, stem, choices_plan = false, content, nil
+	local cb, cis, cie, cef, copts = find_env_block(content, 'choices')
+	if cb then
+		is_mc = true
+		stem  = content:sub(1, cb - 1) .. content:sub(cef + 1)
+		local items = parse_choice_items(content:sub(cis, cie))
+		choices_plan = build_choice_plan(items, copts,
+			solution:match('%S') ~= nil, id, src_file, src_line)
+	end
+
+	-- Count \ppart occurrences (free-response per-part validation).  Append a
+	-- space so a trailing \ppart still matches the [^%a] guard.
+	local _, part_count = (content .. " "):gsub("\\ppart[^%a]", "")
+
+	problem_db[id] = {
+		meta = meta, content = content, stem = stem, solution = solution,
+		is_mc = is_mc, choices_plan = choices_plan, part_count = part_count,
+		source_file = src_file, source_line = src_line,
+	}
 	source_map[id] = { file = src_file, line = src_line }
 end
 
@@ -993,12 +1288,48 @@ end
 -- within their own section (per-page counts preserved, \extracredit last).  An
 -- exam with no \section headers shuffles as a single section.  Everything
 -- outside \begin{problems} is unchanged.
--- Find \begin{problems} / \end{problems} while ignoring matches that sit inside
--- a % comment.  Author comments frequently mention "\begin{problems} ...
--- \end{problems}" as prose; a naive find() latches onto the comment and slices
--- the body there, corrupting the environment.  Returns start,end of the marker.
+-- A problem-section environment is either {problems} (free response) or
+-- {mcproblems} (multiple choice).  Both are scanned and shuffled the same way;
+-- the heading / page-policy differences are entirely TeX-side.
+local PROBLEM_SECTION_ENVS = { problems = true, mcproblems = true }
+
+-- Find the next \begin / \end of a problem-section environment at or after init,
+-- ignoring matches inside a % comment (author comments often quote the markers
+-- as prose, which a naive find() would latch onto).  `which` is "begin"/"end".
+-- Returns start, end_of_marker, env (the matched environment name), or nil.
 local function find_problems_marker(body, which, init)
-	local pat = "^\\" .. which .. "%s*{problems}"
+	local pos, len = init or 1, #body
+	while pos <= len do
+		local c = body:sub(pos, pos)
+		if c == '%' then
+			local nl = body:find("\n", pos, true)
+			pos = nl and (nl + 1) or (len + 1)
+		elseif c == '\\' then
+			local s, e, env = body:find("^\\" .. which .. "%s*{(%a+)}", pos)
+			if s == pos and env and PROBLEM_SECTION_ENVS[env] then
+				-- Consume a following optional `*` (starred form) and [label] so they
+				-- stay attached to the \begin marker (not swept into — and dropped
+				-- from — the shuffled section body).  Only \begin takes them.
+				if which == 'begin' then
+					local _, se = body:find('^%s*%*', e + 1)
+					if se then e = se end
+					local _, oe = body:find('^%s*%[[^%]]*%]', e + 1)
+					if oe then e = oe end
+				end
+				return s, e, env
+			end
+			pos = pos + 1
+		else
+			pos = pos + 1
+		end
+	end
+	return nil
+end
+
+-- Find the \end of a SPECIFIC problem-section environment, so an {mcproblems}
+-- block always closes on \end{mcproblems} and never on a later \end{problems}.
+local function find_section_end(body, env, init)
+	local pat = "^\\end%s*{" .. env .. "}"
 	local pos, len = init or 1, #body
 	while pos <= len do
 		local c = body:sub(pos, pos)
@@ -1016,157 +1347,57 @@ local function find_problems_marker(body, which, init)
 	return nil
 end
 
-local function shuffle_problems_body(body)
-	local s1, e1 = find_problems_marker(body, "begin", 1)
-	if not s1 then return body end
-	local s2 = find_problems_marker(body, "end", e1 + 1)
-	if not s2 then return body end
-
-	local before = body:sub(1, e1)
-	local inner  = body:sub(e1 + 1, s2 - 1)
-	local after  = body:sub(s2)
-
-	-- \section / \section* header positions at brace-depth 0 (skip comments).
-	-- Name-exact on "section" (so \section and \section* match, but an unrelated
-	-- \sectionfoo does not -- consistent with the \extracredit/\newpage guards).
+-- Shuffle the question order WITHIN one problem-section's inner text.  \section /
+-- \section* headers are hard boundaries kept in original order with the header
+-- pinned at the top; items permute only within their own section, the per-page
+-- \newpage counts are preserved, and \extracredit stays last.
+local function shuffle_one_section(inner)
 	local marks = {}
 	scan_depth0_commands(inner, function(name, cmd_pos, after)
 		if name == "section" then table.insert(marks, cmd_pos) end
 	end)
-
-	local body_out
 	if #marks == 0 then
-		body_out = shuffle_section_body(inner)
-	else
-		local pre = inner:sub(1, marks[1] - 1)
-		local secs = {}
-		for mi = 1, #marks do
-			local seg_start = marks[mi]
-			local seg_end   = (mi < #marks) and (marks[mi + 1] - 1) or #inner
-			local seg = inner:sub(seg_start, seg_end)
-			local nl  = seg:find("\n")
-			local header = nl and seg:sub(1, nl - 1) or seg
-			local sbody  = nl and seg:sub(nl + 1) or ""
-			table.insert(secs, header .. "\n" .. shuffle_section_body(sbody))
-		end
-		body_out = table.concat(secs, "\n\\newpage\n")
-		if pre:match("%S") then body_out = (pre:gsub("%s+$", "")) .. "\n" .. body_out end
+		return shuffle_section_body(inner)
 	end
-
-	return before .. "\n" .. body_out .. "\n" .. after
+	local pre = inner:sub(1, marks[1] - 1)
+	local secs = {}
+	for mi = 1, #marks do
+		local seg_start = marks[mi]
+		local seg_end   = (mi < #marks) and (marks[mi + 1] - 1) or #inner
+		local seg = inner:sub(seg_start, seg_end)
+		local nl  = seg:find("\n")
+		local header = nl and seg:sub(1, nl - 1) or seg
+		local sbody  = nl and seg:sub(nl + 1) or ""
+		table.insert(secs, header .. "\n" .. shuffle_section_body(sbody))
+	end
+	local body_out = table.concat(secs, "\n\\newpage\n")
+	if pre:match("%S") then body_out = (pre:gsub("%s+$", "")) .. "\n" .. body_out end
+	return body_out
 end
 
--- ============================================================
--- MULTIPLE-CHOICE OPTION SHUFFLE
--- ============================================================
--- Reorder the options inside each \begin{choices} / \begin{oneparchoices}
--- block, per version.  \CorrectChoice travels with its option, so the answer
--- key follows automatically -- no separate bookkeeping.  Pinning:
---   \begin{choices}[fixed]  -> the whole block keeps its authored order
---                              (ordered numeric answers, etc.).
---   \fixedchoice            -> this option keeps its slot (e.g. a pinned
---                              "None of the above"); others shuffle around it.
--- The author writes ordinary exam-class markup; these are read from the source
--- string and the class also defines them so every build mode still compiles.
-local CHOICE_ENVS = { choices = true, oneparchoices = true }
-
--- Split a choices block's inner text into option items at \choice /
--- \CorrectChoice / \fixedchoice (brace depth 0, skipping comments).  Returns
--- the prefix before the first option and a list of { text =, fixed = }.
-local function split_choice_items(inner)
-	local kind = { choice = false, CorrectChoice = false, fixedchoice = true }
-	local starts, fixed = {}, {}
-	scan_depth0_commands(inner, function(name, cmd_pos, after)
-		if kind[name] ~= nil then
-			table.insert(starts, cmd_pos); table.insert(fixed, kind[name])
-		end
-	end)
-	local len = #inner
-	if #starts == 0 then return inner, {} end
-	local prefix, items = inner:sub(1, starts[1] - 1), {}
-	for i = 1, #starts do
-		local s = starts[i]
-		local e = (i < #starts) and (starts[i + 1] - 1) or len
-		table.insert(items, { text = (inner:sub(s, e):gsub("%s+$", "")),
-		                      fixed = fixed[i] })
+-- Shuffle every problem-section block ({problems} and {mcproblems}) in the body,
+-- each independently (questions never move across the MC/FR boundary).  Text
+-- outside the blocks is copied verbatim.
+local function shuffle_problems_body(body)
+	local out, cursor = {}, 1
+	while true do
+		local bs, be, env = find_problems_marker(body, "begin", cursor)
+		if not bs then table.insert(out, body:sub(cursor)); break end
+		local es, ee = find_section_end(body, env, be + 1)
+		if not es then table.insert(out, body:sub(cursor)); break end
+		table.insert(out, body:sub(cursor, be))          -- up to & incl. \begin marker
+		table.insert(out, "\n" .. shuffle_one_section(body:sub(be + 1, es - 1)) .. "\n")
+		table.insert(out, body:sub(es, ee))              -- the \end marker
+		cursor = ee + 1
 	end
-	return prefix, items
+	return table.concat(out)
 end
 
--- Fisher-Yates over the movable options; \fixedchoice items keep their slot.
-local function shuffle_choice_items(items)
-	local movable = {}
-	for _, it in ipairs(items) do
-		if not it.fixed then table.insert(movable, it) end
-	end
-	for i = #movable, 2, -1 do
-		local j = math.random(1, i)
-		movable[i], movable[j] = movable[j], movable[i]
-	end
-	local out, mi = {}, 1
-	for _, it in ipairs(items) do
-		if it.fixed then table.insert(out, it.text)
-		else table.insert(out, movable[mi].text); mi = mi + 1 end
-	end
-	return out
-end
-
--- Walk the body, shuffling each choices block in place (comment-aware), unless
--- it is tagged \begin{choices}[fixed].  Everything else is copied verbatim.
-local function shuffle_choices_body(body)
-	local result, i, len = {}, 1, #body
-	while i <= len do
-		local c = body:sub(i, i)
-		if c == '%' then
-			local nl = body:find("\n", i, true)
-			local e = nl or len
-			table.insert(result, body:sub(i, e)); i = e + 1
-		elseif c == '\\' then
-			local env = body:match("^\\begin%s*{(%a+)}", i)
-			if env and CHOICE_ENVS[env] then
-				local _, be = body:find("^\\begin%s*{" .. env .. "}", i)
-				local head = body:sub(i, be)
-				local j = be + 1
-				local fixed_block = false
-				local _, oe, opt = body:find("^%s*%[([^%]]*)%]", j)
-				if opt then
-					fixed_block = opt:find("fixed") ~= nil
-					head = head .. body:sub(j, oe); j = oe + 1
-				end
-				-- find matching \end{env}, skipping comments
-				local es, ee, p = nil, nil, j
-				while p <= len do
-					if body:sub(p, p) == '%' then
-						local nl = body:find("\n", p, true); p = nl and (nl + 1) or (len + 1)
-					else
-						local s2, e2 = body:find("^\\end%s*{" .. env .. "}", p)
-						if s2 then es, ee = s2, e2; break end
-						p = p + 1
-					end
-				end
-				if not es then
-					table.insert(result, head); i = j
-				else
-					local inner = body:sub(j, es - 1)
-					if not fixed_block then
-						local prefix, items = split_choice_items(inner)
-						if #items > 1 then
-							inner = prefix ..
-							        table.concat(shuffle_choice_items(items), "\n") .. "\n"
-						end
-					end
-					table.insert(result, head .. inner .. body:sub(es, ee))
-					i = ee + 1
-				end
-			else
-				table.insert(result, c); i = i + 1
-			end
-		else
-			table.insert(result, c); i = i + 1
-		end
-	end
-	return table.concat(result)
-end
+-- Multiple-choice option ordering is no longer a source-text pre-pass.  Bank
+-- problems live in their own files (the exam body only references them via
+-- \problem{id}), so a body-level choices shuffle never saw them.  Selection
+-- (choose=) and per-version option ordering are now done at typeset time in the
+-- engine (resolve_mc_order / emit_mc_tail), where the bank content is available.
 
 -- set_autoexam_shuffle_pages()
 --   Called by \shufflepages in the preamble.
@@ -1211,18 +1442,27 @@ end
 
 -- Scan a body string for all \problem calls in order.  Returns a list of
 -- {qno, pts, pageno} tables where pts is the raw pts CSV string and pageno is
--- the 1-based problem-page number (reset by \begin{problems}).  The page
--- number is derived by splitting the inner \begin{problems}...\end{problems}
--- content on \newpage, so it matches the exam page counter that
--- \begin{problems} resets to 1.  Runs on the (possibly shuffled) ver_body so
--- the question order matches the version the student actually sees.
+-- the 1-based PRINTED page number.  Question numbers and page numbers run
+-- CONTINUOUSLY across every problem-section block ({problems} and {mcproblems})
+-- in document order: within a section pages advance on \newpage, and one more
+-- page is consumed at each section boundary (the \clearpage that starts the next
+-- Part).  Runs on the (possibly shuffled) ver_body so the order matches what the
+-- student sees.
 local function prescan_problems(body)
-	-- Extract the content between \begin{problems} and \end{problems}.
-	local inner = body:match('\\begin%s*{problems}(.-)\\end%s*{problems}')
-	if not inner then
-		-- Fallback: scan whole body without page tracking.
-		local rows = {}
-		local qno  = 0
+	-- Collect every problem-section block in document order.
+	local sections, cursor = {}, 1
+	while true do
+		local bs, be, env = find_problems_marker(body, "begin", cursor)
+		if not bs then break end
+		local es, ee = find_section_end(body, env, be + 1)
+		if not es then break end
+		table.insert(sections, body:sub(be + 1, es - 1))
+		cursor = ee + 1
+	end
+
+	if #sections == 0 then
+		-- Fallback: scan the whole body without page tracking.
+		local rows, qno = {}, 0
 		for _, pts in ipairs(scan_problem_pts(body)) do
 			qno = qno + 1
 			table.insert(rows, { qno = tostring(qno), pts = pts, pageno = '?' })
@@ -1230,21 +1470,21 @@ local function prescan_problems(body)
 		return rows
 	end
 
-	-- Split on top-level \newpage to get one chunk per exam page.
-	local pages = {}
-	for chunk in (inner .. '\n\\newpage\n'):gmatch('(.-)\n?\\newpage') do
-		table.insert(pages, chunk)
-	end
-
-	local rows = {}
-	local qno  = 0
-	for pageno, chunk in ipairs(pages) do
-		for _, pts in ipairs(scan_problem_pts(chunk)) do
-			qno = qno + 1
-			table.insert(rows, { qno    = tostring(qno),
-									pts    = pts,
-									pageno = tostring(pageno) })
+	local rows, qno, page = {}, 0, 1
+	for si, inner in ipairs(sections) do
+		-- Split this section on top-level \newpage into one chunk per page.
+		local pages = {}
+		for chunk in (inner .. '\n\\newpage\n'):gmatch('(.-)\n?\\newpage') do
+			table.insert(pages, chunk)
 		end
+		for gi, chunk in ipairs(pages) do
+			for _, pts in ipairs(scan_problem_pts(chunk)) do
+				qno = qno + 1
+				table.insert(rows, { qno = tostring(qno), pts = pts, pageno = tostring(page) })
+			end
+			if gi < #pages then page = page + 1 end   -- \newpage within a section
+		end
+		if si < #sections then page = page + 1 end    -- \clearpage to the next Part
 	end
 	return rows
 end
@@ -1335,26 +1575,58 @@ function autoexam_run_versions()
 	-- no longer engages it.
 	pbank_suppress_redirect = false
 
+	-- Solution-build mode (set by \solutions / \justsolutions / \Show*; see
+	-- autoexam.cls).  none = student copies only; only = instructor copies only;
+	-- dual = student copies of every version FOLLOWED BY instructor copies.
+	local solmode     = token.get_macro("AutoExamSolMode") or "none"
 	local builder_ver = token.get_macro("Version")
-	local versions_to_run = autoexam_versions
-	if builder_ver and builder_ver ~= "" then
-		versions_to_run = { builder_ver }
+	local builder     = (builder_ver ~= nil and builder_ver ~= "")
+
+	-- Base version list: the declared versions, or the builder's single version.
+	local versions = autoexam_versions
+	if builder then versions = { builder_ver } end
+	if #versions == 0 then
+		-- No declared versions.  With no solution mode this is a plain document:
+		-- let TeX read the body normally (original behaviour).  Under dual/only
+		-- we still need the loop, so use one implicit (empty-label) version.
+		if solmode == "none" then return end
+		versions = { "" }
 	end
 
-	-- When shuffle is OFF and there is only one version, let TeX read the
-	-- source body normally — no temp file needed.
-	if #versions_to_run == 1 and not autoexam_shuffle_pages then
-		local ver  = versions_to_run[1]
-		-- Still prescan so \scorepage has data on the first pass.
+	-- Expand versions into the copies to typeset.  In builder mode each invocation
+	-- is ONE copy (the builder sets \ShowSolutions per job, so it controls
+	-- \ifsolutions), hence solmode does not expand here.  copy.sol = true/false
+	-- forces \ifsolutions for that copy; nil leaves the current state untouched.
+	local copies = {}
+	if builder or solmode == "none" then
+		for _, v in ipairs(versions) do copies[#copies+1] = { ver = v, sol = nil } end
+	elseif solmode == "only" then
+		for _, v in ipairs(versions) do copies[#copies+1] = { ver = v, sol = true } end
+	else  -- dual: all student copies first, then all instructor copies
+		for _, v in ipairs(versions) do copies[#copies+1] = { ver = v, sol = false } end
+		for _, v in ipairs(versions) do copies[#copies+1] = { ver = v, sol = true } end
+	end
+
+	local function set_sol(c)
+		if c.sol == true then tex.sprint("\\solutionstrue")
+		elseif c.sol == false then tex.sprint("\\solutionsfalse") end
+	end
+
+	-- Fast path: a single copy with no page shuffle needs no temp file.
+	if #copies == 1 and not autoexam_shuffle_pages then
+		local c = copies[1]
 		local body = autoexam_read_body()
-		if body then write_score_file(ver, prescan_problems(body)) end
-		tex.sprint("\\gdef\\theExamVersion{" .. ver .. "}")
-		tex.sprint("\\directlua{local _ENV=texlib;set_exam_seed('" .. ver .. "')}")
+		if body then write_score_file(c.ver, prescan_problems(body)) end
+		tex.sprint("\\gdef\\theExamVersion{" .. c.ver .. "}")
+		tex.sprint("\\directlua{local _ENV=texlib;set_exam_seed('" .. c.ver .. "')}")
+		set_sol(c)
 		return
 	end
 
-	-- All other cases (multi-version, or single-version with shuffle):
-	-- read the source body once, then write a per-version temp file.
+	-- General path (multi-copy, or single-copy with shuffle): read the source
+	-- body once, then write one (possibly shuffled) temp file per DISTINCT
+	-- version.  A version's student and instructor copies reuse the SAME temp
+	-- file and seed, so their question order and answer key match exactly.
 	-- Using \input (file reading) rather than tex.sprint (token injection)
 	-- avoids issues with exam-class list environments in the sprint buffer.
 	local body = autoexam_read_body()
@@ -1363,35 +1635,37 @@ function autoexam_run_versions()
 		return
 	end
 	local tmpbase = tex.jobname .. "_autoexam_body"
+	local ver_tmp = {}   -- ver -> temp file name (written once per version)
 
-	for i, ver in ipairs(versions_to_run) do
+	local function ensure_ver(ver)
+		if ver_tmp[ver] then return end
 		local ver_body = body
 		if autoexam_shuffle_pages then
-			-- Seed Lua RNG for the page shuffle, then re-seed via \directlua
-			-- below so TeX-side bank picks start from the same fresh seed.
 			set_exam_seed(ver)
 			ver_body = shuffle_problems_body(body)
-			ver_body = shuffle_choices_body(ver_body)
+			-- (Per-version MC option ordering is done at typeset time in the
+			-- engine — see resolve_mc_order — not as a body-text pre-pass.)
 		end
-
-		-- Prescan the (possibly shuffled) body and write the .sco file NOW,
-		-- before \input-ing the body, so \scorepage finds it on the first pass.
+		-- Prescan and write the .sco NOW so \scorepage finds it on the first pass.
 		write_score_file(ver, prescan_problems(ver_body))
-
-		-- Write this version's (possibly shuffled) body to its own temp file.
-		local tmpfile_name = tmpbase .. "_" .. ver .. ".tex"
-		local f = io.open(tmpfile_name, "w")
+		local name = tmpbase .. "_" .. (ver ~= "" and ver or "main") .. ".tex"
+		local f = io.open(name, "w")
 		if not f then
-			tex.error("AutoExam: Cannot write temp body file '" .. tmpfile_name .. "'.")
+			tex.error("AutoExam: Cannot write temp body file '" .. name .. "'.")
 			return
 		end
 		f:write(ver_body)
 		f:close()
+		ver_tmp[ver] = name
+	end
 
-		tex.sprint("\\gdef\\theExamVersion{" .. ver .. "}")
-		tex.sprint("\\directlua{local _ENV=texlib;set_exam_seed('" .. ver .. "')}")  -- re-seed for TeX
-		tex.sprint("\\input{" .. tmpfile_name .. "}")
-		if i < #versions_to_run then
+	for i, c in ipairs(copies) do
+		ensure_ver(c.ver)
+		tex.sprint("\\gdef\\theExamVersion{" .. c.ver .. "}")
+		tex.sprint("\\directlua{local _ENV=texlib;set_exam_seed('" .. c.ver .. "')}")  -- re-seed for TeX
+		set_sol(c)
+		tex.sprint("\\input{" .. ver_tmp[c.ver] .. "}")
+		if i < #copies then
 			tex.sprint("\\clearpage")
 		end
 	end

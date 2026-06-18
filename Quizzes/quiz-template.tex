@@ -18,19 +18,22 @@
 
 % ---- Inline bank entries (or move into a separate `quiz_bank.tex` and
 % ---- \loadbank{quiz_bank} below) -------------------------------------
-% Defined with the \begin{problem} environment: content before \solution, the
-% answer after.  Because they live in this file, SyncTeX inverse search lands
+% Defined with the \begin{problem} environment: the stem, then the answer in a
+% \begin{solution}...\end{solution} block.  Because they live in this file,
+% SyncTeX inverse search lands
 % here — double-clicking the typeset problem in the PDF jumps to its
 % \begin{problem} block below.  Definitions may go in the preamble (as here) or
 % the document body.
 \begin{problem}{eval-poly}[topic=eval, diff=easy]
 	Evaluate $3 \cdot (-2)^2 + 5 \cdot 4 - 3 \cdot 3^2$.
-	\solution $5$
+	\begin{solution} $5$
+	\end{solution}
 \end{problem}
 
 \begin{problem}{linear-eq}[topic=algebra, diff=easy]
 	Solve $2x + 5 = 11$ for $x$.
-	\solution $x = 3$
+	\begin{solution} $x = 3$
+	\end{solution}
 \end{problem}
 
 % Alternatively, keep the bank in its own file:

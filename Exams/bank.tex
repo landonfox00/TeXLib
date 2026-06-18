@@ -5,11 +5,16 @@
 % your own problems, or point \loadbank at a real bank file — see
 % Math 126EE/Bank/ for production examples (\byversion, cols, TikZ graphs).
 %
-% Format:
+% Format (region-delimited):
 %   \begin{problem}{id}[topic=..., section=..., source=...]
-%       <statement, optionally with \begin{parts}...\end{parts}>
-%   \solution
-%       <solution; rendered only in \ShowKey / \ShowSolutions builds>
+%       <stem; optionally with \begin{parts}...\end{parts}>
+%       \begin{choices}[choose=m]      % OPTIONAL; presence => multiple choice
+%           \cchoice <correct>         %   \cchoice marks the answer
+%           \choice  <distractor>      %   \fchoice[i] forces an option (slot i)
+%       \end{choices}
+%       \begin{solution}               % OPTIONAL; rendered only in key/solutions
+%           <solution>
+%       \end{solution}
 %   \end{problem}
 %
 % The template body retrieves these three by topic:
@@ -25,9 +30,10 @@
 		\part[2] Verify one of your solutions by substitution.
 			\vspace{\stretch{1}}
 	\end{parts}
-	\solution
+	\begin{solution}
 	Factor: $(x - 2)(x - 3) = 0$, so $x = 2$ or $x = 3$.
 	Check $x = 2$: $\;4 - 10 + 6 = 0$, which is correct.
+	\end{solution}
 \end{problem}
 
 % --- topic: ratineq ---------------------------------------------------------
@@ -36,11 +42,12 @@
 	\[ \frac{x - 1}{x + 2} \ge 0, \]
 	and write your answer in interval notation.
 	\vspace{\stretch{2}}
-	\solution
+	\begin{solution}
 	The expression is zero at $x = 1$ and undefined at $x = -2$. A sign
 	analysis on the intervals $(-\infty, -2)$, $(-2, 1)$, $(1, \infty)$
 	gives the solution $(-\infty, -2) \cup [1, \infty)$ — note $x = -2$
 	is excluded and $x = 1$ is included.
+	\end{solution}
 \end{problem}
 
 % --- topic: graph -----------------------------------------------------------
@@ -54,6 +61,7 @@
 			\draw[->, thick] (0,-3)--(0,3) node[above]{$y$};
 		\end{tikzpicture}
 	\end{center}
-	\solution
+	\begin{solution}
 	A line through $(0, -1)$ and $(1, 1)$ with slope $2$.
+	\end{solution}
 \end{problem}
