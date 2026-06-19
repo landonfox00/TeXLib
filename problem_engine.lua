@@ -416,6 +416,13 @@ end
 -- Reading from the real file preserves the original line endings and
 -- indentation that \Collect@Body discards, giving the callback reader
 -- the correct per-line content for SyncTeX line-number attribution.
+-- Returns (lines, content_start) where content_start is the bank-file line of
+-- lines[1] so the caller maps SyncTeX to the true source line.  The header
+-- \begin{problem}{id}[meta] may wrap onto several physical lines; since meta
+-- carries no ']' of its own, the first ']' at/after the meta-opening '[' closes
+-- it, and the body starts on the next line.  Without skipping those
+-- continuation lines a wrapped header would typeset its trailing meta line
+-- (e.g. "section=R.1, source=...]") as the stem's first line.
 local function read_problem_lines_from_bank(bank_file, start_line)
 	local path = bank_file
 	if not path:match('%.%a+$') then path = path .. '.tex' end
@@ -424,10 +431,19 @@ local function read_problem_lines_from_bank(bank_file, start_line)
 	local lineno = 0
 	local lines  = {}
 	local active = false
+	local in_header = false      -- still inside a wrapped [meta] header
+	local content_start = nil    -- bank-file line of lines[1]
 	for raw_line in f:lines() do
 		lineno = lineno + 1
 		if lineno == start_line then
-			active = true          -- next line is first body line
+			local bopen = raw_line:find('%[')
+			if (not bopen) or raw_line:find('%]', bopen) then
+				active = true       -- header closes on this line (or no [meta])
+			else
+				in_header = true     -- header wraps; skip until ']'
+			end
+		elseif in_header then
+			if raw_line:find('%]') then in_header = false active = true end
 		elseif active then
 			-- Stop at the first region boundary: \begin{choices}, \begin{solution},
 			-- or \end{problem}.  This yields the LEADING region (the stem, plus any
@@ -441,11 +457,12 @@ local function read_problem_lines_from_bank(bank_file, start_line)
 				raw_line:match('^%s*\\end%s*{problem}') then
 				break
 			end
+			if not content_start then content_start = lineno end
 			table.insert(lines, raw_line)
 		end
 	end
 	f:close()
-	return lines
+	return lines, (content_start or (start_line + 1))
 end
 
 -- ============================================================
@@ -766,7 +783,7 @@ local function typeset_problem(p, stretch)
 		-- Read content from the real bank file so we have proper line breaks.
 		-- \Collect@Body collapses all newlines to spaces, so p.content is a
 		-- single long line; reading the file directly restores the structure.
-		local content_lines = read_problem_lines_from_bank(sm.file, sm.line)
+		local content_lines, content_start = read_problem_lines_from_bank(sm.file, sm.line)
 		if not content_lines then
 			-- File unreadable: fall back to p.content (single-line, no newlines).
 			-- SyncTeX line attribution then collapses to the \begin{problem} line
@@ -777,6 +794,7 @@ local function typeset_problem(p, stretch)
 				tostring(pid) .. "'; inverse search will land on its " ..
 				"\\begin{problem} line.")
 			content_lines = {}
+			content_start = sm.line + 1
 			-- For MC, the served region is the stem only (choices/solution are
 			-- emitted separately); for FR it is the full content (stem + parts).
 			local raw = ((p.is_mc and p.stem or p.content) or '') .. '\n'
@@ -785,11 +803,12 @@ local function typeset_problem(p, stretch)
 			end
 		end
 
-		-- Build a sparse line-indexed table: content_lines[1] should appear
-		-- on bank-file line sm.line+1 (the line AFTER \begin{problem}).
+		-- Build a sparse line-indexed table: content_lines[1] sits on bank-file
+		-- line content_start (the line AFTER the \begin{problem}{id}[meta] header,
+		-- which read_problem_lines_from_bank skips even when it wraps lines).
 		local sparse = {}
 		for i, ln in ipairs(content_lines) do
-			sparse[sm.line + i] = ln
+			sparse[content_start + i - 1] = ln
 		end
 		-- Suppress \par firing during the blank-line padding that precedes
 		-- the real content.  Each blank line in the served temp file would

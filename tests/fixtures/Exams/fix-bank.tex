@@ -15,3 +15,14 @@
 	\pickrange{lst}{3}{1}{20}%
 	Pick from the list: \getlist{lst}.
 \end{problem}
+
+% Regression: a \begin{problem}{id}[meta] header that WRAPS across lines. The
+% engine serves each FR stem by re-reading the bank from the line after
+% \begin{problem}, so it must skip these continuation lines; otherwise the
+% trailing meta line (source=MLHEADERLEAK]) leaks in as the stem's first line.
+% The smoke check asserts MULTILINEHEADEROK is present and MLHEADERLEAK absent.
+\begin{problem}{mlheader}[topic=quad,
+                          section=R.1,
+                          source=MLHEADERLEAK]
+	Multi-line header stem renders MULTILINEHEADEROK here.
+\end{problem}

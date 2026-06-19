@@ -21,5 +21,9 @@
 	% stays unset, so \getlist prints '?? ' for each slot). Shows the
 	% picks-are-not-overridable-by-data-but-protected-from-overwrite branch.
 	\problem{picky}[lst=locked]
+
+	% Case 6: multi-line \begin{problem}[meta] header must not leak its trailing
+	% meta line into the stem (read_problem_lines_from_bank skips the wrap).
+	\problem{mlheader}
 \end{problems}
 \end{document}

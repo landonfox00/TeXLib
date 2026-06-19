@@ -214,13 +214,25 @@ EXPECT_TEXT = {
     # the template's stable section headings.
     "Syllabi":      ["Course Description", "Office Hours"],
     "Problem Sets": ["Problem 1"],
-    "tests/fixtures/Exams":   ["Problem 1"],
+    # MULTILINEHEADEROK is the stem of the mlheader problem, whose [meta] header
+    # wraps lines; its presence proves that problem rendered (paired with the
+    # EXPECT_ABSENT leak token below).
+    "tests/fixtures/Exams":   ["Problem 1", "MULTILINEHEADEROK"],
     # One marker per auto-vivified getter (coursemeta key, inline-loud, inline-
     # quiet). All three present == every custom key minted a working getter.
     # SETCMDMARK == \SetCourseTitle round-tripped through \GetCourseTitle;
     # METAALIASMARK == the \meta->\metasetup alias still sets (and mints) a key.
     "tests/fixtures/Metadata": ["CMOFFICEHOURSMARK", "CMLECTHALLMARK", "CMTANAMEMARK",
                                 "SETCMDMARK", "METAALIASMARK"],
+}
+
+# Substrings that must NOT appear in a module's rendered PDF (case-insensitive).
+# The negative mirror of EXPECT_TEXT: asserts something was correctly suppressed.
+# MLHEADERLEAK lives only in a wrapped \begin{problem}[meta] header in
+# fix-bank.tex; it renders ONLY if the engine fails to skip the header
+# continuation lines (the multi-line-header leak regression).
+EXPECT_ABSENT = {
+    "tests/fixtures/Exams": ["MLHEADERLEAK"],
 }
 
 # Generated sidecar files that must exist AND be non-empty after a build. A
@@ -283,8 +295,9 @@ def check_content(module: str, tmp: str, pdf_path: str,
 
     # Text substrings (needs pdftotext).
     expects = EXPECT_TEXT.get(module, []) if check_text else []
+    absent  = EXPECT_ABSENT.get(module, []) if check_text else []
     text_skipped = False
-    if expects:
+    if expects or absent:
         text = extract_pdf_text(pdf_path)
         if text is None:
             text_skipped = True
@@ -293,6 +306,9 @@ def check_content(module: str, tmp: str, pdf_path: str,
             missing = [s for s in expects if s.lower() not in low]
             if missing:
                 problems.append("missing text: " + ", ".join(repr(s) for s in missing))
+            leaked = [s for s in absent if s.lower() in low]
+            if leaked:
+                problems.append("unexpected text: " + ", ".join(repr(s) for s in leaked))
 
     return problems, text_skipped
 
