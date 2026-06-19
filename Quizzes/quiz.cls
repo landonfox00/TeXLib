@@ -91,6 +91,13 @@
 % texlib-problembank.sty for the full API.
 \RequirePackage{texlib-problembank}
 
+% Shared solution box, grading-rubric overlay, {commonerrors}, the \workbox
+% solution-suppress override, and the side-by-side multiple-choice key frame —
+% identical to autoexam, so quiz keys render the same.  Loaded AFTER
+% texlib-problembank so it can override that package's \@mcframe@* / \workbox
+% defaults.
+\RequirePackage{texlib-solutions}
+
 % \loadbank is provided by texlib-problembank.sty. A coursemeta bank-path and a
 % sibling bank.tex are auto-loaded below (shared resolution, see
 % \pbank@load@coursebank), so per-quiz \loadbank is usually unnecessary. Quizzes

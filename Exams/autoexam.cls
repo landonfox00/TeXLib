@@ -160,6 +160,13 @@
 % two classes can't drift.  See texlib-problembank.sty for the full API.
 \RequirePackage{texlib-problembank}
 
+% Shared solution box, grading-rubric overlay, {commonerrors}, the \workbox
+% solution-suppress override, and the side-by-side multiple-choice key frame —
+% all shared with quiz.cls so both classes render keys identically.  Loaded AFTER
+% texlib-problembank so it can override that package's \@mcframe@* / \workbox
+% defaults.
+\RequirePackage{texlib-solutions}
+
 % \begin{problems} / \begin{mcproblems} ... (repeatable Part sections)
 %   The environments are defined once in texlib-problembank.sty (shared with
 %   quiz.cls): each is an auto-numbered "Part N" section, used in any order/count,
@@ -230,64 +237,28 @@
 % handled by the engine's pbank_suppress_redirect flag, set by
 % autoexam_run_versions before the version loop iterates.
 
-% \shufflepages
-%   Declared in the PREAMBLE alongside \examversions.  When present, the Lua
-%   version loop reorders the questions inside \begin{problems}...\end{problems}
-%   independently per version (seeded by that version) and writes a per-version
-%   temp file before TeX processes any tokens.  The shuffle is SECTION-AWARE:
-%   \section / \section* headers are hard boundaries kept in their original
-%   order with the header fixed at the top, and questions are permuted only
-%   within their own section.  The per-page question counts you authored (the
-%   \newpage layout) are preserved, and \extracredit stays last.  No exam-body
-%   changes are needed — author one canonical order and let each version shuffle.
-\newcommand{\shufflepages}{%
+% \shuffle  (deprecated alias: \shufflepages)
+%   Declared in the PREAMBLE alongside \versions.  When present, each version
+%   independently shuffles TWO things:
+%     - problem order inside every {problems}/{mcproblems} section, SECTION-AWARE:
+%       \section / \section* headers are hard boundaries kept in original order
+%       with the header fixed at the top; questions permute only within their own
+%       section; the per-page \newpage counts are preserved and \extracredit stays
+%       last.  (Implemented as a per-version source pre-pass.)
+%     - each multiple-choice problem's options (\cchoice / \fchoice travel with
+%       their option, so the key auto-follows; a \begin{choices}[fixed] block
+%       keeps its authored order).  Per-version, at typeset time.
+%   WITHOUT \shuffle the output is deterministic: authored problem order AND
+%   authored choice order (no option selection/shuffle).  No exam-body changes are
+%   needed — author one canonical order and let each version shuffle.
+\newcommand{\shuffle}{%
 	\directlua{texlib.set_autoexam_shuffle_pages()}%
 }
+\let\shufflepages\shuffle   % deprecated alias
 
-% ---------------------------------------------------------------------------
-% Multiple-choice rendering (the {mcproblems} section).
-%
-% The engine selects and orders the options per version and emits exam-class
-% \choice / \CorrectChoice bracketed by the \@mcframe@* hooks (defaults in
-% texlib-problembank.sty).  Here autoexam overrides those hooks for the
-% instructor key — the solution sits BESIDE the choices ("option B": stem full
-% width, choices left, solution right) — and shifts the choices left.
-% ---------------------------------------------------------------------------
-
-% Shift the choices list left.  The exam class indents choices by
-% width("W.")+labelsep+2.5em (deliberately wide); narrow that to a tidy hang that
-% still clears the "(A)" labels.
-\renewcommand{\choiceshook}{%
-	\setlength{\leftmargin}{2em}%
-	\setlength{\labelwidth}{\dimexpr\leftmargin-\labelsep\relax}%
-}
-
-% Side-by-side instructor key.  The stem is emitted full width by the engine;
-% then (solution builds only) the choices go in a left column and the solution in
-% a right column.  A student build stays full width with a blank answer rule.
-\newlength{\@mc@choicew}  \setlength{\@mc@choicew}{0.54\linewidth}
-\newlength{\@mc@solw}     \setlength{\@mc@solw}{0.42\linewidth}
-\renewcommand{\@mcframe@begin}[1]{%
-	\def\@mc@letter{#1}%
-	\par
-	\ifsolutions \noindent\begin{minipage}[t]{\@mc@choicew}\fi
-}
-\renewcommand{\@mcframe@answer}{%
-	% Right-aligned answer line at the foot of the choices column (instructor) or
-	% under the choices (student); the letter is filled in for the key.  \noindent
-	% leaves vertical mode before \hfill (which would otherwise error there).
-	\par\nobreak\medskip
-	\noindent\hfill\textbf{Answer:}~%
-	\ifsolutions\fbox{\strut\@mc@letter}\else\rule{2.4cm}{0.4pt}\fi
-	\par
-}
-\renewcommand{\@mcframe@mid}{%
-	\ifsolutions \end{minipage}\hfill\begin{minipage}[t]{\@mc@solw}\fi
-}
-\renewcommand{\@mcframe@end}{%
-	\ifsolutions \end{minipage}\fi
-	\par
-}
+% The multiple-choice key frame (\@mcframe@* side-by-side override) and the
+% left-shifted \choiceshook are provided by texlib-solutions.sty (shared with
+% quiz).
 
 % \byversion{A content}{B content}{C content}
 %   Three-version convenience: typesets the argument matching the current
@@ -340,149 +311,9 @@
 	\directlua{texlib.autoexam_run_versions()}%
 }
 
-% ---------------------------------------------------------------------------
-% Internal rubric-overlay machinery
-%
-% \rubric{pts}{text}  (two-argument, defined in section 7d) appends a rubric
-% item to one of two accumulators depending on which environment is active:
-%   \@partsol@rubric  — items collected inside {partsolution}
-%   \@sol@rubric      — items collected inside {solution}
-%
-% The accumulators hold \@rubricline{pts}{text} tokens; they are emitted into
-% a 4.5 cm right-side overlay box that has zero declared height/depth so the
-% solution content below is not displaced.
-%
-% Flags \if@in@partsolution and \if@in@solution let \rubric know which
-% accumulator to use without redefining itself.
-% ---------------------------------------------------------------------------
-
-\newif\if@in@partsolution  \@in@partsolutionfalse
-\newif\if@in@solution      \@in@solutionfalse
-
-\newbox\@partsol@box
-\newbox\@sol@box
-\gdef\@partsol@rubric{}
-\gdef\@sol@rubric{}
-
-\newlength{\rubricboxwidth}
-\setlength{\rubricboxwidth}{4.5cm}
-
-% \@rubricline{pts}{text}  — renders one aligned rubric item inside the box.
-%   [1 pt] / [N pts] label in a fixed 1.4 cm makebox, then the description.
-\newcommand{\@rubricline}[2]{%
-	\noindent
-	\makebox[1.4cm][l]{%
-		\textbf{\textcolor{teal!80!black}{%
-			[#1\,\ifnum#1=1 pt\else pts\fi]}}}%
-	#2\par\smallskip
-}
-
-% \@emit@rubric@overlay{accumulator-macro}
-%   Emits the right-side rubric overlay box.  Zero height/depth so the
-%   solution content below is not pushed down.  Uses \hfill\llap so the
-%   box's right edge sits exactly at \textwidth.
-\newcommand{\@emit@rubric@overlay}[1]{%
-	\hfill
-	\llap{%
-		\raisebox{0pt}[0pt][0pt]{%
-			\setlength{\fboxsep}{4pt}%
-			\colorbox{teal!8}{%
-				\begin{minipage}[t]{\dimexpr\rubricboxwidth-8pt\relax}%
-					\raggedright\small\sffamily
-					\vspace{2pt}%
-					\textbf{\textcolor{teal!80!black}{Rubric:}}\\[0.25em]%
-					#1%
-				\end{minipage}%
-			}%
-		}%
-	}%
-}
-
-% {solution}  — full-problem solution block.
-%   When \ifsolutions is true the block is displayed in blue with a
-%   "Solution:" header and any \rubric items overlaid on the right.
-%   When false the content is silently discarded.
-%
-%   The body is collected into \@sol@box so that \rubric{}{} calls inside
-%   can populate \@sol@rubric before the header line is emitted.
-%   Collecting without \color{blue} and applying it during \unvbox avoids
-%   colour-stack inconsistencies across the vbox boundary.
-%
-%   The {solution} wrapper is only emitted by the Lua engine when
-%   p.solution contains non-whitespace content (see problem_engine.lua),
-%   so the header never appears for multi-part problems whose bank entry
-%   ends with a bare \solution marker.
-\let\solution\relax
-\let\endsolution\relax
-\newenvironment{solution}{%
-	\ifsolutions
-		\par
-		\gdef\@sol@rubric{}%
-		\@in@solutiontrue
-		\setbox\@sol@box\vbox\bgroup
-			\hsize\textwidth
-	\else
-		\setbox\z@\vbox\bgroup
-	\fi
-}{%
-	\ifsolutions
-		\egroup
-		\@in@solutionfalse
-		\begin{tcolorbox}[
-			enhanced, breakable, sharp corners, frame hidden,
-			boxrule=0pt,
-			left=8pt, right=4pt, top=4pt, bottom=4pt,
-			before skip=10pt, after skip=10pt,
-			colback=green!3!white,
-			borderline west={1.5pt}{-6pt}{green!50!black},
-		]%
-			\noindent\textbf{Solution.}%
-			\if@autoexam@rubric
-				\ifx\@sol@rubric\@empty\else
-					\@emit@rubric@overlay{\@sol@rubric}%
-				\fi
-			\fi
-			\par\smallskip
-			\unvbox\@sol@box
-		\end{tcolorbox}
-	\else
-		\egroup
-	\fi
-}
-
-% {partsolution}  — inline per-part solution, placed directly after \ppart.
-%   Shown in blue with a "Solution:" header when \ifsolutions is true;
-%   silently discarded otherwise.  \rubric{}{} items are overlaid on the
-%   right at the same height as the header.
-\newenvironment{partsolution}{%
-	\ifsolutions
-		\par\smallskip
-		\gdef\@partsol@rubric{}%
-		\@in@partsolutiontrue
-		\setbox\@partsol@box\vbox\bgroup
-			\hsize\textwidth
-	\else
-		\setbox\z@\vbox\bgroup
-	\fi
-}{%
-	\ifsolutions
-		\egroup
-		\@in@partsolutionfalse
-		% Inline style (no tcolorbox -- avoids breakage inside exam-class 'parts').
-		% Green prose with bold "Solution." inline header, matching didactic's accent color.
-		\noindent\textbf{Solution.}%
-		\if@autoexam@rubric
-			\ifx\@partsol@rubric\@empty\else
-				\@emit@rubric@overlay{\@partsol@rubric}%
-			\fi
-		\fi
-		\par
-		{\color{green!40!black}\unvbox\@partsol@box}%
-		\normalcolor\par\smallskip
-	\else
-		\egroup
-	\fi
-}
+% The {solution} / {partsolution} boxes and the grading-rubric overlay machinery
+% (\@rubricline, \@emit@rubric@overlay, the \if@in@* flags, \rubricboxwidth) are
+% provided by texlib-solutions.sty (shared with quiz).
 
 % PDF Split Signal (For the Builder)
 \newwrite\splitfile
@@ -817,69 +648,9 @@
 %     \workbox{3}
 %     \rubric{5}{convert $81=3^4$}
 %     \rubric{5}{solve $x=2$}
-% Override the always-on default from texlib-problembank.sty so a solution
-% (key) build does not pad each problem with stretchy answer space.
-\RenewDocumentCommand{\workbox}{m}{%
-	\ifsolutions\else
-		\vspace{\stretch{#1}}%
-	\fi
-}
-
-% \rubric{pts}{text}  — adds one grading criterion shown only when the
-%   ShowRubric flag is set (\rubrics in preamble or \def\ShowRubric{1}).
-%
-%   Each call appends one \@rubricline{pts}{text} item to the accumulator
-%   of the currently active solution environment:
-%     • inside {partsolution}  → \@partsol@rubric
-%     • inside {solution}      → \@sol@rubric
-%   Items are emitted as a right-side overlay box with zero height so the
-%   solution text is not displaced (see \@emit@rubric@overlay above).
-%
-%   Multiple calls accumulate:
-%     \rubric{1}{expand numerator}
-%     \rubric{1}{simplify using exponent rules}
-%
-%   Works anywhere before first use because the check is at execution time.
-\NewDocumentCommand{\rubric}{mm}{%
-	\if@autoexam@rubric
-		\if@in@partsolution
-			\expandafter\gdef\expandafter\@partsol@rubric\expandafter{%
-				\@partsol@rubric\@rubricline{#1}{#2}}%
-		\else
-			\if@in@solution
-				\expandafter\gdef\expandafter\@sol@rubric\expandafter{%
-					\@sol@rubric\@rubricline{#1}{#2}}%
-			\fi
-		\fi
-	\fi
-}
-
-% \begin{commonerrors}...\end{commonerrors}
-%   Block of common student errors shown only in rubric builds.
-%   Use \item for each error.  Content is suppressed (collected into a
-%   discarded box) when ShowRubric is off, so it adds no overhead to student
-%   PDFs.  Does not support verbatim content inside the hidden branch.
-%
-%   Example:
-%     \begin{commonerrors}
-%         \item Forgetting to rewrite the base before equating exponents.
-%         \item Sign error when solving $3 - x = 4$.
-%     \end{commonerrors}
-\newenvironment{commonerrors}{%
-	\if@autoexam@rubric
-		\par\smallskip
-		\noindent\textcolor{red!80!black}{\small\sffamily\textbf{Common Errors:}}%
-		\begin{itemize}\small\sffamily
-	\else
-		\setbox\z@\vbox\bgroup
-	\fi
-}{%
-	\if@autoexam@rubric
-		\end{itemize}\smallskip
-	\else
-		\egroup
-	\fi
-}
+% The \workbox solution-suppress override, the \rubric command, and the
+% {commonerrors} environment are provided by texlib-solutions.sty (shared with
+% quiz).
 
 % \scorepage[max_rows]  — auto-generated instructor score sheet.
 %   Place after \maketitle (before \blankpage and \begin{problems}).

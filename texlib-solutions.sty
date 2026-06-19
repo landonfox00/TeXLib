@@ -1,0 +1,240 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-solutions}[2026/06/18 v1.0 TeXLib shared solution box,
+	rubric overlay, and multiple-choice key frame]
+
+% Shared solution / rubric / multiple-choice-key rendering for the exam-derived
+% classes (autoexam, quiz), so both produce identical keys.  Loaded by each class
+% AFTER texlib-problembank.sty, because it overrides that package's \@mcframe@*
+% and \workbox defaults.  Provides:
+%   * the green {solution} / {partsolution} boxes (shown when \ifsolutions),
+%   * the grading-rubric overlay (\rubric, shown when \ifrubric) and {commonerrors},
+%   * the side-by-side multiple-choice key frame (\@mcframe@* override) and the
+%     left-shifted \choiceshook.
+% \ifsolutions / \ifrubric come from texlib-build; xcolor/environ from
+% texlib-corepkg / texlib-problembank; tcolorbox is loaded here (quiz omits it).
+
+\RequirePackage[many]{tcolorbox}
+
+% ===========================================================================
+% Rubric-overlay machinery
+% ===========================================================================
+% \rubric{pts}{text} appends a rubric item to one of two accumulators depending
+% on which environment is active (\@sol@rubric inside {solution}, \@partsol@rubric
+% inside {partsolution}).  The accumulators hold \@rubricline tokens emitted into
+% a right-side overlay box with zero declared height/depth, so the solution
+% content below is not displaced.  The \if@in@* flags tell \rubric which one.
+
+\newif\if@in@partsolution  \@in@partsolutionfalse
+\newif\if@in@solution      \@in@solutionfalse
+
+\newbox\@partsol@box
+\newbox\@sol@box
+\gdef\@partsol@rubric{}
+\gdef\@sol@rubric{}
+
+\newlength{\rubricboxwidth}
+\setlength{\rubricboxwidth}{4.5cm}
+
+% \@rubricline{pts}{text} — one aligned rubric item: a [N pts] label in a fixed
+% 1.4 cm makebox, then the description.
+\newcommand{\@rubricline}[2]{%
+	\noindent
+	\makebox[1.4cm][l]{%
+		\textbf{\textcolor{teal!80!black}{%
+			[#1\,\ifnum#1=1 pt\else pts\fi]}}}%
+	#2\par\smallskip
+}
+
+% \@emit@rubric@overlay{accumulator} — right-side overlay box with zero
+% height/depth (so the solution below is not pushed down); \hfill\llap pins its
+% right edge at \textwidth.
+\newcommand{\@emit@rubric@overlay}[1]{%
+	\hfill
+	\llap{%
+		\raisebox{0pt}[0pt][0pt]{%
+			\setlength{\fboxsep}{4pt}%
+			\colorbox{teal!8}{%
+				\begin{minipage}[t]{\dimexpr\rubricboxwidth-8pt\relax}%
+					\raggedright\small\sffamily
+					\vspace{2pt}%
+					\textbf{\textcolor{teal!80!black}{Rubric:}}\\[0.25em]%
+					#1%
+				\end{minipage}%
+			}%
+		}%
+	}%
+}
+
+% ===========================================================================
+% {solution} / {partsolution}
+% ===========================================================================
+% {solution} — full-problem solution block: a green box with a bold "Solution."
+% header and any \rubric items overlaid on the right, shown when \ifsolutions;
+% the content is silently discarded otherwise.  The body is collected into
+% \@sol@box first so \rubric{}{} calls can populate \@sol@rubric before the header
+% is emitted.  The exam class defines a native \solution; \let-ing it to \relax
+% lets \newenvironment redefine it (the engine emits {solution} only when the
+% problem actually has a non-empty solution).
+\let\solution\relax
+\let\endsolution\relax
+\newenvironment{solution}{%
+	\ifsolutions
+		\par
+		\gdef\@sol@rubric{}%
+		\@in@solutiontrue
+		\setbox\@sol@box\vbox\bgroup
+			\hsize\textwidth
+	\else
+		\setbox\z@\vbox\bgroup
+	\fi
+}{%
+	\ifsolutions
+		\egroup
+		\@in@solutionfalse
+		\begin{tcolorbox}[
+			enhanced, breakable, sharp corners, frame hidden,
+			boxrule=0pt,
+			left=8pt, right=4pt, top=4pt, bottom=4pt,
+			before skip=10pt, after skip=10pt,
+			colback=green!3!white,
+			borderline west={1.5pt}{-6pt}{green!50!black},
+		]%
+			\noindent\textbf{Solution.}%
+			\ifrubric
+				\ifx\@sol@rubric\@empty\else
+					\@emit@rubric@overlay{\@sol@rubric}%
+				\fi
+			\fi
+			\par\smallskip
+			\unvbox\@sol@box
+		\end{tcolorbox}
+	\else
+		\egroup
+	\fi
+}
+
+% {partsolution} — inline per-part solution placed directly after \ppart; green
+% prose with a bold "Solution." inline header (no tcolorbox, which would break
+% inside the exam-class 'parts' list), shown when \ifsolutions.
+\newenvironment{partsolution}{%
+	\ifsolutions
+		\par\smallskip
+		\gdef\@partsol@rubric{}%
+		\@in@partsolutiontrue
+		\setbox\@partsol@box\vbox\bgroup
+			\hsize\textwidth
+	\else
+		\setbox\z@\vbox\bgroup
+	\fi
+}{%
+	\ifsolutions
+		\egroup
+		\@in@partsolutionfalse
+		\noindent\textbf{Solution.}%
+		\ifrubric
+			\ifx\@partsol@rubric\@empty\else
+				\@emit@rubric@overlay{\@partsol@rubric}%
+			\fi
+		\fi
+		\par
+		{\color{green!40!black}\unvbox\@partsol@box}%
+		\normalcolor\par\smallskip
+	\else
+		\egroup
+	\fi
+}
+
+% \rubric{pts}{text} — one grading criterion, shown only when \ifrubric.  Appends
+% an \@rubricline to whichever solution accumulator is active.  Resolves at
+% execution time, so it works anywhere before first use.
+\NewDocumentCommand{\rubric}{mm}{%
+	\ifrubric
+		\if@in@partsolution
+			\expandafter\gdef\expandafter\@partsol@rubric\expandafter{%
+				\@partsol@rubric\@rubricline{#1}{#2}}%
+		\else
+			\if@in@solution
+				\expandafter\gdef\expandafter\@sol@rubric\expandafter{%
+					\@sol@rubric\@rubricline{#1}{#2}}%
+			\fi
+		\fi
+	\fi
+}
+
+% {commonerrors} — a block of common student errors (\item each) shown only in
+% rubric builds; collected into a discarded box otherwise (no overhead in student
+% PDFs).  Does not support verbatim content in the hidden branch.
+\newenvironment{commonerrors}{%
+	\ifrubric
+		\par\smallskip
+		\noindent\textcolor{red!80!black}{\small\sffamily\textbf{Common Errors:}}%
+		\begin{itemize}\small\sffamily
+	\else
+		\setbox\z@\vbox\bgroup
+	\fi
+}{%
+	\ifrubric
+		\end{itemize}\smallskip
+	\else
+		\egroup
+	\fi
+}
+
+% \workbox{n} — proportional answer space (= \vspace{\stretch{n}}), but suppressed
+% in a solution/key build so a key copy is not padded with blank space.  Overrides
+% the always-on default from texlib-problembank.sty.
+\RenewDocumentCommand{\workbox}{m}{%
+	\ifsolutions\else
+		\vspace{\stretch{#1}}%
+	\fi
+}
+
+% ===========================================================================
+% Multiple-choice key frame (the {mcproblems} section)
+% ===========================================================================
+% The engine selects/orders the options and emits exam-class \choice /
+% \CorrectChoice bracketed by the \@mcframe@* hooks; here we override them so the
+% instructor key sets the solution BESIDE the choices ("option B": stem full
+% width, choices left, solution right) and shift the choices left.
+
+% Shift the choices list left.  The exam class indents choices by
+% width("W.")+labelsep+2.5em (deliberately wide); narrow it to a tidy hang that
+% still clears the "(A)" labels.
+\renewcommand{\choiceshook}{%
+	\setlength{\leftmargin}{2em}%
+	\setlength{\labelwidth}{\dimexpr\leftmargin-\labelsep\relax}%
+}
+
+% Side-by-side applies to vertical {choices}.  An inline {oneparchoices} block
+% (\if@mc@inline) is rendered STACKED instead — choices inline, then the answer
+% line, then the solution full width below — since a one-line option list does
+% not suit a narrow column.
+% Side-by-side fires only for an instructor (\ifsolutions) build of a vertical
+% {choices} block (not \if@mc@inline); a student build, or an inline
+% {oneparchoices} block, renders STACKED (no minipages) so the answer line and
+% the solution sit full width below the choices.
+\newlength{\@mc@choicew}  \setlength{\@mc@choicew}{0.54\linewidth}
+\newlength{\@mc@solw}     \setlength{\@mc@solw}{0.42\linewidth}
+\renewcommand{\@mcframe@begin}[1]{%
+	\def\@mc@letter{#1}%
+	\par
+	\ifsolutions \if@mc@inline\else \noindent\begin{minipage}[t]{\@mc@choicew}\fi \fi
+}
+\renewcommand{\@mcframe@answer}{%
+	% Right-aligned answer line at the foot of the choices column (instructor) or
+	% under the choices (student); the letter is filled in for the key.  \noindent
+	% leaves vertical mode before \hfill (which would otherwise error there).
+	\par\nobreak\medskip
+	\noindent\hfill\textbf{Answer:}~%
+	\ifsolutions\fbox{\strut\@mc@letter}\else\rule{2.4cm}{0.4pt}\fi
+	\par
+}
+\renewcommand{\@mcframe@mid}{%
+	\ifsolutions \if@mc@inline\else \end{minipage}\hfill\begin{minipage}[t]{\@mc@solw}\fi \fi
+}
+\renewcommand{\@mcframe@end}{%
+	\ifsolutions \if@mc@inline\else \end{minipage}\fi \fi
+	\par
+}
+
+\endinput

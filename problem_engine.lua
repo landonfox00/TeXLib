@@ -436,6 +436,7 @@ local function read_problem_lines_from_bank(bank_file, start_line)
 			-- engine-generated tokens (selected/shuffled per version), so they are not
 			-- part of the file-served region.
 			if raw_line:match('^%s*\\begin%s*{choices}') or
+				raw_line:match('^%s*\\begin%s*{oneparchoices}') or
 				raw_line:match('^%s*\\begin%s*{solution}') or
 				raw_line:match('^%s*\\end%s*{problem}') then
 				break
@@ -641,13 +642,16 @@ local function build_choice_plan(items, opts, has_solution, id, sf, sl)
 	return plan
 end
 
--- Per-version: produce the ordered list of presented options.  Pinned options
--- occupy their slots; the \cchoice and bare \fchoice are always included; the
--- remaining free slots are filled by a random sample of the \choice pool, and
--- all non-pinned selected options are shuffled across the free slots.  Uses
--- math.random (the version loop seeds it per version before each copy).
+-- Produce the ordered list of presented options.  Options stay in AUTHORED
+-- ORDER (all of them, no selection) UNLESS \shuffle is active and the block is
+-- not [fixed] -- so the default is deterministic, authored output and \shuffle
+-- is what reorders/selects.  Under \shuffle: pinned options occupy their slots,
+-- the \cchoice and bare \fchoice are always included, the remaining free slots
+-- are filled by a random sample of the \choice pool, and all non-pinned selected
+-- options are shuffled across the free slots.  Uses math.random (the version
+-- loop seeds it per version before each copy).
 local function resolve_mc_order(plan)
-	if plan.fixed_block then
+	if plan.fixed_block or not autoexam_shuffle_pages then
 		local out = {}
 		for _, it in ipairs(plan.items) do table.insert(out, it) end
 		return out
@@ -689,17 +693,22 @@ local function emit_mc_tail(p)
 	for i, it in ipairs(out) do
 		if it.is_correct then letter = string.char(64 + i) end
 	end
-	-- @ is catcode-12 (other) in the document body, so a literal \@mcframe@begin
-	-- would tokenise as \@ (end-of-sentence) + stray text.  Build the control
-	-- sequences by name via \csname...\endcsname instead (same guard the engine
-	-- uses for \@@input and autoexam@problem@sep).
+	local env = p.choices_env or 'choices'
+	-- oneparchoices is inline: the inline flag tells the frame to render it stacked
+	-- (answer line + solution below) rather than side-by-side.  @ is catcode-12 in
+	-- the document body, so a literal \@mcframe@begin would tokenise as \@
+	-- (end-of-sentence) + stray text; build the @-named control sequences by name
+	-- via \csname...\endcsname (same guard the engine uses for \@@input).
+	tex.print(env == 'oneparchoices'
+		and '\\csname @mc@inlinetrue\\endcsname'
+		or  '\\csname @mc@inlinefalse\\endcsname')
 	tex.print('\\csname @mcframe@begin\\endcsname{' .. letter .. '}')
-	tex.print('\\begin{choices}')
+	tex.print('\\begin{' .. env .. '}')
 	for _, it in ipairs(out) do
 		if it.is_correct then tex.print('\\CorrectChoice ' .. it.text)
 		else tex.print('\\choice ' .. it.text) end
 	end
-	tex.print('\\end{choices}')
+	tex.print('\\end{' .. env .. '}')
 	tex.print('\\csname @mcframe@answer\\endcsname')
 	tex.print('\\csname @mcframe@mid\\endcsname')
 	if p.solution and p.solution:match('%S') then
@@ -715,12 +724,13 @@ end
 -- a free-response {problems} section (the choices become ordinary content; the
 -- separate solution box still shows the answer).
 local function emit_choices_plain(p)
-	tex.print('\\begin{choices}')
+	local env = p.choices_env or 'choices'
+	tex.print('\\begin{' .. env .. '}')
 	for _, it in ipairs(p.choices_plan.items) do
 		if it.is_correct then tex.print('\\CorrectChoice ' .. it.text)
 		else tex.print('\\choice ' .. it.text) end
 	end
-	tex.print('\\end{choices}')
+	tex.print('\\end{' .. env .. '}')
 end
 
 local function typeset_problem(p, stretch)
@@ -904,10 +914,18 @@ function define_problem_from_env(id, meta_str, body_str)
 		content  = body_str:sub(1, sb - 1) .. body_str:sub(sef + 1)
 	end
 
-	local is_mc, stem, choices_plan = false, content, nil
+	-- Either \begin{choices} (vertical) or \begin{oneparchoices} (inline) marks an
+	-- MC problem; remember which so the typeset path emits the right environment.
+	local is_mc, stem, choices_plan, choices_env = false, content, nil, nil
+	local cenv = 'choices'
 	local cb, cis, cie, cef, copts = find_env_block(content, 'choices')
+	if not cb then
+		cenv = 'oneparchoices'
+		cb, cis, cie, cef, copts = find_env_block(content, 'oneparchoices')
+	end
 	if cb then
 		is_mc = true
+		choices_env = cenv
 		stem  = content:sub(1, cb - 1) .. content:sub(cef + 1)
 		local items = parse_choice_items(content:sub(cis, cie))
 		choices_plan = build_choice_plan(items, copts,
@@ -920,7 +938,8 @@ function define_problem_from_env(id, meta_str, body_str)
 
 	problem_db[id] = {
 		meta = meta, content = content, stem = stem, solution = solution,
-		is_mc = is_mc, choices_plan = choices_plan, part_count = part_count,
+		is_mc = is_mc, choices_plan = choices_plan, choices_env = choices_env,
+		part_count = part_count,
 		source_file = src_file, source_line = src_line,
 	}
 	source_map[id] = { file = src_file, line = src_line }

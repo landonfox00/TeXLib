@@ -142,8 +142,9 @@ randomly picks one matching problem (per version, deterministically).
 
 `\importproblem{file}{id}` — load a single problem from a file.
 
-`\shufflepages` / `\byversion{A}{B}{C}` — control per-version page
-shuffling and version-specific content.
+`\shuffle` (alias `\shufflepages`) / `\byversion{A}{B}{C}` — control
+per-version shuffling (problem order + each MC problem's options) and
+version-specific content.
 
 ### Lua engine: randomization & math
 

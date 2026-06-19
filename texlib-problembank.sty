@@ -492,7 +492,10 @@
 % solution with these hooks.  Default: full width, choices in place, a
 % right-aligned answer line (the letter in solution builds, a blank rule
 % otherwise), solution below.  autoexam overrides them for the side-by-side
-% instructor key.
+% instructor key.  \if@mc@inline is set true by the engine for an inline
+% (oneparchoices) block, telling the frame to render it stacked rather than
+% side-by-side (the default frame is already stacked, so it ignores the flag).
+\newif\if@mc@inline
 \providecommand{\@mc@letter}{?}
 \providecommand{\@mcframe@begin}[1]{\def\@mc@letter{#1}}
 \providecommand{\@mcframe@answer}{%
