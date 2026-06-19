@@ -237,24 +237,9 @@
 % handled by the engine's pbank_suppress_redirect flag, set by
 % autoexam_run_versions before the version loop iterates.
 
-% \shuffle  (deprecated alias: \shufflepages)
-%   Declared in the PREAMBLE alongside \versions.  When present, each version
-%   independently shuffles TWO things:
-%     - problem order inside every {problems}/{mcproblems} section, SECTION-AWARE:
-%       \section / \section* headers are hard boundaries kept in original order
-%       with the header fixed at the top; questions permute only within their own
-%       section; the per-page \newpage counts are preserved and \extracredit stays
-%       last.  (Implemented as a per-version source pre-pass.)
-%     - each multiple-choice problem's options (\cchoice / \fchoice travel with
-%       their option, so the key auto-follows; a \begin{choices}[fixed] block
-%       keeps its authored order).  Per-version, at typeset time.
-%   WITHOUT \shuffle the output is deterministic: authored problem order AND
-%   authored choice order (no option selection/shuffle).  No exam-body changes are
-%   needed — author one canonical order and let each version shuffle.
-\newcommand{\shuffle}{%
-	\directlua{texlib.set_autoexam_shuffle_pages()}%
-}
-\let\shufflepages\shuffle   % deprecated alias
+% \shuffle (deprecated alias \shufflepages) is provided by texlib-problembank.sty
+% (shared with quiz).  The autoexam version loop reads its flag to reorder
+% problems per version; the engine also shuffles each MC problem's options.
 
 % The multiple-choice key frame (\@mcframe@* side-by-side override) and the
 % left-shifted \choiceshook are provided by texlib-solutions.sty (shared with

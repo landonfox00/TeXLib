@@ -116,6 +116,19 @@
 % also covers quizzes, which never call the per-version seeder.
 \newcommand{\setexamseed}[1]{\pbank@lua{exam_seed_override = #1 set_exam_seed('')}}
 
+% \shuffle  — turn on per-version shuffling (deprecated alias: \shufflepages).
+% Shared by both assessment classes so the toggle (and its default-off behaviour)
+% lives in one place.  autoexam: reorders problems within each {problems} /
+% {mcproblems} section per version (the version loop's source pre-pass) AND
+% shuffles each multiple-choice problem's options at typeset time.  quiz /
+% single-version: shuffles each MC problem's options only (no version loop, so no
+% question-order pre-pass).  WITHOUT \shuffle the output is deterministic —
+% authored problem AND choice order, and \begin{choices}[choose=m] presents ALL
+% options (subset selection is part of the shuffle).  \begin{choices}[fixed]
+% keeps a block in authored order even under \shuffle.
+\newcommand{\shuffle}{\pbank@lua{set_autoexam_shuffle_pages()}}
+\let\shufflepages\shuffle   % deprecated alias
+
 % \calcvar{name}{lua-expr}  — compute an expression using stored vars
 \newcommand{\calcvar}[2]{\pbank@lua{calc_var('#1', '#2')}}
 
