@@ -112,7 +112,11 @@ Resolution order, mirroring the problem bank's `\loadbank`:
 3. else a sibling `gradebook.csv`.
 
 > Requires LuaLaTeX (the engine reads the CSV via `\directlua`). The
-> TeXLib builder forces lualatex for `report-card` automatically.
+> TeXLib builder forces lualatex for `report-card` automatically, but put
+> **`% !TeX program = lualatex`** as the first line of every report-card
+> document so any editor (or a non-redeployed builder) picks the right
+> engine — otherwise a pdflatex build dies with
+> "`\gradebook` requires LuaLaTeX". The template ships with this line.
 
 ---
 

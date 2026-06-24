@@ -452,9 +452,11 @@ class TexlibBuilder(PdfBuilder):
             yield (cmd, f"{label} rerun {run}...")
 
     def _build_version(self, base, engine, version, mode="default"):
-        """One \\versions{} entry, built as <base>_<version>.pdf."""
+        """One \\versions{} entry, built as <base>_<version>.pdf (student) or
+        <base>_<version>_solutions.pdf when mode='solutions' (instructor copy)."""
         macro = MODE_MACROS.get(mode, "")
-        jobname = f"{self.base_name}_{version}"
+        suffix = "_solutions" if mode == "solutions" else ""
+        jobname = f"{self.base_name}_{version}{suffix}"
         # autoexam reads its body from <jobname>.tex (\shufflepages requires
         # it), but the root source is named differently (doc.tex vs jobname
         # doc_A). Build this version against a source copy named to match the

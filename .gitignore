@@ -5,6 +5,9 @@
 # Old / superseded files
 course-metadata_old.sty
 
+# Local Claude Code session guide (per-machine; not distributed to coworkers)
+/CLAUDE.md
+
 # LaTeX build artifacts
 *.aux
 *.log
