@@ -160,6 +160,9 @@
 \renewcommand{\subsectionmark}[1]{\markright{\thesubsection\ #1}}
 \renewcommand{\subsubsectionmark}[1]{%
 	\ifnum\c@secnumdepth>\tw@ \markright{\thesubsubsection\ #1}\fi}
+% tocloft marks the TOC pages \MakeUppercase{\contentsname} ("CONTENTS");
+% every other mark in this header is title-case, so drop the uppercasing.
+\renewcommand{\cftmarktoc}{\@mkboth{\contentsname}{\contentsname}}
 % Footer is the shared TeXLib layout (course | page | institution)
 \SetTeXLibFooter
 
@@ -170,6 +173,11 @@
 	\SetTeXLibFooter
 	\renewcommand{\headrulewidth}{0pt}%
 }
+% tocloft stamps the first TOC page \thispagestyle{plain} (bare centered page
+% number, no shared footer). Inside \maketitle the titlepage stamp fires later
+% and wins, but a \tableofcontents called after \maketitle re-stamps page 1
+% plain and silently drops the footer -- route tocloft to titlepage instead.
+\tocloftpagestyle{titlepage}
 
 % ==============================================================================
 % 5. TITLE BLOCK (metadata-driven, optional TOC)
