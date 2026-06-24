@@ -199,6 +199,27 @@ black frames); `example`, `remark`, `note`, `recall` (no frame, left
 rule only). All share a single counter, numbered `Theorem 1`,
 `Definition 2`, etc.
 
+#### `\solution` inside an `example`
+
+Within an `example` (also `example*`) you can mark a worked solution inline
+with `\solution`:
+
+```latex
+\begin{example}
+	Evaluate $\lim_{x \to 3}(2x + 1)$.
+	\solution Direct substitution gives $7$.
+\end{example}
+```
+
+Everything after `\solution` renders with a bold **"Solution."** lead-in and is
+**always visible** in every build mode — a worked example's solution is part of
+the exposition, not a gated answer (unlike the standalone `solution` box, which
+is discarded outside answer-key/student mode). The hook is shared — it lives in
+`texlib-thmenv.sty`, so every class with an `example` environment gets it — and
+is scoped to the example environment, so the standalone `\begin{solution}` box
+keeps `\solution` everywhere else; just don't nest a `\begin{solution}` box
+*inside* an example.
+
 ### Math utilities
 
 `\mbb`, `\mrm`, `\mcal`, `\msf`, `\mf`, `\mscr`, `\dd`, `\abs`,
