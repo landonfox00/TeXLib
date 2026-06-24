@@ -41,6 +41,7 @@ import concurrent.futures
 import glob
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -123,14 +124,20 @@ def _aux_dir_for(tex_root, version):
     return d
 
 
-def build_one_version(tex_root, base, version, engine, timeout, verbose):
-    """Build a single version -> dict(version, ok, pdf, passes, seconds, log)."""
+def build_one_version(tex_root, base, version, engine, timeout, verbose,
+                      mode="default"):
+    """Build a single copy -> dict(version, ok, pdf, passes, seconds, log).
+
+    mode="solutions" builds the instructor copy (passes \\ShowSolutions) under
+    the jobname <base>_<version>_solutions; "default" builds the student copy
+    <base>_<version>."""
     tex_dir = os.path.dirname(os.path.abspath(tex_root))
     src_name = os.path.basename(tex_root)
-    jobname = f"{base}_{version}"
+    suffix = "_solutions" if mode == "solutions" else ""
+    jobname = f"{base}_{version}{suffix}"
     copy_name = f"{jobname}.tex"          # jobname must match the source basename
     copy_path = os.path.join(tex_dir, copy_name)
-    aux = _aux_dir_for(tex_root, version)
+    aux = _aux_dir_for(tex_root, version + suffix)
 
     b = TexlibBuilder()
     b.tex_root = tex_root
@@ -151,7 +158,7 @@ def build_one_version(tex_root, base, version, engine, timeout, verbose):
     heads, log = [], []
     try:
         shutil.copyfile(tex_root, copy_path)
-        gen = b._build_version(base_cmd, engine, version)
+        gen = b._build_version(base_cmd, engine, version, mode=mode)
         item = next(gen)
         while True:
             cmd, _msg = item
@@ -246,6 +253,27 @@ def merge_pdfs(version_pdfs, out_path):
     return True, out_path
 
 
+def _parse_solmode(src):
+    r"""Detect the exam's solution-build mode from its source.
+
+    \solutions     -> 'dual' (student + instructor copy of every version);
+    \justsolutions -> 'only' (instructor copies only);
+    otherwise      -> 'none'. Comment-only occurrences are ignored. If BOTH are
+    present, \solutions wins (matching autoexam.cls) and a warning is printed.
+    """
+    text = "\n".join(ln.split("%", 1)[0] for ln in src.splitlines())
+    has_dual = bool(re.search(r"\\solutions\b", text))
+    has_only = bool(re.search(r"\\justsolutions\b", text))
+    if has_dual and has_only:
+        print(r"build_versions: both \solutions and \justsolutions found; "
+              r"ignoring \justsolutions (building student + instructor copies).")
+    if has_dual:
+        return "dual"
+    if has_only:
+        return "only"
+    return "none"
+
+
 # --- Driver -----------------------------------------------------------------
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Parallel multi-version exam builder.")
@@ -280,38 +308,61 @@ def main(argv=None):
         print("error: no \\versions{...} / \\examversions{...} found.")
         return 2
 
-    # Default output mode: combined (per the standalone default).
-    combined = args.combined or args.both or not args.separate
-    keep_separate = args.separate or args.both
+    # Solution-build mode (\solutions / \justsolutions in the source).
+    #   none -> student copy per version (default)
+    #   only -> instructor copy per version
+    #   dual -> student copies (version order) THEN instructor copies
+    solmode = _parse_solmode(src)
+    if solmode == "only":
+        joblist = [(v, "solutions") for v in versions]
+    elif solmode == "dual":
+        joblist = ([(v, "default") for v in versions]
+                   + [(v, "solutions") for v in versions])
+    else:
+        joblist = [(v, "default") for v in versions]
+
+    # Output mode. Solutions builds emit BOTH the individual PDFs and a combined
+    # one; plain builds honour the CLI flags (combined is the default).
+    if solmode != "none":
+        combined, keep_separate = True, True
+    else:
+        combined = args.combined or args.both or not args.separate
+        keep_separate = args.separate or args.both
+
+    def _label(v, m):
+        return f"{v}_solutions" if m == "solutions" else v
 
     jobs = args.jobs if args.jobs > 0 else (os.cpu_count() or 4)
-    jobs = max(1, min(jobs, len(versions)))
-    print(f"Building {len(versions)} version(s) {versions} of {base!r} with "
-          f"{engine}, {jobs} in parallel...")
+    jobs = max(1, min(jobs, len(joblist)))
+    print(f"Building {len(joblist)} copy(ies) "
+          f"[{', '.join(_label(v, m) for v, m in joblist)}] of {base!r} with "
+          f"{engine} (solmode={solmode}), {jobs} in parallel...")
 
     t0 = time.monotonic()
     results = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
         futs = {pool.submit(build_one_version, tex_root, base, v, engine,
-                            args.timeout, args.verbose): v for v in versions}
+                            args.timeout, args.verbose, mode=m): (v, m)
+                for (v, m) in joblist}
         for fut in concurrent.futures.as_completed(futs):
+            v, m = futs[fut]
             r = fut.result()
-            results[r["version"]] = r
+            results[(v, m)] = r
             status = "ok" if r["ok"] else "FAILED"
-            print(f"  [{r['version']}] {status} in {r['seconds']:.1f}s "
+            print(f"  [{_label(v, m)}] {status} in {r['seconds']:.1f}s "
                   f"({'/'.join(r['passes'])})")
             if r["log"] and (args.verbose or not r["ok"]):
                 print("      " + r["log"].replace("\n", "\n      "))
     wall = time.monotonic() - t0
 
-    ordered = [results[v] for v in versions]
-    failed = [r["version"] for r in ordered if not r["ok"]]
+    ordered = [results[(v, m)] for (v, m) in joblist]
+    failed = [_label(v, m) for (v, m) in joblist if not results[(v, m)]["ok"]]
     total_cpu = sum(r["seconds"] for r in ordered)
-    print(f"\nWall time {wall:.1f}s (sum of version times {total_cpu:.1f}s -> "
-          f"{(total_cpu / wall):.1f}x speedup).")
+    print(f"\nWall time {wall:.1f}s (sum of copy times {total_cpu:.1f}s -> "
+          f"{(total_cpu / max(wall, 1e-9)):.1f}x speedup).")
 
     if failed:
-        print(f"FAILED versions: {failed}. Not merging.")
+        print(f"FAILED: {failed}. Not merging.")
         return 1
 
     if combined:
@@ -321,10 +372,10 @@ def main(argv=None):
         if not ok and not keep_separate:
             return 1
         if not keep_separate:
-            for r in ordered:  # combined-only: drop the per-version PDFs
+            for r in ordered:  # combined-only: drop the per-copy PDFs
                 TexlibBuilder._force_remove(r["pdf"])
     if keep_separate:
-        print("Per-version PDFs: " +
+        print("Individual PDFs: " +
               ", ".join(os.path.basename(r["pdf"]) for r in ordered))
     return 0
 

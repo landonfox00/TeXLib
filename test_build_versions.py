@@ -259,6 +259,20 @@ def main():
         check("driver default: produces combined exam.pdf (no flag)",
               rc == 0 and os.path.exists(os.path.join(d6, "exam.pdf")), f"rc={rc}")
 
+    # --- solution-build mode detection (\solutions / \justsolutions) --------
+    check("solmode: none when neither macro present",
+          bv._parse_solmode(r"\documentclass{autoexam}\versions{A,B}") == "none")
+    check("solmode: \\solutions -> dual",
+          bv._parse_solmode("\\solutions\n\\versions{A,B}") == "dual")
+    check("solmode: \\justsolutions -> only (not misread as dual)",
+          bv._parse_solmode("\\justsolutions\n\\versions{A,B}") == "only")
+    check("solmode: both macros -> dual wins",
+          bv._parse_solmode(r"\solutions \justsolutions") == "dual")
+    check("solmode: commented macro ignored",
+          bv._parse_solmode("% \\solutions\n\\versions{A,B}") == "none")
+    check("solmode: word boundary (\\solutionsfoo not a match)",
+          bv._parse_solmode(r"\solutionsfoo") == "none")
+
     # --- real toolchain: genuine 2-version autoexam build (gated) -----------
     real_build_check()
 
