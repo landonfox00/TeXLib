@@ -174,7 +174,8 @@
 % Header: L = syllabus title  C = (none)  R = term + section.
 \SetTeXLibHeader{\bfseries\GetSyllabusTitle}{}{\GetTermSection}
 \SetTeXLibFooter                  % L = \GetCourse (shared default)
-\TeXLibRuleBleed                  % symmetric rule length, matching didactic
+% Rule bleed comes from texlib-sectionhang's [LR] offset (loaded at the end of
+% this class), so \TeXLibRuleBleed must NOT also be called.
 
 % Title page (\maketitle uses \thispagestyle{plain}): keep the shared footer,
 % suppress the header + its rule.
@@ -354,9 +355,12 @@
 % ==============================================================================
 % 7. SECTION COMMAND
 % ==============================================================================
+% The bold run-in title hangs onto the shared structural-hang line
+% (\texlibsectionhang, from texlib-sectionhang loaded at the end of this
+% class); the syllabus body text that follows stays at the normal margin.
 \newcommand{\syllabussection}[1]{%
 	\vskip.15in
-	\noindent\textbf{#1.}%
+	\noindent\hspace*{-\texlibsectionhang}\textbf{#1.}%
 }
 
 % ==============================================================================
@@ -395,5 +399,13 @@
 		\gradescale{#2}
 	\end{center}
 }
+
+% ==============================================================================
+% Structural hang: \syllabussection titles (via the \hspace above), any raw
+% \section-family headings, and the running header/footer all hang onto one
+% outer left edge. Loaded LAST so its redefinitions land on top of the article
+% defaults.
+% ==============================================================================
+\RequirePackage{texlib-sectionhang}
 
 \endinput

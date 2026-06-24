@@ -4,6 +4,7 @@
 
 \RequirePackage{expl3}
 \RequirePackage{xparse}
+\RequirePackage{etoolbox}        % \AtEndPreamble, for the preamble-file auto-load
 
 \ExplSyntaxOn
 
@@ -57,6 +58,7 @@
 \meta_create_var:nn { final-time }     { FinalTime }
 \meta_create_var:nn { bank-path }      { BankPath }
 \meta_create_var:nn { gradebook-path } { GradebookPath }
+\meta_create_var:nn { preamble-file }  { PreambleFile }
 % Per-class instructions-file keys. They live here (not in each class) so a
 % course can point every quiz/exam/card-set/pset at one file course-wide from
 % coursemeta.tex — coursemeta is read at this package's load, before any class
@@ -86,6 +88,7 @@
 	final-time      .tl_gset:c = { g__meta_final-time_tl },
 	bank-path       .tl_gset:c = { g__meta_bank-path_tl },
 	gradebook-path  .tl_gset:c = { g__meta_gradebook-path_tl },
+	preamble-file   .tl_gset:c = { g__meta_preamble-file_tl },
 	quiz-instructions-file  .tl_gset:c = { g__meta_quiz-instructions-file_tl },
 	exam-instructions-file  .tl_gset:c = { g__meta_exam-instructions-file_tl },
 	bingo-instructions-file .tl_gset:c = { g__meta_bingo-instructions-file_tl },
@@ -229,3 +232,12 @@
 \providecommand{\theTerm}{\GetTerm}
 
 \LoadCourseMeta
+
+% Auto-load a course-wide preamble file when `preamble-file` is set in
+% coursemeta.tex. The path is resolved coursemeta-relative (\GetCourseMetaDir
+% prepended, like bank-path) and the input is deferred to \AtEndPreamble so the
+% document class is fully loaded first. Lets a course point every document at one
+% shared preamble instead of \input-ing it by hand; a no-op when the key is unset.
+\AtEndPreamble{%
+	\IfMetaSet{preamble-file}{\input{\GetCourseMetaDir\GetPreambleFile}}{}%
+}

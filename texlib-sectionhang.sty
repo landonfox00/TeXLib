@@ -1,10 +1,13 @@
 % texlib-sectionhang.sty
-% Shared "structural hang" for the section-based TeXLib classes (didactic, pset).
+% Shared "structural hang" for the section-based TeXLib classes (didactic,
+% pset, report-card, syllabus, autoexam, quiz). NOT for schedule (it rebinds
+% \section as the Lua calendar command) or bingo (no sectioning at all).
 %
 % Hangs every structural marker into the left margin by \texlibsectionhang so
 % they share one outer left edge, while body text and the theorem rules sit
 % inside it:
-%   * \section / \subsection headings (numbers or, when unnumbered, the title)
+%   * \section / \subsection / \subsubsection headings
+%     (numbers or, when unnumbered, the title)
 %   * the table-of-contents title  (tocloft)
 %   * the bibliography heading      (biblatex)
 %   * the running header + footer   (fancyhdr)
@@ -18,7 +21,7 @@
 % The rule WIDTH of the theorem boxes is untouched (\texlibrulewidth, in
 % texlib-theorems.sty); this only moves the heading/frame left edge.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{texlib-sectionhang}[2026/06/01 v1.0 TeXLib hanging section headings]
+\ProvidesPackage{texlib-sectionhang}[2026/06/10 v1.1 TeXLib hanging section headings]
 
 \RequirePackage{etoolbox}
 
@@ -27,9 +30,10 @@
 \newlength{\texlibsectionhang}
 \setlength{\texlibsectionhang}{24pt}
 
-% \section / \subsection: re-issue the article defaults with a NEGATIVE indent,
-% so the heading's left edge lands \texlibsectionhang into the margin. (didactic
-% and pset both build on article and don't otherwise restyle these.)
+% \section / \subsection / \subsubsection: re-issue the article defaults with a
+% NEGATIVE indent, so the heading's left edge lands \texlibsectionhang into the
+% margin. (The consumer classes build on article — directly or via exam, which
+% \LoadClass{article}es — and don't otherwise restyle these.)
 \newcommand{\texlib@sh@sections}{%
 	\renewcommand\section{\@startsection{section}{1}{-\texlibsectionhang}%
 		{-3.5ex \@plus -1ex \@minus -.2ex}%
@@ -39,6 +43,10 @@
 		{-3.25ex\@plus -1ex \@minus -.2ex}%
 		{1.5ex \@plus .2ex}%
 		{\normalfont\large\bfseries}}%
+	\renewcommand\subsubsection{\@startsection{subsubsection}{3}{-\texlibsectionhang}%
+		{-3.25ex\@plus -1ex \@minus -.2ex}%
+		{1.5ex \@plus .2ex}%
+		{\normalfont\normalsize\bfseries}}%
 }
 
 % Apply now (file is loaded last in the class, so this lands on top of the

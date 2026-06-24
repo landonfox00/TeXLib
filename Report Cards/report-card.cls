@@ -165,7 +165,8 @@
 % Header: L = report-card title  C = (none)  R = term + section.
 \SetTeXLibHeader{\bfseries\GetReportCardTitle}{}{\GetTermSection}
 \SetTeXLibFooter
-\TeXLibRuleBleed                  % symmetric rule length, matching didactic
+% Rule bleed comes from texlib-sectionhang's [LR] offset (loaded at the end of
+% this class), so \TeXLibRuleBleed must NOT also be called.
 
 % Title-page style: same footer as `fancy`, but header + rule suppressed so the
 % \maketitle block sits cleanly at the top of page 1 (matches pset/syllabus).
@@ -411,5 +412,12 @@
 \NewDocumentCommand{\gradebook}{ o }{%
 	\IfValueTF{#1}{\rc@gradebook@render{#1}}{\rc@load@coursegradebook}%
 }
+
+% ==============================================================================
+% Structural hang: section headings (the per-student \section* blocks), the TOC
+% title, and the running header/footer all hang onto one outer left edge.
+% Loaded LAST so its redefinitions land on top of the article defaults.
+% ==============================================================================
+\RequirePackage{texlib-sectionhang}
 
 \endinput
