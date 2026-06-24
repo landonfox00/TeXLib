@@ -203,8 +203,22 @@
 \NewExpandableDocumentCommand{\GetCourseMetaDir}{ } {
 	\tl_use:N \g__meta_dir_tl
 }
+% Diagnostic when no coursemeta.tex turns up: the standard getters stay defined
+% (they expand empty), but custom \Get<Key> keys that only a coursemeta would
+% mint surface as confusing "undefined control sequence" errors downstream. A
+% warning (not an error) keeps the class-options-only / \metasetup-only workflow
+% working while pointing at the likely cause.
+\msg_new:nnn { course-metadata } { no-coursemeta }
+	{
+		No~coursemeta.tex~found~(looked~in~.,~..,~../..,~../../..~relative~to~
+		the~job).~Course~metadata~will~be~empty~unless~provided~via~class~
+		options~or~the~metasetup~command.~See~
+		examples/Math181-Fall2026/coursemeta.tex~for~the~expected~file.
+	}
 \NewDocumentCommand{\LoadCourseMeta}{}{
-	\bool_if:NT \g__meta_found_bool { \input{ \g__meta_path_tl } }
+	\bool_if:NTF \g__meta_found_bool
+		{ \input{ \g__meta_path_tl } }
+		{ \msg_warning:nn { course-metadata } { no-coursemeta } }
 }
 
 \ExplSyntaxOff
