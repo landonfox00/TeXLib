@@ -5,12 +5,24 @@
 	\setrng{b}{2}{9}%
 	\setrng{c}{2}{9}%
 	Solve $\get{a}x^2 + \get{b}x + \get{c} = 0$ for $x$.
-	\solution
+	\begin{solution}
 	By the quadratic formula,
 	$x = \frac{-\get{b} \pm \sqrt{\get{b}^2 - 4 \cdot \get{a} \cdot \get{c}}}{2 \cdot \get{a}}.$
+	\end{solution}
 \end{problem}
 
 \begin{problem}{picky}[topic=pick]
 	\pickrange{lst}{3}{1}{20}%
 	Pick from the list: \getlist{lst}.
+\end{problem}
+
+% Regression: a \begin{problem}{id}[meta] header that WRAPS across lines. The
+% engine serves each FR stem by re-reading the bank from the line after
+% \begin{problem}, so it must skip these continuation lines; otherwise the
+% trailing meta line (source=MLHEADERLEAK]) leaks in as the stem's first line.
+% The smoke check asserts MULTILINEHEADEROK is present and MLHEADERLEAK absent.
+\begin{problem}{mlheader}[topic=quad,
+                          section=R.1,
+                          source=MLHEADERLEAK]
+	Multi-line header stem renders MULTILINEHEADEROK here.
 \end{problem}

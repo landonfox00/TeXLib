@@ -10,7 +10,7 @@ End-to-end illustrations of using TeXLib for a real course. Copy a directory and
   - `schedule.tex` — a landscape `schedule` grid: Fall 2026 holidays, MWF sections, Friday quizzes, exam/review weeks, and finals. Reads the term dates and `lecture-days` from `coursemeta.tex`.
   - `lecture-01-limits.tex` — a short `didactic` lecture demonstrating `definition` / `theorem` / `example` / `exercise` / `solution` environments.
   - `quiz-01.tex` — a short `quiz` mixing inline problems and bank-backed `\getproblem` retrieval.
-  - `exam-01.tex` + `bank.tex` — a randomized **multi-version** `autoexam` (`\versions{A,B,C}` + `\shufflepages`) that retrieves problems from a small course bank by topic. Build it as a collated PDF, a single version, or an answer key (see the header of `exam-01.tex`).
+  - `exam-01.tex` + `bank.tex` — a randomized **multi-version** `autoexam` (`\versions{A,B,C}` + `\shuffle`) that retrieves problems from a small course bank by topic. Build it as a collated PDF, a single version, or an answer key (see the header of `exam-01.tex`).
 
 The folder deliberately covers the *everyday* course documents. The remaining classes — `pset` (problem sets), `report-card`, and `bingo` — aren't shown here; for those, copy the canonical template from the module directory ([`Problem Sets/pset-template.tex`](../Problem%20Sets/pset-template.tex), [`Report Cards/report-card-template.tex`](../Report%20Cards/report-card-template.tex), [`Bingo/bingo-template.tex`](../Bingo/bingo-template.tex)). Each module's `README.md` documents its options.
 

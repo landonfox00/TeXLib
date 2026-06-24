@@ -116,6 +116,19 @@
 % also covers quizzes, which never call the per-version seeder.
 \newcommand{\setexamseed}[1]{\pbank@lua{exam_seed_override = #1 set_exam_seed('')}}
 
+% \shuffle  — turn on per-version shuffling (deprecated alias: \shufflepages).
+% Shared by both assessment classes so the toggle (and its default-off behaviour)
+% lives in one place.  autoexam: reorders problems within each {problems} /
+% {mcproblems} section per version (the version loop's source pre-pass) AND
+% shuffles each multiple-choice problem's options at typeset time.  quiz /
+% single-version: shuffles each MC problem's options only (no version loop, so no
+% question-order pre-pass).  WITHOUT \shuffle the output is deterministic —
+% authored problem AND choice order, and \begin{choices}[choose=m] presents ALL
+% options (subset selection is part of the shuffle).  \begin{choices}[fixed]
+% keeps a block in authored order even under \shuffle.
+\newcommand{\shuffle}{\pbank@lua{set_autoexam_shuffle_pages()}}
+\let\shufflepages\shuffle   % deprecated alias
+
 % \calcvar{name}{lua-expr}  — compute an expression using stored vars
 \newcommand{\calcvar}[2]{\pbank@lua{calc_var('#1', '#2')}}
 
@@ -174,16 +187,18 @@
 
 % \begin{problem}{id}[key=val, key=val, ...]
 %   Define a problem in the bank.  Produces no output at definition time.
-%   Everything before the first \solution token in the body is the problem
-%   content; everything after is the solution.  Void setup commands
-%   (\setrng, \calcvar, etc.) may appear anywhere in the body.
+%   The body is region-delimited: an optional \begin{choices}..\end{choices}
+%   (its presence marks the problem multiple choice) and an optional
+%   \begin{solution}..\end{solution}; everything else is the stem.  Void setup
+%   commands (\setrng, \calcvar, etc.) may appear anywhere in the body.
 %
 %   Implementation notes:
 %     - \Collect@Body (from environ) intercepts the body without opening a
 %       nested environment, avoiding LaTeX's env-stack mismatch error.
-%     - \unexpanded{#1} prevents expansion of \solution and setup commands
-%       when the body is passed to \luaescapestring for Lua storage.
-%     - define_problem_from_env() splits the resulting string on \solution.
+%     - \unexpanded{#1} prevents expansion of the body's setup commands when it
+%       is passed to \luaescapestring for Lua storage.
+%     - define_problem_from_env() isolates the choices/solution regions from the
+%       stored string (see problem_engine.lua).
 
 % Internal callback: receives the full collected body as #1.
 \long\def\@problem@collect@done#1{%
@@ -377,46 +392,130 @@
 %   \par\medskip; autoexam.cls overrides with a full-width rule.
 \providecommand{\autoexam@problem@sep}{\par\medskip}
 
-% \begin{problems} ... \end{problems}
-%   Drop-in replacement for {questions} that accepts \problem items (the
-%   {questions} environment is preserved for backward compat).  The core is
-%   identical in every class: it tracks the first problem on each page (for the
-%   inter-problem separator), patches \newpage to reset that flag, opens
-%   {questions}, and swaps \problem <-> \@problem@item for the body.
+% \begin{problems} / \begin{mcproblems} ... (auto-numbered "Part N" sections)
+%   Drop-in replacements for {questions} that accept \problem items (the
+%   {questions} environment is preserved for backward compat).  They are
+%   REPEATABLE — used in any order/count in the body — each emitting a "Part N —
+%   Label" heading (label by type, overridable via the optional argument) and
+%   threading the exam-class question number continuously across sections.  The
+%   shared core (\@texlib@psection@begin/@end) is identical in every class: it
+%   sets the engine render mode (mc/fr), steps the Part counter, opens {questions}
+%   carrying the question number, tracks the first problem on each page (for the
+%   inter-problem separator), patches \newpage, and swaps \problem <-> the item.
 %
 %   Class-specific page policy is injected through two overridable hooks, both
 %   no-ops by default:
-%     \problems@begin@hook — runs before {questions} opens.  autoexam.cls fills
-%        it with \clearpage, the page-counter reset, the problem-style
-%        header/footer slots, and a single-use guard; quiz.cls leaves it empty
-%        (quizzes have no cover page or separate "X of N" numbering, so the
-%        environment must NOT clear the page or reset the counter).
-%     \problems@end@hook   — runs after {questions} closes.  autoexam.cls uses
-%        it to place \label{@lastqpage} for the "X of N" footer.
+%     \problems@begin@hook — runs after the Part counter is stepped.  autoexam.cls
+%        fills it with \clearpage (every section) plus, at the FIRST section only,
+%        the page-counter reset, header/footer slots, and the per-copy "X of N"
+%        footer id; quiz.cls leaves it empty (quizzes flow continuously).
+%     \problems@end@hook   — runs after {questions} closes.  autoexam.cls uses it
+%        to place \label{@lastqpage@<copy>} for the "X of N" footer.
 %   The hooks run INSIDE the environment's group, so a plain \def a class makes
 %   in \problems@begin@hook is local to the environment (use \global for slots
 %   that must outlive it — see autoexam.cls).
 \providecommand{\problems@begin@hook}{}
 \providecommand{\problems@end@hook}{}
-\newenvironment{problems}{%
+
+% Part counter for the auto section heading, and a carry counter that threads the
+% exam-class `question` number CONTINUOUSLY across consecutive problem-sections
+% (the exam `questions` environment restarts it at 0 on each \begin{questions}).
+\newcounter{texlibpartno}
+\newcounter{@texlib@qcarry}
+
+% \texlib@partheading{text} — render a section's "Part N — Label" heading.
+% Overridable per class; the default is a starred section (autoexam's
+% texlib-sectionhang then styles it like every other heading).
+\providecommand{\texlib@partheading}[1]{\section*{#1}}
+
+% \@texlib@psection@begin{mode}{default-label}{user-label}{show-heading}
+%   Shared core of {problems} and {mcproblems}.  mode ('fr'/'mc') is handed to the
+%   engine so \problem items know whether to apply the multiple-choice frame.  The
+%   Part counter is stepped BEFORE \problems@begin@hook so the class page policy
+%   can tell the first section (reset page counter) from later ones (continue) —
+%   stepped even when the heading is suppressed, so the starred form still resets
+%   the page numbering on the first section.  show-heading is 1 (emit "Part N —
+%   Label") or 0 (the starred form: no auto heading, for docs that supply their
+%   own section headings, e.g. review sheets).
+\newcommand{\@texlib@psection@begin}[4]{%
+	\pbank@lua{pbank_section_mode = '#1'}%
+	\stepcounter{texlibpartno}%
 	\problems@begin@hook
 	% ---- inter-problem separator: first problem on a page gets no rule -------
 	\pbank@lua{pbank_first_on_page = true}%
-	% Patch \newpage so crossing a page boundary resets the "first on page" flag.
 	\let\@problems@saved@newpage\newpage
 	\renewcommand{\newpage}{%
 		\@problems@saved@newpage
 		\pbank@lua{pbank_first_on_page = true}%
 	}%
-	% ---- start questions list ------------------------------------------------
+	% ---- open the question list, carrying the question number across sections -
 	\begin{questions}%
+	\setcounter{question}{\value{@texlib@qcarry}}%
 	\let\@saved@problem\problem
 	\let\problem\@problem@item
-}{%
+	% ---- auto "Part N — Label" heading (user label overrides the default) -----
+	\if 1#4%
+		\def\@texlib@ulbl{#3}%
+		\texlib@partheading{%
+			Part~\Roman{texlibpartno}\space\textemdash\space
+			\ifx\@texlib@ulbl\@empty #2\else #3\fi
+		}%
+	\fi
+}
+\newcommand{\@texlib@psection@end}{%
+	\setcounter{@texlib@qcarry}{\value{question}}%
 	\let\problem\@saved@problem
 	\let\newpage\@problems@saved@newpage
 	\end{questions}%
 	\problems@end@hook
 }
+
+% \begin{problems}[label] ... \end{problems}     — free-response section
+% \begin{mcproblems}[label] ... \end{mcproblems} — multiple-choice section
+%   Drop-in replacements for {questions} that accept \problem items.  Used in
+%   arbitrary order/count in the document body; each is auto-numbered "Part N" and
+%   labelled by type (overridable via the optional argument).  The STARRED form
+%   (\begin{problems}*) suppresses the auto heading — for documents that supply
+%   their own \section* headings (e.g. review sheets).  Page/header policy is
+%   injected by the class through \problems@begin@hook / \problems@end@hook.
+\NewDocumentEnvironment{problems}{s O{}}{%
+	\IfBooleanTF{#1}
+		{\@texlib@psection@begin{fr}{Free Response}{#2}{0}}
+		{\@texlib@psection@begin{fr}{Free Response}{#2}{1}}%
+}{\@texlib@psection@end}
+\NewDocumentEnvironment{mcproblems}{s O{}}{%
+	\IfBooleanTF{#1}
+		{\@texlib@psection@begin{mc}{Multiple Choice}{#2}{0}}
+		{\@texlib@psection@begin{mc}{Multiple Choice}{#2}{1}}%
+}{\@texlib@psection@end}
+
+% ---- Multiple-choice option markers ---------------------------------------
+% Authored inside \begin{choices} in the bank; the engine parses them from the
+% captured source and emits exam-class \choice / \CorrectChoice at typeset time,
+% so these are executed only if a choices block is used directly (outside the
+% bank flow).  Defined here for that safety and for documentation.
+%   \cchoice      the correct option (exactly one expected)
+%   \fchoice[i]   a forced (always-present) option; optional i pins its 1-based
+%                 slot (negative = from the end, Python-style)
+\ProvideDocumentCommand{\cchoice}{}{\CorrectChoice}
+\ProvideDocumentCommand{\fchoice}{o}{\choice}
+
+% ---- Multiple-choice layout frame -----------------------------------------
+% emit_mc_tail (engine) brackets each MC problem's choices / answer line /
+% solution with these hooks.  Default: full width, choices in place, a
+% right-aligned answer line (the letter in solution builds, a blank rule
+% otherwise), solution below.  autoexam overrides them for the side-by-side
+% instructor key.  \if@mc@inline is set true by the engine for an inline
+% (oneparchoices) block, telling the frame to render it stacked rather than
+% side-by-side (the default frame is already stacked, so it ignores the flag).
+\newif\if@mc@inline
+\providecommand{\@mc@letter}{?}
+\providecommand{\@mcframe@begin}[1]{\def\@mc@letter{#1}}
+\providecommand{\@mcframe@answer}{%
+	\par\nobreak\noindent\hfill\textbf{Answer:}~%
+	\ifsolutions\fbox{\@mc@letter}\else\rule{2.5cm}{0.4pt}\fi\par
+}
+\providecommand{\@mcframe@mid}{}
+\providecommand{\@mcframe@end}{}
 
 \endinput

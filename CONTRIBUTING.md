@@ -48,9 +48,12 @@ on push/PR. A green PR should pass `smoke_test.py` locally first.
 
 ## Adding bank problems
 
-Bank problems are `\begin{problem}{id}[meta] … \solution … \end{problem}`
-blocks. Define them in a bank file and pull with `\getproblem{id}` (anywhere)
-or `\problem{filter}` (inside `\begin{problems}`). Keep `id`s unique. See
+Bank problems are region-delimited
+`\begin{problem}{id}[meta] <stem> [\begin{choices}…\end{choices}]
+[\begin{solution}…\end{solution}] \end{problem}` blocks (the optional choices
+block marks a multiple-choice problem; `\cchoice` flags the answer). Define them
+in a bank file and pull with `\getproblem{id}` (anywhere) or `\problem{filter}`
+(inside `\begin{problems}` / `\begin{mcproblems}`). Keep `id`s unique. See
 `texlib-problembank.sty` and the `Exams/` templates for the full API.
 
 ## Releasing (maintainer)

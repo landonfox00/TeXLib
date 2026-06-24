@@ -90,9 +90,10 @@ file that's reusable across quizzes and exams.
 `\loadbank{path}` — explicitly load a problem bank file. Inside, you
 typically have a sequence of `\begin{problem}` blocks.
 
-`\begin{problem}{id}[key=val,...] ... \solution ... \end{problem}`
-— define a problem in the database. Body before `\solution` is the
-problem content; body after is the (optional) solution. May sit in a
+`\begin{problem}{id}[key=val,...] ... \end{problem}`
+— define a problem in the database. The body is region-delimited: an
+optional `\begin{choices}...\end{choices}` (multiple choice) and an optional
+`\begin{solution}...\end{solution}`; everything else is the stem. May sit in a
 bank file, in the document preamble, or in the body. Double-clicking the
 typeset problem in the PDF jumps back to its `\begin{problem}` block.
 Example:
@@ -100,7 +101,7 @@ Example:
 ```latex
 \begin{problem}{linear_eq}[topic=algebra, diff=easy]
 	Solve $2x + 5 = 11$ for $x$.
-	\solution $x = 3$
+	\begin{solution} $x = 3$ \end{solution}
 \end{problem}
 ```
 

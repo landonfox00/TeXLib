@@ -91,18 +91,27 @@
 % texlib-problembank.sty for the full API.
 \RequirePackage{texlib-problembank}
 
+% Shared solution box, grading-rubric overlay, {commonerrors}, the \workbox
+% solution-suppress override, and the side-by-side multiple-choice key frame —
+% identical to autoexam, so quiz keys render the same.  Loaded AFTER
+% texlib-problembank so it can override that package's \@mcframe@* / \workbox
+% defaults.
+\RequirePackage{texlib-solutions}
+
 % \loadbank is provided by texlib-problembank.sty. A coursemeta bank-path and a
 % sibling bank.tex are auto-loaded below (shared resolution, see
 % \pbank@load@coursebank), so per-quiz \loadbank is usually unnecessary. Quizzes
 % set no RNG seed (single-version by design), so the hook is just the bank load.
 \AtBeginDocument{\pbank@load@coursebank}
 
-% \begin{problems} is provided by texlib-problembank.sty (shared with
-% autoexam.cls).  Quizzes need no page-section setup, so the shared
-% \problems@begin@hook / \problems@end@hook are left at their no-op defaults:
-% the environment simply wraps {questions} and enables the \problem item
-% command.  (autoexam fills those hooks with \clearpage, a page-counter reset,
-% header/footer slots, and a single-use guard — none of which quizzes want.)
+% \begin{problems} / \begin{mcproblems} are provided by texlib-problembank.sty
+% (shared with autoexam.cls).  Quizzes need no page-section policy, so the shared
+% \problems@begin@hook / \problems@end@hook are left at their no-op defaults: each
+% environment just emits its "Part N" heading, wraps {questions}, and enables the
+% \problem item command.  (autoexam fills those hooks with \clearpage, a first-
+% section page-counter reset, and the "X of N" footer — none of which quizzes
+% want.)  The multiple-choice frame defaults (texlib-problembank's \@mcframe@*)
+% render MC stacked here; autoexam's side-by-side key override is exam-only.
 
 % Math macros (\mbb, \abs, \lrp, \dd, \deriv, \inte, \todo, ...) are provided
 % by texlib-mathutils.sty, loaded in section 1 above.
@@ -171,5 +180,15 @@
 % provided by course-metadata.sty.  Quiz-specific aliases stay here.
 \providecommand{\theQuizNumber}{\GetQuizNumber}
 \providecommand{\theTitle}{\GetQuizTitle}
+
+% ==============================================================================
+% Structural hang: any \section-family headings hang onto the shared TeXLib
+% left edge, matching the other classes (quizzes rarely use them, but the
+% geometry stays in lock-step with autoexam). The exam-class headandfoot rules
+% are untouched (fancyhdr is not loaded, so the package's header/footer offset
+% is a no-op here). Loaded LAST so its redefinitions land on top of the
+% article defaults.
+% ==============================================================================
+\RequirePackage{texlib-sectionhang}
 
 \endinput

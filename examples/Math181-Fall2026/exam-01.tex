@@ -12,11 +12,11 @@
 	exam-date   = {October 9, 2026},
 ]{autoexam}
 
-% Three labeled versions. \shufflepages reorders the questions independently
-% per version (seeded by the version letter), so one authored order below yields
-% A/B/C with the same problems in different sequence — no per-version files.
+% Three labeled versions. \shuffle reorders the questions (and each MC problem's
+% options) independently per version (seeded by the version letter), so one
+% authored order below yields A/B/C in different sequence — no per-version files.
 \versions{A, B, C}
-\shufflepages
+\shuffle
 
 \loadbank{bank.tex}
 
