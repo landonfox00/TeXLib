@@ -151,7 +151,8 @@
 \SetTeXLibBuildBadge{\ifkey Answer Key\fi}
 \SetTeXLibHeader{\bfseries\GetPsetTitle}{\TeXLibBuildBadge}{\GetTermSection}
 \SetTeXLibFooter
-\TeXLibRuleBleed                  % symmetric rule length, matching didactic
+% Rule bleed comes from texlib-sectionhang's [LR] offset (loaded at the end of
+% this class), so \TeXLibRuleBleed must NOT also be called.
 
 % Title-page style: same footer as the regular `fancy` style, but the
 % header and its rule are suppressed so the title block sits at the top
@@ -374,5 +375,12 @@
 % ==============================================================================
 % Math macros (\mbb, \abs, \lrp, \dd, \deriv, \inte, \todo, ...) are provided
 % by texlib-mathutils.sty, loaded transitively via basic-utilities.sty above.
+
+% ==============================================================================
+% Structural hang: section/subsection headings, the TOC title, the bibliography
+% heading, and the running header/footer all hang onto one outer left edge.
+% Loaded LAST so its redefinitions land on top of the article defaults.
+% ==============================================================================
+\RequirePackage{texlib-sectionhang}
 
 \endinput

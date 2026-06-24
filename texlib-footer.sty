@@ -55,13 +55,13 @@
 % Symmetric rule bleed: widen the header AND footer rules by \texlibrulebleed
 % into BOTH margins, so every class's rules are the same length and symmetric
 % about the page midpoint, with the L/R slot text sitting flush at the rule
-% ends. The bleed equals the section hang (\texlibsectionhang = 24pt), so in
-% didactic the LEFT end lands exactly on the hung-heading line while the right
-% end mirrors it; the non-hang classes get the identical geometry (left bleed
-% into otherwise-empty margin). Keep this value in sync with \texlibsectionhang.
-% Call once, after \pagestyle{fancy}. (\fancyhfoffset adjusts head + foot
-% together.) didactic gets its bleed from texlib-sectionhang's [LR] offset
-% instead, so it must NOT also call \TeXLibRuleBleed.
+% ends. The bleed equals the section hang (\texlibsectionhang = 24pt), so the
+% LEFT end lands exactly on the hung-heading line while the right end mirrors
+% it. Keep this value in sync with \texlibsectionhang. Call once, after
+% \pagestyle{fancy}. (\fancyhfoffset adjusts head + foot together.) The
+% classes that load texlib-sectionhang (didactic, pset, report-card, syllabus)
+% get their bleed from its [LR] offset instead, so they must NOT also call
+% \TeXLibRuleBleed; only the no-section classes (bingo) call it.
 \newlength{\texlibrulebleed}
 \setlength{\texlibrulebleed}{24pt}
 \newcommand{\TeXLibRuleBleed}{\fancyhfoffset[LR]{\texlibrulebleed}}
