@@ -29,12 +29,12 @@ CUTOFFS = [("D", 60), ("C", 70), ("B", 80), ("A", 90)]
 # Raw per-assignment scores. Homework/Quiz averages are computed from these;
 # exams and extra credit are single scores.
 roster = {
-    "Sample Student": {"HW": [80, 85, 90], "Q": [75, 80, 85],
-                       "Exam": [78, 75, 80, 76, 78], "EC": [50, 33, 0, 33, 50]},
-    "Jordan Lee":     {"HW": [88, 92, 96], "Q": [85, 88, 91],
-                       "Exam": [90, 85, 91, 88, 93], "EC": [100, 100, 67, 100, 100]},
-    "Alex Kim":       {"HW": [70, 74, 78], "Q": [65, 67.5, 70],
-                       "Exam": [60, 58, 71, 65, 62], "EC": [50, 0, 33, 0, 50]},
+    "John Doe":  {"HW": [80, 85, 90], "Q": [75, 80, 85],
+                  "Exam": [78, 75, 80, 76, 78], "EC": [50, 33, 0, 33, 50]},
+    "Jane Doe":  {"HW": [88, 92, 96], "Q": [85, 88, 91],
+                  "Exam": [90, 85, 91, 88, 93], "EC": [100, 100, 67, 100, 100]},
+    "Jamie Doe": {"HW": [70, 74, 78], "Q": [65, 67.5, 70],
+                  "Exam": [60, 58, 71, 65, 62], "EC": [50, 0, 33, 0, 50]},
 }
 names = list(roster)
 
