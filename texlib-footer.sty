@@ -45,9 +45,37 @@
 % \fancyhead[L/C/R] + \headrulewidth. Content stays class-specific (the center
 % slot is usually \TeXLibBuildBadge from texlib-build); structure + rule are
 % centralized here. Call after \fancyhf{} and \pagestyle{fancy}.
+%
+% fancyhdr anchors the three slots independently (the center slot is centered
+% on \headwidth no matter how wide its neighbors get), so a long L or R slot
+% -- e.g. a lengthy \rightmark in a section-bearing class -- would run straight
+% under a centered build badge. The center slot therefore goes through a
+% shipout-time guard (marks only have their final value there): it prints only
+% when both side slots keep \texlibheaderclearance of air to the centered box.
+% The side slots carry the real navigation content, so the badge yields. An
+% empty center slot (student builds, classes with no badge) takes the
+% short-circuit branch and renders exactly as it always has.
+\newlength{\texlibheaderclearance}
+\setlength{\texlibheaderclearance}{10pt}
+\newcommand{\texlib@guardedcenter}[3]{%
+	\settowidth{\@tempdima}{#2}%
+	\ifdim\@tempdima=\z@
+		#2%
+	\else
+		% widest a side slot may grow before crowding the centered one
+		\@tempdimb=\dimexpr(\headwidth-\@tempdima)/2-\texlibheaderclearance\relax
+		\settowidth{\@tempdima}{#1}%
+		\ifdim\@tempdima>\@tempdimb\else
+			\settowidth{\@tempdima}{#3}%
+			\ifdim\@tempdima>\@tempdimb\else
+				#2%
+			\fi
+		\fi
+	\fi
+}
 \newcommand{\SetTeXLibHeader}[3]{%
 	\fancyhead[L]{#1}%
-	\fancyhead[C]{#2}%
+	\fancyhead[C]{\texlib@guardedcenter{#1}{#2}{#3}}%
 	\fancyhead[R]{#3}%
 	\renewcommand{\headrulewidth}{0.4pt}%
 }
