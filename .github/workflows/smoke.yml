@@ -20,7 +20,9 @@ jobs:
           python-version: "3.12"
 
       - name: Run smoke tests in TeX Live container
-        uses: xu-cheng/texlive-action@v2
+        # Pinned (the commit v2 resolved to) so the build environment — and thus
+        # the visual.yml reference rendering it shares — stays stable over time.
+        uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
           scheme: full
           # poppler-utils provides pdftotext for the content checks (substring

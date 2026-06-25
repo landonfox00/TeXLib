@@ -93,10 +93,14 @@ _(open)_
   registered in `schedule.cls`'s `meta` family (mirrors `quiz-days`:
   `\clist_gset` + an expandable `\GetRecitationDays`); the `recitations` scenario
   and the README now use it idiomatically.
-- Visual scenarios are local-only (env-specific refs). To make them CI-gateable,
+- ~~Visual scenarios are local-only (env-specific refs). To make them CI-gateable,
   pin the TeX Live container version and generate/commit refs from that image,
-  then add a separate (non-required, or nightly) visual job. Also: parallelize
-  builds + seed-pin autoexam/quiz to bring randomized modules into visual scope.
+  then add a separate (non-required, or nightly) visual job.~~ **Done** —
+  `visual.yml` pins the container (`xu-cheng/texlive-action@f886de8`) and runs
+  `--visual` + `--scenarios` on PRs + nightly, non-required; refs are regenerated
+  in-container via the workflow's `update_refs` dispatch (the committed refs
+  already match the pinned container byte-for-byte). **Still open:** parallelize
+  builds + seed-pin autoexam/quiz to bring the randomized modules into visual scope.
 - ~~**Delete orphaned `Quizzes/preamble.tex`**~~ **Done** — the file was already
   removed in `b7b0ba5` (2026-06-05, superseded by `quiz.cls`); the stale README
   layout reference to it is now fixed too.

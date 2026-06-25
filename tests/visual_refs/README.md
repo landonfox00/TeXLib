@@ -31,7 +31,18 @@ python smoke_test.py --update-refs            # all covered modules
 python smoke_test.py Schedule --update-refs   # just one
 ```
 
-Because of that environment-sensitivity, `--visual` is a **local** developer
-aid (run it before a layout-touching refactor); CI runs build + content checks
-only, which are portable. Comparison needs `pdftoppm` (poppler) and `magick`
-(ImageMagick); when either is missing the check soft-skips.
+`--visual` is also a quick **local** dev aid (run it before a layout-touching
+refactor). Comparison needs `pdftoppm` (poppler) and `magick` (ImageMagick);
+when either is missing the check soft-skips.
+
+## CI gate
+
+`.github/workflows/visual.yml` diffs against these refs inside a **pinned** TeX
+Live container (`xu-cheng/texlive-action@f886de8`) on PRs + nightly, non-required
+(it reports regressions without blocking merges). The pin keeps rendering stable
+so the committed refs stay valid — they currently match that container
+byte-for-byte. If the refs ever drift, regenerate them **in the container**: run
+the `visual` workflow manually with `update_refs=true` (Actions ▸ visual ▸ Run
+workflow), download the `visual-refs` artifact, and commit `tests/visual_refs/`.
+A plain local `--update-refs` only stays green in CI if your toolchain renders
+identically to the pinned container.
