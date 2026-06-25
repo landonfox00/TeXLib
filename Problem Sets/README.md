@@ -211,9 +211,10 @@ with `\solution`:
 \end{example}
 ```
 
-Everything after `\solution` renders with a bold **"Solution."** lead-in and is
-**always visible** in every build mode — a worked example's solution is part of
-the exposition, not a gated answer (unlike the standalone `solution` box, which
+Everything after `\solution` renders with an italic **"Solution."** lead-in
+(matching the `\answer` command) and is **always visible** in every build mode —
+a worked example's solution is part of the exposition, not a gated answer
+(unlike the standalone `solution` box, which
 is discarded outside answer-key/student mode). The hook is shared — it lives in
 `texlib-thmenv.sty`, so every class with an `example` environment gets it — and
 is scoped to the example environment, so the standalone `\begin{solution}` box

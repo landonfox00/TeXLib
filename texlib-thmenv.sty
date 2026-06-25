@@ -52,10 +52,10 @@
 % \texlib@example@solution is the inline "Solution." lead-in that the example
 % environment binds \solution to (see \__texlib_thm_declare:n). ALWAYS visible:
 % a worked example's solution is part of the exposition, not a build-mode-gated
-% answer key, so it carries no \ifsolutions guard. Bold "Solution." matches the
-% standalone {solution} box's label; the worked text follows inline.
+% answer key, so it carries no \ifsolutions guard. Mirrors didactic's \answer
+% command (italic label, \bigskip before, inline continuation), labeled "Solution.".
 \newcommand{\texlib@example@solution}{%
-	\par\smallskip\noindent\textbf{Solution.}\space}
+	\par\bigskip\noindent\textit{Solution.}\space}
 
 \ExplSyntaxOn
 
