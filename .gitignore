@@ -8,6 +8,9 @@ course-metadata_old.sty
 # Local Claude Code session guide (per-machine; not distributed to coworkers)
 /CLAUDE.md
 
+# Local feature-idea scratch log (cron-appended; not distributed to coworkers)
+/FEATURE-IDEAS.md
+
 # LaTeX build artifacts
 *.aux
 *.log
