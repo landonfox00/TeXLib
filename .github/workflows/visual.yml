@@ -1,0 +1,70 @@
+name: visual
+
+# Visual-regression gate. The reference images in tests/visual_refs/ are
+# environment-specific (font rendering differs across TeX Live builds), so this
+# job pins the SAME TeX Live container the refs were generated in and diffs
+# freshly rendered pages against them. Non-required by design: it reports a
+# regression without blocking merges.
+#
+# Regenerating the refs: run this workflow manually
+# (Actions > visual > Run workflow) with "update_refs" = true. It rebuilds the
+# refs inside the pinned container and uploads them as the "visual-refs"
+# artifact; download it and commit tests/visual_refs/ so a later check matches.
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * *"   # nightly safety net (default branch only)
+  workflow_dispatch:
+    inputs:
+      update_refs:
+        description: "Regenerate + upload reference images instead of checking"
+        type: boolean
+        default: false
+
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Pinned to the commit v2 resolved to, so rendering stays byte-stable over
+      # time (a silent TeX Live bump would otherwise invalidate every ref).
+      - name: Visual regression in pinned TeX Live
+        uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
+        with:
+          scheme: full
+          # poppler-utils -> pdftoppm (PDF->PNG); imagemagick -> magick compare.
+          run: |
+            set -e
+            apk add --no-cache python3 poppler-utils imagemagick
+            # Fail loudly if the compare tool is missing: smoke_test soft-skips
+            # visual checks when ImageMagick is absent, which would make this
+            # gate pass vacuously.
+            command -v magick >/dev/null 2>&1 || command -v compare >/dev/null 2>&1 \
+              || { echo "ImageMagick (magick/compare) not available"; exit 1; }
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
+               && [ "${{ github.event.inputs.update_refs }}" = "true" ]; then
+              echo "Regenerating reference images..."
+              python3 smoke_test.py --update-refs
+              python3 smoke_test.py --scenarios --update-refs
+            else
+              echo "Checking against committed reference images..."
+              python3 smoke_test.py --visual
+              python3 smoke_test.py --scenarios
+            fi
+
+      - name: Upload regenerated refs
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_refs == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-refs
+          path: tests/visual_refs/
+          retention-days: 7
