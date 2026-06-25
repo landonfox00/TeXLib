@@ -13,10 +13,12 @@ Two naming schemes share this directory:
 
 ## Scope
 
-Only deterministic modules are covered (`VISUAL_MODULES` in `smoke_test.py`:
-Schedule, Report Cards, Syllabi, Notes). `autoexam`/`quiz` shuffle versions and
-pull random bank problems, so their pages differ build-to-build and can't be
-pixel-compared.
+Only deterministic modules are covered at the **bare-template** level
+(`VISUAL_MODULES` in `smoke_test.py`: Schedule, Report Cards, Syllabi, Notes).
+`autoexam`/`quiz` shuffle versions and pull random bank problems, so their bare
+templates differ build-to-build. They're instead covered by **seed-pinned
+scenario packs** (`tests/scenarios/exam`, `tests/scenarios/quiz`), where a fixed
+`\setexamseed` + a single version makes the render reproducible and comparable.
 
 ## Regenerating
 

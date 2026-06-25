@@ -101,6 +101,7 @@ SCENARIO_AREA_MODULE = {
     "syllabi": "Syllabi",
     "notes": "Notes",
     "quiz": "Quizzes",
+    "exam": "Exams",
 }
 
 # Modules and their template files. Engine is auto-detected from \documentclass.
@@ -1037,7 +1038,7 @@ def main() -> int:
                 tail = "  (checks partially skipped)"
             if saved and not ok:
                 tail += f"  log: {saved}"
-            print(f"{status} {elapsed:5.1f}s{tail}")
+            print(f"  [{module:<14}] {mode_name:<9} ... {status} {elapsed:5.1f}s{tail}")
             results.append((module, mode_name, ok, elapsed, err))
 
     total = time.time() - t_start

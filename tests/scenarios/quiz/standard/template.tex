@@ -1,0 +1,43 @@
+% Scenario: quiz / standard   (tier: core)
+% A representative, deterministic quiz (student copy): title block + a
+% free-response problem and a multiple-choice problem. Seed-pinned and
+% self-contained (inline problems + inline metadata) so the render is
+% reproducible and pixel-comparable. (The quiz/coursemeta-instructions pack
+% covers the coursemeta path; this one covers the canonical student layout.)
+\documentclass{quiz}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	term           = {Fall 2026},
+}
+\meta{ quiz-number = 1 }
+\setexamseed{42}
+
+\begin{problem}{int-fr}
+	Evaluate $\displaystyle\int_0^1 x \, dx$.
+	\begin{solution} $\tfrac{1}{2}$. \end{solution}
+\end{problem}
+
+\begin{problem}{deriv-mc}
+	Which is $\dfrac{d}{dx}\!\left[\sin x\right]$?
+	\begin{choices}
+		\cchoice $\cos x$
+		\choice  $-\cos x$
+		\choice  $-\sin x$
+	\end{choices}
+\end{problem}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem{int-fr}
+\end{problems}
+\begin{mcproblems}
+	\problem{deriv-mc}
+\end{mcproblems}
+\end{document}

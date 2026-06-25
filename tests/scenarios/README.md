@@ -52,11 +52,13 @@ python smoke_test.py --scenarios schedule --full --update-refs   # combine freel
 ```
 
 Each scenario runs the area's content checks (grid non-empty + text tokens) plus
-a per-page visual diff. Like all visual checks, references are
-**rendering-environment-specific**, so this stays a local aid (not wired into
-CI) and must be regenerated after an intentional layout change or a TeX Live
-bump. Comparison needs `pdftoppm` (poppler) and `magick` (ImageMagick); missing
-tools soft-skip.
+a per-page visual diff. References are **rendering-environment-specific**, so
+they must be regenerated after an intentional layout change or a TeX Live bump.
+The `visual.yml` workflow runs `--scenarios` inside a **pinned** TeX Live
+container, so these are gated in CI (non-required); locally, comparison needs
+`pdftoppm` (poppler) and `magick` (ImageMagick) — missing tools soft-skip. The
+randomized `autoexam`/`quiz` classes are made deterministic here with a fixed
+`\setexamseed` + single version, bringing them into visual scope.
 
 ## Current packs
 
@@ -75,6 +77,8 @@ tools soft-skip.
 | syllabi | `long`               | full | content-heavy syllabus that spills onto page 2 |
 | notes | `theorem-custom`       | core | `\texlibtheoremsetup` — tint off + recoloured theorem/definition rules |
 | quiz | `coursemeta-instructions` | core | `quiz-instructions-file` set in `coursemeta.tex` resolves to a course-local instructions file (text-assertion scenario, no PNG ref) |
+| exam | `standard`               | core | deterministic seed-pinned exam: cover + MC answer-key frame + free-response (instructor copy) |
+| quiz | `standard`               | core | deterministic seed-pinned quiz: title + free-response + multiple-choice (student copy) |
 
 ## Adding a scenario
 

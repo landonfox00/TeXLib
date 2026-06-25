@@ -1,0 +1,51 @@
+% Scenario: exam / standard   (tier: core)
+% A representative, deterministic autoexam: cover page + a multiple-choice
+% section (the side-by-side instructor answer key) + a free-response section.
+% Seed-pinned (\setexamseed) and single-version (no \versions / \shuffle), so the
+% render is reproducible and pixel-comparable. Self-contained -- problems are
+% defined inline and metadata is inline, so no bank/coursemeta.tex is needed.
+\documentclass[
+	exam-number = {1},
+	exam-date   = {Smoke Test Date},
+	points      = {20},
+]{autoexam}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	term           = {Fall 2026},
+}
+
+\setexamseed{42}
+\solutions          % instructor copy: exercises the solution box + MC answer key
+
+% Problems defined inline (no bank file needed for the scenario).
+\begin{problem}{deriv-mc}
+	What is $\dfrac{d}{dx}\!\left[x^2\right]$?
+	\begin{choices}
+		\cchoice $2x$
+		\choice  $x$
+		\choice  $\dfrac{x^3}{3}$
+		\choice  $2$
+	\end{choices}
+	\begin{solution} By the power rule, $2x$. \end{solution}
+\end{problem}
+
+\begin{problem}{int-fr}
+	Evaluate $\displaystyle\int_0^2 3x^2 \, dx$.
+	\begin{solution} $\bigl[x^3\bigr]_0^2 = 8$. \end{solution}
+\end{problem}
+
+\begin{document}
+\maketitle
+\begin{mcproblems}
+	\problem[5]{deriv-mc}
+\end{mcproblems}
+\begin{problems}
+	\problem[15]{int-fr}
+\end{problems}
+\end{document}
