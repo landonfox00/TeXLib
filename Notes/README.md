@@ -161,6 +161,28 @@ Behavior:
 | Instructor (default)        | Body visible, blue tint                    |
 | Student                     | Blank box of `<height>`, "Space for Notes" |
 
+#### `\solution` inside an `example`
+
+Within an `example` (also `example*` and the `exam` alias) you can mark a
+worked solution inline with `\solution`:
+
+```latex
+\begin{example}
+	Evaluate $\lim_{x \to 3}(2x + 1)$.
+	\solution Direct substitution gives $7$.
+\end{example}
+```
+
+Everything after `\solution` renders with an italic **"Solution."** lead-in
+(matching the `\answer` command) and is **always visible** in every build mode —
+a worked example's solution is part of the exposition, not a gated answer key
+(the key difference from the standalone
+`solution` box, which blanks out for students). The hook is shared — it lives in
+`texlib-thmenv.sty`, so every class with an `example` environment gets it — and
+is scoped to the example environment, so the standalone `\begin{solution}` box
+keeps `\solution` everywhere else; just don't nest a `\begin{solution}` box
+*inside* an example.
+
 ### Math utilities
 
 The class predefines: `\mbb`, `\mrm`, `\mcal`, `\msf`, `\mf`, `\mscr`,

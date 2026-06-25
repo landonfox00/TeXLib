@@ -31,6 +31,7 @@
 % tcolorbox.
 
 \RequirePackage{amsthm}
+\RequirePackage{etoolbox}   % \AtBeginEnvironment, for the example \solution hook
 
 % ------------------------------------------------------------------------------
 % Alias builder (traditional catcodes: needs raw #/## for the env's optional arg)
@@ -44,6 +45,17 @@
 		{\IfNoValueTF{##1}{\begin{#2}}{\begin{#2}[##1]}}
 		{\end{#2}}%
 }
+
+% ------------------------------------------------------------------------------
+% Worked-example inline solution
+% ------------------------------------------------------------------------------
+% \texlib@example@solution is the inline "Solution." lead-in that the example
+% environment binds \solution to (see \__texlib_thm_declare:n). ALWAYS visible:
+% a worked example's solution is part of the exposition, not a build-mode-gated
+% answer key, so it carries no \ifsolutions guard. Mirrors didactic's \answer
+% command (italic label, \bigskip before, inline continuation), labeled "Solution.".
+\newcommand{\texlib@example@solution}{%
+	\par\bigskip\noindent\textit{Solution.}\space}
 
 \ExplSyntaxOn
 
@@ -136,6 +148,15 @@
 				{ \l__texlib_thm_box_tl } }
 			\use:x { \exp_not:N \tcolorboxenvironment { \exp_not:n {#1} * }
 				{ \l__texlib_thm_box_tl } }
+		}
+		% The example box binds \solution to an always-visible inline "Solution."
+		% lead-in (a worked example's solution is exposition, not a gated key).
+		% Scoped via \AtBeginEnvironment so the class's standalone {solution} box
+		% keeps the \solution token elsewhere; the example group restores it at
+		% \end. example* gets the same hook.
+		\str_if_eq:nnT {#1} {example} {
+			\AtBeginEnvironment{example}{\let\solution\texlib@example@solution}
+			\AtBeginEnvironment{example*}{\let\solution\texlib@example@solution}
 		}
 	}{
 		\msg_error:nnn { texlib-thmenv } { unknown-env } {#1}
