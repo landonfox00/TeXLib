@@ -104,10 +104,17 @@
 %   The Python builder also parses this command via regex to discover versions.
 \def\@autoexam@versions{}  % empty = edit/single-version mode
 \newcommand{\examversions}[1]{%
-	\def\@autoexam@versions{#1}%
-	\@autoexam@versionedtrue%           % mark that explicit versions were declared
-	\directlua{texlib.set_autoexam_versions('\luaescapestring{#1}')}%
-	\typeout{AutoExam: Detected Versions: #1}%
+	\ifdefined\directlua
+		\def\@autoexam@versions{#1}%
+		\@autoexam@versionedtrue%       % mark that explicit versions were declared
+		\directlua{texlib.set_autoexam_versions('\luaescapestring{#1}')}%
+		\typeout{AutoExam: Detected Versions: #1}%
+	\else
+		\ClassError{autoexam}{Multi-version exams require LuaLaTeX}{%
+			\string\versions/\string\examversions builds randomized versions
+			through a Lua engine (\string\directlua), which only exists under
+			LuaLaTeX. Compile this document with lualatex.}%
+	\fi
 }
 \let\versions\examversions              % \versions is the preferred short alias
 

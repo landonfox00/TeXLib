@@ -134,7 +134,7 @@ The Sublime build system surfaces these as palette entries; `smoke_test.py` inje
 ├── Exams/                 # autoexam.cls + bank + template
 ├── Notes/                 # didactic.cls + template
 ├── Problem Sets/          # pset.cls + template
-├── Quizzes/               # quiz.cls + preamble + template
+├── Quizzes/               # quiz.cls + template
 ├── Report Cards/          # report-card.cls + template
 ├── Schedule/              # schedule.cls + lua helpers + template
 ├── Syllabi/               # syllabus.cls + template

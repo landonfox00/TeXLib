@@ -97,6 +97,6 @@ _(open)_
   pin the TeX Live container version and generate/commit refs from that image,
   then add a separate (non-required, or nightly) visual job. Also: parallelize
   builds + seed-pin autoexam/quiz to bring randomized modules into visual scope.
-- **Delete orphaned `Quizzes/preamble.tex`** — not `\input`/`\usepackage`d
-  anywhere (only named in the top-level README layout); superseded by
-  `quiz.cls`. Verify, remove, and fix the README layout line.
+- ~~**Delete orphaned `Quizzes/preamble.tex`**~~ **Done** — the file was already
+  removed in `b7b0ba5` (2026-06-05, superseded by `quiz.cls`); the stale README
+  layout reference to it is now fixed too.

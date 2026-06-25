@@ -70,6 +70,9 @@
 % ==============================================================================
 % 4. LUA BRIDGE
 % ==============================================================================
+% LuaLaTeX only — the calendar grid is built by a Lua engine. Under a non-Lua
+% engine, fail with a clear instruction instead of a cryptic \directlua error.
+\ifdefined\directlua
 \directlua{
 	local function load_safe(name)
 		local cls_path = kpse.find_file("schedule.cls")
@@ -88,6 +91,11 @@
 	load_safe("calendar.lua")
 	load_safe("schedule.lua")
 }
+\else
+	\ClassError{schedule}{The schedule class requires LuaLaTeX}{%
+		schedule builds its calendar through a Lua engine (\string\directlua),
+		which only exists under LuaLaTeX. Compile this document with lualatex.}%
+\fi
 
 % ==============================================================================
 % 5. CLASS-LOCAL METADATA KEYS

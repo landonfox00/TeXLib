@@ -54,7 +54,13 @@
 
 % Randomization + cell-list engine (LuaLaTeX only). \directlua loads the
 % sibling bingo.lua via kpathsea so the Lua keeps normal file syntax.
-\directlua{ dofile(kpse.find_file("bingo.lua")) }
+\ifdefined\directlua
+	\directlua{ dofile(kpse.find_file("bingo.lua")) }
+\else
+	\ClassError{bingo}{The bingo class requires LuaLaTeX}{%
+		bingo randomizes its cards through a Lua engine (\string\directlua),
+		which only exists under LuaLaTeX. Compile this document with lualatex.}%
+\fi
 
 
 % ==============================================================================
