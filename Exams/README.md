@@ -108,6 +108,13 @@ backward-compat alias (it forwards to `\meta` internally).
 | `exam-instructions`      | —                     | Inline instructions text (boxed); overrides the default file |
 | `exam-instructions-file` | `instructions-file`   | Filename (no `.tex`) for instructions, `\input` unboxed and overriding inline; default file `autoexam-instructions`. Settable course-wide in `coursemeta.tex`. |
 
+**Exam date from coursemeta.** If `exam-date` is not set on the document,
+`autoexam` falls back to the coursemeta `exam<N>-date` key whose number matches
+`exam-number` (e.g. `exam-number=3` → `exam3-date`). An explicit local
+`exam-date` always wins; with neither, the date shows the `\todo` placeholder.
+Set `exam1-date`..`exam5-date` (and `final-date`) once in `coursemeta.tex` to
+share them with the syllabus `\examdatetable` — a reschedule is then one edit.
+
 Plus all `course-metadata` keys (`course-title`, `course-section`,
 `institution`, `term`, …) — set them in `coursemeta.tex` once and
 never again.

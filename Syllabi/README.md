@@ -12,6 +12,7 @@ syllabi that used command-style metadata (`\instructor{}`, `\email{}`,
 	appear or disappear based on which fields are set.
 - A `\syllabussection{Title}` command for policy/info blocks.
 - Grade-table helpers: `\gradecategories`, `\gradescale`, `\gradetables`.
+- `\examdatetable`: an `Exam | Date` table built from the shared coursemeta exam dates.
 - The unified TeXLib build-flag CLI.
 
 ---
@@ -148,6 +149,12 @@ Render a `Grade Letter | Grade Range (%)` table.
 
 `\gradetables{cats}{scale}`
 Render both side by side, centered.
+
+`\examdatetable`
+Render an `Exam | Date` table from the coursemeta `exam1-date`..`exam5-date`
+keys plus `final-date`. Only assessments whose date is set appear; if none are
+set, the command produces nothing. The same keys drive `autoexam`'s exam date,
+so the dates are single-sourced — set them once in `coursemeta.tex`.
 
 ### Predicates
 

@@ -400,6 +400,40 @@
 	\end{center}
 }
 
+% ------------------------------------------------------------------------------
+% \examdatetable -- exam-date table driven by coursemeta
+% ------------------------------------------------------------------------------
+% Builds a two-column "Exam | Date" table from the coursemeta exam<N>-date keys
+% (exam1-date .. exam5-date) plus final-date. Only assessments whose date is set
+% appear; if none are set, the command produces nothing. Single-sources exam
+% dates with autoexam (which reads the same exam<N>-date keys), so a reschedule
+% edits one place.
+\ExplSyntaxOn
+\tl_new:N \l__syll_examrows_tl
+\NewDocumentCommand{\examdatetable}{}{
+	\tl_clear:N \l__syll_examrows_tl
+	\clist_map_inline:nn { 1, 2, 3, 4, 5 } {
+		\tl_if_exist:cT { g__meta_exam ##1 -date_tl } {
+			\tl_if_empty:cF { g__meta_exam ##1 -date_tl } {
+				\tl_put_right:Nn \l__syll_examrows_tl
+					{ Exam~##1 & \tl_use:c { g__meta_exam ##1 -date_tl } \\ \hline }
+			}
+		}
+	}
+	\tl_if_empty:cF { g__meta_final-date_tl } {
+		\tl_put_right:Nn \l__syll_examrows_tl { Final~Exam & \GetFinalDate \\ \hline }
+	}
+	\tl_if_empty:NF \l__syll_examrows_tl {
+		\begin { tabular } { | c | c | }
+			\hline
+			Exam & Date \\
+			\hline \hline
+			\tl_use:N \l__syll_examrows_tl
+		\end { tabular }
+	}
+}
+\ExplSyntaxOff
+
 % ==============================================================================
 % Structural hang: \syllabussection titles (via the \hspace above), any raw
 % \section-family headings, and the running header/footer all hang onto one

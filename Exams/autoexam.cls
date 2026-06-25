@@ -498,8 +498,26 @@
 \NewExpandableDocumentCommand{\GetExamNumber}{}{
 	\tl_if_empty:NTF \g__autoexam_number_tl { \todo } { \tl_use:N \g__autoexam_number_tl }
 }
+% \GetExamDate resolves in precedence order: an explicit local exam-date (class
+% option / \meta) wins; else, when coursemeta defines exam<exam-number>-date,
+% that course-wide date is used; else the historical \todo placeholder.
+\cs_new:Npn \__autoexam_coursemeta_date: {
+	\tl_if_empty:NTF \g__autoexam_number_tl
+		{ \todo }
+		{
+			\tl_if_exist:cTF { g__meta_exam \g__autoexam_number_tl -date_tl }
+				{
+					\tl_if_empty:cTF { g__meta_exam \g__autoexam_number_tl -date_tl }
+						{ \todo }
+						{ \tl_use:c { g__meta_exam \g__autoexam_number_tl -date_tl } }
+				}
+				{ \todo }
+		}
+}
 \NewExpandableDocumentCommand{\GetExamDate}{}{
-	\tl_if_empty:NTF \g__autoexam_date_tl { \todo } { \tl_use:N \g__autoexam_date_tl }
+	\tl_if_empty:NTF \g__autoexam_date_tl
+		{ \__autoexam_coursemeta_date: }
+		{ \tl_use:N \g__autoexam_date_tl }
 }
 \NewExpandableDocumentCommand{\GetExamPostscript}{}{ \tl_use:N \g__autoexam_postscript_tl }
 % \GetExamTitle -- left-header title; defaults to "Exam <n>" (cf. \GetPsetTitle
