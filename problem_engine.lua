@@ -1714,6 +1714,38 @@ function autoexam_run_versions()
 end
 
 -- ============================================================
+-- POINT-TOTAL SANITY CHECK
+-- ============================================================
+
+-- autoexam_check_points(declared)
+--   Sum the regular-problem points and warn (via \PackageWarning) when they do
+--   not match the document's declared total.  Extra credit is excluded for free:
+--   scan_problem_pts (used by prescan_problems) matches \problem only, never
+--   \extracredit.  Best-effort and silent when nothing is comparable: a
+--   non-numeric/absent declared value, an unreadable body, or a source with no
+--   annotated points (sum 0 -- e.g. an all-bank exam whose points resolve at
+--   typeset time and are invisible to the source prescan) all skip quietly.
+function autoexam_check_points(declared)
+	declared = tonumber(declared)
+	if not declared then return end
+	local body = autoexam_read_body()
+	if not body then return end
+	local total = 0
+	for _, row in ipairs(prescan_problems(body)) do
+		for p in row.pts:gmatch("[^,]+") do
+			total = total + (tonumber(p) or 0)
+		end
+	end
+	if total == 0 then return end
+	if total ~= declared then
+		tex.print("\\PackageWarning{autoexam}{Regular-problem points sum to " ..
+			total .. " but the declared total is " .. declared ..
+			" (extra credit excluded).\\MessageBreak Fix the problems or set " ..
+			"\\string\\meta{points=" .. total .. "}}")
+	end
+end
+
+-- ============================================================
 -- SCORE PAGE
 -- ============================================================
 
