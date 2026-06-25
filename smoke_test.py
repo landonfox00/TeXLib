@@ -47,6 +47,7 @@ Exit code is the number of failed builds (0 = all passed).
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import glob
 import os
 import re
@@ -864,19 +865,22 @@ def run_scenarios(area_filter: list[str], include_full: bool, update_refs: bool,
     results: list[tuple[str, bool, str]] = []
     any_skipped = False
     t_start = time.time()
-    for s in scen:
-        sys.stdout.write(f"  [{s['slug']:<26}] ... ")
-        sys.stdout.flush()
-        ok, elapsed, err, saved, skipped = build_scenario(
-            s, timeout, verbose, content_enabled, visual_mode)
-        any_skipped = any_skipped or skipped
-        tail = "" if ok else f"  ({err})"
-        if skipped and ok:
-            tail = "  (checks partially skipped)"
-        if saved and not ok:
-            tail += f"  log: {saved}"
-        print(f"{'PASS' if ok else 'FAIL'} {elapsed:5.1f}s{tail}")
-        results.append((s["slug"], ok, err))
+    # Scenarios build in isolated temp dirs and (under --update-refs) write
+    # distinct per-slug ref files, so they parallelize safely.
+    max_workers = min(len(scen), os.cpu_count() or 4) or 1
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = [(s, pool.submit(build_scenario, s, timeout, verbose,
+                                   content_enabled, visual_mode)) for s in scen]
+        for s, fut in futures:
+            ok, elapsed, err, saved, skipped = fut.result()
+            any_skipped = any_skipped or skipped
+            tail = "" if ok else f"  ({err})"
+            if skipped and ok:
+                tail = "  (checks partially skipped)"
+            if saved and not ok:
+                tail += f"  log: {saved}"
+            print(f"  [{s['slug']:<26}] ... {'PASS' if ok else 'FAIL'} {elapsed:5.1f}s{tail}")
+            results.append((s["slug"], ok, err))
 
     total = time.time() - t_start
     passed = sum(1 for _, ok, _ in results if ok)
@@ -1009,15 +1013,23 @@ def main() -> int:
     results: list[tuple[str, str, bool, float, str]] = []
     any_skipped = False
     t_start = time.time()
-    for module, template in targets:
-        for mode_name, mode_macro in modes:
-            label = f"  [{module:<14}] {mode_name:<9} "
-            sys.stdout.write(label + "... ")
-            sys.stdout.flush()
-            ok, elapsed, err, saved, skipped = build_one(
-                module, template, mode_macro, args.timeout, args.verbose,
-                content=content_enabled, visual=visual_mode,
-            )
+    # Each build_one runs in its own temp dir (cwd=tmp), so builds are independent
+    # and parallelize safely; subprocess.run releases the GIL while the engine runs,
+    # so threads suffice. Results print in submission order as they complete.
+    jobs = [(module, template, mode_name, mode_macro)
+            for module, template in targets
+            for mode_name, mode_macro in modes]
+    max_workers = min(len(jobs), os.cpu_count() or 4) or 1
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = [
+            (module, mode_name,
+             pool.submit(build_one, module, template, mode_macro,
+                         args.timeout, args.verbose,
+                         content=content_enabled, visual=visual_mode))
+            for (module, template, mode_name, mode_macro) in jobs
+        ]
+        for module, mode_name, fut in futures:
+            ok, elapsed, err, saved, skipped = fut.result()
             any_skipped = any_skipped or skipped
             status = "PASS" if ok else "FAIL"
             tail = "" if ok else f"  ({err})"
