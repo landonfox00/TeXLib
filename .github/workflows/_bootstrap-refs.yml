@@ -1,0 +1,35 @@
+name: bootstrap-refs
+
+# TEMPORARY (deleted before this branch merges). workflow_dispatch can't be
+# triggered from a non-default branch, so this push-triggered job bootstraps the
+# container-matched visual references: it regenerates them inside the SAME pinned
+# TeX Live container visual.yml uses and uploads them as the "visual-refs"
+# artifact, which is then downloaded and committed.
+on:
+  push:
+    branches: [ci/visual-regression]
+
+jobs:
+  regen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
+        with:
+          scheme: full
+          run: |
+            set -e
+            apk add --no-cache python3 poppler-utils imagemagick
+            command -v magick >/dev/null 2>&1 || command -v compare >/dev/null 2>&1 \
+              || { echo "ImageMagick (magick/compare) not available"; exit 1; }
+            python3 smoke_test.py --update-refs
+            python3 smoke_test.py --scenarios --update-refs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: visual-refs
+          path: tests/visual_refs/
+          retention-days: 7
