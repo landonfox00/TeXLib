@@ -295,6 +295,10 @@
 % Sprints all version bodies + \enddocument onto the input stack so the
 % source body is never processed directly.
 \AddToHook{begindocument/end}{%
+	% Point-total sanity check: warn when the regular-problem points don't match
+	% the declared total (\meta{points}, default 100; extra credit excluded).
+	% Runs in every build mode (independent of the version loop below).
+	\directlua{texlib.autoexam_check_points("\luaescapestring{\GetExamPoints}")}%
 	% Unconditional: the Lua function checks #autoexam_versions == 0 and
 	% returns immediately when no versions are declared.  Keeping the TeX
 	% side conditional-free avoids an open \ifx on the stack when Lua
@@ -478,11 +482,13 @@
 \tl_new:N \g__autoexam_title_tl
 \tl_new:N \g__autoexam_date_tl
 \tl_new:N \g__autoexam_postscript_tl
+\tl_new:N \g__autoexam_points_tl
 \keys_define:nn { meta } {
 	exam-number             .tl_gset:N = \g__autoexam_number_tl,
 	exam-title              .tl_gset:N = \g__autoexam_title_tl,
 	exam-date               .tl_gset:N = \g__autoexam_date_tl,
 	exam-postscript         .tl_gset:N = \g__autoexam_postscript_tl,
+	points                  .tl_gset:N = \g__autoexam_points_tl,
 	% exam-instructions-file lives in course-metadata.sty (so a course can set it
 	% course-wide); the bare `instructions-file` alias below writes the same store.
 	% Backward-compat aliases (bare names available via \examsetup or \meta)
@@ -520,6 +526,12 @@
 		{ \tl_use:N \g__autoexam_date_tl }
 }
 \NewExpandableDocumentCommand{\GetExamPostscript}{}{ \tl_use:N \g__autoexam_postscript_tl }
+% Declared point total for the sanity check (autoexam_check_points at
+% begindocument/end). Defaults to 100, overridable via \meta{points=...} or a
+% class option; the check warns when the summed regular-problem points differ.
+\NewExpandableDocumentCommand{\GetExamPoints}{}{
+	\tl_if_empty:NTF \g__autoexam_points_tl { 100 } { \tl_use:N \g__autoexam_points_tl }
+}
 % \GetExamTitle -- left-header title; defaults to "Exam <n>" (cf. \GetPsetTitle
 % -> "Problem Set <n>", \GetQuizTitle -> "Quiz <n>"), overridable via exam-title.
 \NewExpandableDocumentCommand{\GetExamTitle}{}{

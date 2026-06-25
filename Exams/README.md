@@ -105,6 +105,7 @@ backward-compat alias (it forwards to `\meta` internally).
 | `exam-number`            | `number`              | Stored as `\theExamNumber`                   |
 | `exam-date`              | `date`                | Stored as `\theExamDate`                     |
 | `exam-postscript`        | `ps`                  | Postscript shown on the title page           |
+| `points`                 | —                     | Declared point total (default 100); the point-total check warns on mismatch |
 | `exam-instructions`      | —                     | Inline instructions text (boxed); overrides the default file |
 | `exam-instructions-file` | `instructions-file`   | Filename (no `.tex`) for instructions, `\input` unboxed and overriding inline; default file `autoexam-instructions`. Settable course-wide in `coursemeta.tex`. |
 
@@ -114,6 +115,14 @@ backward-compat alias (it forwards to `\meta` internally).
 `exam-date` always wins; with neither, the date shows the `\todo` placeholder.
 Set `exam1-date`..`exam5-date` (and `final-date`) once in `coursemeta.tex` to
 share them with the syllabus `\examdatetable` — a reschedule is then one edit.
+
+**Point-total check.** At `\begin{document}`, `autoexam` sums the
+explicitly-annotated `\problem[pts]` points and warns if they don't match
+`points` (default `100`; set `\meta{points=…}` to change). Extra credit
+(`\extracredit`) is excluded. Bank problems whose points resolve from the bank
+at typeset time (no `[pts]` in the source) can't be seen by the source scan, so
+an all-bank exam (source sum 0) is skipped — annotate `\problem[pts]{…}` to
+bring a problem into the tally.
 
 Plus all `course-metadata` keys (`course-title`, `course-section`,
 `institution`, `term`, …) — set them in `coursemeta.tex` once and
