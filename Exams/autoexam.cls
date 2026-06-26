@@ -509,7 +509,13 @@
 % that course-wide date is used; else the historical \todo placeholder.
 \cs_new:Npn \__autoexam_meta_date:n #1 {
 	\tl_if_exist:cTF { g__meta_#1_tl }
-		{ \tl_if_empty:cTF { g__meta_#1_tl } { \todo } { \tl_use:c { g__meta_#1_tl } } }
+		{ \tl_if_empty:cTF { g__meta_#1_tl }
+			{ \todo }
+			% final-date is stored as M-D for the schedule; render it human-readable
+			% so a Final exam's cover date matches the free-form exam<N>-date keys.
+			{ \str_if_eq:nnTF {#1} { final-date }
+				{ \MetaHumanMonthDay { \tl_use:c { g__meta_#1_tl } } }
+				{ \tl_use:c { g__meta_#1_tl } } } }
 		{ \todo }
 }
 \cs_new:Npn \__autoexam_coursemeta_date: {

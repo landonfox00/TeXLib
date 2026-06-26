@@ -412,8 +412,11 @@
 			}
 		}
 	}
+	% final-date is stored as M-D for the schedule; render it human-readable so it
+	% matches the free-form exam<N>-date rows above (e.g. "Dec 15, 2026").
 	\tl_if_empty:cF { g__meta_final-date_tl } {
-		\tl_put_right:Nn \l__syll_examrows_tl { Final~Exam & \GetFinalDate \\ \hline }
+		\tl_put_right:Nn \l__syll_examrows_tl
+			{ Final~Exam & \MetaHumanMonthDay{\GetFinalDate} \\ \hline }
 	}
 	\tl_if_empty:NF \l__syll_examrows_tl {
 		\begin { tabular } { | c | c | }

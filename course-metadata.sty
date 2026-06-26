@@ -259,6 +259,31 @@
 		{ \msg_warning:nn { course-metadata } { no-coursemeta } }
 }
 
+% ------------------------------------------------------------------------------
+% \MetaHumanMonthDay{<value>} -- render a numeric "M-D" date (the form final-date
+% must take so the schedule's date math can parse it) as a human-readable
+% "<Mon> <D>, <year>", matching the free-form exam<N>-date keys. The syllabus
+% \examdatetable and the autoexam Final-exam cover use it so a schedule-parseable
+% final-date still displays like the other exam dates, single-sourcing the month
+% names. Fully expandable. A value that expands EMPTY yields nothing; the value
+% is otherwise assumed to be "M-D" (final-date always is).
+% ------------------------------------------------------------------------------
+\cs_new:Npn \__meta_month_abbr:n #1 {
+	\str_case:nnF {#1}
+		{ {1}{Jan} {2}{Feb} {3}{Mar} {4}{Apr}  {5}{May}  {6}{Jun}
+		  {7}{Jul} {8}{Aug} {9}{Sep} {10}{Oct} {11}{Nov} {12}{Dec} }
+		{#1}
+}
+\cs_new:Npn \__meta_md_split:w #1-#2\q_stop {
+	\__meta_month_abbr:n {#1}~#2,~\GetYear
+}
+\cs_new:Npn \__meta_md_human:n #1 {
+	\tl_if_blank:nTF {#1} { } { \__meta_md_split:w #1 \q_stop }
+}
+\NewExpandableDocumentCommand{\MetaHumanMonthDay}{ m } {
+	\exp_args:Ne \__meta_md_human:n { #1 }
+}
+
 \ExplSyntaxOff
 
 % ==============================================================================
