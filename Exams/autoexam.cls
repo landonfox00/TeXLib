@@ -507,17 +507,24 @@
 % \GetExamDate resolves in precedence order: an explicit local exam-date (class
 % option / \meta) wins; else, when coursemeta defines exam<exam-number>-date,
 % that course-wide date is used; else the historical \todo placeholder.
+\cs_new:Npn \__autoexam_meta_date:n #1 {
+	\tl_if_exist:cTF { g__meta_#1_tl }
+		{ \tl_if_empty:cTF { g__meta_#1_tl } { \todo } { \tl_use:c { g__meta_#1_tl } } }
+		{ \todo }
+}
 \cs_new:Npn \__autoexam_coursemeta_date: {
 	\tl_if_empty:NTF \g__autoexam_number_tl
 		{ \todo }
 		{
-			\tl_if_exist:cTF { g__meta_exam \g__autoexam_number_tl -date_tl }
+			% A final exam (exam-number = Final/final) inherits coursemeta's
+			% final-date; a numbered exam inherits exam<number>-date.
+			\str_if_eq:eeTF { \tl_use:N \g__autoexam_number_tl } { Final }
+				{ \__autoexam_meta_date:n { final-date } }
 				{
-					\tl_if_empty:cTF { g__meta_exam \g__autoexam_number_tl -date_tl }
-						{ \todo }
-						{ \tl_use:c { g__meta_exam \g__autoexam_number_tl -date_tl } }
+					\str_if_eq:eeTF { \tl_use:N \g__autoexam_number_tl } { final }
+						{ \__autoexam_meta_date:n { final-date } }
+						{ \__autoexam_meta_date:n { exam \tl_use:N \g__autoexam_number_tl -date } }
 				}
-				{ \todo }
 		}
 }
 \NewExpandableDocumentCommand{\GetExamDate}{}{

@@ -34,4 +34,18 @@
 	% gradebook. Resolved like bank-path; an .xlsx value is mapped to the
 	% .csv the TeXLib builder exports from it.
 	gradebook-path  = {gradebook.xlsx},
+	% --- Optional course-wide defaults (a document's class options override) ----
+	% Instructor contact + scheduling fields. These were historically options of
+	% the syllabus class; set here, they become defaults for every document.
+	% instructor-email = {you@unr.edu},      % alias: email
+	% office           = {NLLC 146F},
+	% office-hours     = {MWF 9--10am},
+	% class-time       = {MWF 9:00--9:50am}, % syllabus "Time" row; omit to derive
+	%                                        % it from lecture-days + lecture-times
+	% short-title      = {Math 181 Calc I},  % short header title for the syllabus
+	% Per-exam dates feed both autoexam (matched by exam-number) and the syllabus
+	% \examdatetable; a Final exam (exam-number = Final) inherits final-date above.
+	% exam1-date       = {Sep 19, 2026},
+	% exam2-date       = {Oct 17, 2026},
+	% exam3-date       = {Nov 14, 2026},
 }

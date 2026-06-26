@@ -1,6 +1,6 @@
 % course-metadata.sty
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{course-metadata}[2026/05/07 v8.1 Layered Metadata Engine]
+\ProvidesPackage{course-metadata}[2026/06/25 v8.2 Layered Metadata Engine]
 
 \RequirePackage{expl3}
 \RequirePackage{xparse}
@@ -77,6 +77,21 @@
 \meta_create_var:nn { bingo-instructions-file } { BingoInstructionsFile }
 \meta_create_var:nn { pset-instructions-file }  { PsetInstructionsFile }
 
+% Promoted class fields (course-wide defaults). These were historically options
+% of a single document class (the syllabus's instructor-contact and scheduling
+% fields). Declaring them here — before \LoadCourseMeta — lets a course set them
+% ONCE in coursemeta.tex; a document's class options still override. The consuming
+% class reads the \Get<Camel> getter instead of a private store. short-title gets
+% a store only (no auto getter): the syllabus exposes \GetShortTitle with its own
+% \GetCourse fallback.
+\meta_create_var:nn { email }          { Email }
+\meta_create_var:nn { office }         { Office }
+\meta_create_var:nn { office-hours }   { OfficeHours }
+\meta_create_var:nn { organizer }      { Organizer }
+\meta_create_var:nn { class-time }     { ClassTime }
+\meta_create_var:nn { class-time-alt } { ClassTimeAlt }
+\tl_new:c { g__meta_short-title_tl }
+
 \keys_define:nn { meta } {
 	institution     .tl_gset:c = { g__meta_institution_tl },
 	instructor      .tl_gset:c = { g__meta_instructor_tl },
@@ -106,6 +121,16 @@
 	exam-instructions-file  .tl_gset:c = { g__meta_exam-instructions-file_tl },
 	bingo-instructions-file .tl_gset:c = { g__meta_bingo-instructions-file_tl },
 	pset-instructions-file  .tl_gset:c = { g__meta_pset-instructions-file_tl },
+	% Promoted class fields (course-wide defaults; see the var block above).
+	email            .tl_gset:c = { g__meta_email_tl },
+	instructor-email .tl_gset:c = { g__meta_email_tl },        % alias for email
+	office           .tl_gset:c = { g__meta_office_tl },
+	office-hours     .tl_gset:c = { g__meta_office-hours_tl },
+	organizer        .tl_gset:c = { g__meta_organizer_tl },
+	class-time       .tl_gset:c = { g__meta_class-time_tl },
+	class-time-alt   .tl_gset:c = { g__meta_class-time-alt_tl },
+	short-title      .tl_gset:c = { g__meta_short-title_tl },
+	syllabus-title   .tl_gset:c = { g__meta_short-title_tl },  % alias for short-title
 }
 
 % Warn on terminal when a field is auto-created (catches typos like instuctor=).
