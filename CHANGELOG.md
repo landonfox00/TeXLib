@@ -4,7 +4,9 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
-A consolidation pass: a new user-facing feature on `\problem`, four new shared `.sty` files that retire duplicated machinery between `autoexam` and `quiz`, a Lua engine rename, the test harness extended to cover the new feature, and partial SyncTeX inverse-search support for the `schedule` class.
+## [0.2.0] — 2026-06-26
+
+The first feature release since v0.1.1 — a large batch spanning two development passes (PRs #1–#21). Highlights: new shared `.sty` packages that retire duplicated machinery across the classes (`texlib-corepkg`, `texlib-problembank`, `texlib-itemfmt`, `texlib-pagestyle`, `texlib-thmenv`, `texlib-solutions`, `texlib-callouts`); the region-delimited bank format with a multiple-choice redesign and repeatable `{problems}`/`{mcproblems}` sections; a layered metadata engine with coursemeta-driven exam dates and course-wide instructor-contact fields; SyncTeX inverse search for the problem bank and the `schedule` class; friendly "requires LuaLaTeX" guards; inline `\solution`/`\answer`/`\pf` lead-ins and shared `{hint}`/`{readings}` callouts; an end-to-end example course; and a content-aware, parallelized smoke harness with a pinned visual-regression gate. The sections below group the work by development pass.
 
 ### Added (this pass)
 
@@ -182,6 +184,7 @@ Initial public-on-GitHub release. Snapshot of TeXLib after the documentation pas
 - `course-metadata_old.sty` (v7) was archived on the `archive/old-metadata` branch before deletion. Recoverable from there if ever needed.
 - A handful of pre-class-consolidation prototypes (`Bingo/bingo.tex`, `Bingo/bingo_og.tex`, `Bingo/Math 181 Su25 *.tex`) and dev-test files (`Notes/test_aliases.*`, `Notes/test_conv_fix.*`, `Notes/test_labeledsection.*`) were deleted from disk before the first commit, so they have no history in this repo.
 
-[Unreleased]: https://github.com/landonfox00/TeXLib/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/landonfox00/TeXLib/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/landonfox00/TeXLib/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/landonfox00/TeXLib/releases/tag/v0.1.1
 [0.1.0]: https://github.com/landonfox00/TeXLib/releases/tag/v0.1.0
