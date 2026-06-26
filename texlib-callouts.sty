@@ -1,0 +1,41 @@
+% texlib-callouts.sty
+% Always-visible "callout" environments shared by the boxed teaching classes
+% (didactic, pset): {hint} and {readings}. Both are build-mode independent (no
+% \ifsolutions guard). Extracted from pset.cls during the consolidation pass so
+% the two classes share ONE implementation instead of drifting copies; didactic
+% gains both for parity with pset.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-callouts}[2026/06/25 v1.0 TeXLib shared callout environments]
+
+\RequirePackage{texlib-theorems}   % texlibbase + \texlibrulewidth + tcolorbox (\NewTColorBox)
+\RequirePackage{enumitem}          % keyval itemize for {readings}
+
+% {hint} -- a light yellow left-rule box, always visible, lighter than a
+% {solution}. Shares the canonical TeXLib rule width/position via texlibbase, so
+% its left rule lines up with every other TeXLib rule.
+\NewTColorBox{hint}{ }{
+	texlibbase,
+	colback=yellow!4!white,
+	borderline west={\texlibrulewidth}{0pt}{yellow!55!black},
+	before upper={\textbf{Hint.}\par\smallskip},
+}
+
+% {readings} -- a bold "Readings." header + indented en-dash list, no box. Use to
+% list assigned readings under a section/day. Lightweight: tight vertical spacing.
+%
+%   \begin{readings}
+%       \item Stewart, Calculus, §2.1--2.2.
+%       \item Course notes, Lecture 1.
+%   \end{readings}
+\newenvironment{readings}
+	{%
+		\par\addvspace{6pt}%
+		\noindent{\bfseries Readings.}\par\nopagebreak
+		\begin{itemize}[leftmargin=2em, topsep=2pt, parsep=2pt,
+						itemsep=2pt, label={\textendash}]%
+	}
+	{%
+		\end{itemize}\addvspace{4pt}%
+	}
+
+\endinput

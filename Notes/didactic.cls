@@ -225,6 +225,7 @@
 % section-based numbering and the four-letter aliases.
 \RequirePackage{texlib-theorems}
 \RequirePackage{texlib-thmenv}
+\RequirePackage{texlib-callouts}   % shared {hint} + {readings} callout envs
 
 % Problem-bank engine -- so didactic-class documents (e.g. exam-review
 % handouts) can \getproblem{id} from the course's bank without each file

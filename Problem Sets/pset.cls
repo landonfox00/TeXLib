@@ -256,6 +256,7 @@
 % based) and no four-letter aliases.
 \RequirePackage{texlib-theorems}
 \RequirePackage{texlib-thmenv}
+\RequirePackage{texlib-callouts}   % shared {hint} + {readings} callout envs
 
 % One declaration per environment (and its unnumbered `*` twin), each with the
 % canonical TeXLib styling and a flat shared counter (master: theorem). The
@@ -265,8 +266,10 @@
 % inline (no box). (note* is also defined, guarded, in the Category Theory
 % preamble; its \ifcsname check skips that copy when this one is present.)
 \TeXLibTheorems[numbering=flat]{
-	theorem, definition, corollary, proposition, lemma,
-	example, remark, note, recall
+	theorem, corollary, lemma, conjecture, proposition,
+	definition, convention, procedure, challenge,
+	example, notation,
+	remark, note, recall
 }
 
 % ==============================================================================
@@ -334,41 +337,11 @@
 }
 
 % ==============================================================================
-% 9. HINT ENVIRONMENT — always visible, lighter than a solution
+% 9. CALLOUT ENVIRONMENTS — {hint} and {readings}  (shared with didactic)
 % ==============================================================================
-% \begin{hint} ... \end{hint}
-% Left-rule aesthetic (texlibbase: same width/position as every TeXLib rule),
-% keeping hint's existing yellow identity. The inline "Hint." label replaces
-% the old full-frame title bar.
-\NewTColorBox{hint}{ }{
-	texlibbase,
-	colback=yellow!4!white,
-	borderline west={\texlibrulewidth}{0pt}{yellow!55!black},
-	before upper={\textbf{Hint.}\par\smallskip},
-}
-
-% ==============================================================================
-% 10. READINGS ENVIRONMENT — bold "Readings" header + indented list, no box
-% ==============================================================================
-% Use under a day-subsection (or anywhere) to list assigned readings.
-%
-%   \begin{readings}
-%       \item Leinster §1.1–1.2.
-%       \item Riehl, \emph{Category Theory in Context}, §1.1.
-%   \end{readings}
-%
-% Lightweight on purpose: bold header, en-dash bullets, tight vertical
-% spacing.  Always visible regardless of build mode.
-\newenvironment{readings}
-	{%
-		\par\addvspace{6pt}%
-		\noindent{\bfseries Readings.}\par\nopagebreak
-		\begin{itemize}[leftmargin=2em, topsep=2pt, parsep=2pt,
-						itemsep=2pt, label={\textendash}]%
-	}
-	{%
-		\end{itemize}\addvspace{4pt}%
-	}
+% Both now live in texlib-callouts.sty (\RequirePackage'd above) so didactic and
+% pset share ONE implementation: {hint} a yellow left-rule box, {readings} a bold
+% "Readings." header + en-dash list. Always visible regardless of build mode.
 
 % ==============================================================================
 % 11. MATH UTILITIES

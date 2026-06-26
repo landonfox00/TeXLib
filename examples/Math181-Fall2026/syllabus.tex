@@ -1,17 +1,14 @@
 % Syllabus — example course syllabus.
 %
 % Course-wide values (title, course number, section, instructor, term, room)
-% come from coursemeta.tex in this directory. The keys below are the ones the
-% syllabus class adds on top: instructor contact details and the short header
-% title. Build:  lualatex syllabus.tex
+% AND the instructor contact + scheduling fields (email, office, office-hours,
+% short-title) now come from coursemeta.tex in this directory — promoted to
+% course-wide keys in course-metadata.sty v8.2, so they're set once and shared.
+% A class option here would still override them. (class-time is unset in
+% coursemeta, so the title block derives "MWF 9:00-9:50am" from the lecture
+% pattern.)  Build:  lualatex syllabus.tex
 
-\documentclass[
-	short-title  = {Math 181},
-	email        = {instructor@unr.edu},
-	office       = {DMSC 220},
-	office-hours = {MWF 10:00--10:50am, or by appointment},
-	class-time   = {MWF 9:00--9:50am},
-]{syllabus}
+\documentclass{syllabus}
 
 \begin{document}
 \maketitle
@@ -47,6 +44,15 @@ Course grades will be determined as follows:
 	D & $60 \leq x < 70$  \\ \hline
 	F & $x < 60$
 }
+
+\syllabussection{Exam Schedule}
+Tentative exam dates (subject to change). These come from the per-exam dates in
+\texttt{coursemeta.tex}, the same source the exam covers read, so one edit
+reschedules everywhere:
+
+\begin{center}
+\examdatetable
+\end{center}
 
 \syllabussection{Course Schedule}
 See \texttt{schedule.pdf} on the Syllabus page of our Canvas course.
