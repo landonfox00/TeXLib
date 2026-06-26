@@ -44,14 +44,27 @@
 	and $f(b)$, then there exists $c \in (a, b)$ with $f(c) = N$.
 \end{theorem}
 
+The \ivt{} is the workhorse behind the following exercise. (\texttt{\textbackslash ivt}
+is defined once in \texttt{course-preamble.tex}, auto-loaded for every document in
+this course via coursemeta's \texttt{preamble-file} key.)
+
 \begin{exercise}
 	Show that $x^3 - x - 1 = 0$ has a solution in $(1, 2)$.
 \end{exercise}
+
+\begin{hint}
+	Evaluate $f$ at the endpoints $x = 1$ and $x = 2$ and compare the signs.
+\end{hint}
 
 \begin{solution}[2in]
 	Let $f(x) = x^3 - x - 1$. Then $f(1) = -1 < 0$ and
 	$f(2) = 5 > 0$. Since $f$ is continuous, the IVT gives a root
 	in $(1, 2)$.
 \end{solution}
+
+\begin{readings}
+	\item Stewart, \emph{Calculus}, \S2.5 (Continuity).
+	\item Course notes, Lecture 1.
+\end{readings}
 
 \end{document}

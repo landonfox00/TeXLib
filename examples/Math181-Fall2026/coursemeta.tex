@@ -20,4 +20,19 @@
 	end-date        = 12-8,
 	final-date      = 12-15,
 	final-time      = {9:45-11:45am},
+	% --- Instructor contact + scheduling (course-wide keys, course-metadata v8.2).
+	% Set once here instead of per-document; the syllabus reads them, and a
+	% document's class options still override. class-time is intentionally omitted
+	% so the syllabus derives "MWF 9:00-9:50am" from lecture-days + lecture-times.
+	email           = {instructor@unr.edu},
+	office          = {DMSC 220},
+	office-hours    = {MWF 10:00--10:50am, or by appointment},
+	short-title     = {Math 181},
+	% --- Per-exam dates: feed both the autoexam cover (matched by exam-number)
+	% and the syllabus \examdatetable, so a reschedule is a one-line edit here.
+	exam1-date      = {Sep 19, 2026},
+	exam2-date      = {Oct 17, 2026},
+	exam3-date      = {Nov 14, 2026},
+	% --- Shared preamble auto-loaded (\AtEndPreamble) for every document here.
+	preamble-file   = {course-preamble},
 }

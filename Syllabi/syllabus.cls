@@ -71,62 +71,54 @@
 % ==============================================================================
 \ExplSyntaxOn
 
-\tl_new:N \g__syll_email_tl
-\tl_new:N \g__syll_office_tl
-\tl_new:N \g__syll_office_hours_tl
-\tl_new:N \g__syll_organizer_tl
-\tl_new:N \g__syll_class_time_tl
-\tl_new:N \g__syll_class_time_alt_tl
-\tl_new:N \g__syll_short_title_tl
-
-\keys_define:nn { meta } {
-	email              .tl_gset:N = \g__syll_email_tl,    % legacy alias
-	instructor-email   .tl_gset:N = \g__syll_email_tl,
-	office          .tl_gset:N = \g__syll_office_tl,
-	office-hours    .tl_gset:N = \g__syll_office_hours_tl,
-	organizer       .tl_gset:N = \g__syll_organizer_tl,
-	class-time      .tl_gset:N = \g__syll_class_time_tl,
-	class-time-alt  .tl_gset:N = \g__syll_class_time_alt_tl,
-	short-title     .tl_gset:N = \g__syll_short_title_tl,
-	syllabus-title  .tl_gset:N = \g__syll_short_title_tl,
-}
-
-\NewExpandableDocumentCommand{\GetEmail}        {}{ \tl_use:N \g__syll_email_tl }
-\NewExpandableDocumentCommand{\GetOffice}       {}{ \tl_use:N \g__syll_office_tl }
-\NewExpandableDocumentCommand{\GetOfficeHours}  {}{ \tl_use:N \g__syll_office_hours_tl }
-\NewExpandableDocumentCommand{\GetOrganizer}    {}{ \tl_use:N \g__syll_organizer_tl }
-\NewExpandableDocumentCommand{\GetClassTime}    {}{ \tl_use:N \g__syll_class_time_tl }
-\NewExpandableDocumentCommand{\GetClassTimeAlt} {}{ \tl_use:N \g__syll_class_time_alt_tl }
+% Instructor-contact and scheduling fields — email / instructor-email, office,
+% office-hours, organizer, class-time, class-time-alt, short-title / syllabus-title
+% — are course-wide keys defined in course-metadata.sty (v8.2+). A course may set
+% them once in coursemeta.tex as defaults; a document's class options still
+% override (this class re-applies its option list after coursemeta loads). We read
+% the shared \GetEmail / \GetOffice / ... getters and the \g__meta_short-title_tl
+% store via the composite accessors below.
 
 % Composite accessors for the default info table. Each is fully expandable and
 % yields nothing when its underlying field(s) are unset, so the info-table
 % emptiness filter (expansion + \tl_if_blank) drops the entry and reflows.
 \NewExpandableDocumentCommand{\GetInstructorOrOrganizer}{}{
 	\tl_if_empty:cTF { g__meta_instructor_tl }
-		{ \tl_use:N \g__syll_organizer_tl }
+		{ \GetOrganizer }
 		{ \GetInstructor }
 }
+% Class meeting time: an explicit class-time wins (with an optional alternate
+% appended); otherwise fall back to the coursemeta lecture pattern
+% (lecture-days + lecture-times) so a course need not repeat it here. Expands to
+% nothing when none are set, and the info-table filter then drops the row.
 \NewExpandableDocumentCommand{\GetClassTimeFull}{}{
-	\tl_if_empty:NF \g__syll_class_time_tl {
-		\GetClassTime
-		\tl_if_empty:NF \g__syll_class_time_alt_tl { ~/~\GetClassTimeAlt }
-	}
+	\tl_if_empty:cTF { g__meta_class-time_tl }
+		{
+			\tl_if_empty:cTF { g__meta_lecture-days_tl }
+				{ \GetLectureTimes }
+				{ \GetLectureDays
+				  \tl_if_empty:cF { g__meta_lecture-times_tl } { ~\GetLectureTimes } }
+		}
+		{
+			\GetClassTime
+			\tl_if_empty:cF { g__meta_class-time-alt_tl } { ~/~\GetClassTimeAlt }
+		}
 }
 \NewExpandableDocumentCommand{\GetEmailLinked}{}{
-	\tl_if_empty:NF \g__syll_email_tl { \href{mailto:\GetEmail}{\GetEmail} }
+	\tl_if_empty:cF { g__meta_email_tl } { \href{mailto:\GetEmail}{\GetEmail} }
 }
 
 \NewExpandableDocumentCommand{\GetShortTitle}   {}{
-	\tl_if_empty:NTF \g__syll_short_title_tl
+	\tl_if_empty:cTF { g__meta_short-title_tl }
 		{ \GetCourse }
-		{ \tl_use:N \g__syll_short_title_tl }
+		{ \tl_use:c { g__meta_short-title_tl } }
 }
 % \GetSyllabusTitle -- canonical \Get<class>Title name (mirrors \GetPsetTitle,
 % \GetUnitTitle, ...); \GetShortTitle is kept as the original alias.
 \NewExpandableDocumentCommand{\GetSyllabusTitle}{}{
-	\tl_if_empty:NTF \g__syll_short_title_tl
+	\tl_if_empty:cTF { g__meta_short-title_tl }
 		{ \GetCourse }
-		{ \tl_use:N \g__syll_short_title_tl }
+		{ \tl_use:c { g__meta_short-title_tl } }
 }
 
 \NewDocumentCommand{\IfSyllSet}{ m +m +m } {
@@ -420,8 +412,11 @@
 			}
 		}
 	}
+	% final-date is stored as M-D for the schedule; render it human-readable so it
+	% matches the free-form exam<N>-date rows above (e.g. "Dec 15, 2026").
 	\tl_if_empty:cF { g__meta_final-date_tl } {
-		\tl_put_right:Nn \l__syll_examrows_tl { Final~Exam & \GetFinalDate \\ \hline }
+		\tl_put_right:Nn \l__syll_examrows_tl
+			{ Final~Exam & \MetaHumanMonthDay{\GetFinalDate} \\ \hline }
 	}
 	\tl_if_empty:NF \l__syll_examrows_tl {
 		\begin { tabular } { | c | c | }

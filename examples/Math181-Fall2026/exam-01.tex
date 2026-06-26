@@ -7,10 +7,11 @@
 % Build one version (instructor):  lualatex "\def\Version{A}\input{exam-01.tex}"
 % Build the answer key:            lualatex "\def\ShowKey{}\input{exam-01.tex}"
 
-\documentclass[
-	exam-number = 1,
-	exam-date   = {October 9, 2026},
-]{autoexam}
+% exam-date is intentionally NOT set here: with exam-number = 1, the cover date
+% comes from coursemeta's exam1-date — the same source the syllabus
+% \examdatetable reads — so a reschedule is one edit. A local exam-date option
+% (class option or \meta) would override it.
+\documentclass[exam-number = 1]{autoexam}
 
 % Three labeled versions. \shuffle reorders the questions (and each MC problem's
 % options) independently per version (seeded by the version letter), so one
