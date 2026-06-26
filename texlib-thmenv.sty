@@ -47,15 +47,36 @@
 }
 
 % ------------------------------------------------------------------------------
-% Worked-example inline solution
+% Worked-problem inline lead-ins  (\solution  \answer / \ans  \pf)
 % ------------------------------------------------------------------------------
-% \texlib@example@solution is the inline "Solution." lead-in that the example
-% environment binds \solution to (see \__texlib_thm_declare:n). ALWAYS visible:
-% a worked example's solution is part of the exposition, not a build-mode-gated
-% answer key, so it carries no \ifsolutions guard. Mirrors didactic's \answer
-% command (italic label, \bigskip before, inline continuation), labeled "Solution.".
-\newcommand{\texlib@example@solution}{%
-	\par\bigskip\noindent\textit{Solution.}\space}
+% The problem-shaped environments (example, exercise, question, challenge, and
+% the exam-class statements exam*/ex*/ques*/prob*) bind a small family of inline
+% lead-ins for writing a worked solution / answer / proof in line with the
+% statement. ALL ALWAYS VISIBLE: a worked solution is exposition, not a build-
+% mode-gated key, so they carry no \ifsolutions guard -- the gated mechanism
+% stays the separate {solution}/{partsolution} box. Each is an italic label with
+% a \bigskip before and an inline space after (matching didactic's \answer).
+%
+% Two of the requested names collide with existing constructs and are
+% deliberately OMITTED rather than allowed to shadow them inside a worked env:
+%   \soln  -- didactic already uses {soln} as its solution-BOX alias;
+%   \proof -- amsthm owns the {proof} environment.
+% The non-colliding members (\solution, \answer, \ans, \pf) cover the same need,
+% and {soln} / {proof} stay fully usable (as a sibling after the statement, or
+% nested -- neither token is rebound).
+\newcommand{\texlib@inline@solution}{\par\bigskip\noindent\textit{Solution.}\space}
+\newcommand{\texlib@inline@answer}  {\par\bigskip\noindent\textit{Answer.}\space}
+\newcommand{\texlib@inline@proof}   {\par\bigskip\noindent\textit{Proof.}\space}
+
+% Bound inside each worked env via \AtBeginEnvironment, so the redefinitions are
+% scoped to that environment's group and revert at \end (the class's standalone
+% {solution} box, the global \answer, and amsthm's \proof are untouched outside).
+\newcommand{\texlib@bind@worked}{%
+	\let\solution\texlib@inline@solution
+	\let\answer\texlib@inline@answer
+	\let\ans\texlib@inline@answer
+	\let\pf\texlib@inline@proof
+}
 
 \ExplSyntaxOn
 
@@ -149,14 +170,14 @@
 			\use:x { \exp_not:N \tcolorboxenvironment { \exp_not:n {#1} * }
 				{ \l__texlib_thm_box_tl } }
 		}
-		% The example box binds \solution to an always-visible inline "Solution."
-		% lead-in (a worked example's solution is exposition, not a gated key).
-		% Scoped via \AtBeginEnvironment so the class's standalone {solution} box
-		% keeps the \solution token elsewhere; the example group restores it at
-		% \end. example* gets the same hook.
-		\str_if_eq:nnT {#1} {example} {
-			\AtBeginEnvironment{example}{\let\solution\texlib@example@solution}
-			\AtBeginEnvironment{example*}{\let\solution\texlib@example@solution}
+		% Problem-shaped envs bind the always-visible inline lead-ins
+		% (\solution \answer \ans \pf -- see \texlib@bind@worked). Scoped via
+		% \AtBeginEnvironment so the redefinitions revert at \end (the class's
+		% standalone {solution} box keeps \solution elsewhere); the unnumbered
+		% `*' twin gets the same hook.
+		\clist_if_in:nnT { example , exercise , question , challenge } {#1} {
+			\AtBeginEnvironment{#1}{\texlib@bind@worked}
+			\AtBeginEnvironment{#1*}{\texlib@bind@worked}
 		}
 	}{
 		\msg_error:nnn { texlib-thmenv } { unknown-env } {#1}
@@ -226,6 +247,13 @@
 	\newtheorem*{recall*}     {Recall}%
 	\newtheorem*{case*}       {Case}%
 	\newtheorem*{desiderata*} {Desiderata}%
+	% Worked-statement inline lead-ins on the problem-shaped members
+	% (\solution \answer \ans \pf -- see \texlib@bind@worked), matching the boxed
+	% taxonomy. Scoped per-environment via \AtBeginEnvironment; reverts at \end.
+	\AtBeginEnvironment{exam*}{\texlib@bind@worked}%
+	\AtBeginEnvironment{ex*}{\texlib@bind@worked}%
+	\AtBeginEnvironment{ques*}{\texlib@bind@worked}%
+	\AtBeginEnvironment{prob*}{\texlib@bind@worked}%
 	% Restore the default style so later class code starts clean.
 	\theoremstyle{plain}%
 }
