@@ -53,13 +53,9 @@
 \providecommand{\lrcb}[1]{\left\{ #1 \right\}}
 
 % --- Differential calculus --------------------------------------------------
-\providecommand{\dd}{\mathrm{d}}
-\ProvideDocumentCommand{\deriv}{ O{} m m }{%
-	\frac{\dd^{#1} #2}{\dd #3^{#1}}%
-}
-\ProvideDocumentCommand{\inte}{ O{} O{} m m }{%
-	\int_{#1}^{#2} #3\, \dd #4%
-}
+% \dd, \deriv, and \inte were removed 2026-06-24: they are now course-local.
+% Math 181 defines them in its coursemeta.tex; Math 182 repurposes \dd in its
+% preamble. No course relied on the library versions except Math 181.
 
 % --- Editorial --------------------------------------------------------------
 \providecommand{\todo}{\textcolor{red}{\textbf{TODO}}}
