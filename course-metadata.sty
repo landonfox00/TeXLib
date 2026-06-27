@@ -277,10 +277,19 @@
 \cs_new:Npn \__meta_md_split:w #1-#2\q_stop {
 	\__meta_month_abbr:n {#1}~#2,~\GetYear
 }
-\cs_new:Npn \__meta_md_human:n #1 {
-	\tl_if_blank:nTF {#1} { } { \__meta_md_split:w #1 \q_stop }
+% Humanize an "M-D" date (8-12 -> "Aug 12, 2026"). A value with NO "-" is already
+% human-readable (e.g. "August 12, 2026") and is returned unchanged, so a course
+% may store final-date / exam<N>-date in either form without the M-D splitter
+% running away on a free-form string. Protected (the \tl_if_in test is); both
+% call sites only typeset the result, so expandability is not required.
+\cs_new_protected:Npn \__meta_md_human:n #1 {
+	\tl_if_blank:nTF {#1}
+		{ }
+		{ \tl_if_in:nnTF {#1} { - }
+			{ \__meta_md_split:w #1 \q_stop }
+			{ #1 } }
 }
-\NewExpandableDocumentCommand{\MetaHumanMonthDay}{ m } {
+\NewDocumentCommand{\MetaHumanMonthDay}{ m } {
 	\exp_args:Ne \__meta_md_human:n { #1 }
 }
 

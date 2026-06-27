@@ -4,6 +4,23 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-26
+
+Syllabus section shortcuts, a metadata robustness fix, and two breaking removals.
+
+### Added
+
+- **Syllabus section shortcuts.** One-word commands for common syllabus headings in `syllabus.cls`: `\coursedescription`, `\prerequisites`, `\requiredmaterials`, `\learningoutcomes`, `\grading`, `\courseschedule`, `\examschedule`, `\officehours`, `\communication` (+ `\communications`), `\attendancepolicy`, `\latework`, `\academicintegrity`, `\accommodations`, `\academicsupport`, `\wellness`, `\inclusivity`, `\technology`, `\titleix`. Each emits `\syllabussection{<title>}` (bold run-in heading, body prose follows) and takes an optional `[title]` override, e.g. `\academicintegrity[Academic Honesty]`.
+
+### Changed
+
+- **`\MetaHumanMonthDay` is robust to non-`M-D` values.** It now passes a value through unchanged when it contains no `-` (already human-readable, e.g. "August 12, 2026") instead of the `M-D` splitter running away on it. Made non-expandable (the `\tl_if_in` guard is); both call sites (`\examdatetable`, the `autoexam` Final cover) only typeset the result.
+
+### Removed
+
+- **Backward-compat command-style metadata shims in `syllabus.cls`.** `\coursetitle`, `\courseshort`, `\coursesection`, `\semester`, `\instructor`, `\email`, `\office`, `\officehours`, `\classroom`, `\organizer`, and `\classtime` are gone — set syllabus metadata via class options / `coursemeta.tex` / `\metasetup` instead (dropping the shims also freed `\officehours` for the section shortcut). **Breaking** for syllabi that used the command-style setters; migrate to `\documentclass[...]` options.
+- **`\dd`, `\deriv`, `\inte` removed from `texlib-mathutils.sty`.** These differential-calculus macros are now defined per-course where needed (Math 181 in its `coursemeta.tex`; Math 182 repurposes `\dd`). **Breaking** for any document that used the library versions without defining its own.
+
 ## [0.2.0] — 2026-06-26
 
 The first feature release since v0.1.1 — a large batch spanning two development passes (PRs #1–#21). Highlights: new shared `.sty` packages that retire duplicated machinery across the classes (`texlib-corepkg`, `texlib-problembank`, `texlib-itemfmt`, `texlib-pagestyle`, `texlib-thmenv`, `texlib-solutions`, `texlib-callouts`); the region-delimited bank format with a multiple-choice redesign and repeatable `{problems}`/`{mcproblems}` sections; a layered metadata engine with coursemeta-driven exam dates and course-wide instructor-contact fields; SyncTeX inverse search for the problem bank and the `schedule` class; friendly "requires LuaLaTeX" guards; inline `\solution`/`\answer`/`\pf` lead-ins and shared `{hint}`/`{readings}` callouts; an end-to-end example course; and a content-aware, parallelized smoke harness with a pinned visual-regression gate. The sections below group the work by development pass.
@@ -184,7 +201,8 @@ Initial public-on-GitHub release. Snapshot of TeXLib after the documentation pas
 - `course-metadata_old.sty` (v7) was archived on the `archive/old-metadata` branch before deletion. Recoverable from there if ever needed.
 - A handful of pre-class-consolidation prototypes (`Bingo/bingo.tex`, `Bingo/bingo_og.tex`, `Bingo/Math 181 Su25 *.tex`) and dev-test files (`Notes/test_aliases.*`, `Notes/test_conv_fix.*`, `Notes/test_labeledsection.*`) were deleted from disk before the first commit, so they have no history in this repo.
 
-[Unreleased]: https://github.com/landonfox00/TeXLib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/landonfox00/TeXLib/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/landonfox00/TeXLib/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/landonfox00/TeXLib/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/landonfox00/TeXLib/releases/tag/v0.1.1
 [0.1.0]: https://github.com/landonfox00/TeXLib/releases/tag/v0.1.0
