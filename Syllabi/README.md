@@ -2,15 +2,15 @@
 
 A LaTeX class for typesetting course syllabi. The title block, page
 header, and contact-info table are all driven by `coursemeta.tex` and
-class-local metadata keys, with backward-compat shims for older
-syllabi that used command-style metadata (`\instructor{}`, `\email{}`,
-…).
+class-local metadata keys.
 
 ## What it gives you
 
 - A clean two-column contact-info block above the body, with rows that
 	appear or disappear based on which fields are set.
-- A `\syllabussection{Title}` command for policy/info blocks.
+- A `\syllabussection{Title}` command for policy/info blocks, plus one-word
+	shortcuts for common headings (`\officehours`, `\communication`,
+	`\academicintegrity`, …).
 - Grade-table helpers: `\gradecategories`, `\gradescale`, `\gradetables`.
 - `\examdatetable`: an `Exam | Date` table built from the shared coursemeta exam dates.
 - The unified TeXLib build-flag CLI.
@@ -40,11 +40,11 @@ syllabi that used command-style metadata (`\instructor{}`, `\email{}`,
 \begin{document}
 \maketitle
 
-\syllabussection{Course Description}
+\coursedescription
 The course covers fundamentals of algebra, polynomial and rational
 functions, and complex numbers.
 
-\syllabussection{Grade Scale}
+\grading[Grade Scale]
 \gradetables{
 	Homework & 15\% \\ \hline
 	Quizzes  & 10\% \\ \hline
@@ -87,18 +87,6 @@ packages pull `xcolor` in first.
 Plus all standard `course-metadata` keys: `course-title`, `course-section`,
 `institution`, `course-room`, `term`, …
 
-### Backward-compat command-style metadata
-
-For documents that pre-date the metadata refactor, the following
-commands still work and forward to `\metasetup`:
-
-```
-\coursetitle{...}     \courseshort{...}    \coursesection{...}
-\semester{...}        \instructor{...}     \email{...}
-\office{...}          \officehours{...}    \classroom{...}
-\organizer{...}       \classtime[alt]{main}
-```
-
 ### Build flags (TeXLib unified CLI)
 
 `\ifsolutions`, `\ifkey`, `\ifrubric`, `\ifdraft`, `\ifstudent`,
@@ -139,6 +127,24 @@ is fine (the default `Email` value carries it).
 `\syllabussection{Title}`
 Bold-titled paragraph break for a policy or info block. Title is
 followed by a period.
+
+**Section shortcuts** — one-word commands for common headings, each emitting
+`\syllabussection{<title>}` so body prose follows just like `\syllabussection`.
+An optional argument overrides the title (`\academicintegrity[Academic Honesty]`).
+
+| Command | Heading | Command | Heading |
+|---------|---------|---------|---------|
+| `\coursedescription` | Course Description | `\attendancepolicy` | Attendance Policy |
+| `\prerequisites` | Prerequisites | `\latework` | Late and Make-up Work |
+| `\requiredmaterials` | Required Materials | `\academicintegrity` | Academic Integrity |
+| `\learningoutcomes` | Learning Outcomes | `\accommodations` | Accommodations |
+| `\grading` | Grading | `\academicsupport` | Academic Support |
+| `\courseschedule` | Course Schedule | `\wellness` | Student Wellness |
+| `\examschedule` | Exam Schedule | `\inclusivity` | Inclusivity |
+| `\officehours` | Office Hours | `\technology` | Technology Requirements |
+| `\communication` | Communication | `\titleix` | Title IX |
+
+`\communications` is an alias for `\communication`.
 
 `\gradecategories{rows}`
 Render a `Category | Total Grade` table. Pass tabular rows separated

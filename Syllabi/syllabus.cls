@@ -140,22 +140,6 @@
 }
 \ExplSyntaxOff
 
-% Backward-compat shims for older syllabi using command-style metadata.
-\newcommand{\coursetitle}[1]{\metasetup{course-title={#1}}}
-\newcommand{\courseshort}[1]{\metasetup{short-title={#1}}}
-\newcommand{\coursesection}[1]{\metasetup{course-section={#1}}}
-\newcommand{\semester}[1]{\metasetup{term={#1}}}
-\newcommand{\instructor}[1]{\metasetup{instructor={#1}}}
-\newcommand{\email}[1]{\metasetup{email={#1}}}
-\newcommand{\office}[1]{\metasetup{office={#1}}}
-\newcommand{\officehours}[1]{\metasetup{office-hours={#1}}}
-\newcommand{\classroom}[1]{\metasetup{course-room={#1}}}
-\newcommand{\organizer}[1]{\metasetup{organizer={#1}}}
-\NewDocumentCommand{\classtime}{ O{} m }{%
-	\metasetup{class-time={#2}}%
-	\IfValueT{#1}{\metasetup{class-time-alt={#1}}}%
-}
-
 % ==============================================================================
 % 5. PAGE LAYOUT
 % ==============================================================================
@@ -354,6 +338,33 @@
 	\vskip.15in
 	\noindent\hspace*{-\texlibsectionhang}\textbf{#1.}%
 }
+
+% Section shortcuts: common syllabus headings as one-word commands. Each emits
+% \syllabussection{<standard title>}, so body prose follows exactly as with
+% \syllabussection; an optional argument overrides the title, e.g.
+% \academicintegrity[Academic Honesty]. \texlib@syllsec{\cmd}{Title} mints one.
+\newcommand{\texlib@syllsec}[2]{%
+	\NewDocumentCommand{#1}{o}{\syllabussection{\IfValueTF{##1}{##1}{#2}}}%
+}
+\texlib@syllsec{\coursedescription} {Course Description}
+\texlib@syllsec{\prerequisites}     {Prerequisites}
+\texlib@syllsec{\requiredmaterials} {Required Materials}
+\texlib@syllsec{\learningoutcomes}  {Learning Outcomes}
+\texlib@syllsec{\grading}           {Grading}
+\texlib@syllsec{\courseschedule}    {Course Schedule}
+\texlib@syllsec{\examschedule}      {Exam Schedule}
+\texlib@syllsec{\officehours}       {Office Hours}
+\texlib@syllsec{\communication}     {Communication}
+\texlib@syllsec{\attendancepolicy}  {Attendance Policy}
+\texlib@syllsec{\latework}          {Late and Make-up Work}
+\texlib@syllsec{\academicintegrity} {Academic Integrity}
+\texlib@syllsec{\accommodations}    {Accommodations}
+\texlib@syllsec{\academicsupport}   {Academic Support}
+\texlib@syllsec{\wellness}          {Student Wellness}
+\texlib@syllsec{\inclusivity}       {Inclusivity}
+\texlib@syllsec{\technology}        {Technology Requirements}
+\texlib@syllsec{\titleix}           {Title IX}
+\let\communications\communication   % plural alias for \communication
 
 % ==============================================================================
 % 8. GRADE TABLES
