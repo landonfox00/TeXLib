@@ -102,6 +102,12 @@ local part_letters = {'a','b','c','d','e','f','g','h'}
 --   in the PDF jumps into the real source.  This is the path for both single-
 --   and multi-version builds.  The helper backs the served content with ONE
 --   reused scratch file per job (<jobname>_synctex.tex), not one per problem.
+--   The {solution} block (if any) gets its OWN separate redirect to the same
+--   file at its own line, staged by pbank_stage_solution once the stem's
+--   \@@input has actually finished (texlib_synctex_stage only holds one
+--   pending redirect at a time — see that function's comment).  Choices are
+--   different: they're engine-selected/shuffled per version, so there is no
+--   fixed source line to redirect to; they're plain engine-generated tokens.
 --
 -- Fallback path — per-problem temp files (<jobname>_prob_<id>.tex):
 --   Used only when a problem has no usable source: a \begin{problem} in a
@@ -495,9 +501,11 @@ local function read_problem_lines_from_bank(bank_file, start_line)
 			-- Stop at the first region boundary: \begin{choices}, \begin{solution},
 			-- or \end{problem}.  This yields the LEADING region (the stem, plus any
 			-- \begin{parts} for free-response problems) that we attribute to the bank
-			-- file via \@@input.  Choices and the solution are emitted separately as
-			-- engine-generated tokens (selected/shuffled per version), so they are not
-			-- part of the file-served region.
+			-- file via \@@input.  Choices are engine-generated (selected/shuffled per
+			-- version) and never file-served; the solution IS still bank-attributed,
+			-- but via its own separate redirect -- see read_solution_lines_from_bank
+			-- and pbank_stage_solution, staged only after this region's \@@input
+			-- actually completes (texlib_synctex_stage has one pending slot).
 			if raw_line:match('^%s*\\begin%s*{choices}') or
 				raw_line:match('^%s*\\begin%s*{oneparchoices}') or
 				raw_line:match('^%s*\\begin%s*{solution}') or
@@ -509,6 +517,45 @@ local function read_problem_lines_from_bank(bank_file, start_line)
 		end
 	end
 	f:close()
+	return lines, (content_start or (start_line + 1))
+end
+
+-- Read the lines of a problem's SOLUTION block directly from the bank file on
+-- disk, mirroring read_problem_lines_from_bank above but for the region
+-- between \begin{solution} and \end{solution} instead of the stem.  Returns
+-- (lines, content_start) -- content_start is the bank-file line of lines[1],
+-- i.e. the line right after \begin{solution}.  Returns nil if the file can't
+-- be opened, or if the \begin{problem}...\end{problem} block starting at
+-- start_line has no \begin{solution} (\end{problem} reached first).
+local function read_solution_lines_from_bank(bank_file, start_line)
+	local path = bank_file
+	if not path:match('%.%a+$') then path = path .. '.tex' end
+	local f = io.open(path, 'r')
+	if not f then return nil end
+	local lineno = 0
+	local lines  = {}
+	local in_solution = false
+	local found = false
+	local content_start = nil
+	for raw_line in f:lines() do
+		lineno = lineno + 1
+		if lineno >= start_line then
+			if in_solution then
+				if raw_line:match('^%s*\\end%s*{solution}') then
+					found = true
+					break
+				end
+				if not content_start then content_start = lineno end
+				table.insert(lines, raw_line)
+			elseif raw_line:match('^%s*\\begin%s*{solution}') then
+				in_solution = true
+			elseif raw_line:match('^%s*\\end%s*{problem}') then
+				break   -- this problem has no solution
+			end
+		end
+	end
+	f:close()
+	if not found then return nil end
 	return lines, (content_start or (start_line + 1))
 end
 
@@ -746,6 +793,88 @@ local function resolve_mc_order(plan)
 	return out
 end
 
+-- Deferred: stage + \@@input the bank/document file's SOLUTION region for
+-- problem `pid`, mirroring typeset_problem's own stem redirect.  Must run as
+-- its OWN \directlua invocation, triggered by TeX reaching the printed
+-- \csname pbank@lua\endcsname{...} token below -- NOT called inline alongside
+-- the stem's stage call.  texlib_synctex_stage has a single pending slot,
+-- consumed by the next matching \@@input; staging the solution redirect
+-- inline (in the same Lua call that also stages the stem) would overwrite
+-- that slot before TeX ever processes the stem's \@@input, since tex.print
+-- output is only consumed after this whole callback returns.  Printing a
+-- follow-up \directlua call instead defers the second stage call until TeX's
+-- own sequential reading has carried it past the stem's \@@input to real EOF
+-- (same reasoning as pbank_print_catalog's per-id deferred calls above).
+-- Falls back to a plain tex.print of the collapsed solution text (the OLD,
+-- unattributed behaviour) when there is no usable bank/document source, or
+-- the live file no longer contains a \begin{solution} at the expected spot.
+function pbank_stage_solution(pid)
+	local p  = problem_db[pid]
+	local sm = p and source_map[pid]
+	if not (p and sm and sm.file and sm.file ~= '' and sm.line and sm.line > 0) then
+		tex.print(p and p.solution or '')
+		return
+	end
+	local bank_path = sm.file
+	if not bank_path:match('%.%a+$') then bank_path = bank_path .. '.tex' end
+
+	local sol_lines, sol_start = read_solution_lines_from_bank(sm.file, sm.line)
+	if not sol_lines then
+		texio.write_nl("TeXLib warning: could not locate \\begin{solution} in '" ..
+			tostring(sm.file) .. "' for SyncTeX line mapping of problem '" ..
+			tostring(pid) .. "'; its solution will not be independently " ..
+			"clickable in inverse search.")
+		tex.print(p.solution or '')
+		return
+	end
+
+	-- Same sparse-table + blank-line-padding-suppression scheme as the stem
+	-- redirect (see typeset_problem): content_start-indexed lines, with
+	-- \endlinechar toggled off then back on around the padding so the many
+	-- leading blank lines a deep-in-the-file solution requires don't each
+	-- tokenise to a \par (see typeset_problem's own comment for the exam.cls
+	-- \trivlist "missing \item" failure mode this avoids).
+	local sparse = {}
+	for i, ln in ipairs(sol_lines) do
+		sparse[sol_start + i - 1] = ln
+	end
+	if sol_start >= 3 then
+		sparse[1]             = "\\endlinechar=-1\\relax"
+		sparse[sol_start - 1] = "\\endlinechar=13\\relax"
+	end
+	texlib_synctex_stage{
+		target_file = bank_path,
+		lines       = sparse,
+		id          = pid .. '-sol',
+	}
+	-- \begingroup/\endgroup scope the \endlinechar toggling above the same way
+	-- typeset_problem's own stem \@@input does (belt-and-suspenders: the
+	-- explicit restore line already un-toggles it, but this guarantees no
+	-- leak even if content_start/sol_lines ever disagree).
+	tex.print("\\begingroup")
+	tex.print("\\csname @@input\\endcsname " .. bank_path)
+	tex.print("\\endgroup")
+end
+
+-- Shared by typeset_problem (FR path) and emit_mc_tail (MC path): emit a
+-- problem's {solution} block, bank-attributed via pbank_stage_solution when a
+-- source is known and the redirect helper is active, else the old plain
+-- tex.print of the collapsed (newline-free) solution text.
+local function emit_solution_block(p)
+	if not (p.solution and p.solution:match('%S')) then return end
+	local pid = p.meta and p.meta.id or ''
+	local sm  = source_map[pid]
+	tex.print('\\begin{solution}')
+	if sm and sm.file and sm.file ~= '' and sm.line and sm.line > 0
+			and texlib_synctex_is_active() and not pbank_suppress_redirect then
+		tex.print('\\csname pbank@lua\\endcsname{pbank_stage_solution(' ..
+			pbank_lua_quote(pid) .. ')}')
+	else
+		tex.print(p.solution)
+	end
+	tex.print('\\end{solution}')
+end
+
 -- Emit the multiple-choice tail: the selected/shuffled choices, the answer line,
 -- and (instructor builds) the solution, all bracketed by the \@mcframe@* layout
 -- hooks (default layout in texlib-problembank.sty; autoexam overrides them for
@@ -775,11 +904,7 @@ local function emit_mc_tail(p)
 	tex.print('\\end{' .. env .. '}')
 	tex.print('\\csname @mcframe@answer\\endcsname')
 	tex.print('\\csname @mcframe@mid\\endcsname')
-	if p.solution and p.solution:match('%S') then
-		tex.print('\\begin{solution}')
-		tex.print(p.solution)
-		tex.print('\\end{solution}')
-	end
+	emit_solution_block(p)
 	tex.print('\\csname @mcframe@end\\endcsname')
 end
 
@@ -821,7 +946,9 @@ local function typeset_problem(p, stretch)
 	-- usable source map (a \begin{problem} in a transient multi-version body
 	-- replay file) or under a non-redirect engine — both single- and
 	-- multi-version exams otherwise keep the redirect, so the normal path is the
-	-- bank \@@input above.
+	-- bank \@@input above.  (The {solution} block below, if any, repeats this
+	-- same stage-then-@@input strategy independently once this \@@input has
+	-- closed — see emit_solution_block / pbank_stage_solution.)
 	if sm and sm.file and sm.file ~= '' and sm.line and sm.line > 0
 			and texlib_synctex_is_active() and not pbank_suppress_redirect then
 		local bank_path = sm.file
@@ -917,15 +1044,12 @@ local function typeset_problem(p, stretch)
 	if p.is_mc and pbank_section_mode == 'mc' then
 		-- Full MC frame: choices + answer line + solution are emitted as
 		-- engine-generated tokens (selected/shuffled per version).  The stem above
-		-- came from the bank \@@input; the choices/solution intentionally do not.
+		-- came from the bank \@@input; the choices are engine-selected and never
+		-- file-served, but emit_mc_tail's solution gets its own bank redirect.
 		emit_mc_tail(p)
 	else
 		if p.is_mc then emit_choices_plain(p) end   -- MC problem in an FR section
-		if p.solution and p.solution:match('%S') then
-			tex.print("\\begin{solution}")
-			tex.print(p.solution)
-			tex.print("\\end{solution}")
-		end
+		emit_solution_block(p)
 		if stretch and stretch ~= 0 then
 			tex.print("\\workbox{" .. tostring(stretch) .. "}")
 		end
@@ -936,7 +1060,14 @@ end
 local function problem_not_found(query_str)
 	local msg = "Problem with query {" .. query_str .. "} not found."
 	texio.write_nl("AutoExam WARNING: " .. msg)
-	tex.print("\\textbf{[AutoExam: " .. msg .. "]}")
+	-- query_str is typeset as document text here, not read back through the
+	-- usual \problem{...} argument path, so it needs its own escaping -- a
+	-- query containing '_' (the overwhelmingly common case: bank ids are
+	-- conventionally snake_case) would otherwise fatal with "Missing $
+	-- inserted" instead of showing this placeholder, turning one missing bank
+	-- entry into a build that produces no PDF at all.
+	tex.print("\\textbf{[AutoExam: Problem with query {" ..
+		pbank_texify(query_str) .. "} not found.]}")
 end
 
 -- ---- Environment interface (\begin{problem}{id}[meta] ... \end{problem}) ----
