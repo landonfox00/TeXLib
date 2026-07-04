@@ -487,6 +487,138 @@ def scenario_schedule_plain_cli():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# --- Fixture: schedule class in BOX-GRID mode (box-grid=true) ---------------
+# The box grid draws the calendar as stacked box rows instead of an xltabular,
+# so each cell ships eagerly and SyncTeX records it against its OWN grid-file
+# line -- which is what makes the .schedmap rewrite land clicks on the real
+# source line (the whole point of the mode). These scenarios assert that REAL
+# per-cell accuracy, in contrast to scenarios 4/5 which assert the honest
+# fallback the DEFAULT (xltabular) renderer is stuck with.
+SCHEDULE_BOXGRID_TEX = (
+    "\\documentclass[landscape=true, box-grid=true]{schedule}\n"  # 1
+    "\\begin{document}\n"                                          # 2
+    "\\maketitle\n"                                                # 3
+    "\\begin{schedule}\n"                                          # 4
+    "\t\\holiday{8-26}{SYNCNEEDLEHOLIDAY}\n"                       # 5
+    "\t\\syllabus\n"                                               # 6
+    "\t\\section{SYNCNEEDLESECTION}\n"                             # 7
+    "\\end{schedule}\n"                                            # 8
+    "\\end{document}\n"                                            # 9
+)
+BOXGRID_HOLIDAY_LINE = 5
+BOXGRID_SECTION_LINE = 7
+
+
+def _stage_schedule_engine(tmp):
+    """Copy THIS repo's schedule engine (schedule.cls + the .lua files) plus the
+    shared .sty/.lua into the fixture dir so `.` resolves them ahead of anything
+    the junction/TEXINPUTS points at. Necessary because box-grid support may be
+    an uncommitted/worktree change while the machine's junction still points at
+    a box-grid-unaware checkout -- the fixture must exercise the code under test,
+    not whatever schedule.cls is on the search path."""
+    for pat in ("*.sty", "*.lua"):
+        for f in glob.glob(os.path.join(TEXLIB_ROOT, pat)):
+            shutil.copy(f, tmp)
+    sched = os.path.join(TEXLIB_ROOT, "Schedule")
+    for f in glob.glob(os.path.join(sched, "*.lua")):
+        shutil.copy(f, tmp)
+    shutil.copy(os.path.join(sched, "schedule.cls"), tmp)
+
+
+def scenario_schedule_boxgrid_builder():
+    """Box-grid via the real builder (aux routing + schedmap rewrite): a click
+    on a calendar cell must resolve to the SOURCE .tex at the directive's line
+    -- real per-cell inverse search, the outcome the xltabular path cannot
+    reach. This is the assertion scenarios 4/5 would love to make but can't."""
+    print("\n=== Scenario 6: schedule BOX-GRID via builder (real per-cell) ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_synctex_it_boxgrid_")
+    try:
+        _stage_schedule_engine(tmp)
+        write(tmp, "coursemeta.tex", SCHEDULE_COURSEMETA_TEX)
+        write(tmp, "schedule.tex", SCHEDULE_BOXGRID_TEX)
+        result = run_build(tmp, "schedule.tex", aux_directory="<<temp>>")
+        check("builder reports it mapped real cell records to the user source "
+              "(box grid, not the honest-fallback message)",
+              "cell record(s) to the user source" in result["displayed"],
+              result["displayed"])
+
+        pdf = os.path.join(tmp, "schedule.pdf")
+        check("PDF was produced", os.path.exists(pdf))
+        if not os.path.exists(pdf):
+            return
+
+        # Holiday cell -> its \holiday directive line.
+        pos = find_word(pdf, "SYNCNEEDLEHOLIDAY")
+        check("found the holiday needle in the PDF", pos is not None)
+        if pos:
+            r = synctex_edit(pdf, *pos)
+            check("click on the holiday cell resolves to schedule.tex",
+                  basename_matches(r["input"], "schedule.tex"), r["raw"][:300])
+            check(f"...at the holiday's own source line ({BOXGRID_HOLIDAY_LINE})",
+                  r["line"] == BOXGRID_HOLIDAY_LINE, f"got line {r['line']!r}")
+
+        # Section cell -> its \section directive line: proves DISTINCT cells map
+        # to DISTINCT lines (the collapse would put both on one line).
+        pos2 = find_word(pdf, "SYNCNEEDLESECTION")
+        check("found the section needle in the PDF", pos2 is not None)
+        if pos2:
+            r2 = synctex_edit(pdf, *pos2)
+            check("click on the section cell resolves to schedule.tex",
+                  basename_matches(r2["input"], "schedule.tex"), r2["raw"][:300])
+            check(f"...at the section's OWN source line ({BOXGRID_SECTION_LINE}), "
+                  "distinct from the holiday's -- per-cell, not collapsed",
+                  r2["line"] == BOXGRID_SECTION_LINE, f"got line {r2['line']!r}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def scenario_schedule_boxgrid_plain_cli():
+    """Box-grid plain CLI (no builder rewrite): each cell's raw attribution
+    already lands on its OWN grid-file line (that's what the box grid buys, with
+    or without the rewrite), so a click resolves to the grid file at the line
+    whose content is that cell -- a genuinely useful fallback, unlike xltabular's
+    collapse-to-last-line. We assert the two cells resolve to DIFFERENT grid
+    lines (the collapse signature is both landing on the same line)."""
+    print("\n=== Scenario 7: schedule BOX-GRID, plain CLI (per-cell grid lines) ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_synctex_it_boxgrid_cli_")
+    try:
+        _stage_schedule_engine(tmp)
+        write(tmp, "coursemeta.tex", SCHEDULE_COURSEMETA_TEX)
+        write(tmp, "schedule.tex", SCHEDULE_BOXGRID_TEX)
+        env = _texinputs_env(tmp)
+        cmd = [LUALATEX, "-interaction=nonstopmode", "-synctex=1",
+               "-shell-escape", "schedule.tex"]
+        for _ in range(2):
+            subprocess.run(cmd, cwd=tmp, capture_output=True, text=True,
+                            encoding="utf-8", errors="replace", env=env, timeout=180)
+
+        pdf = os.path.join(tmp, "schedule.pdf")
+        gz = os.path.join(tmp, "schedule.synctex.gz")
+        check("PDF was produced", os.path.exists(pdf))
+        check(".synctex.gz was produced", os.path.exists(gz))
+        if not (os.path.exists(pdf) and os.path.exists(gz)):
+            return
+
+        ph = find_word(pdf, "SYNCNEEDLEHOLIDAY")
+        ps = find_word(pdf, "SYNCNEEDLESECTION")
+        check("found both needles in the PDF", ph is not None and ps is not None)
+        if ph and ps:
+            rh = synctex_edit(pdf, *ph)
+            rs = synctex_edit(pdf, *ps)
+            grid_bn = "schedule_schedule_grid.tex"
+            check("holiday cell resolves into the grid file",
+                  basename_matches(rh["input"], grid_bn), rh["raw"][:200])
+            check("section cell resolves into the grid file",
+                  basename_matches(rs["input"], grid_bn), rs["raw"][:200])
+            check("the two cells land on DIFFERENT grid lines (per-cell, not "
+                  "collapsed to one line as xltabular does)",
+                  rh["line"] is not None and rs["line"] is not None
+                  and rh["line"] != rs["line"],
+                  f"holiday line={rh['line']!r} section line={rs['line']!r}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     print("TeXLib SyncTeX inverse-search integration test\n")
     if not LUALATEX:
@@ -504,6 +636,8 @@ def main():
     scenario_document_attributed_problem()
     scenario_schedule_aux_routed()
     scenario_schedule_plain_cli()
+    scenario_schedule_boxgrid_builder()
+    scenario_schedule_boxgrid_plain_cli()
 
     summary = f"\n{_PASS} passed, {_FAIL} failed"
     if _KNOWN_FAIL:

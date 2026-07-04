@@ -26,6 +26,15 @@
 % leave room, e.g. {1.0, 1.0, 0.5} for a short Friday. quiz-days = F layers a
 % weekly quiz onto Fridays. Add  month-pages = true  to split the grid into one
 % page per calendar month.
+%
+% Add  box-grid = true  to render the calendar as stacked box rows instead of an
+% xltabular. It looks the same, but each cell ships eagerly so SyncTeX inverse
+% search (double-click a PDF cell in SumatraPDF -> jump to the directive that
+% produced it) actually works per-cell; under the default xltabular it cannot,
+% because the table defers shipout and every cell's line collapses to one. The
+% box grid does NOT repeat the day-name header on continuation pages of a
+% single continuous grid — pair it with month-pages = true (header per month)
+% for a multi-page schedule, or accept the header on page 1 only.
 
 \begin{document}
 \maketitle

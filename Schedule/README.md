@@ -86,6 +86,34 @@ Class-local keys (in addition to all standard `course-metadata` keys):
 | `quiz-days`     | Days of the week for quizzes (e.g. `T`, `Th`)           |
 | `recitation-days` | Days of the week for recitations (e.g. `R`); adds a capacity-0 column. Default: none. |
 | `month-pages`   | `true` to put each calendar month on its own page (see below). Default `false`: one continuous table. |
+| `box-grid`      | `true` to render the calendar as stacked box rows instead of an `xltabular`, enabling per-cell SyncTeX inverse search (see below). Default `false`. |
+
+#### `box-grid` (SyncTeX inverse search)
+
+By default the calendar is an `xltabular`. It looks right, but SyncTeX
+**inverse search does not work per-cell** under it: `xltabular` (via
+`longtable`) defers box shipout to its output routine, so every cell's
+recorded source line collapses to one — double-clicking a cell in the
+PDF cannot jump to the directive that produced it. Under the default
+renderer, clicks land in the auto-generated grid scratch file instead
+(an honest fallback, not a wrong source line).
+
+Set `box-grid = true` to draw the **same grid** out of stacked box rows
+(`\schedcell` framed boxes in one `\hbox` per week) that ship eagerly, so
+SyncTeX records each cell against its own line and clicking a cell opens
+your source `.tex` at the `\section` / `\holiday` / `\exam` / … directive
+that produced it. Verified end-to-end against a real build with the
+`synctex` CLI.
+
+Limitation: the box grid repeats the day-name header only per page-*group*,
+not per physical page, so a single continuous grid that overflows onto a
+second page has no header on the continuation. For a multi-page schedule,
+combine it with `month-pages = true` — each month is its own group with its
+own header, so every page gets one:
+
+```latex
+\meta{ landscape = true, box-grid = true, month-pages = true }
+```
 
 #### `month-pages`
 
