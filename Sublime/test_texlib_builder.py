@@ -263,56 +263,6 @@ def main():
     check("mode=draft -> \\def\\ShowDraft{}",
           r"\def\ShowDraft{}" in cmds[0][0][-1], cmds[0][0][-1] if cmds else "")
 
-    # (f) autoexam + allversions -> one build per version, jobnames + \def\Version
-    cmds, disp = run_builder(
-        r"\documentclass{autoexam}\versions{A, B, C}\begin{document}x\end{document}",
-        options=["--texlib-mode=allversions"])
-    check("allversions -> 3 builds", len(cmds) == 3, f"{len(cmds)} builds")
-    jobnames = [
-        next((a for a in c[0] if str(a).startswith("--jobname=")), None) for c in cmds
-    ]
-    check("allversions -> jobnames doc_A / doc_B / doc_C",
-          jobnames == ["--jobname=doc_A", "--jobname=doc_B", "--jobname=doc_C"],
-          jobnames)
-    check("allversions -> \\def\\Version{A} in first build",
-          bool(cmds) and r"\def\Version{A}" in cmds[0][0][-1],
-          cmds[0][0][-1] if cmds else "")
-    check("allversions -> \\input{doc_A.tex} (per-version source copy)",
-          bool(cmds) and r"\input{doc_A.tex}" in cmds[0][0][-1],
-          cmds[0][0][-1] if cmds else "")
-
-    # (g) \examversions alias also parsed
-    cmds, _ = run_builder(
-        r"\documentclass{autoexam}\examversions{A,B}\begin{document}x\end{document}",
-        options=["--texlib-mode=allversions"])
-    check("\\examversions alias -> 2 builds", len(cmds) == 2, f"{len(cmds)} builds")
-
-    # (g2) allversions_solutions -> one instructor-copy build per version,
-    # jobnames + \def\Version + \def\ShowSolutions{}. Previously unreachable:
-    # _build_version already had a mode="solutions" branch, but nothing in
-    # commands() ever passed it.
-    cmds, _ = run_builder(
-        r"\documentclass{autoexam}\versions{A, B, C}\begin{document}x\end{document}",
-        options=["--texlib-mode=allversions_solutions"])
-    check("allversions_solutions -> 3 builds", len(cmds) == 3, f"{len(cmds)} builds")
-    jobnames = [
-        next((a for a in c[0] if str(a).startswith("--jobname=")), None) for c in cmds
-    ]
-    check("allversions_solutions -> jobnames doc_A_solutions / _B_ / _C_",
-          jobnames == [
-              "--jobname=doc_A_solutions", "--jobname=doc_B_solutions",
-              "--jobname=doc_C_solutions",
-          ], jobnames)
-    check("allversions_solutions -> \\def\\Version{A} in first build",
-          bool(cmds) and r"\def\Version{A}" in cmds[0][0][-1],
-          cmds[0][0][-1] if cmds else "")
-    check("allversions_solutions -> \\def\\ShowSolutions{} in first build",
-          bool(cmds) and r"\def\ShowSolutions{}" in cmds[0][0][-1],
-          cmds[0][0][-1] if cmds else "")
-    check("allversions_solutions -> \\input{doc_A_solutions.tex}",
-          bool(cmds) and r"\input{doc_A_solutions.tex}" in cmds[0][0][-1],
-          cmds[0][0][-1] if cmds else "")
-
     # (h) %!TeX program respected (LaTeXTools resolves it into self.engine)
     cmds, _ = run_builder(r"\documentclass{article}\begin{document}x\end{document}",
                           engine="lualatex")
@@ -666,26 +616,6 @@ def main():
     check("seq: biber + bare undefined-refs -> no extra pass",
           heads(cmds) == ["pdflatex", "biber", "pdflatex"], heads(cmds))
 
-    # allversions: biber gating is per-version. Seed version A as up-to-date
-    # (skips biber); version B is fresh (runs biber). MAX_RERUNS is per version.
-    DOCV = r"\documentclass{autoexam}\versions{A,B}\begin{document}x\end{document}"
-    cmds, _, _ = drive_builder(
-        DOCV, options=["--texlib-mode=allversions"], engine="lualatex",
-        seed_files={"doc_A.bcf": "<a>", "doc_A.bbl": "ba",
-                    "doc_A.bcf.texlibhash": _fp("<a>")},
-        steps=[
-            {"out": ""},                          # A pass 1: A is current -> skip
-            {"write": {"doc_B.bcf": "<b>"}},      # B pass 1 wrote its .bcf
-            {"write": {"doc_B.bbl": "bb"}},       # B biber wrote .bbl
-            {"out": ""},                          # B post-biber pass clean
-        ])
-    check("seq: allversions per-version biber -> A skipped, B ran",
-          heads(cmds) == ["lualatex", "lualatex", "biber", "lualatex"], heads(cmds))
-    biber_cmd = next((c for c in cmds if c[0][0] == "biber"), None)
-    check("seq: allversions biber targets version B's jobname",
-          biber_cmd is not None and any("doc_B" in str(a) for a in biber_cmd[0]),
-          biber_cmd)
-
     # ====================================================================== #
     # (p) biber change-detection helpers, exercised directly.
     # ====================================================================== #
@@ -829,45 +759,6 @@ def main():
     os.chmod(ro, 0o444)  # read-only
     TexlibBuilder._force_remove(ro)
     check("_force_remove: read-only file is deleted", not os.path.exists(ro), ro)
-
-    # ====================================================================== #
-    # (t) per-version source copy: autoexam reads its body from <jobname>.tex,
-    #     so allversions stages a copy named to match the jobname -- which is
-    #     what makes \shufflepages work under a distinct jobname.
-    # ====================================================================== #
-    tmpv = tempfile.mkdtemp(prefix="texlib_vsrc_")
-    with open(os.path.join(tmpv, "doc.tex"), "w", encoding="utf-8") as fh:
-        fh.write("body")
-    vb = TexlibBuilder()
-    vb.tex_name = "doc.tex"
-    vb.base_name = "doc"
-    vb.tex_dir = tmpv
-    ret = vb._make_version_source_copy("doc_A")
-    check("vsrc: returns the per-version copy name", ret == "doc_A.tex", ret)
-    check("vsrc: copy created with the source content",
-          os.path.exists(os.path.join(tmpv, "doc_A.tex"))
-          and open(os.path.join(tmpv, "doc_A.tex")).read() == "body")
-
-    vb2 = TexlibBuilder()
-    vb2.tex_name = "doc_A.tex"  # already named as the jobname (build_versions case)
-    vb2.base_name = "doc"
-    vb2.tex_dir = tmpv
-    check("vsrc: no-op when source already named <jobname>.tex",
-          vb2._make_version_source_copy("doc_A") == "doc_A.tex")
-
-    for n in ("doc_A_A.sco", "doc_A.srcmap", "doc_A_synctex.tex",
-              "doc_A_autoexam_body_A.tex"):
-        open(os.path.join(tmpv, n), "w").close()
-    open(os.path.join(tmpv, "doc_A.pdf"), "w").close()  # the real output
-    vb._cleanup_version_scratch()
-    check("vsrc: cleanup removes the source copy",
-          not os.path.exists(os.path.join(tmpv, "doc_A.tex")))
-    check("vsrc: cleanup removes jobname scratch (.sco/.srcmap/body/synctex)",
-          not any(os.path.exists(os.path.join(tmpv, n)) for n in
-                  ("doc_A_A.sco", "doc_A.srcmap", "doc_A_synctex.tex",
-                   "doc_A_autoexam_body_A.tex")))
-    check("vsrc: cleanup preserves the output PDF",
-          os.path.exists(os.path.join(tmpv, "doc_A.pdf")))
 
     # ====================================================================== #
     # (u) biber hash is recorded AFTER the final pass, not mid-build.

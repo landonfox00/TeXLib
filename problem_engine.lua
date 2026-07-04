@@ -9,7 +9,10 @@
 --   * Problem-bank loading via \loadbank, with a sanitized id space.
 --   * Per-version selection, shuffling, and deterministic seeding (set_exam_seed).
 --   * Multi-version emission driven by \versions{A,B,C,...} in the document
---     preamble; the builder loops the engine once per version.  Used by
+--     preamble: one engine invocation loops over every version (and, under
+--     \solutions dual/only, every solutions copy), \input-ing each in turn;
+--     the Sublime builder then slices the resulting combined PDF into one
+--     file per version/copy afterward (see autoexam_run_versions).  Used by
 --     autoexam only — quizzes have no versioning but still benefit from the
 --     randomisation helpers (\setrng, \pick*, \calcvar).
 --   * Per-problem temp-file redirection so SyncTeX/inverse-search lands in the

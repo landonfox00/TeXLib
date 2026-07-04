@@ -21,8 +21,9 @@
 ]{autoexam}
 
 % -- Versions ------------------------------------------------------------------
-% Declare the per-exam letter labels. The Python builder (if used) parses
-% this line via regex to discover versions.
+% Declare the per-exam letter labels. A normal build compiles every version
+% into one combined PDF, then the Sublime builder slices <base>_A.pdf,
+% <base>_B.pdf, ... out of it afterward.
 \versions{A, B, C}
 
 % -- Problem bank --------------------------------------------------------------

@@ -97,11 +97,13 @@
 
 % \examversions{A, B, C}
 %   Declares the exam versions for this document.
-%   - Standalone mode (no Python builder): the class loops over all versions
-%     in a single compilation, producing a collated PDF.
-%   - Builder mode (\def\Version{A} passed on the command line): the class
-%     runs only the specified version (builder handles parallelism).
-%   The Python builder also parses this command via regex to discover versions.
+%   - Normal compile (no \Version forced): the class loops over every version
+%     (and, under \solutions dual/only, every solutions copy) in ONE
+%     compilation, producing a single collated PDF -- which the Sublime
+%     builder then slices into <base>_A.pdf, <base>_B.pdf, ... afterward (see
+%     \AutoExamVmapRecord below).
+%   - Forced single version (\def\Version{A} on the command line): the class
+%     runs only that one version/copy, producing just its own PDF directly.
 \def\@autoexam@versions{}  % empty = edit/single-version mode
 \newcommand{\examversions}[1]{%
 	\ifdefined\directlua
@@ -122,8 +124,9 @@
 % \instructormode are provided by texlib-build (loaded above).
 %
 % Exam solution-build modes (override texlib-build's \solutions for exams).
-% \AutoExamSolMode is read by the Lua version loop (collated single-file build,
-% autoexam_run_versions) and by build_versions.py (parallel builder):
+% \AutoExamSolMode is read by the Lua version loop (autoexam_run_versions,
+% problem_engine.lua) -- whether it collates every copy into one build, or a
+% forced single version/copy (\def\Version{...} on the command line):
 %   none -> student copies only (default)
 %   dual -> student AND instructor copy of each version
 %           (e.g. A, B, C, A-sol, B-sol, C-sol)

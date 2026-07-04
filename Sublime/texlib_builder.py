@@ -22,11 +22,13 @@
 #     matching TeXLib flag (\def\ShowKey{}, \def\StudentMode{}, ...). You never
 #     edit the .tex to switch modes.
 #
-#   * autoexam versions -- the "All Versions" variant detects \versions{A,B,C}
-#     (or \examversions{...}) in the root document and builds one separate PDF
-#     per version: <base>_A.pdf, <base>_B.pdf, ... via \def\Version{X}.
-#     "All Versions (Solutions)" builds the same per-version loop with
-#     \ShowSolutions injected, producing <base>_A_solutions.pdf, ... instead.
+#   * autoexam versions -- a normal build of a \versions{A,B,C} (or
+#     \examversions{...}) document compiles every version (and, under
+#     \solutions dual/only mode, every solutions copy) into ONE combined
+#     PDF, then slices <base>_A.pdf, <base>_B.pdf, <base>_A_solutions.pdf,
+#     ... out of it afterward -- see _slice_versions_from_vmap, keyed off
+#     the <base>.vmap sidecar autoexam.cls writes per copy. No extra clicks
+#     or separate recompiles needed.
 #
 #   * Cross-reference reruns -- re-runs the engine (up to MAX_RERUNS) while the
 #     log still says "Rerun to get cross-references right."
@@ -180,16 +182,6 @@ MODE_MACROS = {
     "draft":     r"\def\ShowDraft{}",
 }
 
-# A pseudo-mode: build every \versions{...} entry as its own PDF
-# (<base>_<ver>.pdf, the student/default copy).
-MODE_ALLVERSIONS = "allversions"
-
-# A pseudo-mode: build every \versions{...} entry as its own instructor-copy
-# PDF (<base>_<ver>_solutions.pdf, \ShowSolutions injected). _build_version's
-# `mode` parameter already produced this suffix; nothing previously called it
-# with mode="solutions", so this build never actually happened before.
-MODE_ALLVERSIONS_SOLUTIONS = "allversions_solutions"
-
 # A pseudo-mode: a single engine pass with no biber and no rerun loop, for fast
 # preview while writing. Cross-references / citations may be stale; a normal
 # build settles them.
@@ -214,7 +206,6 @@ PUBLISH_SHORTCUT_DIR = "Course Materials"
 
 # Regexes over the root document / engine output.
 DOCCLASS_RE = re.compile(r"\\documentclass(?:\[[^\]]*\])?\{(\w[\w-]*)\}")
-VERSIONS_RE = re.compile(r"\\(?:exam)?versions\s*\{([^}]+)\}")
 # A problem-bank fragment (bank.tex, chN.tex, ...): no \documentclass of its
 # own -- normally only ever \loadbank'd/\input from a real quiz/exam/didactic
 # root -- but it does define \begin{problem} blocks. See _build_bank_catalog.
@@ -305,7 +296,6 @@ class TexlibBuilder(PdfBuilder):
         # the PDF viewer and SyncTeX both keep working.
         tex_dir = self._tex_dir()
         self._set_aux_target(tex_dir)
-        self._version_sources = []
         # Jobnames whose biber ran this build; their input fingerprint is
         # recorded in _postprocess, AFTER the final engine pass settles the
         # .bcf (recording mid-build would capture a .bcf the post-biber pass
@@ -315,31 +305,7 @@ class TexlibBuilder(PdfBuilder):
             engine, self._aux_target, tex_dir, engine_options
         )
 
-        if mode in (MODE_ALLVERSIONS, MODE_ALLVERSIONS_SOLUTIONS):
-            per_version_mode = (
-                "solutions" if mode == MODE_ALLVERSIONS_SOLUTIONS else "default"
-            )
-            versions = self._parse_versions(src)
-            if not versions:
-                self.display(
-                    "TeXLib: 'All Versions' requested but no \\versions{...} "
-                    "found in the root document -- building once instead.\n"
-                )
-                yield from self._count_passes(
-                    self._build_once(base, engine, per_version_mode)
-                )
-            else:
-                self.display(
-                    "TeXLib: building "
-                    f"{len(versions)} version(s): {', '.join(versions)}\n"
-                )
-                for version in versions:
-                    yield from self._count_passes(
-                        self._build_version(
-                            base, engine, version, per_version_mode
-                        )
-                    )
-        elif mode == MODE_QUICK:
+        if mode == MODE_QUICK:
             yield from self._count_passes(self._build_quick(base, engine))
         else:
             yield from self._count_passes(self._build_once(base, engine, mode))
@@ -381,9 +347,7 @@ class TexlibBuilder(PdfBuilder):
                 mode = match.group(1).strip().lower()
             else:
                 passthrough.append(opt)
-        if mode not in MODE_MACROS and mode not in (
-            MODE_ALLVERSIONS, MODE_ALLVERSIONS_SOLUTIONS, MODE_QUICK
-        ):
+        if mode not in MODE_MACROS and mode != MODE_QUICK:
             self.display(
                 f"TeXLib: unknown build mode {mode!r}; falling back to default.\n"
             )
@@ -408,13 +372,6 @@ class TexlibBuilder(PdfBuilder):
             )
             return "lualatex"
         return engine
-
-    @staticmethod
-    def _parse_versions(src):
-        match = VERSIONS_RE.search(src)
-        if not match:
-            return []
-        return [v.strip() for v in match.group(1).split(",") if v.strip()]
 
     # ------------------------------------------------------------------ #
     # Gradebook xlsx -> report-view CSV  (report-card class)
@@ -555,9 +512,8 @@ class TexlibBuilder(PdfBuilder):
     def _base_engine_cmd(engine, aux_target=None, tex_dir=None, options=()):
         """Assemble the shared engine command prefix.
 
-        Single source of truth for the base flags so the standalone
-        build_versions.py driver (which imports this class) cannot drift from
-        the interactive builder. Adds -output-directory only when routing to a
+        Single source of truth for the base flags every build step (_build_once,
+        _build_quick) starts from. Adds -output-directory only when routing to a
         distinct aux dir; appends any genuine engine options last.
         """
         cmd = [engine, "-interaction=nonstopmode", "-synctex=1"]
@@ -599,81 +555,6 @@ class TexlibBuilder(PdfBuilder):
         while run < MAX_RERUNS and self._needs_another_run():
             run += 1
             yield (cmd, f"{label} rerun {run}...")
-
-    def _build_version(self, base, engine, version, mode="default"):
-        """One \\versions{} entry, built as <base>_<version>.pdf (student) or
-        <base>_<version>_solutions.pdf when mode='solutions' (instructor copy)."""
-        macro = MODE_MACROS.get(mode, "")
-        suffix = "_solutions" if mode == "solutions" else ""
-        jobname = f"{self.base_name}_{version}{suffix}"
-        # autoexam reads its body from <jobname>.tex (\shufflepages requires
-        # it), but the root source is named differently (doc.tex vs jobname
-        # doc_A). Build this version against a source copy named to match the
-        # jobname; _cleanup_version_scratch removes it afterwards.
-        input_name = self._make_version_source_copy(jobname)
-        arg = f"\\def\\Version{{{version}}}{macro}\\input{{{input_name}}}"
-        cmd = base + [f"--jobname={jobname}", arg]
-
-        run = 1
-        yield (cmd, f"version {version} run {run}...")
-
-        # biblatex: same change-detection, scoped to the version's jobname, so
-        # a rebuilt version reuses its .bbl when its bibliography is unchanged.
-        if self._biber_needed(jobname) and not self._biber_is_current(jobname):
-            yield (self._biber_command(jobname), f"biber [{version}]...")
-            self._biber_ran.append(jobname)
-            run += 1
-            yield (cmd, f"version {version} rerun {run} (post-biber)...")
-
-        while run < MAX_RERUNS and self._needs_another_run():
-            run += 1
-            yield (cmd, f"version {version} rerun {run}...")
-
-    def _make_version_source_copy(self, jobname):
-        """Ensure <jobname>.tex exists as this version's body source; return the
-        basename to \\input.
-
-        autoexam reads its body from \\jobname.tex and \\shufflepages requires
-        it, so a version built under jobname <base>_<ver> needs a source named
-        to match. Copy the root source to <jobname>.tex (tracked for cleanup).
-        If the source is already named <jobname>.tex (e.g. build_versions.py
-        pre-staged it), no copy is made. Falls back to the original source on
-        error -- which keeps the no-shuffle case working.
-        """
-        target = jobname + ".tex"
-        if self.tex_name == target:
-            return target
-        tex_dir = self._tex_dir()
-        dst = os.path.join(tex_dir, target)
-        try:
-            self._force_remove(dst)
-            shutil.copyfile(os.path.join(tex_dir, self.tex_name), dst)
-        except OSError as exc:  # noqa: BLE001 - degrade to the original source
-            self.display(
-                f"TeXLib: could not stage version source {target}: {exc}; "
-                "building from the original (\\shufflepages may fail).\n"
-            )
-            return self.tex_name
-        self._version_sources = getattr(self, "_version_sources", [])
-        self._version_sources.append(dst)
-        return target
-
-    def _cleanup_version_scratch(self):
-        """Remove the per-version source copies + jobname-keyed scratch the
-        autoexam engine writes to the source dir, preserving the output PDFs /
-        SyncTeX. No-op unless _make_version_source_copy staged anything.
-        """
-        tex_dir = self._tex_dir()
-        for src in getattr(self, "_version_sources", []):
-            jobname = os.path.splitext(os.path.basename(src))[0]
-            for pat in (
-                jobname + ".tex", jobname + ".srcmap", jobname + "_synctex.tex",
-                jobname + "_*.sco", jobname + "_autoexam_body*.tex",
-                jobname + "_prob_*.tex",
-            ):
-                for f in glob.glob(os.path.join(tex_dir, pat)):
-                    self._force_remove(f)
-        self._version_sources = []
 
     def _build_bank_catalog(self, base, engine):
         """Build a problem-bank fragment directly: synthesize a minimal quiz.cls
@@ -1065,10 +946,7 @@ class TexlibBuilder(PdfBuilder):
 
         self._finalize_synctex(tex_dir)
 
-        self._cleanup_version_scratch()
-
         self._display_build_summary(tex_dir, base_path)
-
     def _finalize_synctex(self, tex_dir):
         """Reduce inverse-search artifacts to a single uncompressed <base>.synctex.
 
