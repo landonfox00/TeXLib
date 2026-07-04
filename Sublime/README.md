@@ -114,6 +114,7 @@ The builder has three layers of automated tests (none deployed to Sublime):
 |--------|-----------|--------|
 | `test_texlib_builder.py` | No | Decision logic + **full multi-pass orchestration** (biber-skip cache, rerun detection, `MAX_RERUNS` cap, per-version biber, aux routing, hidden-file recovery, schedmap rewrite). Drives `commands()` with a scripted side-effect timeline so the biber/rerun branches actually execute. |
 | `test_biber_integration.py` | Yes (`pdflatex`/`lualatex` + `biber`) | Real end-to-end: drives the actual builder coroutine against the real toolchain on a biblatex fixture. Proves a fresh build settles with no undefined refs, an unchanged rebuild **skips biber** in one pass, and editing the `.bib` re-runs biber. Soft-skips if the tools are absent. |
+| `test_synctex_integration.py` | Yes (`lualatex` + poppler's `pdftotext` + `synctex`) | Real end-to-end **inverse search**: drives the real builder against a real build, then uses TeX Live's own `synctex edit -o page:x:y:pdf` CLI to simulate a Sumatra double-click and check where it actually lands — the fabricated-data unit tests above can't catch a real engine/table-package quirk (e.g. xltabular deferring shipout) that only shows up against genuine output. Soft-skips if the tools (or a poppler-flavored `pdftotext` specifically — an xpdf build earlier on `PATH` silently lacks `-bbox`) are absent. |
 | `test_build_versions.py` (repo root) | No | The parallel version builder: per-version source-copy + PDF collection + scratch cleanup, rerun handling, parallel fan-out, and `--combined`/`--separate`/default merge. Uses a fake subprocess (merge tests need `pypdf`). |
 | `smoke_test.py` (repo root) | Yes (`lualatex`) | Builds every module template; content/visual regression for shared `.sty`/`.cls` refactors. |
 
@@ -122,6 +123,7 @@ Run them directly:
 ```sh
 python Sublime/test_texlib_builder.py        # fast, no TeX
 python Sublime/test_biber_integration.py     # real pdflatex + biber
+python Sublime/test_synctex_integration.py   # real lualatex + synctex CLI
 python test_build_versions.py                 # fast, no TeX (pypdf for merge)
 python smoke_test.py                          # full template builds
 ```

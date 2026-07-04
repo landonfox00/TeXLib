@@ -23,15 +23,21 @@ jobs:
         run: python test_build_versions.py
 
   # Real end-to-end: drives the actual builder coroutines against a genuine
-  # toolchain. Two proofs run here:
-  #   * test_biber_integration.py -- pdflatex + biber on a biblatex fixture,
+  # toolchain. Three proofs run here:
+  #   * test_biber_integration.py    -- pdflatex + biber on a biblatex fixture,
   #     proving the biber-skip cache and rerun handling.
-  #   * test_build_versions.py    -- its gated real_build_check() does a genuine
-  #     2-version autoexam build with LUALATEX, proving the parallel driver
-  #     resolves the shared root .sty files (the comma-safe TEXINPUTS) and emits
-  #     two distinct single-version PDFs. This is the one check the fake-engine
-  #     suite cannot exercise, so it must run somewhere with a real toolchain.
-  # Both tests soft-skip if their tools are missing, so a toolchain hiccup
+  #   * test_build_versions.py      -- its gated real_build_check() does a
+  #     genuine 2-version autoexam build with LUALATEX, proving the parallel
+  #     driver resolves the shared root .sty files (the comma-safe TEXINPUTS)
+  #     and emits two distinct single-version PDFs. This is the one check the
+  #     fake-engine suite cannot exercise, so it must run somewhere with a
+  #     real toolchain.
+  #   * test_synctex_integration.py -- drives a real lualatex build then asks
+  #     TeX Live's own `synctex edit` CLI to resolve a PDF-space point back to
+  #     a source file + line, exactly what SumatraPDF does before an inverse
+  #     search jump. Needs poppler's pdftotext (-bbox support -- NOT any
+  #     xpdf-flavored build) in addition to the toolchain the other two use.
+  # All three soft-skip if their tools are missing, so a toolchain hiccup
   # degrades gracefully rather than failing the job.
   #
   # Runs in the SAME pinned full-scheme TeX Live container as smoke.yml /
@@ -43,14 +49,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Real biber + version-builder tests in pinned TeX Live
+      - name: Real biber + version-builder + SyncTeX tests in pinned TeX Live
         uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
           scheme: full
           run: |
             set -e
-            apk add --no-cache python3 py3-pip
+            apk add --no-cache python3 py3-pip poppler-utils
             pip install --break-system-packages --quiet pypdf \
               || pip install --quiet pypdf
             python3 Sublime/test_biber_integration.py
             python3 test_build_versions.py
+            python3 Sublime/test_synctex_integration.py

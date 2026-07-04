@@ -1170,16 +1170,9 @@ class TexlibBuilder(PdfBuilder):
             )
             return
 
-        # 1) Rewrite each grid-file Input record to point at the user source.
-        def _rewrite_input(match):
-            fid = int(match.group(1))
-            if fid in grid_ids:
-                return "Input:%d:%s" % (fid, src_path)
-            return match.group(0)
-        content = re.sub(r"^Input:(\d+):.+$", _rewrite_input,
-                         content, flags=re.MULTILINE)
-
-        # 2) Remap line numbers in typeset records.
+        # 1) Remap line numbers in typeset records FIRST (order matters here --
+        #    see the Input-record step below, which depends on whether this
+        #    pass actually maps anything).
         #    Record prefix is one of: ( [ h v x g k r $  (boxes, nodes, math).
         #    Format: "<prefix><fileID>,<line>:..."
         #    File-scope markers ({N / }N) carry no line so they're untouched.
@@ -1213,6 +1206,33 @@ class TexlibBuilder(PdfBuilder):
         if rewrites == 0 and boilerplate_rewrites == 0:
             return
 
+        # 2) Rewrite each grid-file Input record to point at the user source --
+        #    ONLY when at least one CELL record was actually remapped above
+        #    (rewrites > 0).
+        #
+        #    xltabular/longtable defer real box shipout until the output
+        #    routine fires (page-full or end-of-table), by which point every
+        #    cell's raw SyncTeX line has collapsed to whatever line the input
+        #    stream had reached by then -- typically the grid file's OWN last
+        #    line, which is never a key in line_map. When that happens
+        #    `rewrites` stays 0 even though `boilerplate_rewrites` may still
+        #    fire (a separate, independent mechanism keyed off the SOURCE
+        #    file's own fid, unaffected by this). Swapping the Input record in
+        #    that situation would repoint every still-wrong grid-file line at
+        #    the real source file, turning an honestly-broken click target
+        #    (lands in the auto-generated grid file, self-evidently a scratch
+        #    file) into a confidently WRONG one (lands on a plausible-looking
+        #    but unrelated real source line). Leaving the Input record alone
+        #    keeps the same honest fallback plain CLI builds already get.
+        if rewrites > 0:
+            def _rewrite_input(match):
+                fid = int(match.group(1))
+                if fid in grid_ids:
+                    return "Input:%d:%s" % (fid, src_path)
+                return match.group(0)
+            content = re.sub(r"^Input:(\d+):.+$", _rewrite_input,
+                             content, flags=re.MULTILINE)
+
         # Write back.  Re-gzip to keep the file format unchanged.
         try:
             with gzip.open(synctex, "wt", encoding="utf-8") as fh:
@@ -1224,16 +1244,26 @@ class TexlibBuilder(PdfBuilder):
             )
             return
 
-        msg = (
-            "TeXLib: rewrote %d schedule SyncTeX records "
-            "(%d cell(s) mapped to user source"
-            % (rewrites, len(line_map))
-        )
+        if rewrites > 0:
+            msg = (
+                "TeXLib: rewrote %d schedule SyncTeX cell record(s) to the "
+                "user source (%d cell(s) in the schedmap)"
+                % (rewrites, len(line_map))
+            )
+        else:
+            msg = (
+                "TeXLib: schedule per-cell SyncTeX could not be applied (0 "
+                "of %d schedmap entries matched a real record -- likely "
+                "every cell's raw attribution collapsed to one line, a "
+                "known xltabular limitation); calendar cells will open the "
+                "auto-generated grid file instead of the real source"
+                % len(line_map)
+            )
         if boilerplate_rewrites:
             msg += "; %d boilerplate record(s) redirected to line %d" % (
                 boilerplate_rewrites, boilerplate_target_line
             )
-        msg += ").\n"
+        msg += ".\n"
         self.display(msg)
 
     def _split_pdf_if_signaled(self, base_path):

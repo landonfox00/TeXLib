@@ -4,6 +4,14 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- **`Sublime/test_synctex_integration.py` — real end-to-end inverse-search test.** Drives the actual Sublime builder against a real `lualatex` build, then uses TeX Live's own `synctex edit -o page:x:y:pdf` CLI to simulate a SumatraPDF double-click and check where it actually lands. The existing SyncTeX tests (`Schedule/test_schedule_synctex.lua`, `test_texlib_builder.py`'s schedmap-rewrite cases) both fabricate their input data by hand and can't catch a real engine/table-package interaction — which is exactly what this found (see Fixed, below). Wired into CI (`tests.yml`, `biber-integration` job; needs poppler's `pdftotext` for `-bbox`, added via `apk add poppler-utils`).
+
+### Fixed
+
+- **Schedule per-cell inverse search: corrected a claim from the 0.2.0 entry below, which turns out to have never actually worked.** "Clicking a calendar cell in the PDF now opens `template.tex` at the line of the directive that produced that cell" was verified only against a hand-fabricated `.synctex.gz`; against a REAL build, `xltabular` (the table package driving the calendar grid) defers real box shipout until its output routine fires, so every cell's raw SyncTeX line collapses to one value (the grid file's own last line) that's never a key in the `.schedmap` table — confirmed fundamental to `xltabular`/`longtable`, not a TeXLib-specific bug, with a trivial non-TeXLib repro (`\LTchunksize=1` doesn't help either). `_rewrite_synctex_for_schedmap` (`Sublime/texlib_builder.py`) no longer swaps the Input record to the real source file when zero cell records actually got remapped — it leaves the honest fallback (lands in the auto-generated grid file, self-evidently a scratch file) instead of confidently repointing at a plausible-looking but unrelated real source line. A real per-cell fix needs either a hand-rolled per-page `tabular` (replacing `xltabular`, with Lua-computed pagination) or a carefully-verified geometry/stream-order rewrite; tracked as follow-up work, not shipped here.
+
 ## [0.3.0] — 2026-06-26
 
 Syllabus section shortcuts, a metadata robustness fix, and two breaking removals.

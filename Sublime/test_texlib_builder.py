@@ -532,6 +532,56 @@ def main():
     check("schedmap rewrite: warns when .synctex.gz is missing",
           "no .synctex.gz" in b._displayed, b._displayed)
 
+    # (n2) real-world xltabular case: every cell's raw line collapses to ONE
+    # value absent from the schedmap (xltabular defers real box shipout to
+    # end-of-file, so every typeset record lands on the grid file's own last
+    # line -- see the docstring on _rewrite_synctex_for_schedmap). The Input
+    # record must NOT be swapped in this case: doing so would repoint every
+    # still-wrong grid-file line at the real source, turning an honestly
+    # broken click target into a confidently WRONG one.
+    tmp5 = tempfile.mkdtemp(prefix="texlib_bt_synctex_collapse_")
+    src_path5 = os.path.join(tmp5, "doc.tex").replace("\\", "/")
+    grid_path5 = os.path.join(tmp5, "doc_schedule_grid.tex").replace("\\", "/")
+    # Every CELL record lands on grid_line 99 (the grid file's own EOF line),
+    # which is NOT a key in the schedmap below -- but a source-file (fid=1)
+    # record past boilerplate-after-line is ALSO present, mirroring the real
+    # build this was modeled on (rewrites=0, boilerplate_rewrites>0), so the
+    # early "nothing at all happened" return doesn't mask the cell-level
+    # fallback path this case exists to test.
+    fake_collapsed = (
+        f"SyncTeX Version:1\n"
+        f"Input:1:{src_path5}\n"
+        f"Input:7:{grid_path5}\n"
+        f"!17\n"
+        f"{{0\n"
+        f"(7,99:1000,2000:5000,500,100\n"
+        f"h7,99:1500,2200:3000,400,80\n"
+        f"(7,99:1000,5000:5000,500,100\n"
+        f"(1,97:500,600:9000,500,0\n"
+        f"}}0\n"
+        f"Postamble:\n"
+    )
+    with gzip.open(os.path.join(tmp5, base + ".synctex.gz"), "wt", encoding="utf-8") as fh:
+        fh.write(fake_collapsed)
+    with open(os.path.join(tmp5, base + ".schedmap"), "w", encoding="utf-8") as fh:
+        fh.write("# schedule source map v1\n")
+        fh.write("# boilerplate-after-line: 96\n")
+        fh.write("# boilerplate-target-line: 93\n")
+        fh.write("4|34\n5|24\n6|38\n")  # grid_line 99 deliberately absent
+    b = TexlibBuilder()
+    b._rewrite_synctex_for_schedmap(tmp5, tmp5, base)
+    with gzip.open(os.path.join(tmp5, base + ".synctex.gz"), "rt", encoding="utf-8") as fh:
+        collapsed_out = fh.read()
+    check("schedmap rewrite: Input record left pointing at the grid file "
+          "when every cell line collapses to one value absent from the "
+          "schedmap (honest fallback, not a confidently wrong source line)",
+          f"Input:7:{grid_path5}" in collapsed_out
+          and f"Input:7:{src_path5}" not in collapsed_out,
+          collapsed_out)
+    check("schedmap rewrite: reports the per-cell-unavailable fallback, "
+          "not a false 'rewrote N records' success message",
+          "per-cell SyncTeX could not be applied" in b._displayed, b._displayed)
+
     # ====================================================================== #
     # (o) Multi-pass orchestration sequences (simulation harness).
     #     These exercise the biber + rerun branches end-to-end by scripting
