@@ -25,6 +25,8 @@
 #   * autoexam versions -- the "All Versions" variant detects \versions{A,B,C}
 #     (or \examversions{...}) in the root document and builds one separate PDF
 #     per version: <base>_A.pdf, <base>_B.pdf, ... via \def\Version{X}.
+#     "All Versions (Solutions)" builds the same per-version loop with
+#     \ShowSolutions injected, producing <base>_A_solutions.pdf, ... instead.
 #
 #   * Cross-reference reruns -- re-runs the engine (up to MAX_RERUNS) while the
 #     log still says "Rerun to get cross-references right."
@@ -46,7 +48,12 @@
 #     .out/.toc/.bcf/.bbl/.fls/.fdb_latexmk) stay in the aux dir, keeping
 #     the source dir clean and reducing OneDrive sync churn. biber runs are
 #     redirected to the aux dir via --input-directory / --output-directory
-#     so biblatex cross-references resolve correctly.
+#     so biblatex cross-references resolve correctly. _set_aux_target also
+#     exports the resolved dir as TEXLIB_AUX_DIR so problem_engine.lua's own
+#     build-time scratch (per-version body files, .sco, .srcmap, per-problem
+#     SyncTeX-fallback files -- all written via raw Lua io.open, which
+#     -output-directory does not touch) follows the same routing instead of
+#     landing next to the source.
 #
 #   * Tidy -- on Windows, hides the <base>.synctex.gz build artifact.
 #
@@ -115,8 +122,15 @@ MODE_MACROS = {
     "draft":     r"\def\ShowDraft{}",
 }
 
-# A pseudo-mode: build every \versions{...} entry as its own PDF.
+# A pseudo-mode: build every \versions{...} entry as its own PDF
+# (<base>_<ver>.pdf, the student/default copy).
 MODE_ALLVERSIONS = "allversions"
+
+# A pseudo-mode: build every \versions{...} entry as its own instructor-copy
+# PDF (<base>_<ver>_solutions.pdf, \ShowSolutions injected). _build_version's
+# `mode` parameter already produced this suffix; nothing previously called it
+# with mode="solutions", so this build never actually happened before.
+MODE_ALLVERSIONS_SOLUTIONS = "allversions_solutions"
 
 # A pseudo-mode: a single engine pass with no biber and no rerun loop, for fast
 # preview while writing. Cross-references / citations may be stale; a normal
@@ -129,6 +143,10 @@ MAX_RERUNS = 3
 # Regexes over the root document / engine output.
 DOCCLASS_RE = re.compile(r"\\documentclass(?:\[[^\]]*\])?\{(\w[\w-]*)\}")
 VERSIONS_RE = re.compile(r"\\(?:exam)?versions\s*\{([^}]+)\}")
+# A problem-bank fragment (bank.tex, chN.tex, ...): no \documentclass of its
+# own -- normally only ever \loadbank'd/\input from a real quiz/exam/didactic
+# root -- but it does define \begin{problem} blocks. See _build_bank_catalog.
+BANK_FRAGMENT_RE = re.compile(r"\\begin\{problem\}")
 # Engine/package signals that another LaTeX pass will resolve something:
 #   * "...Rerun to get cross-references right." / "Rerun to get outlines right."
 #   * "Label(s) may have changed. Rerun..."   (cross-references / toc)
@@ -171,6 +189,27 @@ class TexlibBuilder(PdfBuilder):
             return
 
         mode, engine_options = self._extract_mode(self.options or [])
+
+        # Problem-bank fragments (bank.tex, chN.tex, ...) have no root document
+        # of their own -- \documentclass never matches, but \begin{problem}
+        # blocks do. Building one directly synthesizes a throwaway quiz.cls
+        # harness instead of running the normal mode/version dispatch below.
+        if not DOCCLASS_RE.search(src) and BANK_FRAGMENT_RE.search(src):
+            self.display(
+                "TeXLib: no \\documentclass here, but \\begin{problem} blocks "
+                "are -- building a \\printbankcatalog listing of this bank.\n"
+            )
+            tex_dir = self._tex_dir()
+            self._set_aux_target(tex_dir)
+            self._version_sources = []
+            self._biber_ran = []
+            base = self._base_engine_cmd(
+                "lualatex", self._aux_target, tex_dir, engine_options
+            )
+            yield from self._build_bank_catalog(base, "lualatex")
+            self._postprocess()
+            return
+
         engine = self._select_engine(src)
 
         # Report cards: turn the one gradebook.xlsx (source of truth) into the
@@ -184,7 +223,7 @@ class TexlibBuilder(PdfBuilder):
         # then copies the PDF / .synctex.gz / .spl back next to the source so
         # the PDF viewer and SyncTeX both keep working.
         tex_dir = self._tex_dir()
-        self._aux_target = self._resolve_aux_directory(tex_dir)
+        self._set_aux_target(tex_dir)
         self._version_sources = []
         # Jobnames whose biber ran this build; their input fingerprint is
         # recorded in _postprocess, AFTER the final engine pass settles the
@@ -195,21 +234,26 @@ class TexlibBuilder(PdfBuilder):
             engine, self._aux_target, tex_dir, engine_options
         )
 
-        if mode == MODE_ALLVERSIONS:
+        if mode in (MODE_ALLVERSIONS, MODE_ALLVERSIONS_SOLUTIONS):
+            per_version_mode = (
+                "solutions" if mode == MODE_ALLVERSIONS_SOLUTIONS else "default"
+            )
             versions = self._parse_versions(src)
             if not versions:
                 self.display(
                     "TeXLib: 'All Versions' requested but no \\versions{...} "
                     "found in the root document -- building once instead.\n"
                 )
-                yield from self._build_once(base, engine, "default")
+                yield from self._build_once(base, engine, per_version_mode)
             else:
                 self.display(
                     "TeXLib: building "
                     f"{len(versions)} version(s): {', '.join(versions)}\n"
                 )
                 for version in versions:
-                    yield from self._build_version(base, engine, version)
+                    yield from self._build_version(
+                        base, engine, version, per_version_mode
+                    )
         elif mode == MODE_QUICK:
             yield from self._build_quick(base, engine)
         else:
@@ -234,7 +278,9 @@ class TexlibBuilder(PdfBuilder):
                 mode = match.group(1).strip().lower()
             else:
                 passthrough.append(opt)
-        if mode not in MODE_MACROS and mode not in (MODE_ALLVERSIONS, MODE_QUICK):
+        if mode not in MODE_MACROS and mode not in (
+            MODE_ALLVERSIONS, MODE_ALLVERSIONS_SOLUTIONS, MODE_QUICK
+        ):
             self.display(
                 f"TeXLib: unknown build mode {mode!r}; falling back to default.\n"
             )
@@ -526,6 +572,29 @@ class TexlibBuilder(PdfBuilder):
                     self._force_remove(f)
         self._version_sources = []
 
+    def _build_bank_catalog(self, base, engine):
+        """Build a problem-bank fragment directly: synthesize a minimal quiz.cls
+        harness on the command line (the same \\def...\\input trick _build_once
+        uses for mode injection) that \\loadbank's this file and calls
+        \\printbankcatalog, so a bank can be perused without hand-authoring a
+        companion root document. --jobname pins the output to
+        <base>.pdf/.log/... like every other build, so _postprocess's copy-back
+        (which globs by self.base_name) needs no changes. quiz.cls's "X of Y"
+        footer needs the usual second pass, handled by the normal rerun loop.
+        """
+        arg = (
+            r"\documentclass{quiz}\begin{document}"
+            f"\\loadbank{{{self.tex_name}}}"
+            r"\printbankcatalog\end{document}"
+        )
+        cmd = base + [f"--jobname={self.base_name}", arg]
+
+        run = 1
+        yield (cmd, f"{engine} [bank catalog] run {run}...")
+        while run < MAX_RERUNS and self._needs_another_run():
+            run += 1
+            yield (cmd, f"{engine} [bank catalog] rerun {run}...")
+
     def _build_quick(self, base, engine):
         """One engine pass, no biber, no rerun loop -- fast preview while writing.
 
@@ -541,6 +610,24 @@ class TexlibBuilder(PdfBuilder):
         return getattr(self, "tex_dir", None) or os.path.dirname(
             getattr(self, "tex_root", "") or ""
         )
+
+    def _set_aux_target(self, tex_dir):
+        """Resolve the aux directory and export it for the Lua engine too.
+
+        problem_engine.lua writes its own build-time scratch (per-version
+        body files, .sco, .srcmap, per-problem SyncTeX-fallback files) via
+        raw Lua io.open, which -output-directory does not redirect (unlike
+        \\openout, which kpathsea already routes -- why .aux/.log land in the
+        aux dir but this engine's scratch always landed next to the source).
+        TEXLIB_AUX_DIR lets problem_engine.lua's texlib_scratch_path mirror
+        that same routing; os.environ is inherited by the lualatex
+        subprocess LaTeXTools spawns for the command we yield. Empty string
+        (not None) when aux routing is disabled, so a stale value from a
+        previous build in the same process can't leak into this one.
+        """
+        self._aux_target = self._resolve_aux_directory(tex_dir)
+        os.environ["TEXLIB_AUX_DIR"] = self._aux_target or ""
+        return self._aux_target
 
     def _resolve_aux_directory(self, tex_dir):
         """Resolve LaTeXTools' aux_directory setting to an absolute path.
@@ -1081,16 +1168,9 @@ class TexlibBuilder(PdfBuilder):
             )
             return
 
-        # 1) Rewrite each grid-file Input record to point at the user source.
-        def _rewrite_input(match):
-            fid = int(match.group(1))
-            if fid in grid_ids:
-                return "Input:%d:%s" % (fid, src_path)
-            return match.group(0)
-        content = re.sub(r"^Input:(\d+):.+$", _rewrite_input,
-                         content, flags=re.MULTILINE)
-
-        # 2) Remap line numbers in typeset records.
+        # 1) Remap line numbers in typeset records FIRST (order matters here --
+        #    see the Input-record step below, which depends on whether this
+        #    pass actually maps anything).
         #    Record prefix is one of: ( [ h v x g k r $  (boxes, nodes, math).
         #    Format: "<prefix><fileID>,<line>:..."
         #    File-scope markers ({N / }N) carry no line so they're untouched.
@@ -1124,6 +1204,33 @@ class TexlibBuilder(PdfBuilder):
         if rewrites == 0 and boilerplate_rewrites == 0:
             return
 
+        # 2) Rewrite each grid-file Input record to point at the user source --
+        #    ONLY when at least one CELL record was actually remapped above
+        #    (rewrites > 0).
+        #
+        #    xltabular/longtable defer real box shipout until the output
+        #    routine fires (page-full or end-of-table), by which point every
+        #    cell's raw SyncTeX line has collapsed to whatever line the input
+        #    stream had reached by then -- typically the grid file's OWN last
+        #    line, which is never a key in line_map. When that happens
+        #    `rewrites` stays 0 even though `boilerplate_rewrites` may still
+        #    fire (a separate, independent mechanism keyed off the SOURCE
+        #    file's own fid, unaffected by this). Swapping the Input record in
+        #    that situation would repoint every still-wrong grid-file line at
+        #    the real source file, turning an honestly-broken click target
+        #    (lands in the auto-generated grid file, self-evidently a scratch
+        #    file) into a confidently WRONG one (lands on a plausible-looking
+        #    but unrelated real source line). Leaving the Input record alone
+        #    keeps the same honest fallback plain CLI builds already get.
+        if rewrites > 0:
+            def _rewrite_input(match):
+                fid = int(match.group(1))
+                if fid in grid_ids:
+                    return "Input:%d:%s" % (fid, src_path)
+                return match.group(0)
+            content = re.sub(r"^Input:(\d+):.+$", _rewrite_input,
+                             content, flags=re.MULTILINE)
+
         # Write back.  Re-gzip to keep the file format unchanged.
         try:
             with gzip.open(synctex, "wt", encoding="utf-8") as fh:
@@ -1135,16 +1242,26 @@ class TexlibBuilder(PdfBuilder):
             )
             return
 
-        msg = (
-            "TeXLib: rewrote %d schedule SyncTeX records "
-            "(%d cell(s) mapped to user source"
-            % (rewrites, len(line_map))
-        )
+        if rewrites > 0:
+            msg = (
+                "TeXLib: rewrote %d schedule SyncTeX cell record(s) to the "
+                "user source (%d cell(s) in the schedmap)"
+                % (rewrites, len(line_map))
+            )
+        else:
+            msg = (
+                "TeXLib: schedule per-cell SyncTeX could not be applied (0 "
+                "of %d schedmap entries matched a real record -- likely "
+                "every cell's raw attribution collapsed to one line, a "
+                "known xltabular limitation); calendar cells will open the "
+                "auto-generated grid file instead of the real source"
+                % len(line_map)
+            )
         if boilerplate_rewrites:
             msg += "; %d boilerplate record(s) redirected to line %d" % (
                 boilerplate_rewrites, boilerplate_target_line
             )
-        msg += ").\n"
+        msg += ".\n"
         self.display(msg)
 
     def _split_pdf_if_signaled(self, base_path):

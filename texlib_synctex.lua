@@ -71,6 +71,26 @@ local function sanitize_id(id)
 	return (id or 'redirect'):gsub('[^%w%-]', '_')
 end
 
+-- Resolve the write/read path for this file's own scratch (the served-content
+-- temp file below) the same way problem_engine.lua's texlib_scratch_path does
+-- -- this file loads first (see the loader in texlib-problembank.sty) and has
+-- no shared lexical scope with it, so the ~5-line duplication is cheaper than
+-- coupling the two load orders. TEXLIB_AUX_DIR is exported by the Sublime
+-- builder (and build_versions.py) to mirror -output-directory, which raw Lua
+-- io.open never honors on its own. Unset/empty (a raw CLI build) preserves
+-- the original behaviour of writing next to the source.
+local function texlib_scratch_path(name)
+	local dir = os.getenv("TEXLIB_AUX_DIR")
+	if dir and dir ~= "" then
+		-- Normalize: TEXLIB_AUX_DIR is os.path.join'd, so backslashed on
+		-- Windows. This file's own use (io.open only, never \input) isn't
+		-- TeX-escape-vulnerable, but keep it consistent with
+		-- problem_engine.lua's copy of this helper, which IS.
+		return (dir:gsub('\\', '/')) .. "/" .. name
+	end
+	return name
+end
+
 -- Write the served content to a real temp file so LuaTeX's SyncTeX
 -- records line attribution properly (a pure Lua-string reader would not
 -- emit the necessary {N / }N markers).
@@ -87,7 +107,7 @@ local function write_temp_file(p)
 	-- write.  Collapsing to a single name keeps course folders from
 	-- accumulating one orphan .tex per problem.  p.id is retained only for
 	-- diagnostics now.
-	local tmpfile = tex.jobname .. '_synctex.tex'
+	local tmpfile = texlib_scratch_path(tex.jobname .. '_synctex.tex')
 	local fout    = io.open(tmpfile, 'w')
 	if not fout then return nil end
 	for i = 1, maxline do
