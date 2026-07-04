@@ -286,6 +286,32 @@ def main():
         options=["--texlib-mode=allversions"])
     check("\\examversions alias -> 2 builds", len(cmds) == 2, f"{len(cmds)} builds")
 
+    # (g2) allversions_solutions -> one instructor-copy build per version,
+    # jobnames + \def\Version + \def\ShowSolutions{}. Previously unreachable:
+    # _build_version already had a mode="solutions" branch, but nothing in
+    # commands() ever passed it.
+    cmds, _ = run_builder(
+        r"\documentclass{autoexam}\versions{A, B, C}\begin{document}x\end{document}",
+        options=["--texlib-mode=allversions_solutions"])
+    check("allversions_solutions -> 3 builds", len(cmds) == 3, f"{len(cmds)} builds")
+    jobnames = [
+        next((a for a in c[0] if str(a).startswith("--jobname=")), None) for c in cmds
+    ]
+    check("allversions_solutions -> jobnames doc_A_solutions / _B_ / _C_",
+          jobnames == [
+              "--jobname=doc_A_solutions", "--jobname=doc_B_solutions",
+              "--jobname=doc_C_solutions",
+          ], jobnames)
+    check("allversions_solutions -> \\def\\Version{A} in first build",
+          bool(cmds) and r"\def\Version{A}" in cmds[0][0][-1],
+          cmds[0][0][-1] if cmds else "")
+    check("allversions_solutions -> \\def\\ShowSolutions{} in first build",
+          bool(cmds) and r"\def\ShowSolutions{}" in cmds[0][0][-1],
+          cmds[0][0][-1] if cmds else "")
+    check("allversions_solutions -> \\input{doc_A_solutions.tex}",
+          bool(cmds) and r"\input{doc_A_solutions.tex}" in cmds[0][0][-1],
+          cmds[0][0][-1] if cmds else "")
+
     # (h) %!TeX program respected (LaTeXTools resolves it into self.engine)
     cmds, _ = run_builder(r"\documentclass{article}\begin{document}x\end{document}",
                           engine="lualatex")
@@ -506,6 +532,56 @@ def main():
     check("schedmap rewrite: warns when .synctex.gz is missing",
           "no .synctex.gz" in b._displayed, b._displayed)
 
+    # (n2) real-world xltabular case: every cell's raw line collapses to ONE
+    # value absent from the schedmap (xltabular defers real box shipout to
+    # end-of-file, so every typeset record lands on the grid file's own last
+    # line -- see the docstring on _rewrite_synctex_for_schedmap). The Input
+    # record must NOT be swapped in this case: doing so would repoint every
+    # still-wrong grid-file line at the real source, turning an honestly
+    # broken click target into a confidently WRONG one.
+    tmp5 = tempfile.mkdtemp(prefix="texlib_bt_synctex_collapse_")
+    src_path5 = os.path.join(tmp5, "doc.tex").replace("\\", "/")
+    grid_path5 = os.path.join(tmp5, "doc_schedule_grid.tex").replace("\\", "/")
+    # Every CELL record lands on grid_line 99 (the grid file's own EOF line),
+    # which is NOT a key in the schedmap below -- but a source-file (fid=1)
+    # record past boilerplate-after-line is ALSO present, mirroring the real
+    # build this was modeled on (rewrites=0, boilerplate_rewrites>0), so the
+    # early "nothing at all happened" return doesn't mask the cell-level
+    # fallback path this case exists to test.
+    fake_collapsed = (
+        f"SyncTeX Version:1\n"
+        f"Input:1:{src_path5}\n"
+        f"Input:7:{grid_path5}\n"
+        f"!17\n"
+        f"{{0\n"
+        f"(7,99:1000,2000:5000,500,100\n"
+        f"h7,99:1500,2200:3000,400,80\n"
+        f"(7,99:1000,5000:5000,500,100\n"
+        f"(1,97:500,600:9000,500,0\n"
+        f"}}0\n"
+        f"Postamble:\n"
+    )
+    with gzip.open(os.path.join(tmp5, base + ".synctex.gz"), "wt", encoding="utf-8") as fh:
+        fh.write(fake_collapsed)
+    with open(os.path.join(tmp5, base + ".schedmap"), "w", encoding="utf-8") as fh:
+        fh.write("# schedule source map v1\n")
+        fh.write("# boilerplate-after-line: 96\n")
+        fh.write("# boilerplate-target-line: 93\n")
+        fh.write("4|34\n5|24\n6|38\n")  # grid_line 99 deliberately absent
+    b = TexlibBuilder()
+    b._rewrite_synctex_for_schedmap(tmp5, tmp5, base)
+    with gzip.open(os.path.join(tmp5, base + ".synctex.gz"), "rt", encoding="utf-8") as fh:
+        collapsed_out = fh.read()
+    check("schedmap rewrite: Input record left pointing at the grid file "
+          "when every cell line collapses to one value absent from the "
+          "schedmap (honest fallback, not a confidently wrong source line)",
+          f"Input:7:{grid_path5}" in collapsed_out
+          and f"Input:7:{src_path5}" not in collapsed_out,
+          collapsed_out)
+    check("schedmap rewrite: reports the per-cell-unavailable fallback, "
+          "not a false 'rewrote N records' success message",
+          "per-cell SyncTeX could not be applied" in b._displayed, b._displayed)
+
     # ====================================================================== #
     # (o) Multi-pass orchestration sequences (simulation harness).
     #     These exercise the biber + rerun branches end-to-end by scripting
@@ -716,6 +792,31 @@ def main():
           ab._resolve_aux_directory(proj) == os.path.normpath(
               os.path.join(proj, "build")),
           ab._resolve_aux_directory(proj))
+
+    # ====================================================================== #
+    # (r2) _set_aux_target also exports TEXLIB_AUX_DIR for problem_engine.lua:
+    # raw Lua io.open bypasses -output-directory (unlike \openout, which
+    # kpathsea redirects), so the engine's own build-time scratch (per-version
+    # body files, .sco, .srcmap, per-problem SyncTeX-fallback files) needs this
+    # env var to follow the same routing instead of landing next to the source.
+    # ====================================================================== #
+    saved_env = os.environ.get("TEXLIB_AUX_DIR")
+    try:
+        ab.aux_directory = ""
+        ab._set_aux_target(proj)
+        check("aux-dir: TEXLIB_AUX_DIR empty when routing disabled",
+              os.environ.get("TEXLIB_AUX_DIR") == "",
+              os.environ.get("TEXLIB_AUX_DIR"))
+        ab.aux_directory = abs_dir
+        ab._set_aux_target(proj)
+        check("aux-dir: TEXLIB_AUX_DIR matches the resolved aux dir",
+              os.environ.get("TEXLIB_AUX_DIR") == abs_dir,
+              os.environ.get("TEXLIB_AUX_DIR"))
+    finally:
+        if saved_env is None:
+            os.environ.pop("TEXLIB_AUX_DIR", None)
+        else:
+            os.environ["TEXLIB_AUX_DIR"] = saved_env
 
     # ====================================================================== #
     # (s) _force_remove also clears a ReadOnly file (the other Errno-13 cause).
@@ -950,6 +1051,35 @@ def main():
         engine="pdflatex")
     check("report-card + pdflatex -> overridden to lualatex",
           bool(cmds) and cmds[0][0][0] == "lualatex", cmds)
+
+    # (bank fragment) no \documentclass but \begin{problem} blocks -> a
+    # synthesized quiz.cls \printbankcatalog harness, forced lualatex,
+    # --jobname pinned to base_name so copy-back needs no changes.
+    bank_src = r"\begin{problem}{sample}[topic=x]Stem text.\end{problem}"
+    cmds, disp = run_builder(bank_src, engine="pdflatex")
+    check("bank fragment -> forced lualatex",
+          bool(cmds) and cmds[0][0][0] == "lualatex", cmds)
+    check("bank fragment -> --jobname=doc",
+          bool(cmds) and "--jobname=doc" in cmds[0][0], cmds)
+    arg = cmds[0][0][-1] if cmds else ""
+    check("bank fragment -> \\loadbank{doc.tex} in synthesized arg",
+          r"\loadbank{doc.tex}" in arg, arg)
+    check("bank fragment -> \\printbankcatalog in synthesized arg",
+          r"\printbankcatalog" in arg, arg)
+    check("bank fragment -> quiz.cls harness synthesized",
+          r"\documentclass{quiz}" in arg, arg)
+    check("bank fragment -> detection message shown",
+          "printbankcatalog listing" in disp, repr(disp))
+
+    # A real document that happens to define a \begin{problem} inline must NOT
+    # be treated as a bank fragment -- \documentclass wins the check.
+    cmds, _ = run_builder(
+        r"\documentclass{quiz}\begin{document}"
+        r"\begin{problem}{sample}Stem\end{problem}"
+        r"\end{document}"
+    )
+    check("real document with inline \\begin{problem} -> normal build",
+          bool(cmds) and cmds[0][0][-1] == "doc.tex", cmds)
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL

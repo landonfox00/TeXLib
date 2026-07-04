@@ -614,10 +614,22 @@ end
 -- file (which is what \input'ing it produces).  The Sublime builder closes the
 -- loop: texlib_builder.py's _rewrite_synctex_for_schedmap reads the .schedmap
 -- after compilation and rewrites <jobname>.synctex.gz, repointing the grid-file
--- records at the user's .tex and remapping each row's line from grid_line to
--- the recorded source line.  Click a calendar row in the PDF -> jump to the
+-- records at the user's .tex and remapping each cell's line from grid_line to
+-- the recorded source line.  Click a calendar cell in the PDF -> jump to the
 -- directive line in the source.  On command-line builds (no rewrite step) the
 -- fallback is still usable: clicks land in the grid file at the matching line.
+--
+-- CRITICAL — this only actually works under the BOX-GRID renderer (box_grid
+-- true).  The default xltabular renderer (via longtable) defers real box
+-- shipout to its output routine; by then every cell's raw SyncTeX line has
+-- collapsed to the grid file's LAST line, which is never a schedmap key, so the
+-- rewrite finds nothing to remap and the builder honestly leaves clicks landing
+-- in the grid scratch file (see _rewrite_synctex_for_schedmap's writeup).  The
+-- box grid instead draws each row as stacked \hbox/\schedcell boxes that ship
+-- during ordinary box construction, so SyncTeX records each cell against its
+-- OWN grid_line and the schedmap remap takes effect — real per-cell inverse
+-- search.  The .schedmap is emitted the same way in both modes; what differs is
+-- whether the engine records per-cell lines for the rewrite to consume.
 --
 -- NB: this path does NOT use texlib_synctex.lua / texlib_synctex_stage; that
 -- helper drives the problem-bank classes' \@@input redirect, but the schedule
@@ -636,13 +648,29 @@ end
 -- (the default) the whole term is one continuous table that breaks across
 -- pages wherever it runs out of room.  Toggled from the document via the
 -- `month-pages` meta key (see schedule.cls).
-function render_grid(month_pages)
+--
+-- box_grid: when true, render with the box-grid renderer (stacked \hbox rows of
+-- \schedcell boxes) instead of xltabular.  Same visual grid, but each cell
+-- ships eagerly so SyncTeX inverse search works per-cell (see the SyncTeX
+-- writeup above).  Toggled via the `box-grid` meta key.  nil/false -> xltabular.
+-- Pull the xcolor spec out of a cell.color string ("\\cellcolor{orange!15}" ->
+-- "orange!15").  The box-grid renderer needs the bare color name for
+-- \schedcell's first argument; empty / unrecognised -> "white" (no fill).
+local function cell_color_name(color_str)
+	if not color_str or color_str == "" then return "white" end
+	local name = color_str:match("\\cellcolor%s*{(.-)}")
+	return name or "white"
+end
+
+function render_grid(month_pages, box_grid)
 	if not start_date or not start_date.time then
 		tex.print("\\textbf{ERROR: 'start-date' is missing.}")
 		return
 	end
 
-	tex.print("\\renewcommand\\tabularxcolumn[1]{p{#1}}")
+	if not box_grid then
+		tex.print("\\renewcommand\\tabularxcolumn[1]{p{#1}}")
+	end
 	local col_def = "| c ||"
 	local active_indices = calendar_mgr.active_col_indices
 	local day_names = {"MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"}
@@ -753,7 +781,12 @@ function render_grid(month_pages)
 
 			local src = (cell.source_line and cell.source_line > 0) and cell.source_line or nil
 			table.insert(cells_out, {
+				-- xltabular form (default renderer): `& <cellcolor> <content>`.
 				text       = "& " .. cell.color .. " " .. cell_content,
+				-- box-grid form ingredients: content + bare color name, wrapped
+				-- into \schedcell{color}{content} at emit time.
+				content    = cell_content,
+				color_name = cell_color_name(cell.color),
 				source_line = src,
 			})
 
@@ -765,7 +798,8 @@ function render_grid(month_pages)
 		local row_attr = row_source or (fallback_src > 0 and fallback_src or nil)
 
 		table.insert(rows, {
-			week_label = week_label,
+			week_label = week_label,   -- xltabular week cell (\raisebox parbox)
+			week_num   = week_num,     -- plain number for the box-grid \schedlabel
 			cells      = cells_out,
 			row_attr   = row_attr,
 			month_set  = row_month_set,
@@ -858,21 +892,74 @@ function render_grid(month_pages)
 		groups = { rows }
 	end
 
-	-- One table per group; \newpage between groups.  Header/lastfoot boilerplate
-	-- is re-emitted per group so each month's table carries its own header row.
-	for gi, group in ipairs(groups) do
-		if gi > 1 then emit("\\newpage") end
-		emit(tbl_open)
-		emit(tbl_head)
-		emit(tbl_lastfoot)
-		for _, row in ipairs(group) do
-			emit(row.week_label, row.row_attr)
-			for _, c in ipairs(row.cells) do
-				emit(c.text, c.source_line or row.row_attr)
-			end
-			emit("\\tabularnewline \\hline", row.row_attr)
+	if box_grid then
+		-- BOX-GRID RENDERER.  Each week is one \hbox of framed \schedcell boxes
+		-- placed in the vertical list under \offinterlineskip, so cells ship
+		-- eagerly (per-cell SyncTeX) and rows are atomic across page breaks.
+		-- Structure per row, one cell PER LINE so SyncTeX records each cell on
+		-- its own grid_line (the whole point):
+		--     \hbox{\schedlabel{N}\scheddivider
+		--     \schedcell{color}{<cell 1>}\kern-\fboxrule
+		--     \schedcell{color}{<cell 2>}\kern-\fboxrule
+		--     ...
+		--     \schedcell{color}{<cell k>}}
+		-- The \kern-\fboxrule between cells overlaps shared vertical borders.
+		-- Header/boilerplate carry no source line (nobody inverse-searches them).
+		local ncols = #active_indices
+		local box_header = "\\hbox{\\schedheadcell{\\schedlabelw}{\\footnotesize WEEK}\\kern-\\fboxrule"
+			.. "\\fcolorbox{black}{white}{\\rule{0pt}{2.4ex}\\hspace{1pt}}\\kern-\\fboxrule"
+		for ci, idx in ipairs(active_indices) do
+			box_header = box_header .. "\\schedheadcell{\\schedcellw}{" .. day_names[idx] .. "}"
+			if ci < ncols then box_header = box_header .. "\\kern-\\fboxrule" end
 		end
-		emit(tbl_close)
+		box_header = box_header .. "}"
+
+		-- Trailing `%` on every line that continues the row \hbox: inside an
+		-- \hbox a bare newline is a space, and a space after \kern-\fboxrule (or
+		-- after \scheddivider) would reintroduce the inter-cell gap the negative
+		-- kern exists to remove.  The `%` swallows the newline so cells abut.
+		--
+		-- Each page-group is its OWN \begingroup...\endgroup, and \SchedSetCols
+		-- (which sets \schedcellw with a local \setlength) is re-emitted inside
+		-- every group: the column width must be re-established after each
+		-- \endgroup restores it, or later month-pages groups collapse to a stale
+		-- width.  \offinterlineskip is likewise group-local.
+		local group_open = "\\begingroup\\offinterlineskip\\SchedSetCols{" .. ncols .. "}"
+		for gi, group in ipairs(groups) do
+			if gi > 1 then emit("\\endgroup\\newpage") end
+			emit(group_open)
+			emit(box_header)
+			for _, row in ipairs(group) do
+				-- Open the row \hbox with the week label + doubled divider.
+				emit("\\hbox{\\schedlabel{" .. row.week_num .. "}\\scheddivider\\kern-\\fboxrule%",
+					row.row_attr)
+				local k = #row.cells
+				for ci, c in ipairs(row.cells) do
+					local sep = (ci < k) and "\\kern-\\fboxrule%" or "}"
+					emit("\\schedcell{" .. c.color_name .. "}{" .. c.content .. "}" .. sep,
+						c.source_line or row.row_attr)
+				end
+			end
+		end
+		emit("\\endgroup")
+	else
+		-- One table per group; \newpage between groups.  Header/lastfoot
+		-- boilerplate is re-emitted per group so each month's table carries its
+		-- own header row.
+		for gi, group in ipairs(groups) do
+			if gi > 1 then emit("\\newpage") end
+			emit(tbl_open)
+			emit(tbl_head)
+			emit(tbl_lastfoot)
+			for _, row in ipairs(group) do
+				emit(row.week_label, row.row_attr)
+				for _, c in ipairs(row.cells) do
+					emit(c.text, c.source_line or row.row_attr)
+				end
+				emit("\\tabularnewline \\hline", row.row_attr)
+			end
+			emit(tbl_close)
+		end
 	end
 
 	if fout then

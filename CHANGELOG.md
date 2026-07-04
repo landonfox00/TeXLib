@@ -4,6 +4,14 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- **Box-grid schedule renderer (`box-grid = true`): real per-cell SyncTeX inverse search for the calendar.** The `schedule` class can now draw the calendar as stacked box rows (`\schedcell`/`\schedlabel`/`\scheddivider`, driven by a new `box_grid` branch in `render_grid`) instead of an `xltabular`. It looks the same, but each cell ships during ordinary box construction, so SyncTeX records every cell against its *own* grid-file line and the existing `.schedmap` → `.synctex.gz` rewrite finally takes effect: double-clicking a calendar cell in the PDF opens the source `.tex` at the directive that produced that cell. Verified end-to-end (real `lualatex` build + `synctex edit`) in `Sublime/test_synctex_integration.py` scenarios 6–7 (distinct cells → distinct source lines) and a new `schedule__box-grid` visual scenario. Opt-in; the default renderer is unchanged. Known gap: the box grid repeats the day-name header only per page-*group*, so pair it with `month-pages = true` (header per month) for a multi-page schedule.
+
+### Fixed
+
+- **Schedule SyncTeX inverse search now actually works (was silently broken under `xltabular`).** The v0.2.0 claim that "clicking a calendar cell opens `template.tex` at the directive's line" held only against a hand-fabricated `.synctex.gz`, never a real build: `xltabular` (via `longtable`) defers box shipout to its output routine, by which point every cell's raw SyncTeX line has collapsed to the grid file's last line, so the `.schedmap` rewrite found nothing to remap. Two-part resolution: (1) `_rewrite_synctex_for_schedmap` now only repoints the grid-file `Input` record at the real source when at least one cell record was actually remapped — otherwise it honestly leaves clicks landing in the auto-generated grid scratch file instead of confidently pointing at a wrong source line; (2) the new opt-in `box-grid` renderer (above) makes per-cell attribution genuinely correct. Under the default `xltabular` renderer, inverse search remains the honest grid-file fallback.
+
 ## [0.3.0] — 2026-06-26
 
 Syllabus section shortcuts, a metadata robustness fix, and two breaking removals.
