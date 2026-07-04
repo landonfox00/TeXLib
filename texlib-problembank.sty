@@ -20,6 +20,7 @@
 %   Retrieval . . . . . . . .  \getlist, \geti, \foreachpick
 %   Bank: define problems . .  \begin{problem} environment
 %   Bank: retrieve problems .  \getproblem (= \useproblem, \reqproblem)
+%   Bank: browse all . . . . . \printbankcatalog
 %   Problems environment . .   \begin{problems} (shared; class page policy via
 %                              \problems@begin@hook / \problems@end@hook), \ppart,
 %                              \@problem@item (the \problem item command, which
@@ -382,6 +383,26 @@
 	\endgroup
 }
 
+% \printbankcatalog — render EVERY problem currently loaded (via \loadbank /
+%   \begin{problem}) as a single browsable listing: a running number + id +
+%   meta heading, followed by the problem's full stem/parts/choices, with
+%   solutions and MC correct answers always shown regardless of the document's
+%   own \ifsolutions state -- this is an instructor perusal tool, not student
+%   output. Problems are listed in bank source order (file, then
+%   \begin{problem} line) so the catalog mirrors how the bank itself reads.
+%   Typically the whole content of a small dedicated root document, e.g.:
+%     \documentclass{quiz}
+%     \begin{document}
+%       \loadbank{bank.tex}
+%       \printbankcatalog
+%     \end{document}
+\NewDocumentCommand{\printbankcatalog}{}{%
+	\begingroup
+	\solutionstrue
+	\pbank@lua{pbank_print_catalog()}%
+	\endgroup
+}
+
 % \workbox{n} — reserved blank space below a problem (engine emits this).
 %   Default: stretchy \vspace.  autoexam.cls overrides to hide the space in
 %   solution builds (so a key copy doesn't get blank pages).
@@ -428,6 +449,16 @@
 % texlib-sectionhang then styles it like every other heading).
 \providecommand{\texlib@partheading}[1]{\section*{#1}}
 
+% \if@texlib@cursectionmc — true while the section now opening/closing is an
+%   {mcproblems} (vs. {problems}), so a class's page-policy hooks can tell them
+%   apart (e.g. autoexam's \problems@begin@hook skips its inter-section
+%   \clearpage when the PREVIOUS section was {mcproblems} — see autoexam.cls).
+%   Set from mode in \@texlib@psection@begin; a LOCAL assignment is enough since
+%   both \problems@begin@hook and \problems@end@hook run inside the same
+%   environment group.
+\newif\if@texlib@cursectionmc
+\def\@texlib@mc@modestr{mc}
+
 % \@texlib@psection@begin{mode}{default-label}{user-label}{show-heading}
 %   Shared core of {problems} and {mcproblems}.  mode ('fr'/'mc') is handed to the
 %   engine so \problem items know whether to apply the multiple-choice frame.  The
@@ -439,6 +470,20 @@
 %   own section headings, e.g. review sheets).
 \newcommand{\@texlib@psection@begin}[4]{%
 	\pbank@lua{pbank_section_mode = '#1'}%
+	% \if m#1... previously compared only the FIRST character of the (2-char)
+	% mode string via the primitive \if, which consumes just one token per
+	% side: the leftover second character ('c' of "mc", 'r' of "fr") was left
+	% sitting in the input stream. \iffalse (mode 'fr') discards it while
+	% skipping to \else, but \iftrue (mode 'mc') does not skip anything, so
+	% the stray "c" was typeset literally -- a lone glyph leaking into
+	% whatever page was still pending when the section began. Compare the
+	% whole string with \ifx instead so nothing is left over.
+	\def\@texlib@modestr{#1}%
+	\ifx\@texlib@modestr\@texlib@mc@modestr
+		\@texlib@cursectionmctrue
+	\else
+		\@texlib@cursectionmcfalse
+	\fi
 	\stepcounter{texlibpartno}%
 	\problems@begin@hook
 	% ---- inter-problem separator: first problem on a page gets no rule -------

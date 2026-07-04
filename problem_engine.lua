@@ -159,6 +159,53 @@ local function sanitize_id(id)
 	return id:gsub('[^%w%-]', '_')
 end
 
+-- Quotes a Lua string literal for embedding inside a printed \directlua call:
+-- escapes backslash and single-quote so it round-trips once TeX re-invokes
+-- \directlua on the printed text.
+local function pbank_lua_quote(s)
+	return "'" .. tostring(s):gsub("[\\']", "\\%0") .. "'"
+end
+
+-- Resolve the write/read path for build-time scratch this engine creates
+-- itself (per-version body files, .sco, .srcmap, per-problem SyncTeX-fallback
+-- files) -- NOT the document source, which io.open's tex.jobname..".tex"
+-- directly and always stays in the working directory.
+--
+-- io.open (and every Lua file call in this engine) is a raw OS call, blind to
+-- LaTeX's own -output-directory routing -- unlike \openout, which kpathsea
+-- redirects automatically, hence .aux/.log landing in the aux dir while this
+-- engine's own scratch always landed next to the source. The Sublime builder
+-- (and build_versions.py) export TEXLIB_AUX_DIR to match whatever aux
+-- directory they resolved (typically %TEMP%\texlib-aux\<hash>), so this
+-- scratch can follow .aux there too instead of littering the source folder
+-- (and, on a OneDrive-synced course folder, its change feed). Unset/empty
+-- (a raw CLI build with no such env var) preserves the original behaviour of
+-- writing next to the source.
+local function texlib_scratch_path(name)
+	local dir = os.getenv("TEXLIB_AUX_DIR")
+	if dir and dir ~= "" then
+		-- Some of these paths get \input/\@@input'd by TeX (the per-version
+		-- body file, the per-problem SyncTeX-fallback file), where backslash
+		-- is the escape character: a raw Windows path (TEXLIB_AUX_DIR is
+		-- os.path.join'd, so \Users\..\Temp\... on Windows) would tokenise as
+		-- a run of (mostly undefined) control sequences instead of a
+		-- filename. io.open accepts forward slashes on Windows too, so
+		-- normalizing once here is safe for every caller, TeX-facing or not.
+		return (dir:gsub('\\', '/')) .. "/" .. name
+	end
+	return name
+end
+
+-- Escape the handful of catcode-active characters that show up in bank ids
+-- and meta values (identifiers commonly use underscores) before printing them
+-- as literal document text -- used wherever an id/query string that did NOT
+-- come from the author's own TeX source (so was never subject to the usual
+-- \problem{...} argument escaping conventions) gets typeset directly, e.g. a
+-- not-found placeholder or the \printbankcatalog listing.
+local function pbank_texify(s)
+	return (tostring(s):gsub('[_%%#&%$]', '\\%0'))
+end
+
 autoexam_shuffle_pages = false  -- set true by \shufflepages in the preamble
 pbank_first_on_page = true   -- reset by \begin{problems} and patched \newpage;
 								-- read by pbank_problem_item to decide separator
@@ -854,7 +901,7 @@ local function typeset_problem(p, stretch)
 		-- Fallback: write a named per-problem temp file and \input it.  MC serves
 		-- the stem only (choices/solution come from emit_mc_tail); FR serves the
 		-- full content (stem + parts).
-		local tmpfile = tex.jobname .. '_prob_' .. sanitize_id(pid) .. '.tex'
+		local tmpfile = texlib_scratch_path(tex.jobname .. '_prob_' .. sanitize_id(pid) .. '.tex')
 		local leading = (p.is_mc and p.stem or p.content) or ''
 		local fout    = io.open(tmpfile, 'w')
 		if fout then
@@ -1039,6 +1086,68 @@ function get_problem(query_str, pts_list)
 	pbank_part_idx    = 0
 
 	typeset_problem(match, trailing)
+end
+
+-- ---- \printbankcatalog: render every loaded problem for instructor perusal ----
+-- Walks problem_db in bank source order (file, then \begin{problem} line) and
+-- typesets each problem for instructor perusal. \printbankcatalog
+-- (texlib-problembank.sty) wraps the call in \solutionstrue so answers/
+-- solutions always show here, independent of the document's own build mode.
+--
+-- Each problem's actual retrieval is deferred to its OWN printed
+-- \csname pbank@lua\endcsname{... get_problem(id) ...} call rather than
+-- calling get_problem() directly in this loop. Reason: typeset_problem's
+-- SyncTeX bank-file redirect (texlib_synctex.lua) supports only ONE pending
+-- stage at a time, consumed by the next matching \@@input. tex.print output
+-- is only consumed by TeX after THIS \directlua call returns, so looping
+-- get_problem() calls here would stage id 2 before TeX ever processes id 1's
+-- \@@input -- the mismatch falls through to a real io.open of id 1's own
+-- filename, which (for a problem defined directly in the current document)
+-- re-reads the whole document from the top, recursing until LuaTeX's
+-- text-input-level limit aborts the run. Printing one deferred call per id
+-- instead lets TeX fully resolve each problem's redirect, in order, before
+-- advancing to the next -- the same guarantee that makes ordinary sequential
+-- \getproblem{a}\getproblem{b} calls safe.
+function pbank_print_catalog()
+	local ids = {}
+	for id in pairs(problem_db) do table.insert(ids, id) end
+	if #ids == 0 then
+		tex.print("\\textbf{[TeXLib: no problems loaded --- call " ..
+			"\\string\\loadbank\\space before \\string\\printbankcatalog]}")
+		return
+	end
+	table.sort(ids, function(a, b)
+		local pa, pb = problem_db[a], problem_db[b]
+		if pa.source_file ~= pb.source_file then return pa.source_file < pb.source_file end
+		if pa.source_line ~= pb.source_line then return pa.source_line < pb.source_line end
+		return a < b
+	end)
+
+	for n, id in ipairs(ids) do
+		local p = problem_db[id]
+		local metaparts = {}
+		for k, v in pairs(p.meta) do
+			if k ~= 'id' then table.insert(metaparts, k .. '=' .. tostring(v)) end
+		end
+		table.sort(metaparts)
+
+		-- \@totalleftmargin: @ is catcode-12 in the document body, so a literal
+		-- \@totalleftmargin would tokenise as \@ (end-of-sentence) + stray text
+		-- "totalleftmargin" (same guard used by \@mcframe@* above). The control
+		-- sequence's real name keeps the @ -- \csname must too.
+		tex.print("\\par\\bigskip\\noindent\\hspace*{-\\csname @totalleftmargin\\endcsname}" ..
+			"\\rule{\\linewidth}{0.4pt}\\par\\smallskip")
+		tex.print("\\noindent\\textbf{" .. n .. ". " .. pbank_texify(id) .. "}")
+		if #metaparts > 0 then
+			tex.print("\\hfill{\\normalfont\\itshape\\footnotesize " ..
+				pbank_texify(table.concat(metaparts, ", ")) .. "}")
+		end
+		tex.print("\\par\\smallskip\\noindent")
+
+		tex.print("\\csname pbank@lua\\endcsname{pbank_section_mode=" ..
+			pbank_lua_quote(p.is_mc and 'mc' or 'fr') ..
+			" get_problem(" .. pbank_lua_quote(id) .. ")}")
+	end
 end
 
 -- ---- \ppart callback ----
@@ -1531,7 +1640,7 @@ end
 -- Called before each version body is input, so \scorepage can read it immediately.
 local function write_score_file(ver, rows)
 	local suffix = (ver and ver ~= '') and ('_' .. ver) or ''
-	local fname  = tex.jobname .. suffix .. '.sco'
+	local fname  = texlib_scratch_path(tex.jobname .. suffix .. '.sco')
 	local f = io.open(fname, 'w')
 	if not f then return end
 	for _, row in ipairs(rows) do
@@ -1552,7 +1661,7 @@ end
 --   .synctex.gz, replacing content_tmpfile references with bank_file:start_line
 --   references so that inverse search navigates directly to the bank file.
 function autoexam_write_srcmap()
-	local fname = tex.jobname .. '.srcmap'
+	local fname = texlib_scratch_path(tex.jobname .. '.srcmap')
 	local f = io.open(fname, 'w')
 	if not f then
 		texio.write_nl("AutoExam WARNING: could not write source map " .. fname)
@@ -1686,7 +1795,7 @@ function autoexam_run_versions()
 		end
 		-- Prescan and write the .sco NOW so \scorepage finds it on the first pass.
 		write_score_file(ver, prescan_problems(ver_body))
-		local name = tmpbase .. "_" .. (ver ~= "" and ver or "main") .. ".tex"
+		local name = texlib_scratch_path(tmpbase .. "_" .. (ver ~= "" and ver or "main") .. ".tex")
 		local f = io.open(name, "w")
 		if not f then
 			tex.error("AutoExam: Cannot write temp body file '" .. name .. "'.")
@@ -1697,16 +1806,31 @@ function autoexam_run_versions()
 		ver_tmp[ver] = name
 	end
 
+	-- Multi-copy PDF split map (see \AutoExamVmapRecord in autoexam.cls): lets
+	-- the builder slice this ONE combined PDF into a <base>_<ver>.pdf /
+	-- <base>_<ver>_solutions.pdf per copy instead of recompiling once per
+	-- version. Only worth writing when there is more than one copy to slice
+	-- apart -- a single-copy build already IS its own "per-version" PDF -- and
+	-- never in builder mode, which already forced exactly the one copy it
+	-- wanted via \Version and produces its own single-file output directly.
+	local want_vmap = (#copies > 1) and not builder
+	if want_vmap then tex.sprint("\\AutoExamVmapOpen") end
+
 	for i, c in ipairs(copies) do
 		ensure_ver(c.ver)
 		tex.sprint("\\gdef\\theExamVersion{" .. c.ver .. "}")
 		tex.sprint("\\directlua{local _ENV=texlib;set_exam_seed('" .. c.ver .. "')}")  -- re-seed for TeX
 		set_sol(c)
+		if want_vmap then
+			tex.sprint("\\AutoExamVmapRecord{" .. c.ver .. "}{" ..
+				(c.sol == true and "sol" or "stu") .. "}")
+		end
 		tex.sprint("\\input{" .. ver_tmp[c.ver] .. "}")
 		if i < #copies then
 			tex.sprint("\\clearpage")
 		end
 	end
+	if want_vmap then tex.sprint("\\AutoExamVmapClose") end
 	-- Re-write the source map now that typeset_problem() has populated the
 	-- tmpfile field for every problem that was actually typeset this run.
 	tex.sprint("\\directlua{local _ENV=texlib;autoexam_write_srcmap()}")
@@ -1804,7 +1928,7 @@ function autoexam_scorepage(max_rows)
 	max_rows = max_rows or 20
 	local ver    = token.get_macro('theExamVersion') or ''
 	local suffix = (ver ~= '') and ('_' .. ver) or ''
-	local fname  = tex.jobname .. suffix .. '.sco'
+	local fname  = texlib_scratch_path(tex.jobname .. suffix .. '.sco')
 	local f      = io.open(fname, 'r')
 
 	-- ---- helpers -------------------------------------------------------

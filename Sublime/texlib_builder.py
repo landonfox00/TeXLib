@@ -25,6 +25,8 @@
 #   * autoexam versions -- the "All Versions" variant detects \versions{A,B,C}
 #     (or \examversions{...}) in the root document and builds one separate PDF
 #     per version: <base>_A.pdf, <base>_B.pdf, ... via \def\Version{X}.
+#     "All Versions (Solutions)" builds the same per-version loop with
+#     \ShowSolutions injected, producing <base>_A_solutions.pdf, ... instead.
 #
 #   * Cross-reference reruns -- re-runs the engine (up to MAX_RERUNS) while the
 #     log still says "Rerun to get cross-references right."
@@ -46,7 +48,12 @@
 #     .out/.toc/.bcf/.bbl/.fls/.fdb_latexmk) stay in the aux dir, keeping
 #     the source dir clean and reducing OneDrive sync churn. biber runs are
 #     redirected to the aux dir via --input-directory / --output-directory
-#     so biblatex cross-references resolve correctly.
+#     so biblatex cross-references resolve correctly. _set_aux_target also
+#     exports the resolved dir as TEXLIB_AUX_DIR so problem_engine.lua's own
+#     build-time scratch (per-version body files, .sco, .srcmap, per-problem
+#     SyncTeX-fallback files -- all written via raw Lua io.open, which
+#     -output-directory does not touch) follows the same routing instead of
+#     landing next to the source.
 #
 #   * Tidy -- on Windows, hides the <base>.synctex.gz build artifact.
 #
@@ -115,8 +122,15 @@ MODE_MACROS = {
     "draft":     r"\def\ShowDraft{}",
 }
 
-# A pseudo-mode: build every \versions{...} entry as its own PDF.
+# A pseudo-mode: build every \versions{...} entry as its own PDF
+# (<base>_<ver>.pdf, the student/default copy).
 MODE_ALLVERSIONS = "allversions"
+
+# A pseudo-mode: build every \versions{...} entry as its own instructor-copy
+# PDF (<base>_<ver>_solutions.pdf, \ShowSolutions injected). _build_version's
+# `mode` parameter already produced this suffix; nothing previously called it
+# with mode="solutions", so this build never actually happened before.
+MODE_ALLVERSIONS_SOLUTIONS = "allversions_solutions"
 
 # A pseudo-mode: a single engine pass with no biber and no rerun loop, for fast
 # preview while writing. Cross-references / citations may be stale; a normal
@@ -129,6 +143,10 @@ MAX_RERUNS = 3
 # Regexes over the root document / engine output.
 DOCCLASS_RE = re.compile(r"\\documentclass(?:\[[^\]]*\])?\{(\w[\w-]*)\}")
 VERSIONS_RE = re.compile(r"\\(?:exam)?versions\s*\{([^}]+)\}")
+# A problem-bank fragment (bank.tex, chN.tex, ...): no \documentclass of its
+# own -- normally only ever \loadbank'd/\input from a real quiz/exam/didactic
+# root -- but it does define \begin{problem} blocks. See _build_bank_catalog.
+BANK_FRAGMENT_RE = re.compile(r"\\begin\{problem\}")
 # Engine/package signals that another LaTeX pass will resolve something:
 #   * "...Rerun to get cross-references right." / "Rerun to get outlines right."
 #   * "Label(s) may have changed. Rerun..."   (cross-references / toc)
@@ -171,6 +189,27 @@ class TexlibBuilder(PdfBuilder):
             return
 
         mode, engine_options = self._extract_mode(self.options or [])
+
+        # Problem-bank fragments (bank.tex, chN.tex, ...) have no root document
+        # of their own -- \documentclass never matches, but \begin{problem}
+        # blocks do. Building one directly synthesizes a throwaway quiz.cls
+        # harness instead of running the normal mode/version dispatch below.
+        if not DOCCLASS_RE.search(src) and BANK_FRAGMENT_RE.search(src):
+            self.display(
+                "TeXLib: no \\documentclass here, but \\begin{problem} blocks "
+                "are -- building a \\printbankcatalog listing of this bank.\n"
+            )
+            tex_dir = self._tex_dir()
+            self._set_aux_target(tex_dir)
+            self._version_sources = []
+            self._biber_ran = []
+            base = self._base_engine_cmd(
+                "lualatex", self._aux_target, tex_dir, engine_options
+            )
+            yield from self._build_bank_catalog(base, "lualatex")
+            self._postprocess()
+            return
+
         engine = self._select_engine(src)
 
         # Report cards: turn the one gradebook.xlsx (source of truth) into the
@@ -184,7 +223,7 @@ class TexlibBuilder(PdfBuilder):
         # then copies the PDF / .synctex.gz / .spl back next to the source so
         # the PDF viewer and SyncTeX both keep working.
         tex_dir = self._tex_dir()
-        self._aux_target = self._resolve_aux_directory(tex_dir)
+        self._set_aux_target(tex_dir)
         self._version_sources = []
         # Jobnames whose biber ran this build; their input fingerprint is
         # recorded in _postprocess, AFTER the final engine pass settles the
@@ -195,21 +234,26 @@ class TexlibBuilder(PdfBuilder):
             engine, self._aux_target, tex_dir, engine_options
         )
 
-        if mode == MODE_ALLVERSIONS:
+        if mode in (MODE_ALLVERSIONS, MODE_ALLVERSIONS_SOLUTIONS):
+            per_version_mode = (
+                "solutions" if mode == MODE_ALLVERSIONS_SOLUTIONS else "default"
+            )
             versions = self._parse_versions(src)
             if not versions:
                 self.display(
                     "TeXLib: 'All Versions' requested but no \\versions{...} "
                     "found in the root document -- building once instead.\n"
                 )
-                yield from self._build_once(base, engine, "default")
+                yield from self._build_once(base, engine, per_version_mode)
             else:
                 self.display(
                     "TeXLib: building "
                     f"{len(versions)} version(s): {', '.join(versions)}\n"
                 )
                 for version in versions:
-                    yield from self._build_version(base, engine, version)
+                    yield from self._build_version(
+                        base, engine, version, per_version_mode
+                    )
         elif mode == MODE_QUICK:
             yield from self._build_quick(base, engine)
         else:
@@ -234,7 +278,9 @@ class TexlibBuilder(PdfBuilder):
                 mode = match.group(1).strip().lower()
             else:
                 passthrough.append(opt)
-        if mode not in MODE_MACROS and mode not in (MODE_ALLVERSIONS, MODE_QUICK):
+        if mode not in MODE_MACROS and mode not in (
+            MODE_ALLVERSIONS, MODE_ALLVERSIONS_SOLUTIONS, MODE_QUICK
+        ):
             self.display(
                 f"TeXLib: unknown build mode {mode!r}; falling back to default.\n"
             )
@@ -526,6 +572,29 @@ class TexlibBuilder(PdfBuilder):
                     self._force_remove(f)
         self._version_sources = []
 
+    def _build_bank_catalog(self, base, engine):
+        """Build a problem-bank fragment directly: synthesize a minimal quiz.cls
+        harness on the command line (the same \\def...\\input trick _build_once
+        uses for mode injection) that \\loadbank's this file and calls
+        \\printbankcatalog, so a bank can be perused without hand-authoring a
+        companion root document. --jobname pins the output to
+        <base>.pdf/.log/... like every other build, so _postprocess's copy-back
+        (which globs by self.base_name) needs no changes. quiz.cls's "X of Y"
+        footer needs the usual second pass, handled by the normal rerun loop.
+        """
+        arg = (
+            r"\documentclass{quiz}\begin{document}"
+            f"\\loadbank{{{self.tex_name}}}"
+            r"\printbankcatalog\end{document}"
+        )
+        cmd = base + [f"--jobname={self.base_name}", arg]
+
+        run = 1
+        yield (cmd, f"{engine} [bank catalog] run {run}...")
+        while run < MAX_RERUNS and self._needs_another_run():
+            run += 1
+            yield (cmd, f"{engine} [bank catalog] rerun {run}...")
+
     def _build_quick(self, base, engine):
         """One engine pass, no biber, no rerun loop -- fast preview while writing.
 
@@ -541,6 +610,24 @@ class TexlibBuilder(PdfBuilder):
         return getattr(self, "tex_dir", None) or os.path.dirname(
             getattr(self, "tex_root", "") or ""
         )
+
+    def _set_aux_target(self, tex_dir):
+        """Resolve the aux directory and export it for the Lua engine too.
+
+        problem_engine.lua writes its own build-time scratch (per-version
+        body files, .sco, .srcmap, per-problem SyncTeX-fallback files) via
+        raw Lua io.open, which -output-directory does not redirect (unlike
+        \\openout, which kpathsea already routes -- why .aux/.log land in the
+        aux dir but this engine's scratch always landed next to the source).
+        TEXLIB_AUX_DIR lets problem_engine.lua's texlib_scratch_path mirror
+        that same routing; os.environ is inherited by the lualatex
+        subprocess LaTeXTools spawns for the command we yield. Empty string
+        (not None) when aux routing is disabled, so a stale value from a
+        previous build in the same process can't leak into this one.
+        """
+        self._aux_target = self._resolve_aux_directory(tex_dir)
+        os.environ["TEXLIB_AUX_DIR"] = self._aux_target or ""
+        return self._aux_target
 
     def _resolve_aux_directory(self, tex_dir):
         """Resolve LaTeXTools' aux_directory setting to an absolute path.
@@ -865,6 +952,8 @@ class TexlibBuilder(PdfBuilder):
         self._copy_back_from_aux(tex_dir)
 
         self._split_pdf_if_signaled(base_path)
+
+        self._slice_versions_from_vmap(tex_dir, base_path)
 
         self._finalize_synctex(tex_dir)
 
@@ -1209,3 +1298,107 @@ class TexlibBuilder(PdfBuilder):
             )
         except Exception as exc:
             self.display(f"TeXLib: PDF split failed: {exc}\n")
+
+    def _slice_versions_from_vmap(self, tex_dir, base_path):
+        """Slice ONE combined multi-copy PDF into a PDF per version/solutions
+        copy, honoring a <base>.vmap sidecar autoexam writes for a build with
+        more than one copy (multiple \\versions, \\solutions dual/only mode,
+        or both) that was NOT already forced to a single version/state by the
+        builder itself (see \\AutoExamVmapRecord in autoexam.cls and
+        autoexam_run_versions in problem_engine.lua).
+
+        Each line is "version|stu-or-sol|start_page" in typeset order (version
+        may be empty for a solutions-only/no-\\versions document). A record's
+        last page is inferred as one before the next record's start page, or
+        the PDF's actual last page for the final record -- no explicit end
+        marker is written, so this is a no-op-safe design even if a page
+        count changes between writing the .vmap and reading the final PDF.
+
+        Written via \\immediate\\write (kpathsea-routed, like .aux/.log), so
+        -output-directory places it in the aux dir like any other aux file;
+        _find_in_dirs checks there first, then the source dir (aux routing
+        disabled). No-op if no .vmap exists -- the overwhelmingly common case
+        of a single-copy build, where the combined PDF already IS the only
+        "per-version" PDF there is to produce.
+        """
+        vmap_path = self._find_in_dirs(
+            self.base_name + ".vmap",
+            [getattr(self, "_aux_target", None), tex_dir],
+        )
+        if not vmap_path:
+            return
+        pdf_path = base_path + ".pdf"
+        if not os.path.exists(pdf_path):
+            return
+        try:
+            records = []
+            with open(vmap_path, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    parts = line.split("|")
+                    if len(parts) != 3:
+                        continue
+                    ver, sol, start = parts
+                    try:
+                        records.append((ver, sol == "sol", int(start)))
+                    except ValueError:
+                        continue
+            if not records:
+                return
+
+            from pypdf import PdfReader, PdfWriter
+
+            reader = PdfReader(pdf_path)
+            total = len(reader.pages)
+            base_pdf_name = os.path.basename(pdf_path)
+            produced = []
+            for i, (ver, is_sol, start) in enumerate(records):
+                # Clamp to the PDF's real length: a later record's declared
+                # start (used as THIS record's end - 1) is untrusted data from
+                # a sidecar file, not a guarantee about this PDF. Clamping lets
+                # an earlier, genuinely valid record still get sliced even if
+                # a later one in the same file is bogus/out of range.
+                end = records[i + 1][2] - 1 if i + 1 < len(records) else total
+                end = min(end, total)
+                if not (1 <= start <= end):
+                    self.display(
+                        f"TeXLib: .vmap record {ver or '(none)'}/"
+                        f"{'sol' if is_sol else 'stu'} ({start}-{end}) out of "
+                        f"range for a {total}-page PDF; skipping.\n"
+                    )
+                    continue
+                suffix = "_solutions" if is_sol else ""
+                ver_part = f"_{ver}" if ver else ""
+                out_name = f"{self.base_name}{ver_part}{suffix}.pdf"
+                if out_name == base_pdf_name:
+                    # No version label AND not the solutions copy: e.g. a
+                    # \solutions document with no \versions{} declared, where
+                    # the student record has neither a letter nor a suffix to
+                    # tell it apart from the combined PDF itself. Slicing here
+                    # would just overwrite the combined PDF with a subset of
+                    # its own pages -- skip; it already IS this "slice".
+                    continue
+                writer = PdfWriter()
+                for p in range(start - 1, end):
+                    writer.add_page(reader.pages[p])
+                out_path = os.path.join(tex_dir, out_name)
+                self._force_remove(out_path)
+                with open(out_path, "wb") as fh:
+                    writer.write(fh)
+                produced.append(out_name)
+            if produced:
+                self.display(
+                    "TeXLib: sliced per-version PDF(s) from the combined "
+                    "build: " + ", ".join(produced) + ".\n"
+                )
+        except ImportError:
+            self.display(
+                "TeXLib: pypdf not installed -- skipping per-version PDF "
+                "slicing from .vmap. Install it with: pip install pypdf\n"
+            )
+        except Exception as exc:  # noqa: BLE001 - best-effort
+            self.display(f"TeXLib: per-version PDF slicing from .vmap failed: {exc}\n")
+        finally:
+            self._force_remove(vmap_path)

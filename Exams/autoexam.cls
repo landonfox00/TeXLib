@@ -181,7 +181,10 @@
 %   through the two hooks the shared core calls:
 %
 %   \problems@begin@hook (on entry, after the Part counter is stepped):
-%     - \clearpage so every Part starts on a fresh page
+%     - \clearpage so every Part starts on a fresh page -- UNLESS the section
+%       just closed was an {mcproblems}, in which case the next section (of
+%       either type) continues right on from the last MC problem; see
+%       \if@texlib@prevmc below.
 %     - at the FIRST section only (texlibpartno=1): reset the page counter to 1 so
 %       Q1 lands on "page 1", step the per-copy footer id, install header/footer
 %       slots; later sections continue the page number
@@ -190,6 +193,8 @@
 %     - places \label{@lastqpage@<copy>} on the section's last page; the last
 %       section's placement wins, giving the true denominator for the "X of N"
 %       footer once \blankpage ships that page
+%     - records whether THIS section was an {mcproblems} into \if@texlib@prevmc,
+%       read by the next section's \problems@begin@hook
 %
 %   The shared core handles the parts common to both classes: the Part heading,
 %   continuous question numbering, the inter-problem separator flag, the \newpage
@@ -202,30 +207,44 @@
 % previously made the denominator wrong (e.g. a 9-page copy showing "9 of 10").
 \newcounter{autoexamcopyno}
 
+% True once an {mcproblems} section has just closed; read (and implicitly
+% cleared, by being overwritten) by the NEXT section's \problems@begin@hook to
+% skip its \clearpage -- an MC section flowing straight into the following FR
+% (or MC) section, rather than always forcing a fresh page.  Reset per copy in
+% \maketitle so a new version/instructor-student copy always starts its first
+% section with a \clearpage regardless of how the previous copy ended.
+\newif\if@texlib@prevmc
+\@texlib@prevmcfalse
+
 % Multi-section page policy.  An exam may contain several problem-sections
 % ({mcproblems}, {problems}, ...) in document order.  The shared core steps
 % \texlibpartno BEFORE calling this hook, so texlibpartno=1 marks the FIRST
 % section of the copy.  The first section resets the page counter to 1 and
-% installs the per-copy footer; EVERY section \clearpages so each Part starts on
-% a fresh page, while the page NUMBER runs continuously across all sections.
+% installs the per-copy footer; every section \clearpages so each Part starts on
+% a fresh page, EXCEPT one immediately following an {mcproblems} (see
+% \if@texlib@prevmc); the page NUMBER runs continuously across all sections
+% either way.
 \renewcommand{\problems@begin@hook}{%
 	% Ship any pending page (the title page, a \blankpage scratch leaf, or the
-	% previous section's last page).
-	\clearpage
+	% previous section's last page) -- unless that previous section was an
+	% {mcproblems}, which this section continues right on from.
+	\if@texlib@prevmc\else\clearpage\fi
 	\ifnum\value{texlibpartno}=\@ne
 		% ---- first section of the copy: reset numbering + install header/foot --
 		\setcounter{page}{1}%
 		% Q1 is "page 1"; restore the first-page header slots to match the running
-		% header.  These \def's run inside the environment group (local), but the
-		% running slots below are \global so they survive \end{...} and apply to
-		% every later section of the copy.
-		\def\@lhead{\bfseries\GetExamTitle}%
-		\def\@chead{}%
-		\def\@rhead{\GetTermSection}%
+		% header.  \global throughout: page 1 of the copy may not ship until a
+		% LATER section's \clearpage (short first section, or -- since an
+		% {mcproblems} no longer forces one -- the next section continuing on
+		% the same page), by which point this environment's own group (and any
+		% plain \def make here) has already closed.
+		\gdef\@lhead{\bfseries\GetExamTitle}%
+		\gdef\@chead{}%
+		\gdef\@rhead{\GetTermSection}%
 		\global\@headruletrue%
 		% Per-copy "X of N": freeze THIS copy's id into the footer denominator.
 		\stepcounter{autoexamcopyno}%
-		\edef\@cfoot{%
+		\xdef\@cfoot{%
 			\noexpand\thepage\noexpand\space of\noexpand\space\noexpand\@ifundefined{r@@lastqpage@\theautoexamcopyno}{\noexpand\numpages}{\noexpand\pageref*{@lastqpage@\theautoexamcopyno}}%
 		}%
 		\gdef\run@chead{}%
@@ -235,9 +254,14 @@
 
 % Place the last-page label at EVERY section end.  autoexamcopyno is constant
 % within a copy (stepped only at the first section), so the FINAL section's
-% placement wins and records the true last problem page for "X of N".
+% placement wins and records the true last problem page for "X of N".  Also
+% record whether THIS section was an {mcproblems} (\if@texlib@cursectionmc,
+% set by the shared core in texlib-problembank.sty) so the NEXT section's
+% \problems@begin@hook knows whether to skip its \clearpage; \global since this
+% must survive past this environment's own group closing.
 \renewcommand{\problems@end@hook}{%
 	\label{@lastqpage@\theautoexamcopyno}%
+	\if@texlib@cursectionmc\global\@texlib@prevmctrue\else\global\@texlib@prevmcfalse\fi
 }
 
 % \loadbank is provided by texlib-problembank.sty.  Multi-version mode is
@@ -318,6 +342,29 @@
 	\immediate\write\splitfile{split_page=\thepage}%
 	\immediate\closeout\splitfile%
 }
+
+% Multi-version PDF split map (for the builder): records the ABSOLUTE (never
+% reset) page each copy starts on, so the builder can slice ONE combined
+% multi-version/dual-mode PDF into <base>_<ver>.pdf / <base>_<ver>_solutions.pdf
+% without a separate recompile per version. \thepage/\value{page} are reset to
+% 1 at the start of every copy (see \problems@begin@hook), so they can't tell
+% copies apart across the whole document; \value{autoexamabspage} instead
+% counts every REAL shipped page exactly once, via \AtBeginShipout (atbegshi),
+% and never resets. Written by autoexam_run_versions (problem_engine.lua) --
+% see there for why only multi-copy builds bother.
+\RequirePackage{atbegshi}
+\newcounter{autoexamabspage}
+\AtBeginShipout{\stepcounter{autoexamabspage}}
+
+\newwrite\vmapfile
+\newcommand{\AutoExamVmapOpen}{\immediate\openout\vmapfile=\jobname.vmap}
+% #1 = version label (may be empty), #2 = "sol" or "stu". The record's page is
+% the NEXT page to ship (current shipped count + 1), i.e. this copy's first
+% page -- \numexpr avoids a separate \calcvar-style temp count register.
+\newcommand{\AutoExamVmapRecord}[2]{%
+	\immediate\write\vmapfile{#1|#2|\number\numexpr\value{autoexamabspage}+1\relax}%
+}
+\newcommand{\AutoExamVmapClose}{\immediate\closeout\vmapfile}
 
 % Minimal Key Generation (Writes to .key file)
 \newwrite\keyfile
@@ -586,9 +633,9 @@
 % Override the default \par\medskip from texlib-problembank.sty with a
 % full-width rule between consecutive problems on the same page.
 \renewcommand{\autoexam@problem@sep}{%
-	\par\vspace{1em}%
-	\noindent\hspace*{-\@totalleftmargin}\rule{\linewidth}{0.4pt}%
-	\par\vspace{1em}%
+	\par\vspace{0.25em}%
+	\noindent\hspace*{-\@totalleftmargin}\rule{\textwidth}{0.4pt}%
+	\par\vspace{0.25em}%
 }
 
 % \blankpage — outputs one scratch-work leaf.
@@ -739,6 +786,10 @@
 	% version/copy renumbers its Parts from I and its questions from 1.
 	\setcounter{texlibpartno}{0}%
 	\setcounter{@texlib@qcarry}{0}%
+	% This copy's first problem-section must always \clearpage (ship the title
+	% page just typeset above), regardless of how the PREVIOUS copy's last
+	% section ended.
+	\global\@texlib@prevmcfalse%
 	% Clear first-page header slots so nothing appears above the title block.
 	\def\@lhead{}\def\@chead{}\def\@rhead{}%
 	\@headrulefalse%

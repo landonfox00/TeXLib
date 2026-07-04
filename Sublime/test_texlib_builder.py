@@ -286,6 +286,32 @@ def main():
         options=["--texlib-mode=allversions"])
     check("\\examversions alias -> 2 builds", len(cmds) == 2, f"{len(cmds)} builds")
 
+    # (g2) allversions_solutions -> one instructor-copy build per version,
+    # jobnames + \def\Version + \def\ShowSolutions{}. Previously unreachable:
+    # _build_version already had a mode="solutions" branch, but nothing in
+    # commands() ever passed it.
+    cmds, _ = run_builder(
+        r"\documentclass{autoexam}\versions{A, B, C}\begin{document}x\end{document}",
+        options=["--texlib-mode=allversions_solutions"])
+    check("allversions_solutions -> 3 builds", len(cmds) == 3, f"{len(cmds)} builds")
+    jobnames = [
+        next((a for a in c[0] if str(a).startswith("--jobname=")), None) for c in cmds
+    ]
+    check("allversions_solutions -> jobnames doc_A_solutions / _B_ / _C_",
+          jobnames == [
+              "--jobname=doc_A_solutions", "--jobname=doc_B_solutions",
+              "--jobname=doc_C_solutions",
+          ], jobnames)
+    check("allversions_solutions -> \\def\\Version{A} in first build",
+          bool(cmds) and r"\def\Version{A}" in cmds[0][0][-1],
+          cmds[0][0][-1] if cmds else "")
+    check("allversions_solutions -> \\def\\ShowSolutions{} in first build",
+          bool(cmds) and r"\def\ShowSolutions{}" in cmds[0][0][-1],
+          cmds[0][0][-1] if cmds else "")
+    check("allversions_solutions -> \\input{doc_A_solutions.tex}",
+          bool(cmds) and r"\input{doc_A_solutions.tex}" in cmds[0][0][-1],
+          cmds[0][0][-1] if cmds else "")
+
     # (h) %!TeX program respected (LaTeXTools resolves it into self.engine)
     cmds, _ = run_builder(r"\documentclass{article}\begin{document}x\end{document}",
                           engine="lualatex")
@@ -718,6 +744,31 @@ def main():
           ab._resolve_aux_directory(proj))
 
     # ====================================================================== #
+    # (r2) _set_aux_target also exports TEXLIB_AUX_DIR for problem_engine.lua:
+    # raw Lua io.open bypasses -output-directory (unlike \openout, which
+    # kpathsea redirects), so the engine's own build-time scratch (per-version
+    # body files, .sco, .srcmap, per-problem SyncTeX-fallback files) needs this
+    # env var to follow the same routing instead of landing next to the source.
+    # ====================================================================== #
+    saved_env = os.environ.get("TEXLIB_AUX_DIR")
+    try:
+        ab.aux_directory = ""
+        ab._set_aux_target(proj)
+        check("aux-dir: TEXLIB_AUX_DIR empty when routing disabled",
+              os.environ.get("TEXLIB_AUX_DIR") == "",
+              os.environ.get("TEXLIB_AUX_DIR"))
+        ab.aux_directory = abs_dir
+        ab._set_aux_target(proj)
+        check("aux-dir: TEXLIB_AUX_DIR matches the resolved aux dir",
+              os.environ.get("TEXLIB_AUX_DIR") == abs_dir,
+              os.environ.get("TEXLIB_AUX_DIR"))
+    finally:
+        if saved_env is None:
+            os.environ.pop("TEXLIB_AUX_DIR", None)
+        else:
+            os.environ["TEXLIB_AUX_DIR"] = saved_env
+
+    # ====================================================================== #
     # (s) _force_remove also clears a ReadOnly file (the other Errno-13 cause).
     # ====================================================================== #
     tmpr = tempfile.mkdtemp(prefix="texlib_ro_")
@@ -847,8 +898,87 @@ def main():
         sb3._split_pdf_if_signaled(bp3)
         check("split: warns when .spl is in aux but not copied back",
               "not copied back" in sb3._displayed, sb3._displayed)
+
+        # ================================================================== #
+        # (v2) Multi-copy PDF slicing honoring a <base>.vmap sidecar
+        # (autoexam_run_versions / \AutoExamVmapRecord).
+        # ================================================================== #
+        tmpv = tempfile.mkdtemp(prefix="texlib_vmap_")
+        bpv = os.path.join(tmpv, "doc")
+        _blank_pdf(bpv + ".pdf", 6)
+        with open(bpv + ".vmap", "w", encoding="utf-8") as fh:
+            fh.write("A|stu|1\nB|stu|3\nA|sol|5\n")
+        vb = TexlibBuilder(); vb.tex_dir = tmpv; vb.base_name = "doc"
+        vb._aux_target = None
+        vb._slice_versions_from_vmap(tmpv, bpv)
+        check("vmap: doc_A.pdf gets pages 1-2",
+              os.path.exists(bpv + "_A.pdf")
+              and len(PdfReader(bpv + "_A.pdf").pages) == 2)
+        check("vmap: doc_B.pdf gets pages 3-4",
+              os.path.exists(bpv + "_B.pdf")
+              and len(PdfReader(bpv + "_B.pdf").pages) == 2)
+        check("vmap: doc_A_solutions.pdf gets the last 2 pages (no next record)",
+              os.path.exists(bpv + "_A_solutions.pdf")
+              and len(PdfReader(bpv + "_A_solutions.pdf").pages) == 2)
+        check("vmap: .vmap consumed after slicing", not os.path.exists(bpv + ".vmap"))
+
+        # No \versions{} (empty version label) -> no "_" version segment, just
+        # <base>.pdf / <base>_solutions.pdf.
+        tmpv2 = tempfile.mkdtemp(prefix="texlib_vmap_")
+        bpv2 = os.path.join(tmpv2, "doc")
+        _blank_pdf(bpv2 + ".pdf", 4)
+        with open(bpv2 + ".vmap", "w", encoding="utf-8") as fh:
+            fh.write("|stu|1\n|sol|3\n")
+        vb2 = TexlibBuilder(); vb2.tex_dir = tmpv2; vb2.base_name = "doc"
+        vb2._aux_target = None
+        vb2._slice_versions_from_vmap(tmpv2, bpv2)
+        check("vmap: empty version label -> doc.pdf (student, no suffix)",
+              os.path.exists(bpv2 + ".pdf") and len(PdfReader(bpv2 + ".pdf").pages) == 4,
+              "the ORIGINAL combined doc.pdf must survive untouched")
+        check("vmap: empty version label -> doc_solutions.pdf",
+              os.path.exists(bpv2 + "_solutions.pdf")
+              and len(PdfReader(bpv2 + "_solutions.pdf").pages) == 2)
+
+        # A record whose computed range is out of bounds is skipped, not fatal.
+        tmpv3 = tempfile.mkdtemp(prefix="texlib_vmap_")
+        bpv3 = os.path.join(tmpv3, "doc")
+        _blank_pdf(bpv3 + ".pdf", 2)
+        with open(bpv3 + ".vmap", "w", encoding="utf-8") as fh:
+            fh.write("A|stu|1\nB|stu|9\n")   # B starts past the PDF's own length
+        vb3 = TexlibBuilder(); vb3.tex_dir = tmpv3; vb3.base_name = "doc"
+        vb3._aux_target = None
+        vb3._slice_versions_from_vmap(tmpv3, bpv3)
+        check("vmap: valid record still sliced when a later one is out of range",
+              os.path.exists(bpv3 + "_A.pdf"))
+        check("vmap: out-of-range record skipped, not fatal",
+              not os.path.exists(bpv3 + "_B.pdf") and "out of" in vb3._displayed,
+              vb3._displayed)
+
+        # No .vmap present at all (the common single-copy build) -> silent no-op.
+        tmpv4 = tempfile.mkdtemp(prefix="texlib_vmap_")
+        bpv4 = os.path.join(tmpv4, "doc")
+        _blank_pdf(bpv4 + ".pdf", 2)
+        vb4 = TexlibBuilder(); vb4.tex_dir = tmpv4; vb4.base_name = "doc"
+        vb4._aux_target = None
+        vb4._slice_versions_from_vmap(tmpv4, bpv4)
+        check("vmap: no .vmap file -> no-op, no error",
+              vb4._displayed == "", vb4._displayed)
+
+        # aux routing active + .vmap only in the aux dir (the normal case,
+        # since \write is kpathsea-routed like .aux/.log) -> still found and sliced.
+        tmpv5 = tempfile.mkdtemp(prefix="texlib_vmap_")
+        auxv5 = tempfile.mkdtemp(prefix="texlib_vmap_aux_")
+        bpv5 = os.path.join(tmpv5, "doc")
+        _blank_pdf(bpv5 + ".pdf", 2)
+        with open(os.path.join(auxv5, "doc.vmap"), "w", encoding="utf-8") as fh:
+            fh.write("A|stu|1\n")
+        vb5 = TexlibBuilder(); vb5.tex_dir = tmpv5; vb5.base_name = "doc"
+        vb5._aux_target = auxv5
+        vb5._slice_versions_from_vmap(tmpv5, bpv5)
+        check("vmap: found in the aux dir when aux routing is active",
+              os.path.exists(bpv5 + "_A.pdf"))
     else:
-        print("  SKIP  pypdf not installed -- PDF split tests skipped")
+        print("  SKIP  pypdf not installed -- PDF split/vmap tests skipped")
 
     # ====================================================================== #
     # (w) gradebook xlsx -> report-view CSV conversion (report-card class).
@@ -950,6 +1080,35 @@ def main():
         engine="pdflatex")
     check("report-card + pdflatex -> overridden to lualatex",
           bool(cmds) and cmds[0][0][0] == "lualatex", cmds)
+
+    # (bank fragment) no \documentclass but \begin{problem} blocks -> a
+    # synthesized quiz.cls \printbankcatalog harness, forced lualatex,
+    # --jobname pinned to base_name so copy-back needs no changes.
+    bank_src = r"\begin{problem}{sample}[topic=x]Stem text.\end{problem}"
+    cmds, disp = run_builder(bank_src, engine="pdflatex")
+    check("bank fragment -> forced lualatex",
+          bool(cmds) and cmds[0][0][0] == "lualatex", cmds)
+    check("bank fragment -> --jobname=doc",
+          bool(cmds) and "--jobname=doc" in cmds[0][0], cmds)
+    arg = cmds[0][0][-1] if cmds else ""
+    check("bank fragment -> \\loadbank{doc.tex} in synthesized arg",
+          r"\loadbank{doc.tex}" in arg, arg)
+    check("bank fragment -> \\printbankcatalog in synthesized arg",
+          r"\printbankcatalog" in arg, arg)
+    check("bank fragment -> quiz.cls harness synthesized",
+          r"\documentclass{quiz}" in arg, arg)
+    check("bank fragment -> detection message shown",
+          "printbankcatalog listing" in disp, repr(disp))
+
+    # A real document that happens to define a \begin{problem} inline must NOT
+    # be treated as a bank fragment -- \documentclass wins the check.
+    cmds, _ = run_builder(
+        r"\documentclass{quiz}\begin{document}"
+        r"\begin{problem}{sample}Stem\end{problem}"
+        r"\end{document}"
+    )
+    check("real document with inline \\begin{problem} -> normal build",
+          bool(cmds) and cmds[0][0][-1] == "doc.tex", cmds)
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL

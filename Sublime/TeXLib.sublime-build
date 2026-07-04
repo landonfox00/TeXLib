@@ -66,6 +66,11 @@
 			"name": "All Versions (separate PDFs)",
 			"builder": "texlib",
 			"options": ["--texlib-mode=allversions"]
+		},
+		{
+			"name": "All Versions (Solutions)",
+			"builder": "texlib",
+			"options": ["--texlib-mode=allversions_solutions"]
 		}
 	]
 }
