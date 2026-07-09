@@ -117,6 +117,13 @@
 % also covers quizzes, which never call the per-version seeder.
 \newcommand{\setexamseed}[1]{\pbank@lua{exam_seed_override = #1 set_exam_seed('')}}
 
+% \setversionseed{ver}{n}  — re-roll ONE version of a \versions{...} exam. Folds
+% integer n into that version's seed only, so its problem selection and random
+% values change while every other version stays byte-identical. Put it in the
+% preamble (repeatable for several versions). No effect on quizzes / no-version
+% docs. Example: \setversionseed{A}{7} nudges version A after a bad draw.
+\newcommand{\setversionseed}[2]{\pbank@lua{version_seed_override['#1'] = #2}}
+
 % \shuffle  — turn on per-version shuffling (deprecated alias: \shufflepages).
 % Shared by both assessment classes so the toggle (and its default-off behaviour)
 % lives in one place.  autoexam: reorders problems within each {problems} /
@@ -445,9 +452,12 @@
 \newcounter{@texlib@qcarry}
 
 % \texlib@partheading{text} — render a section's "Part N — Label" heading.
-% Overridable per class; the default is a starred section (autoexam's
-% texlib-sectionhang then styles it like every other heading).
-\providecommand{\texlib@partheading}[1]{\section*{#1}}
+% Overridable per class; the default is a starred section that texlib-sectionhang
+% styles like every other heading.  The heading is emitted inside the exam-class
+% {questions} list, whose left indent would otherwise shift the \@startsection
+% reference point right and swallow the -\texlibsectionhang hang; \@totalleftmargin
+% (0 outside a list) cancels that indent so the hang measures from the true margin.
+\providecommand{\texlib@partheading}[1]{\section*{\hspace*{-\@totalleftmargin}#1}}
 
 % \if@texlib@cursectionmc — true while the section now opening/closing is an
 %   {mcproblems} (vs. {problems}), so a class's page-policy hooks can tell them
