@@ -36,6 +36,44 @@
 %     \SetTeXLibExamRules
 %     \firstpageheadrule
 
+% Symmetric rule bleed for the exam-family. The fancyhdr classes (didactic,
+% pset, ...) widen their header + footer rules \texlibrulebleed=24pt into BOTH
+% margins via \fancyhfoffset[LR] (see texlib-footer.sty) so the rule ends line
+% up with the section-hang. exam's `headandfoot` style draws its head/foot rules
+% flush to \textwidth instead, so without help they fall 24pt short on each side.
+% \fancyhfoffset can't reach them (fancyhdr isn't the active style here), and
+% exam's own \extrawidth would also widen the question BODY -- unwanted. So we
+% patch exam's four head/foot renderers to slide left by the bleed and draw into
+% a locally widened \textwidth, extending the rule (and L/R slot text) 24pt past
+% the body on each side while leaving the body column untouched. Keep this value
+% in sync with \texlibrulebleed / \texlibsectionhang (both 24pt).
+% We wrap exam's four head/foot renderers rather than reproduce them: \let the
+% originals and re-issue each inside \texlib@exambleed, which draws the renderer
+% into a \textwidth locally widened by 2*bleed (and shifted left by bleed), so the
+% rule + L/R slot text extend the bleed past the body on each side. Wrapping (not
+% copying) keeps us forward-compatible if exam.cls changes those definitions.
+\makeatletter
+\newlength{\texlibexamrulebleed}
+\setlength{\texlibexamrulebleed}{24pt}
+\newcommand{\texlib@exambleed}[1]{%
+	\hb@xt@\textwidth{%
+		\hskip-\texlibexamrulebleed
+		\begingroup
+			\advance\textwidth by 2\texlibexamrulebleed
+			#1%
+		\endgroup
+		\hss}%
+}
+\let\texlib@orig@fullhead\@fullhead
+\let\texlib@orig@runfullhead\run@fullhead
+\let\texlib@orig@fullfoot\@fullfoot
+\let\texlib@orig@runfullfoot\run@fullfoot
+\renewcommand*\@fullhead{\texlib@exambleed{\texlib@orig@fullhead}}
+\renewcommand*\run@fullhead{\texlib@exambleed{\texlib@orig@runfullhead}}
+\renewcommand*\@fullfoot{\texlib@exambleed{\texlib@orig@fullfoot}}
+\renewcommand*\run@fullfoot{\texlib@exambleed{\texlib@orig@runfullfoot}}
+\makeatother
+
 % \SetTeXLibExamRules — activate the exam-class `headandfoot` style and the
 %   conventional rule set (first-page footer + running head + running foot).
 %   Idempotent; safe to call from inside \AtBeginDocument or at class load.
