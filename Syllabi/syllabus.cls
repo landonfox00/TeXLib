@@ -56,6 +56,11 @@
 % ==============================================================================
 \RequirePackage{texlib-build}
 
+% Publishable: the builder clones the built PDF to <course>.<section>_<term>.pdf
+% and Syllabus.pdf and drops a "<course> <term> Syllabus" desktop shortcut. See
+% the publish sidecar in course-metadata.sty.
+\TeXLibDeclarePublishable{syllabus}{Syllabus}{Syllabus}
+
 
 % ==============================================================================
 % 3. COLORS & LIST DEFAULTS
