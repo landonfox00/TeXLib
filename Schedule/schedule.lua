@@ -18,7 +18,7 @@
 -- should re-source these files between runs.
 
 -- GLOBAL STATE
-calendar_mgr = nil     
+calendar_mgr = nil
 cursor_date = nil      
 start_date = nil
 course_end_date = nil  
@@ -288,7 +288,7 @@ function L_finals_week(start_str, final_date_str, time_str, duration_in)
 			cell.flags.canceled = true
 
 			if final_day and ptr:to_key() == final_day:to_key() then
-				cell.color = "\\cellcolor{red!15}"
+				cell.color = "\\SetCell{bg=red!15}"
 				cell:append("\\textbf{Final Exam}", "top")
 				if time_str and time_str ~= "" then
 					cell:append("\\textbf{" .. time_str .. "}", "top")
@@ -448,7 +448,7 @@ function L_holiday(date_in, date_end, name)
 
 		cell:append("\\textbf{" .. sanitize(name) .. "}", "top")
 		cell:append("\\textbf{No Classes}", "top")
-		cell.color = "\\cellcolor{black!10}"
+		cell.color = "\\SetCell{bg=black!10}"
 		tag_cell_source(cell, src_line)
 		ptr = ptr + 1
 	end
@@ -505,7 +505,7 @@ function L_quiz(options_in)
 	local cell = calendar_mgr:get_cell(target, cap)
 
 	cell.flags.quiz = true
-	cell.color = "\\cellcolor{orange!15}"
+	cell.color = "\\SetCell{bg=orange!15}"
 
 	-- Append manually
 	cell:append({ event_ref = evt, duration = 0 }, "top")
@@ -562,7 +562,7 @@ function L_exam(options_in)
 	
 	cell.flags.exam = true
 	cell.capacity_cur = cell.capacity_cur - len
-	cell.color = "\\cellcolor{red!15}"
+	cell.color = "\\SetCell{bg=red!15}"
 	cell:append({ event_ref = evt, duration = len }, "top")
 	tag_cell_source(cell, evt.source_line)
 end
@@ -574,7 +574,7 @@ function L_meta(text, date_in, layer_in, color_in)
 	if date_in and date_in ~= "" then target = Date.new(date_in) end
 	local cap = L_get_cap(target); if cap==0 then cap=1.0 end
 	local cell = calendar_mgr:get_cell(target, cap)
-	if color_in and color_in ~= "" then cell.color = "\\cellcolor{" .. sanitize(color_in) .. "}" end
+	if color_in and color_in ~= "" then cell.color = "\\SetCell{bg=" .. sanitize(color_in) .. "}" end
 	local layer = (layer_in and layer_in~="") and layer_in or "bottom"
 	cell:append({ event_ref = evt, duration = 0 }, layer)
 	tag_cell_source(cell, evt.source_line)
@@ -642,32 +642,38 @@ function render_grid(month_pages)
 		return
 	end
 
-	tex.print("\\renewcommand\\tabularxcolumn[1]{p{#1}}")
-	local col_def = "| c ||"
+	local col_def = "|c||"
 	local active_indices = calendar_mgr.active_col_indices
 	local day_names = {"MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"}
 
-	local header = "\\textbf{WEEK} \\rule[-0.65em]{0pt}{2em} "
+	-- Header cells carry no \textbf/\centering: row{1} in the table spec below
+	-- bolds and centers the whole header row. The \rule strut fixes its height.
+	local header = "WEEK \\rule[-0.65em]{0pt}{2em} "
 	for _, idx in ipairs(active_indices) do
-		header = header .. "& \\centering \\textbf{" .. day_names[idx] .. "} "
-		col_def = col_def .. " X |"
+		header = header .. "& " .. day_names[idx] .. " "
+		col_def = col_def .. "X|"
 	end
 
-	-- Reusable table boilerplate.  Emitted once per page-group below (so the
-	-- header repeats at the top of each month in month-pages mode).  These are
-	-- pure class boilerplate — nobody inverse-searches the header — so they go
-	-- out with no source line and produce no .schedmap entry.
-	local tbl_open = "\\begin{xltabular}{\\textwidth}{" .. col_def .. "}"
-	local tbl_head = "\\hline " .. header ..
-		"\\tabularnewline \\hline\\noalign{\\vskip 2pt}\\hline \\endhead"
-	-- Empty \endlastfoot: the bottom rule is drawn by the last row's own
-	-- trailing `\hline` (every row, including the last, ends `\tabularnewline
-	-- \hline`).  An empty lastfoot stops longtable from synthesising a phantom
-	-- trailing row whose column rules would otherwise poke out below the table
-	-- as a short vertical stub — the artifact a non-empty `\hline` lastfoot
-	-- (with its \@arstrutbox strut) used to leave behind.
-	local tbl_lastfoot = "\\endlastfoot"
-	local tbl_close = "\\end{xltabular}"
+	-- Reusable table boilerplate. One longtblr per page-group (see the group
+	-- loop below); rowhead=1 repeats the header row atop each page — the
+	-- longtable \endhead equivalent — so month-pages mode and any table that
+	-- overflows a page both keep their header. [entry=none, label=none]
+	-- suppresses longtblr's default "Table N" caption/counter (and, as a side
+	-- effect, lets rowhead build its repeating-head box without a spurious
+	-- dim-eval error). hlines draws every horizontal rule; rows valign=t tops
+	-- every cell (matching the old p-column body); row{1} bolds and centers the
+	-- header.
+	local tbl_open = "\\begin{longtblr}[entry=none, label=none]{"
+		.. "colspec={" .. col_def .. "}, rowhead=1, "
+		.. "hlines={0.4pt,solid}, rowsep=0pt, "
+		.. "rows={valign=t}, row{1}={valign=m, halign=c, font=\\bfseries}}"
+	-- The header is emitted as the first table row (rowhead=1 marks it as the
+	-- repeating head); it ends with the \\ row terminator. The trailing \hline
+	-- adds a SECOND rule under the header — so hlines' own rule plus this one
+	-- render as a double rule (vertical rules break across the gap), reproducing
+	-- the old \hline\noalign{\vskip2pt}\hline header separator.
+	local tbl_head = header .. "\\\\ \\hline"
+	local tbl_close = "\\end{longtblr}"
 
 	-- Build rows in week order.  Each row is a list of per-cell records
 	-- carrying the cell's typeset content and the source line of the
@@ -728,7 +734,7 @@ function render_grid(month_pages)
 					if not manual_exists then
 						cnt_quiz = cnt_quiz + 1
 						cell.flags.quiz = true
-						if not cell.flags.exam then cell.color = "\\cellcolor{orange!15}" end
+						if not cell.flags.exam then cell.color = "\\SetCell{bg=orange!15}" end
 						cell:append("\\textbf{Quiz " .. cnt_quiz .. "}", "top")
 					end
 				end
@@ -858,19 +864,18 @@ function render_grid(month_pages)
 		groups = { rows }
 	end
 
-	-- One table per group; \newpage between groups.  Header/lastfoot boilerplate
-	-- is re-emitted per group so each month's table carries its own header row.
+	-- One table per group; \newpage between groups.  The header row is re-emitted
+	-- per group so each month's table carries (and, via rowhead, repeats) it.
 	for gi, group in ipairs(groups) do
 		if gi > 1 then emit("\\newpage") end
 		emit(tbl_open)
 		emit(tbl_head)
-		emit(tbl_lastfoot)
 		for _, row in ipairs(group) do
 			emit(row.week_label, row.row_attr)
 			for _, c in ipairs(row.cells) do
 				emit(c.text, c.source_line or row.row_attr)
 			end
-			emit("\\tabularnewline \\hline", row.row_attr)
+			emit("\\\\", row.row_attr)
 		end
 		emit(tbl_close)
 	end
