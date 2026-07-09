@@ -174,6 +174,12 @@
 % defaults.
 \RequirePackage{texlib-solutions}
 
+% Float the blank MC "Answer" rule to the bottom of its page group with a
+% stretch-1 gap after the last option (the MC analogue of a free-response
+% \workbox).  Only the student build's blank answer line honors this; key /
+% solution builds keep the answer beside/below the choices.
+\renewcommand{\@mc@answergap}{\vspace{\stretch{1}}}
+
 % \begin{problems} / \begin{mcproblems} ... (repeatable Part sections)
 %   The environments are defined once in texlib-problembank.sty (shared with
 %   quiz.cls): each is an auto-numbered "Part N" section, used in any order/count,
@@ -829,16 +835,10 @@
 		\fi
 		\vfill
 
-		% Instructions: a user-set exam-instructions-file controls its own layout
-		% (no box); inline text and the default autoexam-instructions.tex are boxed.
-		\IfExamInstructionsFile{%
-			\exam@input@userinstructions
-		}{%
-			\fbox{\fbox{\parbox{\dimexpr\linewidth-4\fboxsep-4\fboxrule\relax}{%
-				\noindent{\large\bf Instructions:}
-				\TeXLibInstructionsInlineOrDefault{exam}%
-			}}}%
-		}%
+		% Instructions: file / inline / default alike are wrapped in the titled
+		% box. A doc can call \TeXLibInstructionsUnboxed to reclaim full layout
+		% control over its own instructions file (renders bare, no box).
+		\TeXLibInstructionsTitled{exam}%
 		\vfill
 
 		Name: \underline{\hspace{4in}}

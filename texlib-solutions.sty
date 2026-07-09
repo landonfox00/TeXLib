@@ -111,6 +111,15 @@
 % breakable tcolorbox could -- accepted because every solution shipped in this
 % repo is a few lines of prose/math (surveyed 2026-07-04: none exceed ~7 lines,
 % none use tikz/tabular/multi-part content, no historical overflow incident).
+% Outer vertical separation placed above and below the green solution box.
+% 10pt suits a full-width free-response box (breathing room between the problem
+% and its boxed solution).  The side-by-side multiple-choice key (\@mcframe@mid)
+% shrinks it to 0pt locally: there the box lives in a narrow right-hand column
+% whose height competes with the answer-choices column, and the inter-problem
+% separator rule already spaces MC problems -- the 10pt chrome only made the
+% solution column outgrow the choices, pushing problems onto extra pages.
+\newlength{\@sol@outervsep}
+\setlength{\@sol@outervsep}{10pt}
 \let\solution\relax
 \let\endsolution\relax
 \newenvironment{solution}{%
@@ -127,15 +136,22 @@
 	\ifsolutions
 		\egroup
 		\@in@solutionfalse
-		\par\vspace{10pt}%
+		\par\vspace{\@sol@outervsep}%
 		\setlength{\fboxsep}{6pt}%
 		\noindent
 		\colorbox{green!3!white}{%
 			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
-				\rlap{\hspace{-6pt}\textcolor{green!50!black}{%
-					\vrule width 1.5pt height
-						\dimexpr\ht\@sol@box+\dp\@sol@box+\ht\strutbox+\dp\strutbox+3pt\relax
-						depth 0pt}}%
+					% Left accent, same total length as before but oriented DOWNWARD
+					% from the "Solution." baseline (height = just the header line,
+					% depth = the rest) and \smash'd so it adds nothing to the box's
+					% own height/depth. A rule with all its length in `height` (as
+					% this once was) makes the enclosing \parbox[t] that tall ABOVE
+					% its first baseline, so the green box reserved an empty band equal
+					% to the solution's own height -- doubling it.
+					\smash{\rlap{\hspace{-6pt}\textcolor{green!50!black}{%
+						\vrule width 1.5pt
+							height \dimexpr\ht\strutbox+3pt\relax
+							depth \dimexpr\ht\@sol@box+\dp\@sol@box+\dp\strutbox\relax}}}%
 				\noindent\textbf{Solution.}%
 				\ifrubric
 					\ifx\@sol@rubric\@empty\else
@@ -146,7 +162,7 @@
 				\box\@sol@box
 			}%
 		}%
-		\vspace{10pt}%
+		\vspace{\@sol@outervsep}%
 	\else
 		\egroup
 	\fi
@@ -257,6 +273,16 @@
 \renewcommand{\choiceshook}{%
 	\setlength{\leftmargin}{2em}%
 	\setlength{\labelwidth}{\dimexpr\leftmargin-\labelsep\relax}%
+	% Solutions copy only: firm up the choice-list spacing a touch so the eight
+	% side-by-side MC keys pack four to a page across every shuffled version.  The
+	% blank copy keeps the exam class's default (looser) spacing untouched -- it is
+	% what students see, and its \stretch answer gap already fills the page.
+	\ifsolutions
+		\setlength{\topsep}{2pt}%
+		\setlength{\partopsep}{0pt}%
+		\setlength{\itemsep}{2pt}%
+		\setlength{\parsep}{0pt}%
+	\fi
 }
 
 % Side-by-side applies to vertical {choices}.  An inline {oneparchoices} block
@@ -289,6 +315,13 @@
 		\strut\vspace*{-\dimexpr\ht\strutbox+\dp\strutbox+1.9pt\relax}%
 	\fi \fi
 }
+% Gap inserted between the last choice and the student answer line.  Empty by
+% default (a fixed \medskip is the only separation, as before); autoexam sets it
+% to \vspace{\stretch{1}} so the blank "Answer" rule floats to the bottom of the
+% page group -- the MC analogue of a free-response \workbox.  Only the blank
+% student build honors it; solution/key builds keep the answer beside/below the
+% choices unchanged.
+\providecommand{\@mc@answergap}{}
 % Right-aligned answer line; the letter is filled in for the key.  \noindent
 % leaves vertical mode before \hfill (which would otherwise error there).
 % Side-by-side (vertical {choices}, \ifsolutions, not \if@mc@inline) defers
@@ -306,19 +339,30 @@
 			\par
 		\fi
 	\else
-		\par\nobreak\medskip
+		\par\nobreak\medskip\@mc@answergap
 		\noindent\hfill\textbf{Answer:}~\rule{2.4cm}{0.4pt}%
 		\par
 	\fi
 }
 \renewcommand{\@mcframe@mid}{%
-	\ifsolutions \if@mc@inline\else \end{minipage}\hfill\begin{minipage}[t]{\@mc@solw}\fi \fi
+	\ifsolutions \if@mc@inline\else
+		\end{minipage}\hfill\begin{minipage}[t]{\@mc@solw}%
+		% Drop the box's 10pt outer padding inside the narrow key column (local to
+		% this minipage) so the solution column doesn't outgrow the choices and the
+		% "Solution." header top-aligns with choice A.
+		\setlength{\@sol@outervsep}{0pt}%
+	\fi \fi
 }
 \renewcommand{\@mcframe@end}{%
-	\ifsolutions \if@mc@inline\else \end{minipage}\fi \fi
 	\ifsolutions \if@mc@inline\else
-		\par\nobreak\medskip
+		% Place the key letter at the FOOT of the (right) solution column, while it
+		% is still open -- not on a new full-width line below both columns.  On the
+		% choice-tall problems (stacked integrals, etc.) the short solution column
+		% has vertical slack here, so the letter costs no extra page height; this is
+		% what lets the eight MC keys pack four to a page like the blank copy.
+		\par\nobreak\vskip2pt
 		\noindent\hfill\textbf{Answer:}~\fbox{\strut\@mc@letter}%
+		\end{minipage}%
 	\fi \fi
 	\par
 }
