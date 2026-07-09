@@ -38,7 +38,11 @@
 #
 #   * PDF splitting -- if the engine drops a <base>.spl signal file containing
 #     "split_page=N", the resulting <base>.pdf is split into <base>_Exam.pdf
-#     and <base>_Solutions.pdf (the autoexam key-build workflow).
+#     and <base>_Solutions.pdf (the autoexam key-build workflow). Likewise a
+#     multi-copy exam's <base>.vmap is sliced into a PDF per version/solutions
+#     copy. Both need pypdf; Sublime's embedded Python has none, so the work is
+#     delegated to texlib_pdfpost.py, run under an external Python that does
+#     (see _run_pdfpost / _external_python).
 #
 #   * aux_directory routing -- honors LaTeXTools' aux_directory setting
 #     (typically "<<temp>>"). On TeX Live there is no separate -aux-directory
@@ -65,22 +69,22 @@ import csv
 import glob
 import gzip
 import hashlib
+import importlib
 import os
 import re
 import shutil
+import subprocess
+import sys
 import tempfile
+import time
 import zipfile
 from xml.etree import ElementTree as ET
 
-# Note on the brief Windows console flash during builds: LaTeXTools' build
-# path runs lualatex through `subprocess.Popen` (via its own external_command
-# helper). On Windows this can briefly show a console window even with
-# CREATE_NO_WINDOW + SW_HIDE passed to CreateProcess. We attempted to suppress
-# it from this builder; the patch worked for ordinary subprocess.Popen calls
-# but not for the build path, and bypassing LaTeXTools' spawn helper has more
-# downside than the flash is worth. If you want to eliminate it, the cleanest
-# route is a Windows shell-level wrapper that detaches lualatex (a tiny .cmd
-# shim using `start "" /B`), pointed to via the LaTeXTools texpath setting.
+# Windows: keep short-lived subprocesses (our own pypdf/probe/powershell calls,
+# and -- via _suppress_build_console_flash below -- LaTeXTools' build spawns)
+# from flashing a console window. 0 elsewhere (creationflags=0 is valid on every
+# platform).
+_NO_WINDOW = 0x08000000 if os.name == "nt" else 0  # CREATE_NO_WINDOW
 
 try:
     # Modern LaTeXTools layout.
@@ -96,6 +100,60 @@ except ImportError:
             "'LaTeXTools.builders.pdfBuilder' (legacy). Is LaTeXTools installed "
             "and reasonably up to date?"
         ) from _exc
+
+
+# --- Suppress the Windows build console flash --------------------------------
+def _suppress_build_console_flash():
+    """
+    Remove the brief console-window flash on Ctrl+B builds (Windows only).
+
+    LaTeXTools spawns every build process -- lualatex, biber, each rerun --
+    through ``latextools.utils.external_command``, which hands Popen a SW_HIDE
+    ``startupinfo`` but never sets ``CREATE_NO_WINDOW``. SW_HIDE alone does not
+    stop Windows from allocating a console for a console-subsystem exe
+    (lualatex) launched by a GUI process, so it flashes for the length of the
+    pass. We wrap that module's *own* ``Popen`` name -- it does
+    ``from subprocess import Popen``, so a global ``subprocess.Popen`` patch
+    (the earlier attempt) never reached it -- and OR ``CREATE_NO_WINDOW`` into
+    creationflags.
+
+    Gated on ``startupinfo is not None``: external_command only builds a
+    startupinfo on its hide path (``show_window=False``). The Sumatra/sioyek
+    PDF viewers call it with ``show_window=True`` (startupinfo stays None), so
+    their windows are left untouched.
+
+    Best-effort and idempotent: any failure here just leaves the harmless flash
+    in place rather than breaking builds.
+    """
+    if os.name != "nt":
+        return
+    ec = None
+    for modpath in (
+        "LaTeXTools.latextools.utils.external_command",  # modern layout
+        "LaTeXTools.latextools_utils.external_command",  # legacy layout
+    ):
+        try:
+            ec = importlib.import_module(modpath)
+            break
+        except Exception:
+            continue
+    if ec is None or not hasattr(ec, "Popen"):
+        return
+    if getattr(ec, "_texlib_nowindow_patched", False):
+        return
+
+    _real_popen = ec.Popen
+
+    def _popen_no_window(*args, **kwargs):
+        if kwargs.get("startupinfo") is not None:
+            kwargs["creationflags"] = kwargs.get("creationflags", 0) | _NO_WINDOW
+        return _real_popen(*args, **kwargs)
+
+    ec.Popen = _popen_no_window
+    ec._texlib_nowindow_patched = True
+
+
+_suppress_build_console_flash()
 
 
 # --- Configuration ----------------------------------------------------------
@@ -139,6 +197,20 @@ MODE_QUICK = "quick"
 
 # How many times to re-run the engine chasing stable cross-references.
 MAX_RERUNS = 3
+
+# --- Publish step -----------------------------------------------------------
+# A class that calls \TeXLibDeclarePublishable (syllabus, schedule) drops a
+# <base>.pubmeta sidecar; _postprocess then clones the built PDF to shareable
+# names (<course>.<section>_<term>.pdf + a generic <kind>.pdf) and, on Windows,
+# a desktop shortcut. Enabled by default; toggle via builder_settings in
+# LaTeXTools.sublime-settings or the env override (0/false/no/off = disabled).
+PUBLISH_SETTING      = "publish_shareable_copies"
+PUBLISH_ENV          = "TEXLIB_PUBLISH"
+PUBLISH_CLIP_SETTING = "copy_published_path_to_clipboard"
+PUBLISH_CLIP_ENV     = "TEXLIB_PUBLISH_CLIPBOARD"
+# Desktop subfolder the shortcuts land in, so they don't pile up loose on the
+# desktop as terms accumulate.
+PUBLISH_SHORTCUT_DIR = "Course Materials"
 
 # Regexes over the root document / engine output.
 DOCCLASS_RE = re.compile(r"\\documentclass(?:\[[^\]]*\])?\{(\w[\w-]*)\}")
@@ -188,6 +260,13 @@ class TexlibBuilder(PdfBuilder):
             self.display(f"TeXLib: cannot read root document {root!r}: {exc}\n")
             return
 
+        # Build-summary state (elapsed time + pass/biber tally). _count_passes
+        # increments the tallies as commands stream past it; _display_build_summary
+        # reports them at the end of _postprocess.
+        self._build_start = time.monotonic()
+        self._pass_count = 0
+        self._biber_count = 0
+
         mode, engine_options = self._extract_mode(self.options or [])
 
         # Problem-bank fragments (bank.tex, chN.tex, ...) have no root document
@@ -206,7 +285,9 @@ class TexlibBuilder(PdfBuilder):
             base = self._base_engine_cmd(
                 "lualatex", self._aux_target, tex_dir, engine_options
             )
-            yield from self._build_bank_catalog(base, "lualatex")
+            yield from self._count_passes(
+                self._build_bank_catalog(base, "lualatex")
+            )
             self._postprocess()
             return
 
@@ -244,22 +325,44 @@ class TexlibBuilder(PdfBuilder):
                     "TeXLib: 'All Versions' requested but no \\versions{...} "
                     "found in the root document -- building once instead.\n"
                 )
-                yield from self._build_once(base, engine, per_version_mode)
+                yield from self._count_passes(
+                    self._build_once(base, engine, per_version_mode)
+                )
             else:
                 self.display(
                     "TeXLib: building "
                     f"{len(versions)} version(s): {', '.join(versions)}\n"
                 )
                 for version in versions:
-                    yield from self._build_version(
-                        base, engine, version, per_version_mode
+                    yield from self._count_passes(
+                        self._build_version(
+                            base, engine, version, per_version_mode
+                        )
                     )
         elif mode == MODE_QUICK:
-            yield from self._build_quick(base, engine)
+            yield from self._count_passes(self._build_quick(base, engine))
         else:
-            yield from self._build_once(base, engine, mode)
+            yield from self._count_passes(self._build_once(base, engine, mode))
 
         self._postprocess()
+
+    def _count_passes(self, inner):
+        """Pass-through generator that tallies engine passes and biber runs for
+        the build summary, without altering the (command, message) stream it
+        forwards. Wrapping every build sub-coroutine here keeps the tally in one
+        place instead of threading a counter through each of them.
+        """
+        try:
+            item = next(inner)
+            while True:
+                head = item[0][0] if item and item[0] else ""
+                if head == "biber":
+                    self._biber_count += 1
+                elif head:
+                    self._pass_count += 1
+                item = inner.send((yield item))
+        except StopIteration:
+            return
 
     # ------------------------------------------------------------------ #
     # Mode + engine resolution
@@ -955,9 +1058,16 @@ class TexlibBuilder(PdfBuilder):
 
         self._slice_versions_from_vmap(tex_dir, base_path)
 
+        # Clone a published class's PDF (syllabus/schedule) to shareable names +
+        # a desktop shortcut, driven by the <base>.pubmeta sidecar. Runs after
+        # copy-back so the final <base>.pdf is already next to the source.
+        self._publish_shareable_copies(tex_dir, base_path)
+
         self._finalize_synctex(tex_dir)
 
         self._cleanup_version_scratch()
+
+        self._display_build_summary(tex_dir, base_path)
 
     def _finalize_synctex(self, tex_dir):
         """Reduce inverse-search artifacts to a single uncompressed <base>.synctex.
@@ -1286,48 +1396,15 @@ class TexlibBuilder(PdfBuilder):
             return
         if not os.path.exists(pdf_file):
             return
-        try:
-            with open(spl_file, "r", encoding="utf-8") as fh:
-                content = fh.read().strip()
-            if "split_page=" not in content:
-                return
-            split_page = int(content.split("=", 1)[1].strip())
-
-            from pypdf import PdfReader, PdfWriter
-
-            reader = PdfReader(pdf_file)
-            total = len(reader.pages)
-            if not (0 < split_page < total):
-                self.display(
-                    f"TeXLib: .spl split_page={split_page} out of range "
-                    f"(PDF has {total} pages); skipping split.\n"
-                )
-                return
-
-            exam = PdfWriter()
-            for i in range(split_page):
-                exam.add_page(reader.pages[i])
-            with open(base_path + "_Exam.pdf", "wb") as fh:
-                exam.write(fh)
-
-            solutions = PdfWriter()
-            for i in range(split_page, total):
-                solutions.add_page(reader.pages[i])
-            with open(base_path + "_Solutions.pdf", "wb") as fh:
-                solutions.write(fh)
-
-            os.remove(spl_file)
-            self.display(
-                "TeXLib: split into "
-                f"{os.path.basename(base_path)}_Exam.pdf / _Solutions.pdf.\n"
-            )
-        except ImportError:
-            self.display(
-                "TeXLib: pypdf not installed -- skipping the .spl PDF split. "
-                "Install it with: pip install pypdf\n"
-            )
-        except Exception as exc:
-            self.display(f"TeXLib: PDF split failed: {exc}\n")
+        produced, messages = self._run_pdfpost(
+            "split", spl_file, pdf_file, os.path.dirname(base_path)
+        )
+        for m in messages:
+            self.display(m + "\n")
+        # Consume the signal only on a real split -- an out-of-range split_page
+        # leaves the .spl in place (matching the pre-delegation behaviour).
+        if produced:
+            self._force_remove(spl_file)
 
     def _slice_versions_from_vmap(self, tex_dir, base_path):
         """Slice ONE combined multi-copy PDF into a PDF per version/solutions
@@ -1361,74 +1438,375 @@ class TexlibBuilder(PdfBuilder):
         if not os.path.exists(pdf_path):
             return
         try:
-            records = []
-            with open(vmap_path, "r", encoding="utf-8") as fh:
-                for line in fh:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    parts = line.split("|")
-                    if len(parts) != 3:
-                        continue
-                    ver, sol, start = parts
-                    try:
-                        records.append((ver, sol == "sol", int(start)))
-                    except ValueError:
-                        continue
-            if not records:
-                return
-
-            from pypdf import PdfReader, PdfWriter
-
-            reader = PdfReader(pdf_path)
-            total = len(reader.pages)
-            base_pdf_name = os.path.basename(pdf_path)
-            produced = []
-            for i, (ver, is_sol, start) in enumerate(records):
-                # Clamp to the PDF's real length: a later record's declared
-                # start (used as THIS record's end - 1) is untrusted data from
-                # a sidecar file, not a guarantee about this PDF. Clamping lets
-                # an earlier, genuinely valid record still get sliced even if
-                # a later one in the same file is bogus/out of range.
-                end = records[i + 1][2] - 1 if i + 1 < len(records) else total
-                end = min(end, total)
-                if not (1 <= start <= end):
-                    self.display(
-                        f"TeXLib: .vmap record {ver or '(none)'}/"
-                        f"{'sol' if is_sol else 'stu'} ({start}-{end}) out of "
-                        f"range for a {total}-page PDF; skipping.\n"
-                    )
-                    continue
-                suffix = "_solutions" if is_sol else ""
-                ver_part = f"_{ver}" if ver else ""
-                out_name = f"{self.base_name}{ver_part}{suffix}.pdf"
-                if out_name == base_pdf_name:
-                    # No version label AND not the solutions copy: e.g. a
-                    # \solutions document with no \versions{} declared, where
-                    # the student record has neither a letter nor a suffix to
-                    # tell it apart from the combined PDF itself. Slicing here
-                    # would just overwrite the combined PDF with a subset of
-                    # its own pages -- skip; it already IS this "slice".
-                    continue
-                writer = PdfWriter()
-                for p in range(start - 1, end):
-                    writer.add_page(reader.pages[p])
-                out_path = os.path.join(tex_dir, out_name)
-                self._force_remove(out_path)
-                with open(out_path, "wb") as fh:
-                    writer.write(fh)
-                produced.append(out_name)
-            if produced:
-                self.display(
-                    "TeXLib: sliced per-version PDF(s) from the combined "
-                    "build: " + ", ".join(produced) + ".\n"
-                )
-        except ImportError:
-            self.display(
-                "TeXLib: pypdf not installed -- skipping per-version PDF "
-                "slicing from .vmap. Install it with: pip install pypdf\n"
+            _produced, messages = self._run_pdfpost(
+                "slice", vmap_path, pdf_path, tex_dir
             )
-        except Exception as exc:  # noqa: BLE001 - best-effort
-            self.display(f"TeXLib: per-version PDF slicing from .vmap failed: {exc}\n")
+            for m in messages:
+                self.display(m + "\n")
         finally:
             self._force_remove(vmap_path)
+
+    # ------------------------------------------------------------------ #
+    # Publish step + build summary
+    # ------------------------------------------------------------------ #
+    def _publish_shareable_copies(self, tex_dir, base_path):
+        """Clone a published class's PDF to shareable names + a desktop shortcut.
+
+        Driven by the <base>.pubmeta sidecar course-metadata.sty writes for a
+        class that called \\TeXLibDeclarePublishable (syllabus, schedule). Its
+        RESOLVED course / section / term (coursemeta defaults + option overrides
+        + the derived term -- none reconstructable from coursemeta.tex by a build
+        tool) name the copies made next to the source:
+
+          * <course>.<section>_<term>.pdf   (or <publish-name>.pdf if that key is
+            set), the section segment dropped when the course has none
+          * <generic>.pdf                   (Syllabus.pdf / Tentative Schedule.pdf)
+
+        and a "<course> <term> <noun>" shortcut in the desktop's Course Materials
+        folder pointing at the coded copy. The sidecar is always consumed so it
+        never litters; a no-op for every non-publishable build. Disabling publish
+        (builder_settings / env) still consumes the sidecar but skips the copies.
+        """
+        meta = self._read_pubmeta(tex_dir)   # consumes the sidecar if present
+        if meta is None:
+            return                           # not a publishable build
+        if not self._publish_enabled():
+            return                           # feature off: copies/shortcut skipped
+        pdf = base_path + ".pdf"
+        if not os.path.exists(pdf):
+            return
+        course   = meta.get("course", "").strip()
+        section  = meta.get("section", "").strip()
+        term     = meta.get("term", "").strip()
+        generic  = meta.get("generic", "").strip()
+        noun     = meta.get("noun", "").strip()
+        override = meta.get("publish-name", "").strip()
+        # Sanity guard: never emit a "Math181__.pdf"-style name from a document
+        # whose coursemeta is missing the identifying pieces. The PDF built fine;
+        # only the shareable clones are skipped.
+        if not course or not term:
+            self.display(
+                "TeXLib: publish skipped -- course/term unset in coursemeta "
+                "(need course-subject + course-number and season + year, or an "
+                "explicit term). The PDF built normally.\n"
+            )
+            return
+        coded = override or self._coded_basename(course, section, term)
+        if override:
+            coded = self._sanitize_filename(coded)
+        made = []
+        coded_pdf = os.path.join(tex_dir, coded + ".pdf")
+        if self._copy_pdf(pdf, coded_pdf):
+            made.append(os.path.basename(coded_pdf))
+        if generic:
+            generic_pdf = os.path.join(
+                tex_dir, self._sanitize_filename(generic) + ".pdf"
+            )
+            if self._copy_pdf(pdf, generic_pdf):
+                made.append(os.path.basename(generic_pdf))
+        extra = ""
+        if noun:
+            label = f"{course} {term} {noun}"
+            if self._make_desktop_shortcut(label, coded_pdf):
+                extra = f'; desktop shortcut "{label}"'
+        # QOL: leave the shareable path on the clipboard, ready to paste into the
+        # LMS. Only fires on a publish (not every build), so it's not intrusive.
+        if self._clipboard_enabled():
+            self._copy_to_clipboard(coded_pdf)
+        if made:
+            self.display("TeXLib: published " + ", ".join(made) + extra + ".\n")
+
+    def _read_pubmeta(self, tex_dir):
+        """Read and DELETE the <base>.pubmeta sidecar; return its key=value map,
+        or None when absent (every non-publishable build). Checked in the aux dir
+        first (\\openout routes there under -output-directory, like .vmap) then
+        the source dir."""
+        path = self._find_in_dirs(
+            self.base_name + ".pubmeta",
+            [getattr(self, "_aux_target", None), tex_dir],
+        )
+        if not path:
+            return None
+        meta = {}
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, val = line.split("=", 1)
+                    meta[key.strip()] = val.strip()
+        except OSError:
+            meta = None
+        self._force_remove(path)
+        return meta
+
+    @staticmethod
+    def _coded_basename(course, section, term):
+        """Build "<Course>.<Section>_<Term>" with whitespace stripped from each
+        token; the ".<Section>" segment is dropped when the course has no section.
+
+          ("Math 181", "1001", "Fall 2026") -> "Math181.1001_Fall2026"
+          ("Math 181", "",     "Fall 2026") -> "Math181_Fall2026"
+        """
+        c = re.sub(r"\s+", "", course)
+        s = re.sub(r"\s+", "", section)
+        t = re.sub(r"\s+", "", term)
+        core = f"{c}.{s}" if s else c
+        name = f"{core}_{t}" if t else core
+        return TexlibBuilder._sanitize_filename(name)
+
+    @staticmethod
+    def _sanitize_filename(name):
+        """Drop characters illegal in a Windows filename, preserving the dots and
+        underscores the coded name relies on."""
+        cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", name)
+        return cleaned.strip().rstrip(".")
+
+    def _copy_pdf(self, src, dst):
+        """Copy src -> dst, clearing a stale Hidden/ReadOnly dest first (the same
+        Errno-13 hazard the copy-back guards against). Returns True on success;
+        a no-op (False) when src and dst are the same file.
+
+        The same-file test is case-insensitive (normcase) and also asks the OS
+        (samefile), because on a case-insensitive Windows volume "Syllabus.pdf"
+        and a source "syllabus.pdf" are ONE file: without this guard the
+        \\force_remove below would delete the just-built source PDF and the copy
+        would then fail. A source already named like the target simply is the
+        shareable copy, so skipping is correct."""
+        src_abs, dst_abs = os.path.abspath(src), os.path.abspath(dst)
+        same = os.path.normcase(src_abs) == os.path.normcase(dst_abs)
+        if not same and os.path.exists(dst_abs):
+            try:
+                same = os.path.samefile(src_abs, dst_abs)
+            except OSError:
+                same = False
+        if same:
+            return False
+        self._force_remove(dst)
+        try:
+            shutil.copy2(src, dst)
+            return True
+        except Exception as exc:  # noqa: BLE001 - best-effort
+            self.display(
+                f"TeXLib: could not write {os.path.basename(dst)}: {exc}\n"
+            )
+            return False
+
+    def _make_desktop_shortcut(self, label, target):
+        """Create/refresh a .lnk to `target` in the desktop's PUBLISH_SHORTCUT_DIR
+        (Windows only; no-op elsewhere). Values pass through the environment so a
+        course name with quotes/spaces can't break the PowerShell command. Uses
+        GetFolderPath('Desktop') so the OneDrive-redirected desktop resolves.
+        Returns True on success."""
+        if os.name != "nt":
+            return False
+        label = self._sanitize_filename(label)
+        if not label:
+            return False
+        env = dict(os.environ)
+        env["TEXLIB_LNK_LABEL"] = label
+        env["TEXLIB_LNK_TARGET"] = os.path.abspath(target)
+        env["TEXLIB_LNK_SUBDIR"] = PUBLISH_SHORTCUT_DIR
+        ps = (
+            "$ErrorActionPreference='Stop';"
+            "$d=[Environment]::GetFolderPath('Desktop');"
+            "$dir=Join-Path $d $env:TEXLIB_LNK_SUBDIR;"
+            "New-Item -ItemType Directory -Force -Path $dir | Out-Null;"
+            "$p=Join-Path $dir ($env:TEXLIB_LNK_LABEL + '.lnk');"
+            "$w=New-Object -ComObject WScript.Shell;"
+            "$s=$w.CreateShortcut($p);"
+            "$s.TargetPath=$env:TEXLIB_LNK_TARGET;"
+            "$s.Save()"
+        )
+        try:
+            proc = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive",
+                 "-ExecutionPolicy", "Bypass", "-Command", ps],
+                env=env, capture_output=True, text=True,
+                creationflags=_NO_WINDOW, timeout=30,
+            )
+        except Exception as exc:  # noqa: BLE001 - best-effort
+            self.display(f"TeXLib: desktop shortcut not created ({exc}).\n")
+            return False
+        if proc.returncode != 0:
+            self.display(
+                "TeXLib: desktop shortcut not created "
+                f"({(proc.stderr or '').strip()[:200]}).\n"
+            )
+            return False
+        return True
+
+    def _copy_to_clipboard(self, text):
+        """Best-effort: put `text` on the Windows clipboard (for pasting the
+        shareable PDF path into the LMS). No-op off Windows / on any error."""
+        if os.name != "nt":
+            return
+        env = dict(os.environ)
+        env["TEXLIB_CLIP"] = str(text)
+        try:
+            subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                 "Set-Clipboard -Value $env:TEXLIB_CLIP"],
+                env=env, capture_output=True, creationflags=_NO_WINDOW,
+                timeout=15,
+            )
+        except Exception:  # noqa: BLE001 - a convenience, never fatal
+            pass
+
+    def _publish_enabled(self):
+        return self._setting_on(PUBLISH_SETTING, PUBLISH_ENV, True)
+
+    def _clipboard_enabled(self):
+        return self._setting_on(PUBLISH_CLIP_SETTING, PUBLISH_CLIP_ENV, True)
+
+    def _setting_on(self, key, env_var, default):
+        """Resolve a boolean toggle: builder_settings[key] wins, else the env var
+        (0/false/no/off/'' = off), else `default`. builder_settings is absent on
+        the bare instances the logic tests construct, hence the getattr."""
+        settings = getattr(self, "builder_settings", None) or {}
+        if key in settings:
+            return bool(settings[key])
+        raw = os.environ.get(env_var)
+        if raw is not None:
+            return raw.strip().lower() not in ("0", "false", "no", "off", "")
+        return default
+
+    def _display_build_summary(self, tex_dir, base_path):
+        """One-line wrap-up: elapsed time, engine passes, biber runs, PDF size."""
+        start = getattr(self, "_build_start", None)
+        if start is None:
+            return
+        elapsed = time.monotonic() - start
+        passes = getattr(self, "_pass_count", 0)
+        bibers = getattr(self, "_biber_count", 0)
+        biber_str = f", {bibers} biber" if bibers else ""
+        size_str = ""
+        pdf = base_path + ".pdf"
+        try:
+            if os.path.exists(pdf):
+                size_str = (
+                    f"; {os.path.basename(pdf)} "
+                    f"{self._human_size(os.path.getsize(pdf))}"
+                )
+        except OSError:
+            pass
+        self.display(
+            f"TeXLib: build finished in {elapsed:.1f}s -- "
+            f"{passes} pass(es){biber_str}{size_str}.\n"
+        )
+
+    @staticmethod
+    def _human_size(n):
+        """Human-readable byte count (B / KB / MB / GB)."""
+        size = float(n)
+        for unit in ("B", "KB", "MB", "GB"):
+            if size < 1024 or unit == "GB":
+                return (f"{size:.0f} {unit}" if unit == "B"
+                        else f"{size:.1f} {unit}")
+            size /= 1024
+
+    def _external_python(self):
+        """A command prefix for an external Python that can import pypdf, or None.
+
+        Sublime Text's embedded interpreter has no site-packages, so the
+        in-process `import pypdf` in _run_pdfpost fails under a real build; the
+        pypdf work is then handed to this interpreter instead. Candidates, in
+        order: $TEXLIB_PYTHON, the current interpreter (only if it actually
+        looks like python -- inside Sublime sys.executable is the plugin host,
+        which must never be run with -c), then python / python3 / py -3 from
+        PATH. The first whose `-c "import pypdf"` succeeds wins; the result
+        (including None) is cached for the process.
+        """
+        cached = getattr(TexlibBuilder, "_ext_python_cache", False)
+        if cached is not False:
+            return cached
+        candidates = []
+        override = os.environ.get("TEXLIB_PYTHON")
+        if override:
+            candidates.append([override])
+        exe = sys.executable or ""
+        if os.path.basename(exe).lower().startswith("python"):
+            candidates.append([exe])
+        candidates += [["python"], ["python3"], ["py", "-3"]]
+        found = None
+        for cand in candidates:
+            try:
+                probe = subprocess.run(
+                    cand + ["-c", "import pypdf"],
+                    capture_output=True, creationflags=_NO_WINDOW,
+                )
+            except Exception:  # noqa: BLE001 - candidate not on PATH, etc.
+                continue
+            if probe.returncode == 0:
+                found = cand
+                break
+        TexlibBuilder._ext_python_cache = found
+        return found
+
+    def _run_pdfpost(self, op, sidecar_path, pdf_path, out_dir):
+        """Run a pypdf post-processing op (slice a .vmap, split a .spl).
+
+        Runs in-process when pypdf is importable here (the CLI test harness /
+        system Python), else via texlib_pdfpost.py under an external Python that
+        has pypdf (Sublime's embedded one does not). Both paths call the SAME
+        module functions, so there is one implementation. Returns
+        (produced_names, messages); messages are user-facing. Never raises --
+        every failure becomes a message the caller can display.
+        """
+        base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+        pdfpost = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "texlib_pdfpost.py"
+        )
+        # 1) In-process: pypdf present (tests / CLI). The op imports pypdf
+        #    itself, so an ImportError here means "no pypdf" -> fall through.
+        try:
+            import pypdf  # noqa: F401
+            import texlib_pdfpost
+            result = texlib_pdfpost._OPS[op](
+                sidecar_path, pdf_path, out_dir, base_name
+            )
+            return result["produced"], result["messages"]
+        except ImportError:
+            pass
+        except Exception as exc:  # noqa: BLE001 - best-effort
+            return [], [f"TeXLib: {op} PDF post-processing failed: {exc}"]
+        # 2) External Python that has pypdf.
+        if not os.path.exists(pdfpost):
+            return [], [
+                f"TeXLib: {os.path.basename(pdfpost)} is missing, so PDFs were "
+                "not post-processed. Redeploy the Sublime integration."
+            ]
+        py = self._external_python()
+        if not py:
+            return [], [
+                "TeXLib: pypdf is unavailable to Sublime's Python and no "
+                "external Python with pypdf was found on PATH, so per-version / "
+                "split PDFs were not produced. Install pypdf for your system "
+                "Python (pip install pypdf), or set TEXLIB_PYTHON to one that "
+                "has it."
+            ]
+        try:
+            proc = subprocess.run(
+                py + [pdfpost, op, sidecar_path, pdf_path, out_dir, base_name],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", creationflags=_NO_WINDOW,
+            )
+        except Exception as exc:  # noqa: BLE001 - best-effort
+            return [], [f"TeXLib: could not run PDF post-processing: {exc}"]
+        if proc.returncode == 3:  # texlib_pdfpost.PYPDF_MISSING_EXIT
+            return [], [
+                "TeXLib: the external Python found also lacks pypdf, so PDFs "
+                "were not post-processed. Install it: pip install pypdf"
+            ]
+        if proc.returncode != 0:
+            return [], [
+                f"TeXLib: PDF post-processing exited {proc.returncode} "
+                f"({(proc.stderr or '').strip()[:300]})"
+            ]
+        try:
+            import json
+            result = json.loads((proc.stdout or "").strip() or "{}")
+        except ValueError:
+            return [], ["TeXLib: PDF post-processing returned unreadable output."]
+        return result.get("produced", []), result.get("messages", [])
