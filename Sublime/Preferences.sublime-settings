@@ -1,44 +1,22 @@
 {
-	// Preferences.sublime-settings -- live copy from Packages/User/.
-	// Deploy to Packages/User/.
-	"ignored_packages":
-	[
-		"Vintage",
-	],
-	"font_size": 10,
-	"auto_complete_triggers":
-	[
-		{
-			"characters": "<",
-			"selector": "text.html, text.xml",
-		},
-		{
-			"rhs_empty": true,
-			"selector": "punctuation.accessor",
-		},
-		{
-			"characters": "\\",
-			"selector": "text.tex.latex",
-		}
-	],
+	// Preferences.sublime-settings -- TeXLib-Installer default editor prefs.
+	// Edit freely after install; this file gets overwritten only by re-installs.
+
+	"ignored_packages": ["Vintage"],
+
+	"font_size": 11,
 	"word_wrap": true,
 	"index_files": true,
+	"highlight_line": true,
 
-	// Personal proper nouns only. The bulk math vocabulary lives in
-	// LaTeX.sublime-settings (syntax-scoped, ships to coworkers via the
-	// installer); LaTeX layout dimensions live in LaTeX.sublime-settings's
-	// "ignored_words" section. Don't add general math terms here.
-	"added_words":
-	[
-		"Getters",
-		"Kerodon",
-		"kerodon",
-		"Kiran",
-		"Kiran's",
-		"Luecke",
-		"mentorship",
-		"Pentek",
-		"Prasma",
-		"Prasma's",
+	// Auto-complete on backslash inside LaTeX (so typing \begin pops
+	// the snippet menu) and on `<` inside HTML/XML.
+	"auto_complete_triggers": [
+		{ "characters": "<", "selector": "text.html, text.xml" },
+		{ "rhs_empty": true, "selector": "punctuation.accessor" },
+		{ "characters": "\\", "selector": "text.tex.latex" }
 	],
+
+	// Show the entire build panel instead of clipping at the first error.
+	"build_panel_word_wrap": true
 }

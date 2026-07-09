@@ -67,6 +67,9 @@
 \meta_create_var:nn { bank-path }      { BankPath }
 \meta_create_var:nn { gradebook-path } { GradebookPath }
 \meta_create_var:nn { preamble-file }  { PreambleFile }
+% Optional override for the builder's shareable-copy basename (see the publish
+% sidecar below). Unset by default -> the builder derives <course>.<section>_<term>.
+\meta_create_var:nn { publish-name }   { PublishName }
 % Per-class instructions-file keys. They live here (not in each class) so a
 % course can point every quiz/exam/card-set/pset at one file course-wide from
 % coursemeta.tex — coursemeta is read at this package's load, before any class
@@ -117,6 +120,7 @@
 	bank-path       .tl_gset:c = { g__meta_bank-path_tl },
 	gradebook-path  .tl_gset:c = { g__meta_gradebook-path_tl },
 	preamble-file   .tl_gset:c = { g__meta_preamble-file_tl },
+	publish-name    .tl_gset:c = { g__meta_publish-name_tl },
 	quiz-instructions-file  .tl_gset:c = { g__meta_quiz-instructions-file_tl },
 	exam-instructions-file  .tl_gset:c = { g__meta_exam-instructions-file_tl },
 	bingo-instructions-file .tl_gset:c = { g__meta_bingo-instructions-file_tl },
@@ -294,6 +298,46 @@
 }
 
 \ExplSyntaxOff
+
+% ==============================================================================
+% Publish sidecar  (opt-in per class via \TeXLibDeclarePublishable)
+% ==============================================================================
+% A class that produces a shareable, course-identified PDF (syllabus, schedule)
+% registers itself with
+%   \TeXLibDeclarePublishable{<kind>}{<generic-name>}{<shortcut-noun>}
+% in its preamble.  At \AtEndDocument we drop a <jobname>.pubmeta sidecar
+% recording the RESOLVED course / section / term — coursemeta defaults, class-
+% option overrides and the derived \GetTerm all folded in, none of which a build
+% tool can reconstruct by scraping coursemeta.tex.  The TeXLib Sublime builder
+% reads it to clone the PDF to <course>.<section>_<term>.pdf + <generic>.pdf and
+% drop a "<course> <term> <noun>" desktop shortcut.  Every other build path just
+% ignores the file (it is \openout-written, so kpathsea routes it to the aux dir
+% like .vmap, and the builder deletes it), so this is inert for plain CLI /
+% installer builds.  An undeclared class writes nothing.
+\newif\ifTeXLib@pub@declared
+\newcommand{\TeXLib@pub@kind}{}
+\newcommand{\TeXLib@pub@generic}{}
+\newcommand{\TeXLib@pub@noun}{}
+\newcommand{\TeXLibDeclarePublishable}[3]{%
+	\TeXLib@pub@declaredtrue
+	\renewcommand{\TeXLib@pub@kind}{#1}%
+	\renewcommand{\TeXLib@pub@generic}{#2}%
+	\renewcommand{\TeXLib@pub@noun}{#3}%
+}
+\newwrite\TeXLib@pub@stream
+\AtEndDocument{%
+	\ifTeXLib@pub@declared
+		\immediate\openout\TeXLib@pub@stream=\jobname.pubmeta\relax
+		\immediate\write\TeXLib@pub@stream{kind=\TeXLib@pub@kind}%
+		\immediate\write\TeXLib@pub@stream{generic=\TeXLib@pub@generic}%
+		\immediate\write\TeXLib@pub@stream{noun=\TeXLib@pub@noun}%
+		\immediate\write\TeXLib@pub@stream{course=\GetCourseShort}%
+		\immediate\write\TeXLib@pub@stream{section=\GetCourseSection}%
+		\immediate\write\TeXLib@pub@stream{term=\GetTerm}%
+		\immediate\write\TeXLib@pub@stream{publish-name=\GetPublishName}%
+		\immediate\closeout\TeXLib@pub@stream
+	\fi
+}
 
 % ==============================================================================
 % Backward-compat \the* aliases

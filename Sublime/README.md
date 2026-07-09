@@ -55,9 +55,11 @@ Open any TeXLib document (`autoexam`, `quiz`, `didactic`, `pset`, `schedule`,
   - **Quick** — a single engine pass, no biber, no rerun loop; for fast preview
     while writing. Cross-references / citations may be stale — run a normal
     build to settle them before sharing.
-  - **All Versions (separate PDFs)** — for `autoexam`, builds one PDF per
-    `\versions{A,B,C}` entry (`<base>_A.pdf`, `<base>_B.pdf`, …)
 - The same modes are in the **command palette** (`Ctrl+Shift+P` → type "TeXLib").
+- For `autoexam` documents with `\versions{A,B,C,...}`, a normal default build
+  already produces `<base>_A.pdf`, `<base>_B.pdf`, … (and `_solutions` copies
+  under dual/only `\solutions` mode) alongside the combined `<base>.pdf` — see
+  **Per-version/solutions PDF slicing** below. No separate mode needed.
 
 You never edit the `.tex` to switch modes — the builder injects the flag on the
 command line, exactly the way `smoke_test.py` does.
@@ -79,32 +81,17 @@ command line, exactly the way `smoke_test.py` does.
 - **PDF splitting.** If the engine drops a `<base>.spl` file containing
   `split_page=N`, the builder splits `<base>.pdf` into `<base>_Exam.pdf` and
   `<base>_Solutions.pdf` (the autoexam key-build workflow). Needs `pypdf`.
+- **Per-version/solutions PDF slicing.** For `autoexam` documents with
+  `\versions{A,B,C,...}` (or dual/only `\solutions` mode), a normal build
+  compiles every version/copy into ONE combined PDF, then slices
+  `<base>_A.pdf`, `<base>_B.pdf`, `<base>_A_solutions.pdf`, … out of it
+  afterward, keyed off a `<base>.vmap` sidecar autoexam writes per copy — no
+  separate recompile per version. Needs `pypdf`.
 - **Tidy.** Hides the `<base>.synctex.gz` artifact on Windows.
 
 It folds in the useful logic from the three retired scripts: `onetex_build.py`
 (engine detection, rerun loop), `OneTeXBuilder.py` (synctex hiding), and
 `autoexam.py` (version loop, PDF split).
-
-## Parallel multi-version exam builds
-
-`build_versions.py` (repo root) builds every `\versions{...}` entry of an
-autoexam document **concurrently** — one process per version — instead of one
-at a time. Each version reuses this builder's per-version pipeline (engine
-selection, biber-skip cache, rerun loop), so there's no logic drift.
-
-```sh
-python build_versions.py Exams/exam.tex             # combined exam.pdf (default)
-python build_versions.py Exams/exam.tex --separate  # exam_A.pdf, exam_B.pdf, ...
-python build_versions.py Exams/exam.tex --both -j 4 # combined + per-version
-```
-
-It's a standalone tool (no Sublime/LaTeXTools needed), so the interactive
-builder is untouched. Correctness under parallelism: autoexam reads its body
-from `<jobname>.tex` and keys every scratch file by jobname, so each version is
-built under a distinct jobname `<base>_<ver>` against its own source copy —
-distinct jobnames never collide, and `\shufflepages` still finds its source.
-Merging (`--combined`/`--both`) needs `pypdf`. (CLI builds from the OneDrive
-path need the comma-free junction + `TEXINPUTS` — see the project memory.)
 
 ## Testing
 
@@ -112,10 +99,9 @@ The builder has three layers of automated tests (none deployed to Sublime):
 
 | Script | Needs TeX? | Covers |
 |--------|-----------|--------|
-| `test_texlib_builder.py` | No | Decision logic + **full multi-pass orchestration** (biber-skip cache, rerun detection, `MAX_RERUNS` cap, per-version biber, aux routing, hidden-file recovery, schedmap rewrite). Drives `commands()` with a scripted side-effect timeline so the biber/rerun branches actually execute. |
+| `test_texlib_builder.py` | No | Decision logic + **full multi-pass orchestration** (biber-skip cache, rerun detection, `MAX_RERUNS` cap, per-version biber, aux routing, hidden-file recovery, schedmap rewrite, per-version/solutions `.vmap` PDF slicing). Drives `commands()` with a scripted side-effect timeline so the biber/rerun branches actually execute. |
 | `test_biber_integration.py` | Yes (`pdflatex`/`lualatex` + `biber`) | Real end-to-end: drives the actual builder coroutine against the real toolchain on a biblatex fixture. Proves a fresh build settles with no undefined refs, an unchanged rebuild **skips biber** in one pass, and editing the `.bib` re-runs biber. Soft-skips if the tools are absent. |
 | `test_synctex_integration.py` | Yes (`lualatex` + poppler's `pdftotext` + `synctex`) | Real end-to-end **inverse search**: drives the real builder against a real build, then uses TeX Live's own `synctex edit -o page:x:y:pdf` CLI to simulate a Sumatra double-click and check where it actually lands — the fabricated-data unit tests above can't catch a real engine/table-package quirk (e.g. xltabular deferring shipout) that only shows up against genuine output. Soft-skips if the tools (or a poppler-flavored `pdftotext` specifically — an xpdf build earlier on `PATH` silently lacks `-bbox`) are absent. |
-| `test_build_versions.py` (repo root) | No | The parallel version builder: per-version source-copy + PDF collection + scratch cleanup, rerun handling, parallel fan-out, and `--combined`/`--separate`/default merge. Uses a fake subprocess (merge tests need `pypdf`). |
 | `smoke_test.py` (repo root) | Yes (`lualatex`) | Builds every module template; content/visual regression for shared `.sty`/`.cls` refactors. |
 
 Run them directly:
@@ -124,12 +110,11 @@ Run them directly:
 python Sublime/test_texlib_builder.py        # fast, no TeX
 python Sublime/test_biber_integration.py     # real pdflatex + biber
 python Sublime/test_synctex_integration.py   # real lualatex + synctex CLI
-python test_build_versions.py                 # fast, no TeX (pypdf for merge)
 python smoke_test.py                          # full template builds
 ```
 
-`.github/workflows/tests.yml` runs the no-TeX suites on every push (logic +
-version builder), plus an integration job that installs TeX Live + biber.
+`.github/workflows/tests.yml` runs the no-TeX logic suite on every push, plus
+an integration job that installs TeX Live + biber.
 
 ## Notes
 

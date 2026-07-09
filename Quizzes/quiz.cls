@@ -166,25 +166,17 @@
 }
 
 \renewcommand{\maketitle}{%
-	% Instructions: file overrides inline text overrides default.
-	% File content controls its own layout (no automatic box around it).
-	\IfQuizInstructionsFile{%
-		\begin{center}
-			{\LARGE \GetQuizTitle}%
-			\ifkey\par\vspace{0.4em}\textit{Answer~Key}\fi
-		\end{center}
-		\quiz@input@userinstructions
-	}{%
-		\begin{center}
-			{\LARGE \GetQuizTitle}%
-			\ifkey\par\vspace{0.4em}\textit{Answer~Key}\fi
-			\par\medskip
-			% Inline text typesets directly; the default wording is \input from
-			% quiz-instructions.tex so double-clicking it in the PDF lands on that
-			% source (inverse search).
-			\TeXLibInstructionsBox{\TeXLibInstructionsInlineOrDefault{quiz}}%
-		\end{center}
-	}%
+	\begin{center}
+		{\LARGE \GetQuizTitle}%
+		\ifkey\par\vspace{0.4em}\textit{Answer~Key}\fi
+	\end{center}
+	\par\medskip
+	% Instructions: file / inline / default alike are wrapped in the titled box
+	% (matching the exam cover page). The default wording is \input from
+	% quiz-instructions.tex so double-clicking it in the PDF lands on that source
+	% (inverse search). A doc can call \TeXLibInstructionsUnboxed to reclaim full
+	% layout control over its own instructions file (renders bare, no box).
+	\TeXLibInstructionsTitled{quiz}%
 }
 
 % Course-metadata aliases (\theCourse, \theCourseNumber, \theCourseTitle,

@@ -54,13 +54,51 @@
 
 % \TeXLibInstructions{<prefix>} — full renderer, file > inline > default. A
 % user-set instructions file controls its own layout (no box); inline/default
-% are boxed and centered.
+% are boxed and centered. (Used by bingo; autoexam/quiz use the titled renderer
+% below.)
 \NewDocumentCommand \TeXLibInstructions { m } {
 	\IfMetaSet { #1 -instructions-file }
 		{ \use:c { #1 @input@userinstructions } }
 		{ \begin{center}
 			\TeXLibInstructionsBox { \TeXLibInstructionsInlineOrDefault {#1} }
 		  \end{center} }
+}
+
+% --- Titled auto-box (autoexam + quiz) ------------------------------------
+% Full-width double-fbox with a bold "Instructions:" header. Unlike
+% \TeXLibInstructionsBox (centered, footnotesize, fixed width — kept for bingo),
+% this fills the text block and titles it, matching the exam cover page.
+\NewDocumentCommand \TeXLibInstructionsTitledBox { +m } {
+	\fbox { \fbox { \parbox { \dimexpr \linewidth - 4\fboxsep - 4\fboxrule \relax } {
+		% ~ is an explicit space: literal spaces are ignored under \ExplSyntaxOn,
+		% and inline (paragraph) instructions must not run into the header.
+		\noindent {\large\bf Instructions:}~#1
+	} } }
+}
+
+% Auto-boxing is on by default; a document that needs full layout control over
+% its own instructions file can switch it off in its preamble with
+% \TeXLibInstructionsUnboxed (the file/inline/default then renders bare).
+\bool_new:N \g__texlibinstr_boxed_bool
+\bool_gset_true:N \g__texlibinstr_boxed_bool
+\NewDocumentCommand \TeXLibInstructionsBoxed   { } { \bool_gset_true:N  \g__texlibinstr_boxed_bool }
+\NewDocumentCommand \TeXLibInstructionsUnboxed { } { \bool_gset_false:N \g__texlibinstr_boxed_bool }
+
+% \TeXLibInstructionsContent{<prefix>} — resolved content (file > inline >
+% default), UNBOXED. The file layer sits atop \TeXLibInstructionsInlineOrDefault.
+\NewDocumentCommand \TeXLibInstructionsContent { m } {
+	\IfMetaSet { #1 -instructions-file }
+		{ \use:c { #1 @input@userinstructions } }
+		{ \TeXLibInstructionsInlineOrDefault {#1} }
+}
+
+% \TeXLibInstructionsTitled{<prefix>} — the autoexam/quiz renderer. Wraps the
+% resolved content (file/inline/default alike) in the titled box, unless a
+% document called \TeXLibInstructionsUnboxed to reclaim full layout control.
+\NewDocumentCommand \TeXLibInstructionsTitled { m } {
+	\bool_if:NTF \g__texlibinstr_boxed_bool
+		{ \TeXLibInstructionsTitledBox { \TeXLibInstructionsContent {#1} } }
+		{ \TeXLibInstructionsContent {#1} }
 }
 
 % \TeXLibDeclareInstructions[<default-file>]{<prefix>}

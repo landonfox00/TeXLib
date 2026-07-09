@@ -20,7 +20,7 @@ are welcome — bug reports, new bank problems, class fixes, and tooling.
   `course-metadata.sty`.
 - **Backend files** — engine/tooling not referenced from `.tex`
   (`.lua`, `.py`, internal helpers) use **underscores**: `problem_engine.lua`,
-  `texlib_synctex.lua`, `build_versions.py`.
+  `texlib_synctex.lua`, `smoke_test.py`.
 
 ## Testing (please run before opening a PR)
 
@@ -30,7 +30,6 @@ You need TeX Live (lualatex/pdflatex, + biber for bibliographies) on `PATH`.
 python smoke_test.py                 # build every module template (all classes)
 python smoke_test.py --modes all     # also key/solutions/student/rubric modes
 python Sublime/test_texlib_builder.py  # builder logic (no toolchain needed)
-python test_build_versions.py        # parallel multi-version driver
 python Sublime/test_biber_integration.py   # real biber cache (needs biber)
 ```
 

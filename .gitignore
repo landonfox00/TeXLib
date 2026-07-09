@@ -35,6 +35,12 @@ course-metadata_old.sty
 *.schedmap
 *_schedule_grid.tex
 
+# Publish sidecar (course-metadata.sty writes it for a publishable class; the
+# Sublime builder consumes it, but a CLI build that bypassed the builder leaves
+# it) and the package_for_lms.py bundle.
+*.pubmeta
+*_LMS.zip
+
 # autoexam / SyncTeX build scratch (generated next to the source by a
 # command-line build that bypassed the Sublime builder's cleanup).
 *.key

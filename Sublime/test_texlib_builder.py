@@ -16,6 +16,7 @@ Run:  python test_texlib_builder.py     (exit code = number of failures)
 """
 
 import hashlib
+import json
 import os
 import sys
 import types
@@ -261,56 +262,6 @@ def main():
           "-halt-on-error" in cmds[0][0], cmds[0][0])
     check("mode=draft -> \\def\\ShowDraft{}",
           r"\def\ShowDraft{}" in cmds[0][0][-1], cmds[0][0][-1] if cmds else "")
-
-    # (f) autoexam + allversions -> one build per version, jobnames + \def\Version
-    cmds, disp = run_builder(
-        r"\documentclass{autoexam}\versions{A, B, C}\begin{document}x\end{document}",
-        options=["--texlib-mode=allversions"])
-    check("allversions -> 3 builds", len(cmds) == 3, f"{len(cmds)} builds")
-    jobnames = [
-        next((a for a in c[0] if str(a).startswith("--jobname=")), None) for c in cmds
-    ]
-    check("allversions -> jobnames doc_A / doc_B / doc_C",
-          jobnames == ["--jobname=doc_A", "--jobname=doc_B", "--jobname=doc_C"],
-          jobnames)
-    check("allversions -> \\def\\Version{A} in first build",
-          bool(cmds) and r"\def\Version{A}" in cmds[0][0][-1],
-          cmds[0][0][-1] if cmds else "")
-    check("allversions -> \\input{doc_A.tex} (per-version source copy)",
-          bool(cmds) and r"\input{doc_A.tex}" in cmds[0][0][-1],
-          cmds[0][0][-1] if cmds else "")
-
-    # (g) \examversions alias also parsed
-    cmds, _ = run_builder(
-        r"\documentclass{autoexam}\examversions{A,B}\begin{document}x\end{document}",
-        options=["--texlib-mode=allversions"])
-    check("\\examversions alias -> 2 builds", len(cmds) == 2, f"{len(cmds)} builds")
-
-    # (g2) allversions_solutions -> one instructor-copy build per version,
-    # jobnames + \def\Version + \def\ShowSolutions{}. Previously unreachable:
-    # _build_version already had a mode="solutions" branch, but nothing in
-    # commands() ever passed it.
-    cmds, _ = run_builder(
-        r"\documentclass{autoexam}\versions{A, B, C}\begin{document}x\end{document}",
-        options=["--texlib-mode=allversions_solutions"])
-    check("allversions_solutions -> 3 builds", len(cmds) == 3, f"{len(cmds)} builds")
-    jobnames = [
-        next((a for a in c[0] if str(a).startswith("--jobname=")), None) for c in cmds
-    ]
-    check("allversions_solutions -> jobnames doc_A_solutions / _B_ / _C_",
-          jobnames == [
-              "--jobname=doc_A_solutions", "--jobname=doc_B_solutions",
-              "--jobname=doc_C_solutions",
-          ], jobnames)
-    check("allversions_solutions -> \\def\\Version{A} in first build",
-          bool(cmds) and r"\def\Version{A}" in cmds[0][0][-1],
-          cmds[0][0][-1] if cmds else "")
-    check("allversions_solutions -> \\def\\ShowSolutions{} in first build",
-          bool(cmds) and r"\def\ShowSolutions{}" in cmds[0][0][-1],
-          cmds[0][0][-1] if cmds else "")
-    check("allversions_solutions -> \\input{doc_A_solutions.tex}",
-          bool(cmds) and r"\input{doc_A_solutions.tex}" in cmds[0][0][-1],
-          cmds[0][0][-1] if cmds else "")
 
     # (h) %!TeX program respected (LaTeXTools resolves it into self.engine)
     cmds, _ = run_builder(r"\documentclass{article}\begin{document}x\end{document}",
@@ -665,26 +616,6 @@ def main():
     check("seq: biber + bare undefined-refs -> no extra pass",
           heads(cmds) == ["pdflatex", "biber", "pdflatex"], heads(cmds))
 
-    # allversions: biber gating is per-version. Seed version A as up-to-date
-    # (skips biber); version B is fresh (runs biber). MAX_RERUNS is per version.
-    DOCV = r"\documentclass{autoexam}\versions{A,B}\begin{document}x\end{document}"
-    cmds, _, _ = drive_builder(
-        DOCV, options=["--texlib-mode=allversions"], engine="lualatex",
-        seed_files={"doc_A.bcf": "<a>", "doc_A.bbl": "ba",
-                    "doc_A.bcf.texlibhash": _fp("<a>")},
-        steps=[
-            {"out": ""},                          # A pass 1: A is current -> skip
-            {"write": {"doc_B.bcf": "<b>"}},      # B pass 1 wrote its .bcf
-            {"write": {"doc_B.bbl": "bb"}},       # B biber wrote .bbl
-            {"out": ""},                          # B post-biber pass clean
-        ])
-    check("seq: allversions per-version biber -> A skipped, B ran",
-          heads(cmds) == ["lualatex", "lualatex", "biber", "lualatex"], heads(cmds))
-    biber_cmd = next((c for c in cmds if c[0][0] == "biber"), None)
-    check("seq: allversions biber targets version B's jobname",
-          biber_cmd is not None and any("doc_B" in str(a) for a in biber_cmd[0]),
-          biber_cmd)
-
     # ====================================================================== #
     # (p) biber change-detection helpers, exercised directly.
     # ====================================================================== #
@@ -828,45 +759,6 @@ def main():
     os.chmod(ro, 0o444)  # read-only
     TexlibBuilder._force_remove(ro)
     check("_force_remove: read-only file is deleted", not os.path.exists(ro), ro)
-
-    # ====================================================================== #
-    # (t) per-version source copy: autoexam reads its body from <jobname>.tex,
-    #     so allversions stages a copy named to match the jobname -- which is
-    #     what makes \shufflepages work under a distinct jobname.
-    # ====================================================================== #
-    tmpv = tempfile.mkdtemp(prefix="texlib_vsrc_")
-    with open(os.path.join(tmpv, "doc.tex"), "w", encoding="utf-8") as fh:
-        fh.write("body")
-    vb = TexlibBuilder()
-    vb.tex_name = "doc.tex"
-    vb.base_name = "doc"
-    vb.tex_dir = tmpv
-    ret = vb._make_version_source_copy("doc_A")
-    check("vsrc: returns the per-version copy name", ret == "doc_A.tex", ret)
-    check("vsrc: copy created with the source content",
-          os.path.exists(os.path.join(tmpv, "doc_A.tex"))
-          and open(os.path.join(tmpv, "doc_A.tex")).read() == "body")
-
-    vb2 = TexlibBuilder()
-    vb2.tex_name = "doc_A.tex"  # already named as the jobname (build_versions case)
-    vb2.base_name = "doc"
-    vb2.tex_dir = tmpv
-    check("vsrc: no-op when source already named <jobname>.tex",
-          vb2._make_version_source_copy("doc_A") == "doc_A.tex")
-
-    for n in ("doc_A_A.sco", "doc_A.srcmap", "doc_A_synctex.tex",
-              "doc_A_autoexam_body_A.tex"):
-        open(os.path.join(tmpv, n), "w").close()
-    open(os.path.join(tmpv, "doc_A.pdf"), "w").close()  # the real output
-    vb._cleanup_version_scratch()
-    check("vsrc: cleanup removes the source copy",
-          not os.path.exists(os.path.join(tmpv, "doc_A.tex")))
-    check("vsrc: cleanup removes jobname scratch (.sco/.srcmap/body/synctex)",
-          not any(os.path.exists(os.path.join(tmpv, n)) for n in
-                  ("doc_A_A.sco", "doc_A.srcmap", "doc_A_synctex.tex",
-                   "doc_A_autoexam_body_A.tex")))
-    check("vsrc: cleanup preserves the output PDF",
-          os.path.exists(os.path.join(tmpv, "doc_A.pdf")))
 
     # ====================================================================== #
     # (u) biber hash is recorded AFTER the final pass, not mid-build.
@@ -1027,6 +919,61 @@ def main():
         vb5._slice_versions_from_vmap(tmpv5, bpv5)
         check("vmap: found in the aux dir when aux routing is active",
               os.path.exists(bpv5 + "_A.pdf"))
+
+        # ================================================================== #
+        # (v3) External-Python fallback plumbing. Under Sublime the in-process
+        # `import pypdf` fails, so slicing/splitting is delegated to
+        # texlib_pdfpost.py run under an external Python. Exercise that exact
+        # path here (the CLI + interpreter discovery), since the tests above
+        # only cover the in-process branch.
+        # ================================================================== #
+        import subprocess as _sp
+        pdfpost = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "texlib_pdfpost.py")
+        check("pdfpost: helper module deployed next to the builder",
+              os.path.exists(pdfpost), pdfpost)
+
+        # _external_python() must find a pypdf-capable interpreter (the one
+        # running this test qualifies), and it must be cached.
+        TexlibBuilder._ext_python_cache = False  # reset any prior discovery
+        eb = TexlibBuilder()
+        extpy = eb._external_python()
+        check("external python: a pypdf-capable interpreter is found",
+              bool(extpy), extpy)
+        check("external python: result is cached",
+              getattr(TexlibBuilder, "_ext_python_cache", False) == extpy)
+
+        # The CLI is what the fallback actually invokes: run it via subprocess
+        # and confirm it slices + emits JSON, just as Sublime's build would.
+        tmpc = tempfile.mkdtemp(prefix="texlib_cli_")
+        bpc = os.path.join(tmpc, "doc")
+        _blank_pdf(bpc + ".pdf", 6)
+        with open(bpc + ".vmap", "w", encoding="utf-8") as fh:
+            fh.write("A|stu|1\nB|stu|3\nA|sol|5\n")
+        cli = _sp.run(
+            (extpy or [sys.executable]) +
+            [pdfpost, "slice", bpc + ".vmap", bpc + ".pdf", tmpc, "doc"],
+            capture_output=True, text=True)
+        check("pdfpost CLI: exit 0", cli.returncode == 0, cli.stderr)
+        check("pdfpost CLI: sliced doc_A/doc_B/doc_A_solutions via subprocess",
+              os.path.exists(bpc + "_A.pdf")
+              and os.path.exists(bpc + "_B.pdf")
+              and os.path.exists(bpc + "_A_solutions.pdf"))
+        _cli_out = json.loads(cli.stdout or "{}")
+        check("pdfpost CLI: JSON lists the produced files",
+              sorted(_cli_out.get("produced", []))
+              == ["doc_A.pdf", "doc_A_solutions.pdf", "doc_B.pdf"],
+              _cli_out.get("produced"))
+
+        # _run_pdfpost end to end (in-process branch here) returns produced.
+        rb = TexlibBuilder(); rb.tex_dir = tmpc
+        _blank_pdf(bpc + ".pdf", 6)
+        with open(bpc + ".vmap", "w", encoding="utf-8") as fh:
+            fh.write("A|stu|1\nB|stu|4\n")
+        _produced, _msgs = rb._run_pdfpost(
+            "slice", bpc + ".vmap", bpc + ".pdf", tmpc)
+        check("_run_pdfpost: returns produced names",
+              sorted(_produced) == ["doc_A.pdf", "doc_B.pdf"], _produced)
     else:
         print("  SKIP  pypdf not installed -- PDF split/vmap tests skipped")
 
@@ -1159,6 +1106,130 @@ def main():
     )
     check("real document with inline \\begin{problem} -> normal build",
           bool(cmds) and cmds[0][0][-1] == "doc.tex", cmds)
+
+    # ====================================================================== #
+    # (x) Publish step: shareable copies + desktop shortcut, driven by the
+    #     <base>.pubmeta sidecar course-metadata.sty writes for a publishable
+    #     class (syllabus, schedule). Shortcut/clipboard are stubbed so tests
+    #     never touch the real desktop or clipboard.
+    # ====================================================================== #
+    # _coded_basename derivation.
+    check("coded: section present -> Course.Section_Term",
+          TexlibBuilder._coded_basename("Math 181", "1001", "Fall 2026")
+          == "Math181.1001_Fall2026")
+    check("coded: no section -> Course_Term (no stray dot)",
+          TexlibBuilder._coded_basename("Math 181", "", "Fall 2026")
+          == "Math181_Fall2026")
+    check("coded: filename-illegal chars stripped",
+          TexlibBuilder._coded_basename("Math/181", "10:01", "Fall 2026")
+          == "Math181.1001_Fall2026")
+
+    # _read_pubmeta: parse + consume, checked in the aux dir first.
+    tmpp = tempfile.mkdtemp(prefix="texlib_pub_")
+    auxp = tempfile.mkdtemp(prefix="texlib_pub_aux_")
+    with open(os.path.join(auxp, "doc.pubmeta"), "w", encoding="utf-8") as fh:
+        fh.write("kind=syllabus\ngeneric=Syllabus\nnoun=Syllabus\n"
+                 "course=Math 181\nsection=1001\nterm=Fall 2026\npublish-name=\n")
+    pb = TexlibBuilder(); pb.tex_dir = tmpp; pb.base_name = "doc"
+    pb._aux_target = auxp
+    meta = pb._read_pubmeta(tmpp)
+    check("pubmeta: parsed key=value map",
+          bool(meta) and meta.get("course") == "Math 181"
+          and meta.get("term") == "Fall 2026", meta)
+    check("pubmeta: sidecar consumed (deleted) after read",
+          not os.path.exists(os.path.join(auxp, "doc.pubmeta")))
+    check("pubmeta: absent -> None", pb._read_pubmeta(tmpp) is None)
+
+    def _publish_case(base, kind, generic, noun, course, section, term,
+                      settings=None, publish_name=""):
+        d = tempfile.mkdtemp(prefix="texlib_pub_")
+        with open(os.path.join(d, base + ".pdf"), "wb") as fh:
+            fh.write(b"%PDF-1.5 test")
+        with open(os.path.join(d, base + ".pubmeta"), "w", encoding="utf-8") as fh:
+            fh.write(f"kind={kind}\ngeneric={generic}\nnoun={noun}\n"
+                     f"course={course}\nsection={section}\nterm={term}\n"
+                     f"publish-name={publish_name}\n")
+        b = TexlibBuilder(); b.tex_dir = d; b.base_name = base
+        b._aux_target = None
+        if settings is not None:
+            b.builder_settings = settings
+        shortcuts, clips = [], []
+        b._make_desktop_shortcut = lambda label, target: (
+            shortcuts.append((label, os.path.basename(target))) or True)
+        b._copy_to_clipboard = lambda text: clips.append(os.path.basename(text))
+        b._publish_shareable_copies(d, os.path.join(d, base))
+        pdfs = sorted(f for f in os.listdir(d) if f.endswith(".pdf"))
+        return d, pdfs, shortcuts, clips, b._displayed
+
+    # Distinct source/generic names -> both copies + shortcut + clipboard.
+    d, pdfs, shortcuts, clips, disp = _publish_case(
+        "schedule", "schedule", "Tentative Schedule", "Schedule",
+        "Math 181", "1001", "Fall 2026")
+    check("publish: coded + generic copies made (source name distinct)",
+          "Math181.1001_Fall2026.pdf" in pdfs
+          and "Tentative Schedule.pdf" in pdfs and "schedule.pdf" in pdfs, pdfs)
+    check("publish: shortcut label is '<course> <term> <noun>' -> coded copy",
+          shortcuts == [("Math 181 Fall 2026 Schedule",
+                         "Math181.1001_Fall2026.pdf")], shortcuts)
+    check("publish: shareable path put on the clipboard",
+          clips == ["Math181.1001_Fall2026.pdf"], clips)
+    check("publish: sidecar consumed", not os.path.exists(
+        os.path.join(d, "schedule.pubmeta")))
+
+    # Case-only collision (source syllabus.pdf vs generic Syllabus.pdf): the
+    # source must survive and the coded copy must still be made. (On a case-
+    # insensitive volume the generic copy is skipped as the same file; on a
+    # case-sensitive one both exist -- either way these invariants hold.)
+    d, pdfs, shortcuts, clips, disp = _publish_case(
+        "syllabus", "syllabus", "Syllabus", "Syllabus",
+        "Math 181", "1001", "Fall 2026")
+    check("publish: source PDF preserved on case-only generic collision",
+          "syllabus.pdf" in pdfs, pdfs)
+    check("publish: coded copy still made alongside the collision",
+          "Math181.1001_Fall2026.pdf" in pdfs, pdfs)
+    check("publish: no spurious 'could not write' on collision",
+          "could not write" not in disp, disp)
+
+    # Sanity guard: term unset -> no copies, explanatory message.
+    d, pdfs, shortcuts, clips, disp = _publish_case(
+        "doc", "syllabus", "Syllabus", "Syllabus", "Math 181", "1001", "")
+    check("publish: guard skips copies when term is unset",
+          pdfs == ["doc.pdf"] and not shortcuts, pdfs)
+    check("publish: guard explains the skip", "publish skipped" in disp, disp)
+
+    # publish-name override names the coded copy.
+    d, pdfs, shortcuts, clips, disp = _publish_case(
+        "doc", "syllabus", "Syllabus", "Syllabus", "Math 181", "1001",
+        "Fall 2026", publish_name="M181-Syllabus-F26")
+    check("publish: publish-name overrides the coded basename",
+          "M181-Syllabus-F26.pdf" in pdfs, pdfs)
+
+    # Disabled via builder_settings -> sidecar still consumed, no copies made.
+    d, pdfs, shortcuts, clips, disp = _publish_case(
+        "doc", "syllabus", "Syllabus", "Syllabus", "Math 181", "1001",
+        "Fall 2026", settings={"publish_shareable_copies": False})
+    check("publish: disabled -> only source PDF, sidecar still consumed",
+          pdfs == ["doc.pdf"]
+          and not os.path.exists(os.path.join(d, "doc.pubmeta")), pdfs)
+
+    # _setting_on precedence: builder_settings > env > default.
+    so = TexlibBuilder()
+    so.builder_settings = {"k": False}
+    check("setting: builder_settings wins over default",
+          so._setting_on("k", "TEXLIB_UNUSED_ENV", True) is False)
+    so.builder_settings = {}
+    check("setting: default applies when unset and no env",
+          so._setting_on("k", "TEXLIB_UNUSED_ENV_XYZ", True) is True)
+    os.environ["TEXLIB_TESTTOGGLE"] = "off"
+    try:
+        check("setting: env override 'off' -> False",
+              so._setting_on("k", "TEXLIB_TESTTOGGLE", True) is False)
+    finally:
+        os.environ.pop("TEXLIB_TESTTOGGLE", None)
+
+    # _human_size formatting.
+    check("human-size: bytes", TexlibBuilder._human_size(512) == "512 B")
+    check("human-size: KB", TexlibBuilder._human_size(2048) == "2.0 KB")
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL

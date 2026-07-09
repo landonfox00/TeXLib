@@ -9,7 +9,10 @@
 --   * Problem-bank loading via \loadbank, with a sanitized id space.
 --   * Per-version selection, shuffling, and deterministic seeding (set_exam_seed).
 --   * Multi-version emission driven by \versions{A,B,C,...} in the document
---     preamble; the builder loops the engine once per version.  Used by
+--     preamble: one engine invocation loops over every version (and, under
+--     \solutions dual/only, every solutions copy), \input-ing each in turn;
+--     the Sublime builder then slices the resulting combined PDF into one
+--     file per version/copy afterward (see autoexam_run_versions).  Used by
 --     autoexam only — quizzes have no versioning but still benefit from the
 --     randomisation helpers (\setrng, \pick*, \calcvar).
 --   * Per-problem temp-file redirection so SyncTeX/inverse-search lands in the
@@ -180,19 +183,25 @@ end
 -- io.open (and every Lua file call in this engine) is a raw OS call, blind to
 -- LaTeX's own -output-directory routing -- unlike \openout, which kpathsea
 -- redirects automatically, hence .aux/.log landing in the aux dir while this
--- engine's own scratch always landed next to the source. The Sublime builder
--- (and build_versions.py) export TEXLIB_AUX_DIR to match whatever aux
--- directory they resolved (typically %TEMP%\texlib-aux\<hash>), so this
--- scratch can follow .aux there too instead of littering the source folder
--- (and, on a OneDrive-synced course folder, its change feed). Unset/empty
--- (a raw CLI build with no such env var) preserves the original behaviour of
--- writing next to the source.
+-- engine's own scratch always landed next to the source. Two env vars can
+-- redirect it: TEXLIB_AUX_DIR (the Sublime builder / build_versions.py export
+-- it to match whatever aux dir they resolved, typically %TEMP%\texlib-aux\
+-- <hash>) and, failing that, TEXMF_OUTPUT_DIRECTORY (TeX Live sets this itself
+-- whenever the engine runs with -output-directory, so a plain command-line or
+-- agent build that routes .aux away is covered too, without exporting anything
+-- extra). Either way this scratch follows .aux instead of littering the source
+-- folder (and, on a OneDrive-synced course folder, its change feed). Only a
+-- build with NO aux routing at all (both unset) writes next to the source --
+-- the documented CLI-scratch behaviour.
 local function texlib_scratch_path(name)
 	local dir = os.getenv("TEXLIB_AUX_DIR")
+	if not dir or dir == "" then
+		dir = os.getenv("TEXMF_OUTPUT_DIRECTORY")
+	end
 	if dir and dir ~= "" then
 		-- Some of these paths get \input/\@@input'd by TeX (the per-version
 		-- body file, the per-problem SyncTeX-fallback file), where backslash
-		-- is the escape character: a raw Windows path (TEXLIB_AUX_DIR is
+		-- is the escape character: a raw Windows path (these dirs are
 		-- os.path.join'd, so \Users\..\Temp\... on Windows) would tokenise as
 		-- a run of (mostly undefined) control sequences instead of a
 		-- filename. io.open accepts forward slashes on Windows too, so
@@ -242,6 +251,13 @@ pbank_stretch_list = {}   -- full stretch list passed in from pbank_problem_item
 -- reproducible yet versions stay decorrelated). nil => previous behavior.
 exam_seed_override = nil
 
+-- Optional per-version salt set via \setversionseed{ver}{n}. Keyed by version
+-- label; when a version appears here its seed is folded with n, changing ONLY
+-- that version's randomization (selection + \setrng/\calcvar values) while every
+-- other version stays byte-identical. Use it to re-roll one version (e.g. a bad
+-- draw on A) without disturbing the rest. Empty table => previous behavior.
+version_seed_override = {}
+
 function set_exam_seed(ver)
 	local seed_val
 	local pin = tonumber(exam_seed_override)
@@ -257,6 +273,12 @@ function set_exam_seed(ver)
 		seed_val = 5381
 		if pin then
 			seed_val = (seed_val * 33 + (pin % 2147483647)) % 2147483647
+		end
+		-- Per-version salt: folded in for just this version, so setting it on one
+		-- version re-rolls that version alone and leaves the others untouched.
+		local vpin = tonumber(version_seed_override[ver])
+		if vpin then
+			seed_val = (seed_val * 33 + (vpin % 2147483647)) % 2147483647
 		end
 		for i = 1, #ver do
 			seed_val = (seed_val * 33 + string.byte(ver, i)) % 2147483647
