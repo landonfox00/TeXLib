@@ -123,10 +123,22 @@ differ, rebuild byte-identical), not a byte match to the old order.
    version). `texlib_scratch_path` (both copies) gained the tier-3 system-temp
    fallback, so a bare `lualatex doc.tex` leaves zero engine scratch beside the
    source. **DONE.**
-4. Verify: smoke-build every exam/quiz template + the real Math 182 exams;
-   assert the properties + the "only PDFs/.synctex beside the source" check;
-   regen visual refs.
-5. Docs + CHANGELOG.
+4. **Verification.** `smoke_test.py` for Exams/Quizzes/Notes + Exams in all five
+   modes (default/student/key/solutions/rubric) pass; `Sublime/test_texlib_builder.py`
+   137/137; `test_shuffle.lua` 10/10; the real Math 182 `exam1.tex`
+   (MC + FR + `\solutions` × 3 versions) builds clean. Bare-CLI cwd holds only
+   `.aux/.log/.pdf` — zero engine scratch. The exam template uses `\versions`
+   but not `\shuffle`, so its output is byte-identical and the visual refs are
+   unaffected (no regen). **DONE.**
+5. **Docs + CHANGELOG.** This file + a CHANGELOG "Changed" entry; stale engine
+   comments refreshed. **DONE.**
+
+---
+
+**Status: all phases complete** on `feat/shuffle-collect-emit`. Remaining
+follow-up (optional): the `.sco`/`\scorepage` shuffled-order reconciliation
+(emit-side `.sco`), and exercising the deferred edge in an exam that actually
+combines `\shuffle` + `\scorepage` + per-problem-varying points.
 
 ## Risks to watch
 
