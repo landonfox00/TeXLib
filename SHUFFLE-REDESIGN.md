@@ -115,10 +115,14 @@ differ, rebuild byte-identical), not a byte match to the old order.
    emit is the only place that knows the permuted order + page structure); the
    prescan text-parse would otherwise have to re-derive `\section` boundaries,
    which is exactly the parsing this redesign removes.
-3. Delete the now-unused string-parsing shuffle layer (`shuffle_problems_body`
-   et al.; `find_problems_marker`/`find_section_end`/`scan_problem_pts` stay —
-   the `.sco` prescan still uses them); version loop → one body temp;
-   `texlib_scratch_path` 3-tier fallback.
+3. **Cleanup + hardening.** Deleted the dead string-parsing shuffle layer
+   (`scan_depth0_commands`, `split_problems_on_newpage`, `split_section_into_items`,
+   `shuffle_section_body`, `shuffle_one_section`, `shuffle_problems_body` — ~170
+   lines; `find_problems_marker`/`find_section_end`/`scan_problem_pts` stay for
+   the `.sco` prescan). Version loop now writes ONE shared body temp (was one per
+   version). `texlib_scratch_path` (both copies) gained the tier-3 system-temp
+   fallback, so a bare `lualatex doc.tex` leaves zero engine scratch beside the
+   source. **DONE.**
 4. Verify: smoke-build every exam/quiz template + the real Math 182 exams;
    assert the properties + the "only PDFs/.synctex beside the source" check;
    regen visual refs.

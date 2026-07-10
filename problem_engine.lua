@@ -19,8 +19,10 @@
 --     originating bank file at the correct line, instead of the raw \directlua
 --     call site. See the SOURCE TRACKING block below for the mechanism.
 --   * Per-part point and stretch injection (\partpoints, \partstretch).
---   * Page-shuffle (\shufflepages) coordinated with first-on-page detection so
---     problem separators don't appear at the top of a new page.
+--   * Question shuffle (\shuffle): {problems}/{mcproblems} collect their items,
+--     then emit them permuted per version at typeset time (pbank_emit_section +
+--     problem_shuffle.lua), coordinated with first-on-page detection so problem
+--     separators don't appear at the top of a new page.
 --
 -- Loaded by autoexam.cls / quiz.cls via \directlua{dofile(...)}; it is not
 -- meant to be required directly from a document. autoexam.cls additionally
@@ -189,14 +191,35 @@ end
 -- <hash>) and, failing that, TEXMF_OUTPUT_DIRECTORY (TeX Live sets this itself
 -- whenever the engine runs with -output-directory, so a plain command-line or
 -- agent build that routes .aux away is covered too, without exporting anything
--- extra). Either way this scratch follows .aux instead of littering the source
--- folder (and, on a OneDrive-synced course folder, its change feed). Only a
--- build with NO aux routing at all (both unset) writes next to the source --
--- the documented CLI-scratch behaviour.
+-- extra). Failing BOTH, tier 3 routes to a per-document subdir of the system
+-- temp dir, so even a bare `lualatex doc.tex` with no routing flags keeps its
+-- scratch out of the (often OneDrive-synced) course folder -- the user never
+-- sees these files. Only if that temp dir can't be created does it fall back to
+-- writing next to the source.
+local texlib_fallback_dir   -- nil = not resolved; "" = tried and failed; else a path
 local function texlib_scratch_path(name)
 	local dir = os.getenv("TEXLIB_AUX_DIR")
 	if not dir or dir == "" then
 		dir = os.getenv("TEXMF_OUTPUT_DIRECTORY")
+	end
+	if not dir or dir == "" then
+		-- Tier 3: a hashed per-document subdir of the system temp. Hash cwd +
+		-- jobname so two documents that share a jobname (e.g. two `exam1.tex`
+		-- in different folders) don't collide on one scratch dir.
+		if texlib_fallback_dir == nil then
+			local tmp = (os.getenv("TEMP") or os.getenv("TMP")
+				or os.getenv("TMPDIR") or "/tmp"):gsub('\\', '/')
+			local key = (lfs.currentdir() or "") .. "\0" .. (tex.jobname or "job")
+			local h = 5381
+			for i = 1, #key do h = (h * 33 + string.byte(key, i)) % 0x7FFFFFFF end
+			local base = tmp .. "/texlib-scratch"
+			local d = base .. "/" .. string.format("%08x", h)
+			lfs.mkdir(base)   -- best-effort (ignores "already exists")
+			lfs.mkdir(d)
+			texlib_fallback_dir =
+				(lfs.attributes(d, "mode") == "directory") and d or ""
+		end
+		dir = texlib_fallback_dir
 	end
 	if dir and dir ~= "" then
 		-- Some of these paths get \input/\@@input'd by TeX (the per-version
@@ -1589,139 +1612,11 @@ function set_autoexam_versions(str)
 	end
 end
 
--- ============================================================
--- PAGE SHUFFLE (source-text approach)
--- ============================================================
-
--- Split the inner content of \begin{problems}...\end{problems} on
--- \newpage commands that appear at brace-depth 0.
--- Returns a list of non-whitespace-only chunk strings.
--- Shared low-level scanner used by the four order/choice splitters below.
--- Walks `s` skipping TeX % comments and tracking { } brace depth; for every
--- \command at brace depth 0 it calls fn(name, cmd_pos, after_pos), where `name`
--- is the run of letters after the backslash (so \newpage and \newpageX are
--- distinguished by name -- the old per-scanner letter-guards fall out for free),
--- `cmd_pos` is the backslash index, and `after_pos` is the index just past the
--- name. Replaces five hand-rolled copies of this same comment/brace state
--- machine; each splitter now just reacts to the command names it cares about.
-local function scan_depth0_commands(s, fn)
-	local depth, pos, len = 0, 1, #s
-	while pos <= len do
-		local c = s:sub(pos, pos)
-		if c == '{' then depth = depth + 1; pos = pos + 1
-		elseif c == '}' then depth = depth - 1; pos = pos + 1
-		elseif c == '%' then
-			local nl = s:find("\n", pos, true)
-			pos = nl and (nl + 1) or (len + 1)
-		elseif c == '\\' and depth == 0 then
-			local name = s:match("^\\(%a+)", pos)
-			if name then
-				fn(name, pos, pos + 1 + #name)
-				pos = pos + 1 + #name
-			else
-				pos = pos + 1
-			end
-		else
-			pos = pos + 1
-		end
-	end
-end
-
-local function split_problems_on_newpage(inner)
-	-- Collect each top-level \newpage boundary, then slice between them.
-	local bounds = {}
-	scan_depth0_commands(inner, function(name, cmd_pos, after)
-		if name == "newpage" then bounds[#bounds + 1] = { cmd_pos, after } end
-	end)
-	local chunks, start = {}, 1
-	for _, b in ipairs(bounds) do
-		table.insert(chunks, inner:sub(start, b[1] - 1))
-		start = b[2]
-	end
-	table.insert(chunks, inner:sub(start))   -- final chunk
-
-	-- Drop whitespace-only chunks (leading/trailing \newpage artefacts).
-	local result = {}
-	for _, c in ipairs(chunks) do
-		if c:match("%S") then table.insert(result, c) end
-	end
-	return result
-end
-
--- Split a section body into individual problem items at brace-depth 0.
--- An item begins at \problem / \extracredit / \importproblem (depth 0, outside
--- comments) and runs until the next such command or end of body.  Leading
--- non-item text (comments/blank lines before the first item) is dropped — it is
--- decorative inside a section that is about to be reordered.
-local function split_section_into_items(body)
-	local cmds = { problem = true, extracredit = true, importproblem = true }
-	local starts = {}
-	scan_depth0_commands(body, function(name, cmd_pos, after)
-		if cmds[name] then table.insert(starts, cmd_pos) end
-	end)
-	local len = #body
-	local items = {}
-	for i = 1, #starts do
-		local s = starts[i]
-		local e = (i < #starts) and (starts[i + 1] - 1) or len
-		table.insert(items, (body:sub(s, e):gsub("%s+$", "")))
-	end
-	return items
-end
-
--- Shuffle the problem items inside ONE section, preserving the per-page item
--- counts the author chose (the \newpage layout) and pinning any \extracredit to
--- the end so the bonus stays last.  Uses math.random, which the version loop
--- seeds per version before calling.
-local function shuffle_section_body(seg_body)
-	local groups = split_problems_on_newpage(seg_body)
-	if #groups == 0 then return seg_body end
-	local counts, all_items = {}, {}
-	for _, g in ipairs(groups) do
-		local items = split_section_into_items(g)
-		table.insert(counts, #items)
-		for _, it in ipairs(items) do table.insert(all_items, it) end
-	end
-	if #all_items == 0 then return seg_body end   -- nothing shuffleable
-	local movable, pinned = {}, {}
-	for _, it in ipairs(all_items) do
-		-- Frontier %f[%A] requires a non-letter right after \extracredit, so a
-		-- command like \extracreditfoo isn't mistakenly pinned to section end.
-		if it:match("^\\extracredit%f[%A]") then table.insert(pinned, it)
-		else table.insert(movable, it) end
-	end
-	for i = #movable, 2, -1 do                    -- Fisher-Yates
-		local j = math.random(1, i)
-		movable[i], movable[j] = movable[j], movable[i]
-	end
-	local reordered = {}
-	for _, it in ipairs(movable) do table.insert(reordered, it) end
-	for _, it in ipairs(pinned)  do table.insert(reordered, it) end
-	local out, idx = {}, 1
-	for _, n in ipairs(counts) do
-		if n > 0 then
-			local parts = {}
-			for _ = 1, n do
-				if reordered[idx] then table.insert(parts, reordered[idx]); idx = idx + 1 end
-			end
-			table.insert(out, table.concat(parts, "\n"))
-		end
-	end
-	while idx <= #reordered do                    -- safety: append any leftover
-		out[#out] = (out[#out] or "") .. "\n" .. reordered[idx]; idx = idx + 1
-	end
-	return table.concat(out, "\n\\newpage\n")
-end
-
--- Locate \begin{problems}...\end{problems} and shuffle question order PER
--- SECTION.  \section / \section* headers are hard boundaries: they stay in their
--- original order with the header fixed at the top, and items are shuffled only
--- within their own section (per-page counts preserved, \extracredit last).  An
--- exam with no \section headers shuffles as a single section.  Everything
--- outside \begin{problems} is unchanged.
 -- A problem-section environment is either {problems} (free response) or
--- {mcproblems} (multiple choice).  Both are scanned and shuffled the same way;
--- the heading / page-policy differences are entirely TeX-side.
+-- {mcproblems} (multiple choice). The score-sheet prescan (prescan_problems)
+-- locates these blocks in the body text to tally points per question; the
+-- shuffle itself is no longer a body-text pass (see the {problems} collect/emit
+-- path -- pbank_emit_section).
 local PROBLEM_SECTION_ENVS = { problems = true, mcproblems = true }
 
 -- Find the next \begin / \end of a problem-section environment at or after init,
@@ -1776,52 +1671,6 @@ local function find_section_end(body, env, init)
 		end
 	end
 	return nil
-end
-
--- Shuffle the question order WITHIN one problem-section's inner text.  \section /
--- \section* headers are hard boundaries kept in original order with the header
--- pinned at the top; items permute only within their own section, the per-page
--- \newpage counts are preserved, and \extracredit stays last.
-local function shuffle_one_section(inner)
-	local marks = {}
-	scan_depth0_commands(inner, function(name, cmd_pos, after)
-		if name == "section" then table.insert(marks, cmd_pos) end
-	end)
-	if #marks == 0 then
-		return shuffle_section_body(inner)
-	end
-	local pre = inner:sub(1, marks[1] - 1)
-	local secs = {}
-	for mi = 1, #marks do
-		local seg_start = marks[mi]
-		local seg_end   = (mi < #marks) and (marks[mi + 1] - 1) or #inner
-		local seg = inner:sub(seg_start, seg_end)
-		local nl  = seg:find("\n")
-		local header = nl and seg:sub(1, nl - 1) or seg
-		local sbody  = nl and seg:sub(nl + 1) or ""
-		table.insert(secs, header .. "\n" .. shuffle_section_body(sbody))
-	end
-	local body_out = table.concat(secs, "\n\\newpage\n")
-	if pre:match("%S") then body_out = (pre:gsub("%s+$", "")) .. "\n" .. body_out end
-	return body_out
-end
-
--- Shuffle every problem-section block ({problems} and {mcproblems}) in the body,
--- each independently (questions never move across the MC/FR boundary).  Text
--- outside the blocks is copied verbatim.
-local function shuffle_problems_body(body)
-	local out, cursor = {}, 1
-	while true do
-		local bs, be, env = find_problems_marker(body, "begin", cursor)
-		if not bs then table.insert(out, body:sub(cursor)); break end
-		local es, ee = find_section_end(body, env, be + 1)
-		if not es then table.insert(out, body:sub(cursor)); break end
-		table.insert(out, body:sub(cursor, be))          -- up to & incl. \begin marker
-		table.insert(out, "\n" .. shuffle_one_section(body:sub(be + 1, es - 1)) .. "\n")
-		table.insert(out, body:sub(es, ee))              -- the \end marker
-		cursor = ee + 1
-	end
-	return table.concat(out)
 end
 
 -- Multiple-choice option ordering is no longer a source-text pre-pass.  Bank
@@ -2065,32 +1914,32 @@ function autoexam_run_versions()
 		tex.error("AutoExam: Cannot read document body from '" .. tex.jobname .. ".tex'.")
 		return
 	end
-	local tmpbase = tex.jobname .. "_autoexam_body"
-	local ver_tmp = {}   -- ver -> temp file name (written once per version)
-
-	local function ensure_ver(ver)
-		if ver_tmp[ver] then return end
-		-- The body is emitted VERBATIM per version: question order is now
-		-- shuffled at typeset time by the {problems} collect/emit path
-		-- (pbank_emit_section), not by rewriting the source text here. Seed the
-		-- stream so the prescan/emit agree; MC option order is likewise a
-		-- typeset-time concern (resolve_mc_order).
-		local ver_body = body
-		if autoexam_shuffle_pages then set_exam_seed(ver) end
-		-- Prescan and write the .sco NOW so \scorepage finds it on the first pass.
-		-- NOTE: the prescan still reads the UNSHUFFLED body, so a \shuffle exam
-		-- that also uses \scorepage has a score sheet in authored (not shuffled)
-		-- order — the one reconciliation still pending for this branch.
-		write_score_file(ver, prescan_problems(ver_body))
-		local name = texlib_scratch_path(tmpbase .. "_" .. (ver ~= "" and ver or "main") .. ".tex")
-		local f = io.open(name, "w")
+	-- One shared body temp file: the body is emitted VERBATIM for every copy
+	-- (question order is shuffled at typeset time by the {problems} collect/emit
+	-- path, not by rewriting the source), so there is nothing per-version to
+	-- stage -- just this single file, \input once per copy.
+	local body_tmp = texlib_scratch_path(tex.jobname .. "_autoexam_body.tex")
+	do
+		local f = io.open(body_tmp, "w")
 		if not f then
-			tex.error("AutoExam: Cannot write temp body file '" .. name .. "'.")
+			tex.error("AutoExam: Cannot write temp body file '" .. body_tmp .. "'.")
 			return
 		end
-		f:write(ver_body)
+		f:write(body)
 		f:close()
-		ver_tmp[ver] = name
+	end
+
+	-- Per-version score sheet (.sco), seeded per version and written before the
+	-- copy is \input so \scorepage finds it on pass 1. The prescan reads the
+	-- UNSHUFFLED body, so a \shuffle exam that also uses \scorepage shows
+	-- authored order -- harmless when a section's points are uniform (the common
+	-- case); the shuffled-order reconciliation is still pending (see header).
+	local sco_done = {}
+	local function ensure_sco(ver)
+		if sco_done[ver] then return end
+		if autoexam_shuffle_pages then set_exam_seed(ver) end
+		write_score_file(ver, prescan_problems(body))
+		sco_done[ver] = true
 	end
 
 	-- Multi-copy PDF split map (see \AutoExamVmapRecord in autoexam.cls): lets
@@ -2104,7 +1953,7 @@ function autoexam_run_versions()
 	if want_vmap then tex.sprint("\\AutoExamVmapOpen") end
 
 	for i, c in ipairs(copies) do
-		ensure_ver(c.ver)
+		ensure_sco(c.ver)
 		tex.sprint("\\gdef\\theExamVersion{" .. c.ver .. "}")
 		tex.sprint("\\directlua{local _ENV=texlib;set_exam_seed('" .. c.ver .. "')}")  -- re-seed for TeX
 		set_sol(c)
@@ -2112,7 +1961,7 @@ function autoexam_run_versions()
 			tex.sprint("\\AutoExamVmapRecord{" .. c.ver .. "}{" ..
 				(c.sol == true and "sol" or "stu") .. "}")
 		end
-		tex.sprint("\\input{" .. ver_tmp[c.ver] .. "}")
+		tex.sprint("\\input{" .. body_tmp .. "}")
 		if i < #copies then
 			tex.sprint("\\clearpage")
 		end
