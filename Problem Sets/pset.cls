@@ -283,9 +283,11 @@
 %   * default                     → no box at all (body discarded)
 %
 % Implementation: in default mode we redefine `solution` to be a
-% body-discarding environment via the `comment` package, replacing
+% body-discarding environment via `environ`'s \NewEnviron, replacing
 % the tcolorbox version. This keeps the box completely off the page
-% (no spacing artifacts).
+% (no spacing artifacts). environ scans tokens, not lines, so it
+% tolerates a TAB-indented \end{solution} (the `comment` package's
+% \excludecomment is a line scanner that fatally runs to EOF on one).
 % Shares the canonical TeXLib geometry (texlibbase): the green solved-rule and
 % the dashed blank-answer rule are the same width (\texlibrulewidth) and sit in
 % the same margin position as every other TeXLib rule, and match didactic's
@@ -322,15 +324,18 @@
 	}
 }
 
-\RequirePackage{comment}
+\RequirePackage{environ}
 \AtBeginDocument{%
 	\ifsolutions\else
 		\ifkey\else
 			\ifstudent\else
-				% Default mode: discard solution bodies entirely.
+				% Default mode: discard solution bodies entirely. environ's
+				% token capture tolerates a TAB-indented \end{solution}; the old
+				% \excludecomment (comment pkg) ran to EOF on one. The [1][3cm]
+				% signature swallows the optional [height] arg; empty body = discard.
 				\let\solution\@undefined
 				\let\endsolution\@undefined
-				\excludecomment{solution}%
+				\NewEnviron{solution}[1][3cm]{}%
 			\fi
 		\fi
 	\fi
