@@ -94,10 +94,24 @@ differ, rebuild byte-identical), not a byte match to the old order.
 
 1. **Pure permute core + contract tests** — `problem_shuffle.lua`,
    `test_shuffle.lua` (10 checks, passing). **DONE.**
-2. `pbank_collect_item` + `pbank_emit_section`; rewire `{problems}` to
-   collect→permute→emit; handle `\newpage`/`\section`/`\extracredit`; thread
-   `{questions}` numbering.
-3. Delete the string-parsing shuffle layer; version loop → one body temp;
+2. **Collect→permute→emit wiring.** `pbank_collect_item` / `pbank_collect_break`
+   / `pbank_emit_section` in `problem_engine.lua`; `{problems}`/`{mcproblems}`
+   rewired (`\@problem@collect`, `\@xc@collect` for deferred extra-credit,
+   `\PbankPageBreak`/`\PbankEmitItem`); `\question` numbering threaded through
+   the emit. The source-text pre-pass is bypassed (`ensure_ver` inputs the body
+   verbatim). Verified: single-version authored order preserved; multi-version
+   shuffle correct + uniform; student/solutions of a version share one order;
+   `\newpage` per-page grouping held; the real Math 182 `exam1.tex`
+   (MC + FR + `\solutions` × 3 versions) builds clean. Two RNG fixes en route:
+   high-bit extraction (LCG low bits correlated → an item stuck in one slot) and
+   a SplitMix32 seed avalanche (adjacent version seeds collapsed onto the same
+   permutation for small item counts). **DONE.** Remaining for this phase:
+   `\extracredit`-content and `\section`-boundary builds not yet exercised; the
+   `.sco`/`\scorepage` still reflects authored (not shuffled) order — the prescan
+   must apply the same permutation (a `\shuffle`+`\scorepage` reconciliation).
+3. Delete the now-unused string-parsing shuffle layer (`shuffle_problems_body`
+   et al.; `find_problems_marker`/`find_section_end`/`scan_problem_pts` stay —
+   the `.sco` prescan still uses them); version loop → one body temp;
    `texlib_scratch_path` 3-tier fallback.
 4. Verify: smoke-build every exam/quiz template + the real Math 182 exams;
    assert the properties + the "only PDFs/.synctex beside the source" check;

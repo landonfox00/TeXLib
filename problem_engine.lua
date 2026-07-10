@@ -211,6 +211,23 @@ local function texlib_scratch_path(name)
 	return name
 end
 
+-- Pure problem-order permutation (Fisher-Yates + extra-credit-last, driven by a
+-- private MINSTD stream), factored into problem_shuffle.lua so it unit-tests
+-- under plain texlua. Resolved the same way texlib-problembank.sty resolves this
+-- engine: kpse, then next to the .sty, then the cwd.
+local problem_shuffle = (function()
+	local function find(name)
+		local p = kpse.find_file(name, "lua")
+		if p and lfs.attributes(p) then return p end
+		local sty = kpse.find_file("texlib-problembank.sty")
+		local dir = sty and sty:match("(.*[/\\])") or ""
+		p = dir .. name
+		if lfs.attributes(p) then return p end
+		return name
+	end
+	return dofile(find("problem_shuffle.lua"))
+end)()
+
 -- Escape the handful of catcode-active characters that show up in bank ids
 -- and meta values (identifiers commonly use underscores) before printing them
 -- as literal document text -- used wherever an id/query string that did NOT
@@ -288,6 +305,9 @@ function set_exam_seed(ver)
 	-- near-consecutive integers, which seed correlated sequences; this scatters
 	-- consecutive seeds far apart so A/B/C shuffles are independent.
 	seed_val = (seed_val * 2654435761) % 2147483647
+	-- Publish the resolved seed so the typeset-time problem shuffle
+	-- (pbank_emit_section) can drive its own independent MINSTD stream from it.
+	current_exam_seed = seed_val
 	math.randomseed(seed_val)
 	-- Warm up by a seed-dependent count so different versions advance to
 	-- different stream positions before any shuffle draw — desynchronises the
@@ -1402,6 +1422,87 @@ function pbank_problem_item(pts_str, stretch_str, query, fix_str)
 	end
 end
 
+-- ============================================================
+-- TYPESET-TIME SHUFFLE: collect a {problems} section, emit it permuted
+-- ============================================================
+-- Replaces the old source-text pre-pass. The {problems}/{mcproblems} envs
+-- (texlib-problembank.sty) put \problem into "collect" mode: each item records
+-- its (pts, stretch, query, fix) here instead of typesetting now, and each
+-- \newpage marks a page boundary. At \end the section is permuted (per version,
+-- when \shuffle is on) and emitted through pbank_problem_item in the new order,
+-- with page breaks reinserted to preserve the authored per-page counts.
+-- \extracredit items are deferred by TeX to after the section (pinned last), so
+-- every item collected here is a movable bank problem. See problem_shuffle.lua.
+
+pbank_collected = nil       -- nil = not collecting; else { items = {...} }
+pbank_pending_break = false
+
+function pbank_begin_collect()
+	pbank_collected = { items = {} }
+	pbank_pending_break = false
+end
+
+function pbank_collect_item(pts, stretch, query, fix)
+	if not pbank_collected then          -- defensive: no active section
+		return pbank_problem_item(pts, stretch, query, fix)
+	end
+	pbank_collected.items[#pbank_collected.items + 1] = {
+		pts = pts, stretch = stretch, query = query, fix = fix,
+		brk = pbank_pending_break,        -- a \newpage preceded this item
+	}
+	pbank_pending_break = false
+end
+
+function pbank_collect_break()
+	pbank_pending_break = true            -- the next item starts a new page
+end
+
+-- Emit the collected section, permuted by (per-version seed, part number) when
+-- \shuffle is active, else in authored order (so a non-shuffled exam stays
+-- byte-identical to the old inline path). `partno` desynchronises equal-sized
+-- sections so two 4-item parts don't share a permutation.
+function pbank_emit_section(partno)
+	local c = pbank_collected
+	pbank_collected = nil
+	if not c or #c.items == 0 then return end
+
+	-- Authored per-page counts (item.brk marks a new page; the first never does).
+	local page_sizes, cur = {}, 0
+	for i, it in ipairs(c.items) do
+		if i > 1 and it.brk then page_sizes[#page_sizes + 1] = cur; cur = 0 end
+		cur = cur + 1
+	end
+	page_sizes[#page_sizes + 1] = cur
+
+	local order
+	if autoexam_shuffle_pages then
+		local seed = ((current_exam_seed or 0) * 33 + (partno or 0)) % 2147483647
+		order = problem_shuffle.permute(c.items, seed)
+	else
+		order = {}
+		for i = 1, #c.items do order[i] = i end
+	end
+
+	-- Emit each item as a \@problem@item macro call (via the @-free
+	-- \PbankEmitItem wrapper), NOT by calling pbank_problem_item directly in
+	-- this loop: each problem's get_problem stages a SyncTeX redirect + \input
+	-- that TeX must fully process before the next problem is set up, so they
+	-- must be handed back to TeX one token-list at a time. Page breaks
+	-- (\PbankPageBreak) reinsert the authored per-page grouping.
+	local pageidx, on_page = 1, 0
+	for _, idx in ipairs(order) do
+		if on_page == page_sizes[pageidx] then
+			tex.sprint("\\PbankPageBreak")
+			pageidx = pageidx + 1
+			on_page = 0
+		end
+		local it = c.items[idx]
+		tex.sprint("\\PbankEmitItem{" .. it.pts .. "}{" .. it.stretch ..
+			"}{" .. it.query .. "}{" .. it.fix .. "}")
+		on_page = on_page + 1
+	end
+end
+
 -- Backward-compat wrappers (pbank_stretch_list already {} after reset)
 function use_problem(id)   pbank_stretch_list = {}; get_problem(id) end
 function random_problem(f) pbank_stretch_list = {}; get_problem(f)  end
@@ -1939,14 +2040,17 @@ function autoexam_run_versions()
 
 	local function ensure_ver(ver)
 		if ver_tmp[ver] then return end
+		-- The body is emitted VERBATIM per version: question order is now
+		-- shuffled at typeset time by the {problems} collect/emit path
+		-- (pbank_emit_section), not by rewriting the source text here. Seed the
+		-- stream so the prescan/emit agree; MC option order is likewise a
+		-- typeset-time concern (resolve_mc_order).
 		local ver_body = body
-		if autoexam_shuffle_pages then
-			set_exam_seed(ver)
-			ver_body = shuffle_problems_body(body)
-			-- (Per-version MC option ordering is done at typeset time in the
-			-- engine — see resolve_mc_order — not as a body-text pre-pass.)
-		end
+		if autoexam_shuffle_pages then set_exam_seed(ver) end
 		-- Prescan and write the .sco NOW so \scorepage finds it on the first pass.
+		-- NOTE: the prescan still reads the UNSHUFFLED body, so a \shuffle exam
+		-- that also uses \scorepage has a score sheet in authored (not shuffled)
+		-- order — the one reconciliation still pending for this branch.
 		write_score_file(ver, prescan_problems(ver_body))
 		local name = texlib_scratch_path(tmpbase .. "_" .. (ver ~= "" and ver or "main") .. ".tex")
 		local f = io.open(name, "w")
