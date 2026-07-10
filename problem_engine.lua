@@ -1498,11 +1498,23 @@ end
 -- non-shuffled exam matches the old inline path), reinserting the authored
 -- per-page breaks. The seed folds in the part number and the sub-run index so
 -- equal-sized runs don't share a permutation.
-function pbank_emit_section(partno)
+pbank_emit_partno = 0   -- section index within the CURRENT copy; the version
+                        -- loop resets it to 0 before each copy's body \input
+
+function pbank_emit_section(partno)   -- `partno` arg unused; see pbank_emit_partno
 	local c = pbank_collected
 	pbank_collected = nil
 	if not c then return end
 
+	-- Section index WITHIN THIS COPY, NOT \arabic{texlibpartno}: texlibpartno
+	-- accumulates across a version's student + solutions copies (it doesn't
+	-- reset per copy), so the two copies would seed differently and shuffle
+	-- differently -- but the answer key MUST match the student exam. This Lua
+	-- counter is reset to 0 per copy by autoexam_run_versions, so equal sections
+	-- of the two copies share one order while distinct sections (MC vs FR) still
+	-- desynchronise.
+	pbank_emit_partno = (pbank_emit_partno or 0) + 1
+	local sect = pbank_emit_partno
 	local run, subno = {}, 0
 	local function flush()
 		if #run == 0 then return end
@@ -1517,7 +1529,7 @@ function pbank_emit_section(partno)
 
 		local order
 		if autoexam_shuffle_pages then
-			local seed = ((current_exam_seed or 0) * 33 + (partno or 0) * 97 + subno)
+			local seed = ((current_exam_seed or 0) * 33 + sect * 97 + subno)
 				% 2147483647
 			order = problem_shuffle.permute(run, seed)
 		else
@@ -1961,6 +1973,9 @@ function autoexam_run_versions()
 			tex.sprint("\\AutoExamVmapRecord{" .. c.ver .. "}{" ..
 				(c.sol == true and "sol" or "stu") .. "}")
 		end
+		-- Reset the per-copy section counter so this copy's sections shuffle the
+		-- same as any other copy of the same version (e.g. student vs solutions).
+		tex.sprint("\\directlua{local _ENV=texlib;pbank_emit_partno=0}")
 		tex.sprint("\\input{" .. body_tmp .. "}")
 		if i < #copies then
 			tex.sprint("\\clearpage")
