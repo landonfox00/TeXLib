@@ -105,10 +105,16 @@ differ, rebuild byte-identical), not a byte match to the old order.
    (MC + FR + `\solutions` × 3 versions) builds clean. Two RNG fixes en route:
    high-bit extraction (LCG low bits correlated → an item stuck in one slot) and
    a SplitMix32 seed avalanche (adjacent version seeds collapsed onto the same
-   permutation for small item counts). **DONE.** Remaining for this phase:
-   `\extracredit`-content and `\section`-boundary builds not yet exercised; the
-   `.sco`/`\scorepage` still reflects authored (not shuffled) order — the prescan
-   must apply the same permutation (a `\shuffle`+`\scorepage` reconciliation).
+   permutation for small item counts). `\extracredit` (deferred, pinned last)
+   and `\section` boundaries (a `{problems}` block splits into independently
+   permuted runs, headings emitted between them) build correctly. **DONE.**
+   Deferred edge case: the `.sco`/`\scorepage` instructor grid still reflects
+   authored (not shuffled) order — only wrong when `\shuffle` + `\scorepage` +
+   *per-problem-varying* points coincide (uniform-point sections, the common
+   case, are already correct). The clean fix is emit-side `.sco` writing (the
+   emit is the only place that knows the permuted order + page structure); the
+   prescan text-parse would otherwise have to re-derive `\section` boundaries,
+   which is exactly the parsing this redesign removes.
 3. Delete the now-unused string-parsing shuffle layer (`shuffle_problems_body`
    et al.; `find_problems_marker`/`find_section_end`/`scan_problem_pts` stay —
    the `.sco` prescan still uses them); version loop → one body temp;

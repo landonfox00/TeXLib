@@ -1434,11 +1434,16 @@ end
 -- \extracredit items are deferred by TeX to after the section (pinned last), so
 -- every item collected here is a movable bank problem. See problem_shuffle.lua.
 
-pbank_collected = nil       -- nil = not collecting; else { items = {...} }
+-- The collected section is an ordered EVENT stream, not a flat item list, so a
+-- \section inside {problems} can act as a hard shuffle boundary: items before
+-- and after it permute independently, with the heading emitted between the runs.
+--   event = { t = "item", pts, stretch, query, fix, brk }   -- brk: \newpage before
+--         | { t = "sec",  n }                                -- heading in \pbank@sec@<n>
+pbank_collected = nil       -- nil = not collecting; else { events = {...} }
 pbank_pending_break = false
 
 function pbank_begin_collect()
-	pbank_collected = { items = {} }
+	pbank_collected = { events = {} }
 	pbank_pending_break = false
 end
 
@@ -1446,8 +1451,8 @@ function pbank_collect_item(pts, stretch, query, fix)
 	if not pbank_collected then          -- defensive: no active section
 		return pbank_problem_item(pts, stretch, query, fix)
 	end
-	pbank_collected.items[#pbank_collected.items + 1] = {
-		pts = pts, stretch = stretch, query = query, fix = fix,
+	pbank_collected.events[#pbank_collected.events + 1] = {
+		t = "item", pts = pts, stretch = stretch, query = query, fix = fix,
 		brk = pbank_pending_break,        -- a \newpage preceded this item
 	}
 	pbank_pending_break = false
@@ -1457,50 +1462,75 @@ function pbank_collect_break()
 	pbank_pending_break = true            -- the next item starts a new page
 end
 
--- Emit the collected section, permuted by (per-version seed, part number) when
--- \shuffle is active, else in authored order (so a non-shuffled exam stays
--- byte-identical to the old inline path). `partno` desynchronises equal-sized
--- sections so two 4-item parts don't share a permutation.
+-- A \section inside {problems}: a hard boundary. Its heading is captured
+-- TeX-side as \pbank@sec@<n>; here we just record the boundary in order.
+function pbank_collect_section(n)
+	if not pbank_collected then return end
+	pbank_collected.events[#pbank_collected.events + 1] = { t = "sec", n = n }
+	pbank_pending_break = false           -- a heading starts a fresh run
+end
+
+-- Emit the collected section: permute each run of items between \section
+-- boundaries independently (under \shuffle; authored order otherwise, so a
+-- non-shuffled exam matches the old inline path), reinserting the authored
+-- per-page breaks. The seed folds in the part number and the sub-run index so
+-- equal-sized runs don't share a permutation.
 function pbank_emit_section(partno)
 	local c = pbank_collected
 	pbank_collected = nil
-	if not c or #c.items == 0 then return end
+	if not c then return end
 
-	-- Authored per-page counts (item.brk marks a new page; the first never does).
-	local page_sizes, cur = {}, 0
-	for i, it in ipairs(c.items) do
-		if i > 1 and it.brk then page_sizes[#page_sizes + 1] = cur; cur = 0 end
-		cur = cur + 1
-	end
-	page_sizes[#page_sizes + 1] = cur
-
-	local order
-	if autoexam_shuffle_pages then
-		local seed = ((current_exam_seed or 0) * 33 + (partno or 0)) % 2147483647
-		order = problem_shuffle.permute(c.items, seed)
-	else
-		order = {}
-		for i = 1, #c.items do order[i] = i end
-	end
-
-	-- Emit each item as a \@problem@item macro call (via the @-free
-	-- \PbankEmitItem wrapper), NOT by calling pbank_problem_item directly in
-	-- this loop: each problem's get_problem stages a SyncTeX redirect + \input
-	-- that TeX must fully process before the next problem is set up, so they
-	-- must be handed back to TeX one token-list at a time. Page breaks
-	-- (\PbankPageBreak) reinsert the authored per-page grouping.
-	local pageidx, on_page = 1, 0
-	for _, idx in ipairs(order) do
-		if on_page == page_sizes[pageidx] then
-			tex.sprint("\\PbankPageBreak")
-			pageidx = pageidx + 1
-			on_page = 0
+	local run, subno = {}, 0
+	local function flush()
+		if #run == 0 then return end
+		subno = subno + 1
+		-- Authored per-page counts (item.brk marks a new page; first never does).
+		local page_sizes, cur = {}, 0
+		for i, it in ipairs(run) do
+			if i > 1 and it.brk then page_sizes[#page_sizes + 1] = cur; cur = 0 end
+			cur = cur + 1
 		end
-		local it = c.items[idx]
-		tex.sprint("\\PbankEmitItem{" .. it.pts .. "}{" .. it.stretch ..
-			"}{" .. it.query .. "}{" .. it.fix .. "}")
-		on_page = on_page + 1
+		page_sizes[#page_sizes + 1] = cur
+
+		local order
+		if autoexam_shuffle_pages then
+			local seed = ((current_exam_seed or 0) * 33 + (partno or 0) * 97 + subno)
+				% 2147483647
+			order = problem_shuffle.permute(run, seed)
+		else
+			order = {}
+			for i = 1, #run do order[i] = i end
+		end
+
+		-- Emit each item as a \@problem@item macro call (via the @-free
+		-- \PbankEmitItem wrapper), NOT by calling pbank_problem_item directly:
+		-- each problem's get_problem stages a SyncTeX redirect + \input that TeX
+		-- must fully process before the next is set up, so they must be handed
+		-- back one token-list at a time. \PbankPageBreak reinserts the grouping.
+		local pageidx, on_page = 1, 0
+		for _, idx in ipairs(order) do
+			if on_page == page_sizes[pageidx] then
+				tex.sprint("\\PbankPageBreak")
+				pageidx = pageidx + 1
+				on_page = 0
+			end
+			local it = run[idx]
+			tex.sprint("\\PbankEmitItem{" .. it.pts .. "}{" .. it.stretch ..
+				"}{" .. it.query .. "}{" .. it.fix .. "}")
+			on_page = on_page + 1
+		end
+		run = {}
 	end
+
+	for _, ev in ipairs(c.events) do
+		if ev.t == "item" then
+			run[#run + 1] = ev
+		else   -- section boundary: flush the run so far, then emit its heading
+			flush()
+			tex.sprint("\\csname pbank@sec@" .. ev.n .. "\\endcsname")
+		end
+	end
+	flush()
 end
 
 -- Backward-compat wrappers (pbank_stretch_list already {} after reset)

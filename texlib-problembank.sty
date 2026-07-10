@@ -349,6 +349,19 @@
 % \@problem@item's [pts][stretch]{filter}[fix] so TeX typesets each problem
 % (and processes its SyncTeX redirect + \input) before the next is emitted.
 \newcommand{\PbankEmitItem}[4]{\@problem@item[#1][#2]{#3}[#4]}
+% A \section inside {problems} is a hard shuffle boundary (items before/after it
+% permute independently). Collect mode captures each heading into \pbank@sec@<n>
+% and records the boundary; pbank_emit_section replays the heading between runs.
+\newcounter{pbank@seccnt}
+\NewDocumentCommand{\@sec@collect}{s o m}{%
+	\stepcounter{pbank@seccnt}%
+	\IfBooleanTF{#1}
+		{\expandafter\gdef\csname pbank@sec@\arabic{pbank@seccnt}\endcsname{\@saved@section*{#3}}}%
+		{\IfValueTF{#2}
+			{\expandafter\gdef\csname pbank@sec@\arabic{pbank@seccnt}\endcsname{\@saved@section[#2]{#3}}}%
+			{\expandafter\gdef\csname pbank@sec@\arabic{pbank@seccnt}\endcsname{\@saved@section{#3}}}}%
+	\pbank@lua{pbank_collect_section(\arabic{pbank@seccnt})}%
+}
 
 % \loadbank{path}  — explicitly load a problem bank file.
 %
@@ -540,6 +553,9 @@
 	\let\problem\@problem@collect
 	\let\@saved@xc\extracredit
 	\let\extracredit\@xc@collect
+	\let\@saved@section\section
+	\let\section\@sec@collect
+	\setcounter{pbank@seccnt}{0}%
 	\gdef\pbank@xc@deferred{}%
 	\renewcommand{\newpage}{\pbank@lua{pbank_collect_break()}}%
 	\pbank@lua{pbank_begin_collect()}%
@@ -563,6 +579,7 @@
 	% Capture the running question count AFTER the emit added its \question items.
 	\setcounter{@texlib@qcarry}{\value{question}}%
 	\let\extracredit\@saved@xc
+	\let\section\@saved@section
 	\let\problem\@saved@problem
 	\end{questions}%
 	\problems@end@hook
