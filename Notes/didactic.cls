@@ -290,31 +290,66 @@
 % ==============================================================================
 % Behaviour:
 %   - \ifsolutions (set by 'solutions = true' or 'instructor = true'):
-%       thin green left rule + 2% tint + inline "Solution." label
+%       thin green left rule + 2% tint + bold "Solution." header
 %   - otherwise (default, 'solutions = false', or 'student = true'):
-%       dashed thin grey left rule outlining a fixed-height blank box
+%       dashed thin grey left rule around a blank answer box of height [#1]
+% Both boxes are breakable, so a tall box splits to fill a page bottom and
+% continues on the next page rather than jumping whole and leaving a gap. The
+% blank box gets its height from breakable filler lines (\@sol@blankfill), not
+% a fixed tcolorbox height, precisely so it CAN split; the student build
+% discards the real solution body rather than hiding it, so no answer ships.
 % Shares the canonical TeXLib geometry (texlibbase: same rule width via
 % \texlibrulewidth, same margin bleed/position as the theorem boxes). The
 % green solved-rule and the dashed blank-answer rule are the same width and
 % sit in the same place as every other TeXLib rule.
-\NewTColorBox{solution}{ O{3cm} }{
+% Two inner boxes: the shown (green) solution and the blank (dashed) answer
+% space. Both inherit texlibbase, so both are breakable.
+\NewTColorBox{@sol@shown}{}{
 	texlibbase,
-	code={
-		\ifsolutions
-			\tcbset{
-				colback=green!3!white,
-				borderline west={\texlibrulewidth}{0pt}{green!50!black},
-				before upper={\textbf{Solution.}\par\smallskip},
-			}
-		\else
-			\tcbset{
-				height=#1,
-				upperbox=invisible,
-				colback=white,
-				borderline west={\texlibrulewidth}{0pt}{black!40, dash pattern=on 3pt off 2pt},
-			}
-		\fi
-	}
+	colback=green!3!white,
+	borderline west={\texlibrulewidth}{0pt}{green!50!black},
+	before upper={\textbf{Solution.}\par\smallskip},
+}
+\NewTColorBox{@sol@blank}{}{
+	texlibbase,
+	colback=white,
+	borderline west={\texlibrulewidth}{0pt}{black!40, dash pattern=on 3pt off 2pt},
+}
+% Reserve #1 of blank writing space as one zero-width strut per line with a
+% \par (a legal page-break point) between each. Two properties matter together:
+% the \par breakpoints let the enclosing breakable box SPLIT to fill a page
+% bottom and continue on the next (a fixed tcolorbox `height`, or one tall
+% \rule, is a single rigid block with no interior breakpoint and just jumps);
+% and the height comes from STRUTS (real boxes), not interline glue -- glue is
+% discarded at a page break, so a glue-based filler's carried-over portion
+% collapses to nothing on the next page. \raggedright suppresses the underfull
+% warning each zero-width line would otherwise raise.
+\newcommand{\@sol@blankfill}[1]{%
+	\par\raggedright
+	\setlength{\@tempdima}{#1}%
+	\@whiledim\@tempdima>\baselineskip\do{%
+		\rule{\z@}{\baselineskip}\par
+		\addtolength{\@tempdima}{-\baselineskip}%
+	}%
+	\rule{\z@}{\@tempdima}\par
+}
+% \ifsolutions: show the solution in the green box. Otherwise: capture and
+% DISCARD the real body (so a student build never ships the answer, even
+% invisibly) and emit a dashed breakable blank box of height #1 to write in.
+\NewDocumentEnvironment{solution}{ O{3cm} }
+{%
+	\ifsolutions
+		\begin{@sol@shown}%
+	\else
+		\setbox\z@\vbox\bgroup
+	\fi
+}{%
+	\ifsolutions
+		\end{@sol@shown}%
+	\else
+		\egroup
+		\begin{@sol@blank}\@sol@blankfill{#1}\end{@sol@blank}%
+	\fi
 }
 
 % \answer  --  inline answer prefix for use inside the question env (always visible)
