@@ -772,7 +772,7 @@ def scenario_schedule_boxgrid_builder():
     on a calendar cell must resolve to the SOURCE .tex at the directive's line
     -- real per-cell inverse search, the outcome the xltabular path cannot
     reach. This is the assertion scenarios 4/5 would love to make but can't."""
-    print("\n=== Scenario 6: schedule BOX-GRID via builder (real per-cell) ===")
+    print("\n=== Scenario 9: schedule BOX-GRID via builder (real per-cell) ===")
     tmp = tempfile.mkdtemp(prefix="texlib_synctex_it_boxgrid_")
     try:
         _stage_schedule_engine(tmp)
@@ -821,7 +821,7 @@ def scenario_schedule_boxgrid_plain_cli():
     whose content is that cell -- a genuinely useful fallback, unlike xltabular's
     collapse-to-last-line. We assert the two cells resolve to DIFFERENT grid
     lines (the collapse signature is both landing on the same line)."""
-    print("\n=== Scenario 7: schedule BOX-GRID, plain CLI (per-cell grid lines) ===")
+    print("\n=== Scenario 10: schedule BOX-GRID, plain CLI (per-cell grid lines) ===")
     tmp = tempfile.mkdtemp(prefix="texlib_synctex_it_boxgrid_cli_")
     try:
         _stage_schedule_engine(tmp)
