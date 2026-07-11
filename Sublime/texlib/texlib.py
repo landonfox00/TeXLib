@@ -99,10 +99,13 @@ def _raw_engine(src):
 
 
 # --- Output panel ------------------------------------------------------------
-def _panel(window):
+def _panel(window, base_dir):
     panel = window.create_output_panel("texlib")
     s = panel.settings()
     s.set("result_file_regex", RESULT_FILE_REGEX)
+    # The engine emits relative paths (./exam-01.tex:14:) under -file-line-error;
+    # without a base dir Sublime can't resolve them, so clicking wouldn't jump.
+    s.set("result_base_dir", base_dir)
     s.set("word_wrap", False)
     s.set("line_numbers", False)
     s.set("scroll_past_end", False)
@@ -199,7 +202,7 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         engine = _raw_engine(src)
         tex_dir = os.path.dirname(root)
 
-        panel = _panel(self.window)
+        panel = _panel(self.window, tex_dir)
 
         def emit(text):
             sublime.set_timeout(lambda t=text: _echo(panel, t), 0)
