@@ -196,9 +196,10 @@ def _drive_finish(script_lines):
             options=["--texlib-mode=default"], display=lambda t: None,
             aux_directory="<<root>>")
 
-        def on_finish(state, errs):
+        def on_finish(state, errs, warns):
             captured["state"] = state
             captured["errs"] = errs
+            captured["warns"] = warns
 
         texlib.TexlibBuildCommand()._drive(
             host, tmp, lambda t: None, threading.Event(), "",
@@ -218,6 +219,20 @@ ok &= check(r["state"] == "ok" and r["errs"] == [],
 r = _drive_finish(["/tmp/aux/doc.aux:12: Undefined control sequence.\n"])
 ok &= check(r["state"] == "error", "classify: an .aux error still marks failure")
 ok &= check(r["errs"] == [], "classify: .aux errors excluded from the summary")
+
+r = _drive_finish(["LaTeX Warning: Reference `x' undefined on input line 5.\n",
+                   "Output written on doc.pdf\n"])
+ok &= check(r["state"] == "ok", "classify: warnings alone do NOT fail the build")
+ok &= check(len(r["warns"]) == 1, "classify: the warning is collected")
+
+# 6. _build_report: counts in the header, errors + warnings, unprefixed file:line.
+report = texlib._build_report(
+    "doc", ["./doc.tex:14: Undefined control sequence."],
+    ["LaTeX Warning: Reference `x' undefined on input line 5."])
+ok &= check("1 error(s), 1 warning(s)" in report, "report: header counts")
+ok &= check("\n./doc.tex:14: Undefined control sequence.\n" in report,
+            "report: error line kept unprefixed (stays clickable)")
+ok &= check("full log" in report, "report: full-log pointer present")
 
 print("\nALL PASS" if ok else "\nFAILURES ABOVE")
 sys.exit(0 if ok else 1)

@@ -59,6 +59,31 @@ RESULT_RE = re.compile(RESULT_FILE_REGEX)
 # A build failed if it emits a file:line error OR one of these fatal markers
 # (which may lack a line number).
 FATAL_RE = re.compile(r"^!\s|! LaTeX Error|Emergency stop|Fatal error")
+# LaTeX / package warnings, for the condensed report (over/underfull boxes are
+# deliberately excluded -- too noisy to be useful).
+WARNING_RE = re.compile(r"\bWarning:")
+MAX_WARNINGS = 30
+
+# Syntax that colors the panel (errors red, warnings, headers). Resource path;
+# best-effort -- a missing/renamed package just leaves the panel uncolored.
+BUILD_SYNTAX = "Packages/TeXLib/TeXLib Build Output.sublime-syntax"
+
+
+def _build_report(base, errors, warnings):
+    """The condensed failure report written to the panel: a header with counts,
+    the clickable file:line errors, then warnings (capped), then a full-log
+    pointer. Kept file:line lines unprefixed so result_file_regex still matches."""
+    out = ["", "==== TeXLib: %s -- %d error(s), %d warning(s) ===="
+           % (base, len(errors), len(warnings)), ""]
+    out.extend(errors)
+    shown = warnings[:MAX_WARNINGS]
+    if shown:
+        out.append("")
+        out.extend(shown)
+        if len(warnings) > MAX_WARNINGS:
+            out.append("... (%d more)" % (len(warnings) - MAX_WARNINGS))
+    out += ["", "(full log: run  TeXLib: Reveal Aux Directory)"]
+    return "\n".join(out) + "\n"
 
 PROGRAM_RE = re.compile(r"(?im)^%\s*!\s*T[Ee]X\s+program\s*=\s*(\S+)")
 ROOT_RE = re.compile(r"(?im)^%\s*!\s*T[Ee]X\s+root\s*=\s*(.+?)\s*$")
@@ -116,6 +141,10 @@ def _panel(window, base_dir):
     s.set("word_wrap", False)
     s.set("line_numbers", False)
     s.set("scroll_past_end", False)
+    try:
+        panel.assign_syntax(BUILD_SYNTAX)
+    except Exception:  # noqa: BLE001 - coloring is best-effort
+        pass
     return panel
 
 
@@ -222,14 +251,20 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         window = self.window
         base = os.path.basename(root)
 
-        def emit(text):
-            sublime.set_timeout(lambda t=text: _echo(panel, t), 0)
-
         settings = sublime.load_settings("TeXLib.sublime-settings")
-        # Panel visibility, LaTeXTools-style: 'errors' (default) surfaces the
-        # panel only on failure; 'always' streams it live; 'never' keeps it hidden.
+        # Panel visibility, LaTeXTools-style: 'errors' (default) surfaces the panel
+        # only on failure, as a condensed report; 'always' streams the raw log
+        # live; 'never' keeps it hidden (status bar only).
         show_mode = (settings.get("show_panel_on_build") or "errors").lower()
-        if show_mode == "always":
+        show_raw = show_mode == "always"
+
+        def emit(text):
+            # Only stream to the panel in 'always' mode; 'errors'/'never' collect
+            # quietly and write a condensed report at the end (see on_finish).
+            if show_raw:
+                sublime.set_timeout(lambda t=text: _echo(panel, t), 0)
+
+        if show_raw:
             sublime.set_timeout(lambda: _show_panel(window), 0)
         view.set_status("texlib_build", "TeXLib: building %s..." % base)
 
@@ -259,7 +294,7 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             # Post-build PDF open + forward sync (Tier C).
             sublime.set_timeout(lambda: _post_build_view(window), 0)
 
-        def on_finish(state, error_lines):
+        def on_finish(state, error_lines, warning_lines):
             # Runs in the worker; marshal all UI changes to the main thread.
             def apply():
                 if state == "cancelled":
@@ -269,12 +304,10 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                         "texlib_build", "TeXLib: build failed -- %d error(s)"
                         % (len(error_lines) or 1))
                     if show_mode != "never":
-                        if error_lines:
-                            _echo(panel, "\n---- TeXLib: %d error(s) "
-                                  "(double-click / F4 to jump) ----\n"
-                                  % len(error_lines))
-                            for line in error_lines:
-                                _echo(panel, line + "\n")
+                        # Condensed, colored report. In 'errors' mode the panel
+                        # was otherwise empty; in 'always' this appends after the
+                        # streamed raw log.
+                        _echo(panel, _build_report(base, error_lines, warning_lines))
                         _show_panel(window)
                 else:  # ok
                     view.set_status("texlib_build", "TeXLib: built %s" % base)
@@ -306,6 +339,7 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         inside commands(), so reaching StopIteration means the build is done."""
         gen = host.commands()
         error_lines = []
+        warning_lines = []
         fatal = [False]
 
         def collect(line):
@@ -319,6 +353,8 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                     error_lines.append(s)
             elif FATAL_RE.search(s):
                 fatal[0] = True
+            elif WARNING_RE.search(s) and len(warning_lines) < 500:
+                warning_lines.append(s)
 
         state = "error"
         try:
@@ -344,7 +380,7 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             if os.path.exists(os.path.join(tex_dir, host.base_name + ".pdf")):
                 on_success()
         if on_finish:
-            on_finish(state, error_lines)
+            on_finish(state, error_lines, warning_lines)
 
 
 class TexlibCancelBuildCommand(sublime_plugin.WindowCommand):

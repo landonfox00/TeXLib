@@ -1,0 +1,28 @@
+%YAML 1.2
+---
+# Coloring for the TeXLib build panel. Uses standard scopes (invalid.illegal,
+# constant.numeric, entity.name.class, comment) so it colors on any theme.
+name: TeXLib Build Output
+scope: text.texlib-build
+hidden: true
+
+contexts:
+  main:
+    # Report header + separators: ==== ... ====  /  ---- ... ----
+    - match: '^(?:====|----).*$'
+      scope: comment.line.texlib-build
+
+    # Error lines: file:line: message  (also clickable via result_file_regex).
+    - match: '^((?:.:)?[^:]+)(:)(\d+)(:)(.*)$'
+      captures:
+        1: entity.name.class.texlib-build
+        3: constant.numeric.texlib-build
+        5: invalid.illegal.texlib-build
+
+    # Warnings.
+    - match: '^.*\bWarning:.*$'
+      scope: markup.warning.texlib-build
+
+    # The full-log pointer.
+    - match: '^\(full log.*$'
+      scope: comment.line.texlib-build
