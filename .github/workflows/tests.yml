@@ -21,15 +21,20 @@ jobs:
         run: python Sublime/test_texlib_builder.py
 
   # Real end-to-end: drives the actual builder coroutines against a genuine
-  # toolchain. Two proofs run here:
+  # toolchain. Three proofs run here:
   #   * test_biber_integration.py    -- pdflatex + biber on a biblatex fixture,
   #     proving the biber-skip cache and rerun handling.
+  #   * test_shuffle_integration.py -- drives a real lualatex build of a
+  #     3-version exam and reads the PDF back to assert the autoexam shuffle
+  #     GUARANTEES at the rendered-PDF level (same set per version, points
+  #     travel, extra credit last, sections unmixed, student order == solutions
+  #     order). Needs poppler's pdftotext (-bbox) + pdftoppm.
   #   * test_synctex_integration.py -- drives a real lualatex build then asks
   #     TeX Live's own `synctex edit` CLI to resolve a PDF-space point back to
   #     a source file + line, exactly what SumatraPDF does before an inverse
   #     search jump. Needs poppler's pdftotext (-bbox support -- NOT any
   #     xpdf-flavored build) in addition to the toolchain the other two use.
-  # Both soft-skip if their tools are missing, so a toolchain hiccup
+  # All soft-skip if their tools are missing, so a toolchain hiccup
   # degrades gracefully rather than failing the job.
   #
   # Runs in the SAME pinned full-scheme TeX Live container as smoke.yml /
@@ -50,4 +55,5 @@ jobs:
             pip install --break-system-packages --quiet pypdf \
               || pip install --quiet pypdf
             python3 Sublime/test_biber_integration.py
+            python3 Sublime/test_shuffle_integration.py
             python3 Sublime/test_synctex_integration.py
