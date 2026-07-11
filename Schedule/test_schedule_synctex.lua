@@ -95,10 +95,11 @@ check("grid file was written", grid ~= nil, grid_path)
 check("schedmap was written", mapl ~= nil, map_path)
 
 if grid and mapl then
-	-- render_grid emits, per page-group: \begin{xltabular} / header+\endhead /
-	-- (empty) \endlastfoot, then for EACH week a \raisebox week-label line, one
-	-- line per active day-cell, and a `\tabularnewline \hline` terminator;
-	-- finally \end{xltabular}.  One cell per line is what gives SyncTeX its
+	-- render_grid emits, per page-group: \begin{longtblr}{...} / a header row
+	-- ending `\\ \hline` (rowhead=1 repeats it per page), then for EACH week a
+	-- \raisebox week-label line, one line per active day-cell, and a bare `\\`
+	-- row terminator (longtblr's hlines draws the rules, so no per-row \hline);
+	-- finally \end{longtblr}.  One cell per line is what gives SyncTeX its
 	-- per-cell precision, so grid_line is NOT the week number — we locate each
 	-- week by its label line.
 
@@ -115,20 +116,21 @@ if grid and mapl then
 	end
 	check("grid has one label row per week (18)", nweeks == 18, "#weeks=" .. nweeks)
 
-	-- 2) Every week row ends with `\tabularnewline \hline` (the cleaned-up
-	--    bottom rule: empty \endlastfoot, no special bare last row), and the
-	--    table closes with \end{xltabular}.
+	-- 2) Every week row ends with a bare `\\` terminator (longtblr's hlines
+	--    draws the rules, so there is no per-row \hline), the header row carries
+	--    the `\\ \hline` double-rule separator, and the table closes with
+	--    \end{longtblr}.
 	local nterm = 0
 	for _, row in ipairs(grid) do
-		if row:find("^\\tabularnewline%s+\\hline%s*$") then nterm = nterm + 1 end
+		if row == "\\\\" then nterm = nterm + 1 end
 	end
-	local has_empty_lastfoot = false
+	local has_header_rule = false
 	for _, row in ipairs(grid) do
-		if row:find("^\\endlastfoot%s*$") then has_empty_lastfoot = true end
+		if row:find("\\\\%s+\\hline%s*$") then has_header_rule = true end
 	end
-	check("every week row ends with \\tabularnewline \\hline (18)", nterm == 18, "#term=" .. nterm)
-	check("empty \\endlastfoot + \\end{xltabular} close the table",
-		has_empty_lastfoot and grid[#grid]:find("\\end{xltabular}") ~= nil)
+	check("every week row ends with the \\\\ terminator (18)", nterm == 18, "#term=" .. nterm)
+	check("header double-rule + \\end{longtblr} close the table",
+		has_header_rule and grid[#grid]:find("\\end{longtblr}") ~= nil)
 
 	-- 3) Parse the schedmap into grid_line -> source_line.
 	local got = {}

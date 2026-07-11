@@ -1,0 +1,16 @@
+% import-test.tex -- imports the standalone problem with all its inputs FIXED via
+% \importproblem's override argument, so the rendered values are deterministic; a
+% following question then reads \get{leak} to prove the import's own variables did
+% not leak past pop_scope (it must read undefined, i.e. "??").
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=1, date={Engine Test}}
+
+\begin{document}
+\begin{problems}
+	\question
+	\importproblem{import-problem.tex}{a=3, b=4, c=5}
+	\question
+	AFTERIMP \get{leak} ENDAFTER
+\end{problems}
+\end{document}

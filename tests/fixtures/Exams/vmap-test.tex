@@ -1,0 +1,16 @@
+% vmap-test.tex -- two versions x (student + solutions) = four copies in one
+% combined PDF, so autoexam_run_versions opens a .vmap and records one marker per
+% copy (autoexam.cls's \AutoExamVmapOpen/Record/Close).  test_engine_correctness.py
+% parses the emitted markers and pdftotext-slices each copy's page range.
+\documentclass{autoexam}
+\versions{A,B}
+\setexamseed{7}
+\solutions
+\examsetup{number=1, date={Engine Test}}
+\loadbank{vmap-bank.tex}
+
+\begin{document}
+\begin{problems}
+	\problem{vprob}
+\end{problems}
+\end{document}

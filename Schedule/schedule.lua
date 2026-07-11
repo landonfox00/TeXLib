@@ -18,7 +18,7 @@
 -- should re-source these files between runs.
 
 -- GLOBAL STATE
-calendar_mgr = nil     
+calendar_mgr = nil
 cursor_date = nil      
 start_date = nil
 course_end_date = nil  
@@ -288,7 +288,7 @@ function L_finals_week(start_str, final_date_str, time_str, duration_in)
 			cell.flags.canceled = true
 
 			if final_day and ptr:to_key() == final_day:to_key() then
-				cell.color = "\\cellcolor{red!15}"
+				cell.color = "\\SetCell{bg=red!15}"
 				cell:append("\\textbf{Final Exam}", "top")
 				if time_str and time_str ~= "" then
 					cell:append("\\textbf{" .. time_str .. "}", "top")
@@ -448,7 +448,7 @@ function L_holiday(date_in, date_end, name)
 
 		cell:append("\\textbf{" .. sanitize(name) .. "}", "top")
 		cell:append("\\textbf{No Classes}", "top")
-		cell.color = "\\cellcolor{black!10}"
+		cell.color = "\\SetCell{bg=black!10}"
 		tag_cell_source(cell, src_line)
 		ptr = ptr + 1
 	end
@@ -505,7 +505,7 @@ function L_quiz(options_in)
 	local cell = calendar_mgr:get_cell(target, cap)
 
 	cell.flags.quiz = true
-	cell.color = "\\cellcolor{orange!15}"
+	cell.color = "\\SetCell{bg=orange!15}"
 
 	-- Append manually
 	cell:append({ event_ref = evt, duration = 0 }, "top")
@@ -562,7 +562,7 @@ function L_exam(options_in)
 	
 	cell.flags.exam = true
 	cell.capacity_cur = cell.capacity_cur - len
-	cell.color = "\\cellcolor{red!15}"
+	cell.color = "\\SetCell{bg=red!15}"
 	cell:append({ event_ref = evt, duration = len }, "top")
 	tag_cell_source(cell, evt.source_line)
 end
@@ -574,7 +574,7 @@ function L_meta(text, date_in, layer_in, color_in)
 	if date_in and date_in ~= "" then target = Date.new(date_in) end
 	local cap = L_get_cap(target); if cap==0 then cap=1.0 end
 	local cell = calendar_mgr:get_cell(target, cap)
-	if color_in and color_in ~= "" then cell.color = "\\cellcolor{" .. sanitize(color_in) .. "}" end
+	if color_in and color_in ~= "" then cell.color = "\\SetCell{bg=" .. sanitize(color_in) .. "}" end
 	local layer = (layer_in and layer_in~="") and layer_in or "bottom"
 	cell:append({ event_ref = evt, duration = 0 }, layer)
 	tag_cell_source(cell, evt.source_line)
@@ -614,10 +614,22 @@ end
 -- file (which is what \input'ing it produces).  The Sublime builder closes the
 -- loop: texlib_builder.py's _rewrite_synctex_for_schedmap reads the .schedmap
 -- after compilation and rewrites <jobname>.synctex.gz, repointing the grid-file
--- records at the user's .tex and remapping each row's line from grid_line to
--- the recorded source line.  Click a calendar row in the PDF -> jump to the
+-- records at the user's .tex and remapping each cell's line from grid_line to
+-- the recorded source line.  Click a calendar cell in the PDF -> jump to the
 -- directive line in the source.  On command-line builds (no rewrite step) the
 -- fallback is still usable: clicks land in the grid file at the matching line.
+--
+-- CRITICAL — this only actually works under the BOX-GRID renderer (box_grid
+-- true).  The default xltabular renderer (via longtable) defers real box
+-- shipout to its output routine; by then every cell's raw SyncTeX line has
+-- collapsed to the grid file's LAST line, which is never a schedmap key, so the
+-- rewrite finds nothing to remap and the builder honestly leaves clicks landing
+-- in the grid scratch file (see _rewrite_synctex_for_schedmap's writeup).  The
+-- box grid instead draws each row as stacked \hbox/\schedcell boxes that ship
+-- during ordinary box construction, so SyncTeX records each cell against its
+-- OWN grid_line and the schedmap remap takes effect — real per-cell inverse
+-- search.  The .schedmap is emitted the same way in both modes; what differs is
+-- whether the engine records per-cell lines for the rewrite to consume.
 --
 -- NB: this path does NOT use texlib_synctex.lua / texlib_synctex_stage; that
 -- helper drives the problem-bank classes' \@@input redirect, but the schedule
@@ -636,38 +648,61 @@ end
 -- (the default) the whole term is one continuous table that breaks across
 -- pages wherever it runs out of room.  Toggled from the document via the
 -- `month-pages` meta key (see schedule.cls).
-function render_grid(month_pages)
+--
+-- box_grid: when true, render with the box-grid renderer (stacked \hbox rows of
+-- \schedcell boxes) instead of xltabular.  Same visual grid, but each cell
+-- ships eagerly so SyncTeX inverse search works per-cell (see the SyncTeX
+-- writeup above).  Toggled via the `box-grid` meta key.  nil/false -> xltabular.
+-- Pull the xcolor spec out of a cell.color string ("\\SetCell{bg=orange!15}" ->
+-- "orange!15").  The box-grid renderer needs the bare color name for
+-- \schedcell's first argument; empty / unrecognised -> "white" (no fill).
+-- NB: cells carry their fill as tabularray's \SetCell{bg=<color>} (see the
+-- cell.color assignments above). Matching the pre-tabularray \cellcolor{...}
+-- here silently returned "white" for every cell, dropping all box-grid fills.
+local function cell_color_name(color_str)
+	if not color_str or color_str == "" then return "white" end
+	local name = color_str:match("bg=([^,}%s]+)")
+	return name or "white"
+end
+
+function render_grid(month_pages, box_grid)
 	if not start_date or not start_date.time then
 		tex.print("\\textbf{ERROR: 'start-date' is missing.}")
 		return
 	end
 
-	tex.print("\\renewcommand\\tabularxcolumn[1]{p{#1}}")
-	local col_def = "| c ||"
+	local col_def = "|c||"
 	local active_indices = calendar_mgr.active_col_indices
 	local day_names = {"MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"}
 
-	local header = "\\textbf{WEEK} \\rule[-0.65em]{0pt}{2em} "
+	-- Header cells carry no \textbf/\centering: row{1} in the table spec below
+	-- bolds and centers the whole header row. The \rule strut fixes its height.
+	local header = "WEEK \\rule[-0.65em]{0pt}{2em} "
 	for _, idx in ipairs(active_indices) do
-		header = header .. "& \\centering \\textbf{" .. day_names[idx] .. "} "
-		col_def = col_def .. " X |"
+		header = header .. "& " .. day_names[idx] .. " "
+		col_def = col_def .. "X|"
 	end
 
-	-- Reusable table boilerplate.  Emitted once per page-group below (so the
-	-- header repeats at the top of each month in month-pages mode).  These are
-	-- pure class boilerplate — nobody inverse-searches the header — so they go
-	-- out with no source line and produce no .schedmap entry.
-	local tbl_open = "\\begin{xltabular}{\\textwidth}{" .. col_def .. "}"
-	local tbl_head = "\\hline " .. header ..
-		"\\tabularnewline \\hline\\noalign{\\vskip 2pt}\\hline \\endhead"
-	-- Empty \endlastfoot: the bottom rule is drawn by the last row's own
-	-- trailing `\hline` (every row, including the last, ends `\tabularnewline
-	-- \hline`).  An empty lastfoot stops longtable from synthesising a phantom
-	-- trailing row whose column rules would otherwise poke out below the table
-	-- as a short vertical stub — the artifact a non-empty `\hline` lastfoot
-	-- (with its \@arstrutbox strut) used to leave behind.
-	local tbl_lastfoot = "\\endlastfoot"
-	local tbl_close = "\\end{xltabular}"
+	-- Reusable table boilerplate. One longtblr per page-group (see the group
+	-- loop below); rowhead=1 repeats the header row atop each page — the
+	-- longtable \endhead equivalent — so month-pages mode and any table that
+	-- overflows a page both keep their header. [entry=none, label=none]
+	-- suppresses longtblr's default "Table N" caption/counter (and, as a side
+	-- effect, lets rowhead build its repeating-head box without a spurious
+	-- dim-eval error). hlines draws every horizontal rule; rows valign=t tops
+	-- every cell (matching the old p-column body); row{1} bolds and centers the
+	-- header.
+	local tbl_open = "\\begin{longtblr}[entry=none, label=none]{"
+		.. "colspec={" .. col_def .. "}, rowhead=1, "
+		.. "hlines={0.4pt,solid}, rowsep=0pt, "
+		.. "rows={valign=t}, row{1}={valign=m, halign=c, font=\\bfseries}}"
+	-- The header is emitted as the first table row (rowhead=1 marks it as the
+	-- repeating head); it ends with the \\ row terminator. The trailing \hline
+	-- adds a SECOND rule under the header — so hlines' own rule plus this one
+	-- render as a double rule (vertical rules break across the gap), reproducing
+	-- the old \hline\noalign{\vskip2pt}\hline header separator.
+	local tbl_head = header .. "\\\\ \\hline"
+	local tbl_close = "\\end{longtblr}"
 
 	-- Build rows in week order.  Each row is a list of per-cell records
 	-- carrying the cell's typeset content and the source line of the
@@ -718,7 +753,14 @@ function render_grid(month_pages)
 					if cell_date:to_key() > course_end_date:to_key() then is_after_end = true end
 				end
 
-				if not is_after_end and not cell.flags.holiday and not cell.flags.canceled and not cell.flags.no_auto_quiz then
+				-- Weekly quiz-day auto-quizzes are suppressed on exam days: an exam
+				-- and a quiz on the same day is virtually never intended. Only the
+				-- automatic quiz is skipped -- a manual \quiz on that date still
+				-- renders (L_quiz appends it directly, independent of this pass).
+				-- \noquiz and the exam's own noquiz option stay as the explicit
+				-- opt-outs for a single day / a whole exam week.
+				if not is_after_end and not cell.flags.holiday and not cell.flags.canceled
+					and not cell.flags.no_auto_quiz and not cell.flags.exam then
 					local manual_exists = false
 					for _, layer in pairs(cell.layers) do
 						for _, item in ipairs(layer) do
@@ -728,7 +770,7 @@ function render_grid(month_pages)
 					if not manual_exists then
 						cnt_quiz = cnt_quiz + 1
 						cell.flags.quiz = true
-						if not cell.flags.exam then cell.color = "\\cellcolor{orange!15}" end
+						cell.color = "\\SetCell{bg=orange!15}"
 						cell:append("\\textbf{Quiz " .. cnt_quiz .. "}", "top")
 					end
 				end
@@ -753,7 +795,12 @@ function render_grid(month_pages)
 
 			local src = (cell.source_line and cell.source_line > 0) and cell.source_line or nil
 			table.insert(cells_out, {
+				-- xltabular form (default renderer): `& <cellcolor> <content>`.
 				text       = "& " .. cell.color .. " " .. cell_content,
+				-- box-grid form ingredients: content + bare color name, wrapped
+				-- into \schedcell{color}{content} at emit time.
+				content    = cell_content,
+				color_name = cell_color_name(cell.color),
 				source_line = src,
 			})
 
@@ -765,7 +812,8 @@ function render_grid(month_pages)
 		local row_attr = row_source or (fallback_src > 0 and fallback_src or nil)
 
 		table.insert(rows, {
-			week_label = week_label,
+			week_label = week_label,   -- xltabular week cell (\raisebox parbox)
+			week_num   = week_num,     -- plain number for the box-grid \schedlabel
 			cells      = cells_out,
 			row_attr   = row_attr,
 			month_set  = row_month_set,
@@ -784,13 +832,12 @@ function render_grid(month_pages)
 	--   & <cell 2>
 	--   ...
 	--   <row terminator>
-	-- xltabular treats inter-cell whitespace (including newlines) as a single
+	-- longtblr treats inter-cell whitespace (including newlines) as a single
 	-- space, so splitting across lines is layout-neutral.
 	--
-	-- Row terminator: EVERY row, including the last in each table, ends with
-	-- `\tabularnewline \hline` (closes the row + draws the rule beneath it).
-	-- Paired with the empty `\endlastfoot` declared above, the last row's own
-	-- `\hline` is the table's clean bottom rule — no phantom trailing-row stub.
+	-- Row terminator: EVERY row ends with a bare `\\`.  longtblr's `hlines`
+	-- draws the rule beneath every row (including the table's bottom edge), so
+	-- unlike the old xltabular grid the terminator carries no per-row `\hline`.
 	-- Resolve the output (aux) directory if `-output-directory=X` was passed
 	-- to lualatex (the TeXLib Sublime builder routes EVERYTHING via that flag
 	-- with aux_directory="<<temp>>").  Both files we generate below — the
@@ -858,21 +905,72 @@ function render_grid(month_pages)
 		groups = { rows }
 	end
 
-	-- One table per group; \newpage between groups.  Header/lastfoot boilerplate
-	-- is re-emitted per group so each month's table carries its own header row.
-	for gi, group in ipairs(groups) do
-		if gi > 1 then emit("\\newpage") end
-		emit(tbl_open)
-		emit(tbl_head)
-		emit(tbl_lastfoot)
-		for _, row in ipairs(group) do
-			emit(row.week_label, row.row_attr)
-			for _, c in ipairs(row.cells) do
-				emit(c.text, c.source_line or row.row_attr)
-			end
-			emit("\\tabularnewline \\hline", row.row_attr)
+	if box_grid then
+		-- BOX-GRID RENDERER.  Each week is one \hbox of framed \schedcell boxes
+		-- placed in the vertical list under \offinterlineskip, so cells ship
+		-- eagerly (per-cell SyncTeX) and rows are atomic across page breaks.
+		-- Structure per row, one cell PER LINE so SyncTeX records each cell on
+		-- its own grid_line (the whole point):
+		--     \hbox{\schedlabel{N}\scheddivider
+		--     \schedcell{color}{<cell 1>}\kern-\fboxrule
+		--     \schedcell{color}{<cell 2>}\kern-\fboxrule
+		--     ...
+		--     \schedcell{color}{<cell k>}}
+		-- The \kern-\fboxrule between cells overlaps shared vertical borders.
+		-- Header/boilerplate carry no source line (nobody inverse-searches them).
+		local ncols = #active_indices
+		local box_header = "\\hbox{\\schedheadcell{\\schedlabelw}{\\footnotesize WEEK}\\kern-\\fboxrule"
+			.. "\\fcolorbox{black}{white}{\\rule{0pt}{2.4ex}\\hspace{1pt}}\\kern-\\fboxrule"
+		for ci, idx in ipairs(active_indices) do
+			box_header = box_header .. "\\schedheadcell{\\schedcellw}{" .. day_names[idx] .. "}"
+			if ci < ncols then box_header = box_header .. "\\kern-\\fboxrule" end
 		end
-		emit(tbl_close)
+		box_header = box_header .. "}"
+
+		-- Trailing `%` on every line that continues the row \hbox: inside an
+		-- \hbox a bare newline is a space, and a space after \kern-\fboxrule (or
+		-- after \scheddivider) would reintroduce the inter-cell gap the negative
+		-- kern exists to remove.  The `%` swallows the newline so cells abut.
+		--
+		-- Each page-group is its OWN \begingroup...\endgroup, and \SchedSetCols
+		-- (which sets \schedcellw with a local \setlength) is re-emitted inside
+		-- every group: the column width must be re-established after each
+		-- \endgroup restores it, or later month-pages groups collapse to a stale
+		-- width.  \offinterlineskip is likewise group-local.
+		local group_open = "\\begingroup\\offinterlineskip\\SchedSetCols{" .. ncols .. "}"
+		for gi, group in ipairs(groups) do
+			if gi > 1 then emit("\\endgroup\\newpage") end
+			emit(group_open)
+			emit(box_header)
+			for _, row in ipairs(group) do
+				-- Open the row \hbox with the week label + doubled divider.
+				emit("\\hbox{\\schedlabel{" .. row.week_num .. "}\\scheddivider\\kern-\\fboxrule%",
+					row.row_attr)
+				local k = #row.cells
+				for ci, c in ipairs(row.cells) do
+					local sep = (ci < k) and "\\kern-\\fboxrule%" or "}"
+					emit("\\schedcell{" .. c.color_name .. "}{" .. c.content .. "}" .. sep,
+						c.source_line or row.row_attr)
+				end
+			end
+		end
+		emit("\\endgroup")
+	else
+		-- One table per group; \newpage between groups.  The header row is re-emitted
+		-- per group so each month's table carries (and, via rowhead, repeats) it.
+		for gi, group in ipairs(groups) do
+			if gi > 1 then emit("\\newpage") end
+			emit(tbl_open)
+			emit(tbl_head)
+			for _, row in ipairs(group) do
+				emit(row.week_label, row.row_attr)
+				for _, c in ipairs(row.cells) do
+					emit(c.text, c.source_line or row.row_attr)
+				end
+				emit("\\\\", row.row_attr)
+			end
+			emit(tbl_close)
+		end
 	end
 
 	if fout then

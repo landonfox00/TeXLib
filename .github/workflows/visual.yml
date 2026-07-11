@@ -62,7 +62,9 @@ jobs:
             fi
 
       - name: Upload regenerated refs
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_refs == 'true'
+        # always(): a failing check step (e.g. one scenario's content assertion)
+        # must not deny you the refs that were regenerated before it.
+        if: always() && github.event_name == 'workflow_dispatch' && github.event.inputs.update_refs == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: visual-refs

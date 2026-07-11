@@ -1,4 +1,7 @@
 % Course-local quiz instructions (smoke-test fixture).  The unique single-token
 % marker proves THIS file -- named only by coursemeta's quiz-instructions-file
 % key -- was resolved and rendered, not the library default quiz-instructions.tex.
-Course-specific quiz instructions for the smoke test. Marker: CMQUIZINSTRMARKER.
+% \mbox keeps the single-token marker unbreakable: in the (wider, normal-size)
+% titled instructions box it can land at a line break and hyphenate, which splits
+% it across two lines in pdftotext output and defeats the substring assertion.
+Course-specific quiz instructions for the smoke test. Marker: \mbox{CMQUIZINSTRMARKER}.

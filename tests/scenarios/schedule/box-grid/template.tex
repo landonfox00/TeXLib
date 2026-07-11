@@ -1,0 +1,49 @@
+% Scenario: schedule / box-grid   (tier: core)
+% The box-grid renderer (box-grid = true): the calendar drawn as stacked box
+% rows instead of an xltabular, so each cell ships eagerly and SyncTeX inverse
+% search works per-cell. Same term as landscape-mwf. Paired with month-pages so
+% the day-name header repeats on every page (the box grid does not repeat the
+% header across continuation pages of a single continuous grid). Exercises the
+% box-grid emit path in render_grid + the \schedcell/\schedrow drawing macros.
+\documentclass{schedule}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	season         = Fall,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	course-room    = TBD,
+	lecture-days   = MWF,
+	lecture-times  = {9:00-9:50am},
+	start-date     = 8-24,
+	end-date       = 12-8,
+	final-date     = 12-15,
+	final-time     = {9:45-11:45am},
+}
+
+\meta{ landscape = true, quiz-days = T, box-grid = true, month-pages = true }
+
+\begin{document}
+\maketitle
+\begin{schedule}
+	\holiday{9-7}{Labor Day}
+	\holiday{11-25}[11-27]{Thanksgiving Break}
+
+	\syllabus
+	\section{1.1}
+	\section{1.2}
+	\section[2]{1.3}
+	\examreview
+	\exam[noquiz]
+
+	\section{2.1}
+	\section{2.2}
+	\finalreview
+	\finalsweek[12-14][5]
+	\winterbreak
+\end{schedule}
+\end{document}
