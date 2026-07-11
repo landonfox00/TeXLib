@@ -107,6 +107,7 @@
 \clist_new:N \g__sched_recitation_days_clist
 \bool_new:N  \g__sched_landscape_bool
 \bool_new:N  \g__sched_monthpages_bool
+\bool_new:N  \g__sched_boxgrid_bool
 
 \keys_define:nn { meta } {
 	lecture-caps     .clist_gset:N = \g__sched_lecture_caps_clist,
@@ -117,6 +118,17 @@
 	% page, with month-boundary weeks repeated so every month shows full weeks.
 	% Default (false / key omitted) keeps the term as one continuous table.
 	month-pages   .bool_gset:N = \g__sched_monthpages_bool,
+
+	% box-grid = true  ->  render the calendar as stacked box rows (\schedrow /
+	% \schedcell) instead of an xltabular.  Both look the same, but the box grid
+	% ships each cell's content eagerly during normal box construction, so
+	% SyncTeX attributes every cell to its own grid-file line — which is what
+	% makes double-click inverse search land on the directive that produced the
+	% cell (see the SyncTeX writeup in schedule.lua's render_grid).  xltabular
+	% defers shipout to its output routine, collapsing every cell's attribution
+	% to one line, so inverse search cannot work per-cell under it.  Default
+	% (false) keeps the historical xltabular rendering.
+	box-grid      .bool_gset:N = \g__sched_boxgrid_bool,
 
 	landscape     .code:n = {
 		\str_if_eq:nnTF { #1 } { true }
@@ -154,6 +166,11 @@
 	\bool_if:NTF \g__sched_monthpages_bool { true } { false }
 }
 
+% Same, for the box-grid flag — second argument to render_grid(...).
+\NewExpandableDocumentCommand{\GetBoxGridFlag}{}{
+	\bool_if:NTF \g__sched_boxgrid_bool { true } { false }
+}
+
 % Apply document metadata from the class option list now that the keys above and
 % coursemeta.tex are loaded (so document options override coursemeta defaults).
 % Read \@raw@classoptionslist, not \CurrentOption, to keep spaces in values.
@@ -168,7 +185,80 @@
 \ExplSyntaxOff
 
 % ==============================================================================
-% 6. SCHEDULE ENVIRONMENT
+% 6. BOX-GRID RENDERER (opt-in: box-grid = true)
+% ==============================================================================
+% An alternative to the xltabular calendar that draws the SAME grid out of
+% stacked box "rows" instead of a table.  Motivation is SyncTeX inverse search:
+% xltabular (via longtable) defers real box shipout to its output routine, by
+% which point every cell's raw SyncTeX line has collapsed to the grid file's
+% last line, so double-clicking any calendar cell in the PDF cannot resolve to
+% the directive that produced it.  A box grid ships each cell during ordinary
+% box construction, so SyncTeX records each cell against its own grid-file line
+% and the .schedmap rewrite (see schedule.lua) can repoint clicks at the user's
+% source.  Trade-off: this hand-rolls what xltabular gives for free; the Lua
+% engine drives it (schedule.lua's render_grid box-grid branch), so the class
+% only supplies the drawing macros.  Page-break placement works (rows are atomic
+% \hboxes, so TeX breaks cleanly between them and never splits a row), but the
+% day-name header is emitted once at the top of each page-GROUP, not once per
+% physical page: a single continuous grid (month-pages off) that overflows onto
+% a second page shows no header on the continuation.  In month-pages mode each
+% month is its own group with its own header, so a multi-page schedule in that
+% mode gets a header on every page — the recommended pairing.
+%
+% Layout model: each row is ONE \hbox placed in the main vertical list with
+% \offinterlineskip active, so fixed-height framed cells butt with no gap and a
+% row is atomic across page breaks (TeX never breaks inside an \hbox).  Every
+% row component (week label, the doubled divider, day cells) shares a top-heavy
+% baseline (outer minipage [t]); mixing a bottom-baseline rule with top-baseline
+% cells in one \hbox would balloon the row to ~2x height.  Adjacent cells kern
+% back by \fboxrule so shared borders draw once.
+\newlength{\schedcellw}
+\newlength{\schedlabelw}
+\newlength{\schedrowh}
+\newlength{\schedpad}
+\setlength{\schedlabelw}{3.2em}   % WEEK column width
+\setlength{\schedrowh}{4.75em}    % fixed cell/row height (matches the historical
+                                  % xltabular week-label \parbox[t][4.75em] size)
+\setlength{\schedpad}{5pt}        % inner horizontal cell padding (~\tabcolsep)
+
+% \SchedSetCols{n}: compute \schedcellw for n equal day columns, given the
+% current \textwidth, the WEEK column, the 1pt divider gap, and border rules.
+% Called by render_grid before emitting rows (the active-column count is only
+% known to the Lua engine).
+\newcommand{\SchedSetCols}[1]{%
+	\setlength{\schedcellw}{%
+		\dimexpr(\textwidth-\schedlabelw-1pt-#1\fboxrule-\fboxrule)/#1\relax}%
+}
+
+% \schedcell{color}{content}: a fixed-height, full-bleed-colored, framed day
+% cell.  content is set \footnotesize in a top-aligned padded minipage.
+\newcommand{\schedcell}[2]{%
+	\fcolorbox{black}{#1}{\hspace{\schedpad}%
+		\begin{minipage}[t][\schedrowh][t]{\dimexpr\schedcellw-2\schedpad\relax}%
+			\footnotesize #2%
+		\end{minipage}%
+		\hspace{\schedpad}}}
+
+% \schedlabel{n}: the WEEK-column cell (week number, vertically centered).
+% Outer [t] keeps its box baseline at the top to match \schedcell.
+\newcommand{\schedlabel}[1]{%
+	\fcolorbox{black}{white}{%
+		\begin{minipage}[t][\schedrowh][c]{\schedlabelw}\centering\textbf{#1}\end{minipage}}}
+
+% \scheddivider: the doubled vertical rule between the WEEK column and the days
+% (mirrors xltabular's `c ||`).  A 1pt-wide framed strut whose frame supplies
+% the second rule; the first is \schedlabel's right border overlapped below.
+\newcommand{\scheddivider}{%
+	\fcolorbox{black}{white}{%
+		\begin{minipage}[t][\schedrowh][c]{1pt}\mbox{}\end{minipage}}}
+
+% \schedheadcell{width}{text}: a short (single-line) header cell.
+\newcommand{\schedheadcell}[2]{%
+	\fcolorbox{black}{white}{%
+		\begin{minipage}[t][2.4ex][c]{#1}\centering\textbf{#2}\end{minipage}}}
+
+% ==============================================================================
+% 7. SCHEDULE ENVIRONMENT
 % ==============================================================================
 % \maketitle / \scheduletitle render the standard banner. Call \maketitle
 % (or \scheduletitle) explicitly in the document body when you want the
@@ -259,7 +349,7 @@
 	\NewDocumentCommand{\debugdate}{ }{ \directlua{ L_debug_cursor() } }
 }
 {
-	\directlua{ render_grid(\GetMonthPagesFlag) }
+	\directlua{ render_grid(\GetMonthPagesFlag, \GetBoxGridFlag) }
 }
 
 \endinput
