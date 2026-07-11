@@ -1,0 +1,15 @@
+% mckey-basic.tex -- deterministic (NO \shuffle) answer-key check: authored
+% option order is preserved, so the \cchoice authored 2nd must render at slot B
+% and the key must read "Answer: B".  \solutions builds a student copy plus a
+% key copy; the test reads the key copy.
+\documentclass{autoexam}
+\versions{A}
+\solutions
+\examsetup{number=1, date={Engine Test}}
+\loadbank{mckey-bank.tex}
+
+\begin{document}
+\begin{mcproblems}
+	\problem{mc_basic}
+\end{mcproblems}
+\end{document}

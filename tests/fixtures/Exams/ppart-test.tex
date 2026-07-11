@@ -1,0 +1,18 @@
+% ppart-test.tex -- builds the two multi-part problems under \shuffle (pinned
+% seed) so the atomicity/sub-numbering assertions in test_engine_correctness.py
+% run against a shuffled question order.  The assertions are seed-invariant: they
+% check each problem's own parts stay together and correctly lettered, whichever
+% order the shuffle emits the problems in.
+\documentclass{autoexam}
+\versions{A}
+\setexamseed{99}
+\shuffle
+\examsetup{number=1, date={Engine Test}}
+\loadbank{ppart-bank.tex}
+
+\begin{document}
+\begin{problems}
+	\problem{pone}
+	\problem{ptwo}
+\end{problems}
+\end{document}

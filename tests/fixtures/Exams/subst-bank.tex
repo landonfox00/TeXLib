@@ -1,0 +1,27 @@
+% subst-bank.tex -- bank proving that FIXED variable VALUES actually render.
+%
+% fix-bank.tex only proves the \problem{id}[a=1,...] SYNTAX parses; it never
+% checks the substituted values reach the page.  Here every var is authored
+% with a bank-side value that DIFFERS from (and, for the ranges, cannot equal)
+% the fixed override, so a rendered value can only match if the fixed guard in
+% set_var/set_rng/calc_var (problem_engine.lua) actually blocked the bank call.
+
+\begin{problem}{quad}[topic=subst]
+	\setvar{a}{7}%          fixed a=1 must beat this -> renders 1, never 7
+	\setrng{b}{20}{29}%     fixed b=2 must beat this -> renders 2 (2 is not in [20,29])
+	\setrng{c}{30}{39}%     fixed c=3 must beat this -> renders 3 (3 is not in [30,39])
+	MATHEXPR $\get{a}x^2 + \get{b}x + \get{c}$ ENDEXPR
+	READOUT A\get{a}B\get{b}C\get{c}D ENDREAD
+\end{problem}
+
+% \calcvar path: the inputs are fixed by the override; the body's own \setvar of
+% an input is blocked, so the Lua eval must run over the fixed values.  Integer
+% expression -> exact integer; the sqrt-style float exercises the (a^2+b^2)^0.5
+% code path the calc_var docstring calls out.
+\begin{problem}{calc}[topic=calc]
+	\setvar{a}{99}%         fixed a=3 must beat this -> calc uses 3, never 99
+	\calcvar{prod}{a*b + c}%        3*4 + 5   = 17   (integer)
+	\calcvar{hyp}{(a^2 + b^2)^0.5}% (9 + 16)^0.5 = 5.0 (float)
+	CALCINT \get{prod} ENDPROD
+	CALCFLOAT \get{hyp} ENDHYP
+\end{problem}
