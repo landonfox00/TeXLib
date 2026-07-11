@@ -230,9 +230,13 @@ code, not a delegated call.
     for real** (2 passes), copy-back, the publish step (shareable PDF + desktop
     shortcut), and the build summary. Closes gaps (a) live build + (c) TEXINPUTS.
     **Remaining live smoke:** a lua doc (quiz/exam — force + `-shell-escape` + bank
-    engine) and a live Cancel. (Publish toggles now wired: the runner feeds
-    `publish_shareable_copies` / `copy_published_path_to_clipboard` from
-    `TeXLib.sublime-settings` into the host's `builder_settings`.)
+    engine) and a live Cancel.
+  - **All live smoke passed (2026-07-10):** quiz (lua force + `-shell-escape` +
+    bank), exam-01 (autoexam versions A/B/C + per-version pypdf slicing via the
+    external-Python shell-out — the hardest postprocess path) + a live Cancel
+    (kill mid-pass-1). **Phase 1 complete, committed as `23378b0`.** (Publish
+    toggles wired: the runner feeds `publish_shareable_copies` /
+    `copy_published_path_to_clipboard` from `TeXLib.sublime-settings`.)
   - **Drift note:** the brain now exists twice (`texlib_builder.py` for LaTeXTools,
     `texlib/texlib_build.py` native). Intentional for coexistence; **Phase 2**
     consolidates — retire the LaTeXTools builder, or make it import the native
