@@ -1,0 +1,30 @@
+[
+	{
+		"id": "tools",
+		"children": [
+			{
+				"caption": "TeXLib",
+				"id": "texlib",
+				"children": [
+					{ "caption": "Build", "command": "texlib_build", "args": { "mode": "default" } },
+					{ "caption": "Build — Pick Mode…", "command": "texlib_build_pick" },
+					{ "caption": "Cancel Build", "command": "texlib_cancel_build" },
+					{ "caption": "-" },
+					{ "caption": "View PDF", "command": "texlib_view_pdf" },
+					{ "caption": "Forward Sync (cursor → PDF)", "command": "texlib_forward_sync" },
+					{ "caption": "-" },
+					{ "caption": "New Document…", "command": "texlib_new_document" },
+					{ "caption": "Go to Bank Problem…", "command": "texlib_goto_problem" },
+					{ "caption": "Insert Bank Problem…", "command": "texlib_insert_problem" },
+					{ "caption": "-" },
+					{ "caption": "Open coursemeta.tex", "command": "texlib_open_coursemeta" },
+					{ "caption": "Reveal Aux Directory", "command": "texlib_reveal_aux" },
+					{ "caption": "Clean Aux Directory", "command": "texlib_clean_aux" },
+					{ "caption": "-" },
+					{ "caption": "Package for LMS", "command": "texlib_package_lms" },
+					{ "caption": "Install Classes to TEXMF", "command": "texlib_install_texmf" }
+				]
+			}
+		]
+	}
+]
