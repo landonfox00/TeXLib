@@ -333,13 +333,21 @@
 	)}%
 }
 % Deferred extra-credit: append the invocation (authored order) to a per-section
-% macro, replayed after the shuffled problems so it always lands last.
+% macro, replayed after the shuffled problems so it always lands last.  Each
+% stored item carries the per-problem chrome the engine gives \problem: the
+% inter-problem separator above (\pbank@xc@sep, first-on-page aware) and, from
+% \@texlib@extracredit itself, the trailing \workbox answer space below — so a
+% bonus divides from and reserves space like every graded problem.  The captured
+% [pts]/[stretch] optionals are forwarded as -NoValue- markers straight to the
+% fixed-arity renderer, so no optional-bracket syntax has to be reconstructed.
 \newcommand{\pbank@xc@deferred}{}
-\NewDocumentCommand{\@xc@collect}{o +m}{%
-	\IfValueTF{#1}
-		{\g@addto@macro\pbank@xc@deferred{\@saved@xc[#1]{#2}}}
-		{\g@addto@macro\pbank@xc@deferred{\@saved@xc{#2}}}%
+\NewDocumentCommand{\@xc@collect}{o o +m}{%
+	\g@addto@macro\pbank@xc@deferred{\pbank@xc@sep\@texlib@extracredit{#1}{#2}{#3}}%
 }
+% Inter-problem separator before a deferred extra-credit item, honoring the same
+% first-on-page rule the engine applies to \problem (no rule if the bonus is the
+% first item on its page).  Shares pbank_emit_sep with pbank_problem_item.
+\newcommand{\pbank@xc@sep}{\pbank@lua{pbank_emit_sep()}}
 % The page break pbank_emit_section emits between authored page groups: a real
 % \newpage plus the first-on-page reset. @-free name so Lua \print's it directly
 % (in the document body @ is catcode 12).

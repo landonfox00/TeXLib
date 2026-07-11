@@ -28,20 +28,33 @@
 		\node (X) [draw, shape=circle, inner sep=0] {\strut #1};%
 }
 
-% \extracredit[points]{body}
-%   Inserts a new \question slot tagged as extra credit, optionally with a
-%   point label.  Use inside the exam-class {questions} environment:
+% \extracredit[points][stretch]{body}
+%   Inserts a new \question slot tagged as extra credit, optionally with a point
+%   label, then reserves trailing answer space so a bonus has room to write —
+%   exactly like a graded \problem.  Use inside the exam-class {questions}
+%   environment, or a TeXLib {problems} section (where it is collected and
+%   replayed at the section end, pinned last):
 %       \extracredit[2]{Find the limit of ...}
 %       \extracredit{Bonus: prove that ...}
-%   Without the optional argument, the heading reads "(Extra Credit)";
-%   with it, "(Extra Credit, N points)".
-\NewDocumentCommand{\extracredit}{ o +m }{%
+%   Without the first optional the heading reads "(Extra Credit)"; with it,
+%   "(Extra Credit, N points)".  The second optional sizes the trailing \workbox
+%   answer space (default 1), mirroring \problem[pts][stretch]{...}; \workbox is
+%   \ifsolutions-suppressed, so a key copy stays compact automatically.
+%
+% \@texlib@extracredit is the fixed-arity renderer shared by the public
+% \extracredit and the deferred-collect replay (texlib-problembank.sty), which
+% forwards the captured -NoValue- markers straight in — so both paths emit
+% byte-identical output without reconstructing optional-bracket syntax (which
+% cannot express "stretch but no points").
+\NewDocumentCommand{\@texlib@extracredit}{ m m +m }{%
 	\stepcounter{question}%
 	\item[\questionlabel]%
-	\IfValueTF{#1}
-		{(\textbf{Extra Credit}, #1 points)~}
-		{(\textbf{Extra Credit})~}%
-	#2%
+	\IfNoValueTF{#1}
+		{(\textbf{Extra Credit})~}
+		{(\textbf{Extra Credit}, #1 points)~}%
+	#3%
+	\workbox{\IfNoValueTF{#2}{1}{#2}}%
 }
+\NewDocumentCommand{\extracredit}{ o o +m }{\@texlib@extracredit{#1}{#2}{#3}}
 
 \endinput
