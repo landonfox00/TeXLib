@@ -179,7 +179,7 @@
 	\setbox\@sol@rowbox\hbox{%
 		\colorbox{green!3!white}{%
 			\parbox[t]{\@sol@curwidth}{%
-				\noindent\textbf{Solution.}%
+				\noindent\textbf{\texlib@solbox@label.}%
 				\ifrubric
 					\ifx\@sol@rubric\@empty\else
 						\@emit@rubric@overlay{\@sol@rubric}%
@@ -264,7 +264,7 @@
 \newcommand{\@sol@thebox@break}{%
 	\par\vspace{\@sol@outervsep}%
 	\begin{@sol@breakbox}%
-		\noindent\textbf{Solution.}%
+		\noindent\textbf{\texlib@solbox@label.}%
 		\ifrubric
 			\ifx\@sol@rubric\@empty\else
 				\@emit@rubric@overlay{\@sol@rubric}%
@@ -298,12 +298,17 @@
 		\egroup
 		\@in@solutionfalse
 		\ifsolutions
+			% Number this box within its problem scope (\question opens a fresh
+			% scope; see the \question wrap below): a lone box stays "Solution.",
+			% multiple boxes on one problem become "Solution 1." / "Solution 2." ...
+			\texlib@solbox@step
 			\if@sol@narrow
 				\@sol@wrap{\@sol@thebox}%         % narrow MC key: rigid box
 			\else
 				\@sol@thebox@break                % full-width key: breakable
 			\fi
 		\else
+			\def\texlib@solbox@label{Solution}%   % blank MC reserve: unnumbered
 			\@sol@wrap{\phantom{\@sol@thebox}}%   % blank MC copy: reserve, no ink
 		\fi
 	\else
@@ -533,6 +538,38 @@
 		\setlength{\@sol@outervsep}{10pt}%
 	\fi
 	\par
+}
+
+% ===========================================================================
+% Per-problem scope for {solution}-box numbering
+% ===========================================================================
+% Each exam problem emits exactly one \question (multi-part problems use one
+% \question + \ppart), in every version and whether bank-served or hand-written,
+% so \question IS the "one problem" boundary. Prepend \texlibnewproblemscope
+% (from texlib-thmenv, loaded later by the class) so a fresh {solution}-box scope
+% opens per problem -- each problem's boxes number independently and do NOT
+% accumulate across the exam. The engine's {problems}/{mcproblems} both open
+% {questions}, so hooking {questions} covers bank-served and manual alike.
+%
+% The exam class's {questions} environment \def's \question LOCALLY in its
+% begin-code, so we must re-wrap AFTER that runs. \AtBeginEnvironment fires
+% BEFORE the env's begin-code (it patches \begin to run the hook ahead of
+% \<env>), so it would be clobbered; instead \apptocmd the {questions} begin
+% macro itself, whose appended code runs at the end of the begin-code -- once
+% \question is its final local definition. Deferred to \AtBeginDocument so the
+% class has defined {questions}. The wrapper is parameterless and calls the
+% saved \question, which scans its own optional [points] argument as before.
+\RequirePackage{etoolbox}
+\AtBeginDocument{%
+	\ifcsname questions\endcsname
+		\apptocmd{\questions}{%
+			\let\texlib@orig@question\question
+			\def\question{\texlibnewproblemscope\texlib@orig@question}%
+		}{}{%
+			\PackageWarning{texlib-solutions}{%
+				Could not hook {questions} for solution-box numbering}%
+		}%
+	\fi
 }
 
 \endinput

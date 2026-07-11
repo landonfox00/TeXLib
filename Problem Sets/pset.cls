@@ -209,6 +209,7 @@
 {%
 	\par\medskip
 	\refstepcounter{problem}%
+	\texlibnewproblemscope   % each problem opens a fresh {solution}-box scope
 	\noindent\textbf{Problem \theproblem.}%
 	\IfValueT{#1}{%
 		\IfInteger{#1}{%
@@ -296,17 +297,19 @@
 	texlibbase,
 	code={
 		\ifsolutions
+			\texlib@solbox@step
 			\tcbset{
 				colback=green!3!white,
 				borderline west={\texlibrulewidth}{0pt}{green!50!black},
-				before upper={\textbf{Solution.}\par\smallskip},
+				before upper={\textbf{\texlib@solbox@label.}\par\smallskip},
 			}
 		\else
 			\ifkey
+				\texlib@solbox@step
 				\tcbset{
 					colback=green!3!white,
 					borderline west={\texlibrulewidth}{0pt}{green!50!black},
-					before upper={\textbf{Solution.}\par\smallskip},
+					before upper={\textbf{\texlib@solbox@label.}\par\smallskip},
 				}
 			\else
 				\ifstudent

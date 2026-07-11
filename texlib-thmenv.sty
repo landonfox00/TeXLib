@@ -64,18 +64,104 @@
 % The non-colliding members (\solution, \answer, \ans, \pf) cover the same need,
 % and {soln} / {proof} stay fully usable (as a sibling after the statement, or
 % nested -- neither token is rebound).
-\newcommand{\texlib@inline@solution}{\par\bigskip\noindent\textit{Solution.}\space}
-\newcommand{\texlib@inline@answer}  {\par\bigskip\noindent\textit{Answer.}\space}
-\newcommand{\texlib@inline@proof}   {\par\bigskip\noindent\textit{Proof.}\space}
+% A lone lead-in stays "Solution." / "Answer." / "Proof."; two or more of the
+% SAME kind inside one worked env become "Solution 1." / "Solution 2." ... in
+% document order (\answer and \ans share the one "Answer" tally). The per-kind
+% total isn't known until the env closes, so it is recorded to the .aux at \end
+% and read back next run -- like any cross-reference, the numbering settles on
+% the second pass (the builder already runs twice). \texlibworkedid gives each
+% env instance a stable, document-order id shared between the write and the read.
+\newcounter{texlibworkedid}
+\newcounter{texlibrcsol}   % per-env running index, reset at each \begin
+\newcounter{texlibrcans}
+\newcounter{texlibrcpf}
+
+% \texlib@wc@set{id}{kind}{total} -- replayed from the .aux to publish a count.
+\def\texlib@wc@set#1#2#3{\expandafter\gdef\csname texlib@wc@#1@#2\endcsname{#3}}
+% \texlib@wc@get{id}{kind} -- the recorded total, or 0 before it is known.
+\newcommand{\texlib@wc@get}[2]{%
+	\ifcsname texlib@wc@#1@#2\endcsname\csname texlib@wc@#1@#2\endcsname\else0\fi}
+
+% \texlib@worked@leadin{running-index counter}{kind}{Label} -- one italic lead-in,
+% numbered only when this env holds more than one of the same kind.
+\newcommand{\texlib@worked@leadin}[3]{%
+	\stepcounter{#1}%
+	\edef\texlib@wc@tot{\texlib@wc@get{\texlib@worked@id}{#2}}%
+	\par\bigskip\noindent
+	% \relax terminates \ifnum's number scan so the following \space is printed,
+	% not absorbed as the optional space that ends a TeX <number>.
+	\textit{#3\ifnum\texlib@wc@tot>1\relax\space\arabic{#1}\fi.}\space}
+
+\newcommand{\texlib@inline@solution}{\texlib@worked@leadin{texlibrcsol}{sol}{Solution}}
+\newcommand{\texlib@inline@answer}  {\texlib@worked@leadin{texlibrcans}{ans}{Answer}}
+\newcommand{\texlib@inline@proof}   {\texlib@worked@leadin{texlibrcpf}{pf}{Proof}}
 
 % Bound inside each worked env via \AtBeginEnvironment, so the redefinitions are
 % scoped to that environment's group and revert at \end (the class's standalone
 % {solution} box, the global \answer, and amsthm's \proof are untouched outside).
+% The running indices are global counters (robust to brace/math groups the
+% lead-in may sit in), zeroed here per env; \texlib@worked@write ships the totals.
+% Nesting two worked envs that both use lead-ins is not supported (the inner env
+% resets the shared running counters) -- vanishingly rare and semantically odd.
 \newcommand{\texlib@bind@worked}{%
+	\stepcounter{texlibworkedid}%
+	\edef\texlib@worked@id{\arabic{texlibworkedid}}%
+	\setcounter{texlibrcsol}{0}\setcounter{texlibrcans}{0}\setcounter{texlibrcpf}{0}%
 	\let\solution\texlib@inline@solution
 	\let\answer\texlib@inline@answer
 	\let\ans\texlib@inline@answer
 	\let\pf\texlib@inline@proof
+}
+
+% Bound via \AtEndEnvironment: record each kind's final tally for this env to the
+% .aux (read on the next run). Only kinds actually used are written.
+\newcommand{\texlib@worked@write}{%
+	\texlib@worked@writeone{sol}{texlibrcsol}%
+	\texlib@worked@writeone{ans}{texlibrcans}%
+	\texlib@worked@writeone{pf}{texlibrcpf}%
+}
+\newcommand{\texlib@worked@writeone}[2]{%
+	\ifnum\value{#2}>0
+		\protected@write\@auxout{}{%
+			\string\texlib@wc@set{\texlib@worked@id}{#1}{\arabic{#2}}}%
+	\fi}
+
+% ------------------------------------------------------------------------------
+% {solution}-box numbering  (per-problem scope)
+% ------------------------------------------------------------------------------
+% The class-local {solution} BOX (didactic/pset) sits as a sibling AFTER a
+% problem statement, so its numbering scope is "the current problem" rather than
+% an enclosing group: a lone box stays "Solution.", two or more attached to the
+% SAME problem become "Solution 1." / "Solution 2." ..., resetting at the next
+% problem. \texlibworkedid IS that problem id -- \texlib@bind@worked already
+% bumps it at every problem-shaped worked env (example/exercise/question/
+% challenge); \texlibnewproblemscope lets a class mark other problem boundaries
+% (pset's {problem}). Because the counter is global and monotonic, boxes sharing
+% a problem read one stable id; \texlib@solbox@step detects the id change and
+% restarts the running box index. Same two-pass .aux tally as the inline lead-ins
+% (kind "box"): the per-problem total settles on the second run.
+\newcounter{texlibsolbox}          % running box index within the current problem
+\def\texlib@solbox@lastepoch{-1}   % problem id the box index was last reset for
+\newcommand{\texlibnewproblemscope}{\stepcounter{texlibworkedid}}
+
+% Call once at the start of a rendered {solution} box: advances the running index
+% (resetting it when the problem changed), records the running total to the .aux,
+% and leaves the header text in \texlib@solbox@label ("Solution" or "Solution N").
+\newcommand{\texlib@solbox@label}{Solution}
+\newcommand{\texlib@solbox@step}{%
+	\edef\texlib@solbox@epoch{\arabic{texlibworkedid}}%
+	\ifx\texlib@solbox@epoch\texlib@solbox@lastepoch\else
+		\setcounter{texlibsolbox}{0}%
+		\global\let\texlib@solbox@lastepoch\texlib@solbox@epoch
+	\fi
+	\stepcounter{texlibsolbox}%
+	\edef\texlib@solbox@tot{\texlib@wc@get{\texlib@solbox@epoch}{box}}%
+	% \relax terminates \ifnum's number scan so the \space survives (see the
+	% inline lead-in's matching note).
+	\edef\texlib@solbox@label{Solution%
+		\ifnum\texlib@solbox@tot>1\relax\space\arabic{texlibsolbox}\fi}%
+	\protected@write\@auxout{}{%
+		\string\texlib@wc@set{\texlib@solbox@epoch}{box}{\arabic{texlibsolbox}}}%
 }
 
 \ExplSyntaxOn
@@ -178,6 +264,8 @@
 		\clist_if_in:nnT { example , exercise , question , challenge } {#1} {
 			\AtBeginEnvironment{#1}{\texlib@bind@worked}
 			\AtBeginEnvironment{#1*}{\texlib@bind@worked}
+			\AtEndEnvironment{#1}{\texlib@worked@write}
+			\AtEndEnvironment{#1*}{\texlib@worked@write}
 		}
 	}{
 		\msg_error:nnn { texlib-thmenv } { unknown-env } {#1}
@@ -254,6 +342,10 @@
 	\AtBeginEnvironment{ex*}{\texlib@bind@worked}%
 	\AtBeginEnvironment{ques*}{\texlib@bind@worked}%
 	\AtBeginEnvironment{prob*}{\texlib@bind@worked}%
+	\AtEndEnvironment{exam*}{\texlib@worked@write}%
+	\AtEndEnvironment{ex*}{\texlib@worked@write}%
+	\AtEndEnvironment{ques*}{\texlib@worked@write}%
+	\AtEndEnvironment{prob*}{\texlib@worked@write}%
 	% Restore the default style so later class code starts clean.
 	\theoremstyle{plain}%
 }

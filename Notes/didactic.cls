@@ -308,7 +308,7 @@
 	texlibbase,
 	colback=green!3!white,
 	borderline west={\texlibrulewidth}{0pt}{green!50!black},
-	before upper={\textbf{Solution.}\par\smallskip},
+	before upper={\textbf{\texlib@solbox@label.}\par\smallskip},
 }
 \NewTColorBox{@sol@blank}{}{
 	texlibbase,
@@ -339,6 +339,7 @@
 \NewDocumentEnvironment{solution}{ O{3cm} }
 {%
 	\ifsolutions
+		\texlib@solbox@step
 		\begin{@sol@shown}%
 	\else
 		\setbox\z@\vbox\bgroup
