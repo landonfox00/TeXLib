@@ -25,15 +25,18 @@ The flags are injected the way the builder injects them -- \\def\\Show...{} on t
 command line before \\input -- so this exercises the real compile-time path, not
 a source-level \\solutions in the document.
 
-IMPORTANT (autoexam specifics, verified empirically 2026-07-10): for the exam
-class the answer key is produced by \\ShowSolutions (which drives the class's
-student+instructor dual-copy loop and sets \\ifsolutions for the instructor
-copy). \\ShowKey sets \\ifkey, but autoexam.cls never consults \\ifkey, so
-\\def\\ShowKey{} is a NO-OP for this class and yields a student-identical body.
-The {solution}/{partsolution} boxes, the side-by-side multiple-choice key, and
-the \\rubric overlay (all in texlib-solutions.sty) gate on \\ifsolutions, not
-\\ifkey. The mode table below pins that reality: if \\ShowKey is ever wired to
-reveal answers for exams, the ShowKey row starts failing and asks to be updated.
+IMPORTANT (autoexam specifics): for the exam class the answer key is produced by
+either \\ShowSolutions or \\ShowKey. \\ShowSolutions drives the class's dual
+student+instructor copy loop (AutoExamSolMode=dual) and sets \\ifsolutions for the
+instructor copy; \\ShowKey (and source \\keys) requests the instructor-ONLY build
+(AutoExamSolMode=only) -- an exam's answer key IS its instructor copy -- and
+autoexam.cls forces \\ifsolutions for it, so \\ifkey now IMPLIES \\ifsolutions.
+Both flags therefore reveal the same content. The {solution}/{partsolution}
+boxes, the side-by-side multiple-choice key, and the \\rubric overlay (all in
+texlib-solutions.sty) gate on \\ifsolutions; rubrics additionally require
+\\ShowRubric. The mode table below asserts \\ShowKey and \\ShowSolutions reveal
+identically for this (no-\\versions) fixture -- if \\ShowKey ever regresses to a
+no-op the ShowKey row starts failing.
 
 Soft-skips (exit 0) if lualatex or a poppler-flavored pdftotext is missing,
 matching test_synctex_integration.py / test_biber_integration.py's
@@ -167,9 +170,12 @@ MODES = [
      dict(sol=False, ans=False, rub=False)),
     ("StudentMode",             r"\def\StudentMode{}",
      dict(sol=False, ans=False, rub=False)),
-    # \ShowKey is a no-op for autoexam (see module docstring); pins that reality.
+    # \ShowKey builds the exam's answer key (instructor-only "only" mode; wired in
+    # autoexam.cls so \ifkey implies \ifsolutions). For this no-\versions fixture
+    # that is a single key copy revealing the solution and the MC answer letter --
+    # identical reveals to \ShowSolutions. Rubrics still need \ShowRubric.
     ("ShowKey",                 r"\def\ShowKey{}",
-     dict(sol=False, ans=False, rub=False)),
+     dict(sol=True,  ans=True,  rub=False)),
     ("ShowSolutions",           r"\def\ShowSolutions{}",
      dict(sol=True,  ans=True,  rub=False)),
     ("ShowSolutions+ShowRubric", r"\def\ShowSolutions{}\def\ShowRubric{}",
