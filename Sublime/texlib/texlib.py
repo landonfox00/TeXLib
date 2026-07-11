@@ -98,8 +98,25 @@ def _build_report(base, errors, warnings, log_path):
 PROGRAM_RE = re.compile(r"(?im)^%\s*!\s*T[Ee]X\s+program\s*=\s*(\S+)")
 ROOT_RE = re.compile(r"(?im)^%\s*!\s*T[Ee]X\s+root\s*=\s*(.+?)\s*$")
 
-# One build at a time; the cancel command reaches the live thread/process here.
-_active = {"thread": None, "cancel": None, "proc": None}
+# Concurrent builds, one registry entry per tex-root: distinct documents build
+# in parallel; a second build of the SAME document is refused. Each entry owns
+# its thread/cancel/proc/panel so cancel targeting and the aux env stay per-build
+# -- there is NO global TEXLIB_AUX_DIR to race (the runner injects each build's
+# own _aux_target into that build's subprocess env instead; see _run_argv).
+_builds = {}                    # root_path -> {"thread","cancel","proc","panel"}
+_builds_lock = threading.Lock()
+
+
+def _build_active(root):
+    """True if a build for `root` is currently running."""
+    with _builds_lock:
+        e = _builds.get(root)
+        return bool(e and e["thread"] and e["thread"].is_alive())
+
+
+def _panel_name(root):
+    """A per-document output-panel name so concurrent builds don't share one."""
+    return "texlib_" + hashlib.md5((root or "").encode("utf-8")).hexdigest()[:8]
 
 
 # --- Target resolution -------------------------------------------------------
@@ -138,11 +155,12 @@ def _raw_engine(src):
 
 
 # --- Output panel ------------------------------------------------------------
-def _panel(window, base_dir):
-    """Create (but do NOT show) the build panel. Visibility is decided by the
+def _panel(window, root, base_dir):
+    """Create (but do NOT show) this build's own output panel (named per tex-root
+    so concurrent builds each stream to their own). Visibility is decided by the
     show_panel_on_build setting: shown during the build only in 'always' mode,
     and at the end only if the build failed."""
-    panel = window.create_output_panel("texlib")
+    panel = window.create_output_panel(_panel_name(root))
     s = panel.settings()
     s.set("result_file_regex", RESULT_FILE_REGEX)
     # The engine emits relative paths (./exam-01.tex:14:) under -file-line-error;
@@ -164,25 +182,28 @@ def _echo(panel, text):
     )
 
 
-def _show_panel(window):
-    window.run_command("show_panel", {"panel": "output.texlib"})
+def _show_panel(window, root):
+    window.run_command("show_panel", {"panel": "output." + _panel_name(root)})
 
 
-def _hide_panel(window):
-    """Hide the TeXLib panel, but only if it's the one currently showing."""
-    if window.active_panel() == "output.texlib":
+def _hide_panel(window, root):
+    """Hide this build's panel, but only if it's the one currently showing."""
+    if window.active_panel() == "output." + _panel_name(root):
         window.run_command("hide_panel")
 
 
 # --- Engine runner (the new surface: async, streamed, cancellable) -----------
-def _run_argv(cmd, cwd, emit, cancel, texinputs):
+def _run_argv(cmd, cwd, emit, cancel, texinputs, aux_dir, entry):
     """Run one engine/biber command; stream combined output via `emit`; return
     the full captured text (fed back to the brain as self.out for rerun/biber
-    detection). Reads os.environ fresh so the brain's TEXLIB_AUX_DIR (set inside
-    commands() before the first yield) is inherited by the child."""
+    detection). The aux dir is injected into THIS subprocess's own env (never a
+    global os.environ), so concurrent builds of different documents can't race a
+    shared TEXLIB_AUX_DIR -- each engine gets its own build's aux dir. proc is
+    parked on this build's registry `entry` so cancel reaches the right process."""
     env = dict(os.environ)
     if texinputs:
         env["TEXINPUTS"] = texinputs
+    env["TEXLIB_AUX_DIR"] = aux_dir or ""
     try:
         proc = subprocess.Popen(
             cmd, cwd=cwd, env=env,
@@ -193,7 +214,7 @@ def _run_argv(cmd, cwd, emit, cancel, texinputs):
     except Exception as exc:  # noqa: BLE001 - surface launch failures to the panel
         emit("TeXLib: failed to launch %s: %s\n" % (cmd[0], exc))
         return ""
-    _active["proc"] = proc
+    entry["proc"] = proc
     chunks = []
     try:
         for line in proc.stdout:
@@ -209,7 +230,7 @@ def _run_argv(cmd, cwd, emit, cancel, texinputs):
         except Exception:  # noqa: BLE001
             pass
         proc.wait()
-        _active["proc"] = None
+        entry["proc"] = None
     return "".join(chunks)
 
 
@@ -237,10 +258,6 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
     """Native TeXLib build. Palette: "TeXLib: Build ..."; arg {"mode": "<token>"}."""
 
     def run(self, mode="default"):
-        t = _active.get("thread")
-        if t and t.is_alive():
-            sublime.status_message("TeXLib: a build is already running.")
-            return
         view = self.window.active_view()
         if not _is_tex(view):
             sublime.status_message("TeXLib: not a LaTeX document.")
@@ -254,10 +271,14 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         if not root:
             sublime.error_message("TeXLib: save the document before building.")
             return
+        if _build_active(root):
+            sublime.status_message(
+                "TeXLib: a build for %s is already running." % os.path.basename(root))
+            return
         engine = _raw_engine(src)
         tex_dir = os.path.dirname(root)
 
-        panel = _panel(self.window, tex_dir)
+        panel = _panel(self.window, root, tex_dir)
         window = self.window
         base = os.path.basename(root)
         log_path = _aux_log_path(root, base)
@@ -276,7 +297,7 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                 sublime.set_timeout(lambda t=text: _echo(panel, t), 0)
 
         if show_raw:
-            sublime.set_timeout(lambda: _show_panel(window), 0)
+            sublime.set_timeout(lambda: _show_panel(window, root), 0)
         view.set_status("texlib_build", "TeXLib: building %s..." % base)
 
         # Optional TEXINPUTS: real cross-package builds need the repo root on the
@@ -320,30 +341,36 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                         # streamed raw log.
                         _echo(panel, _build_report(
                             base, error_lines, warning_lines, log_path))
-                        _show_panel(window)
+                        _show_panel(window, root)
                 else:  # ok
                     view.set_status("texlib_build", "TeXLib: built %s" % base)
                     if show_mode != "always":
-                        _hide_panel(window)
+                        _hide_panel(window, root)
                 sublime.set_timeout(
                     lambda: view.erase_status("texlib_build"),
                     8000 if state == "error" else 4000)
             sublime.set_timeout(apply, 0)
 
         cancel = threading.Event()
-        _active["cancel"] = cancel
+        entry = {"thread": None, "cancel": cancel, "proc": None,
+                 "panel": _panel_name(root)}
         th = threading.Thread(
             target=self._drive,
-            args=(host, tex_dir, emit, cancel, texinputs, on_success, on_finish),
+            args=(host, tex_dir, emit, cancel, texinputs, root, entry,
+                  on_success, on_finish),
         )
         th.daemon = True
-        _active["thread"] = th
+        entry["thread"] = th
+        # Register atomically, replacing any finished entry for this root. The
+        # _build_active guard above already refused a still-running same-doc build.
+        with _builds_lock:
+            _builds[root] = entry
         th.start()
 
     def is_enabled(self):
         return _is_tex(self.window.active_view())
 
-    def _drive(self, host, tex_dir, emit, cancel, texinputs,
+    def _drive(self, host, tex_dir, emit, cancel, texinputs, root, entry,
                on_success=None, on_finish=None):
         """Consume the brain's commands() coroutine: run each yielded argv, feed
         its output back via host.out, resume, collecting file:line errors from the
@@ -374,7 +401,8 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             while True:
                 cmd, msg = item
                 emit(msg + "\n")
-                host.out = _run_argv(cmd, tex_dir, collect, cancel, texinputs)
+                host.out = _run_argv(cmd, tex_dir, collect, cancel, texinputs,
+                                     getattr(host, "_aux_target", None), entry)
                 if cancel.is_set():
                     emit("TeXLib: build cancelled.\n")
                     state = "cancelled"
@@ -386,8 +414,8 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             emit("TeXLib: build driver error: %s\n" % exc)
             state = "error"
         finally:
-            _active["thread"] = None
-            _active["cancel"] = None
+            with _builds_lock:
+                _builds.pop(root, None)
         if state == "ok" and on_success:
             if os.path.exists(os.path.join(tex_dir, host.base_name + ".pdf")):
                 on_success()
@@ -395,24 +423,55 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             on_finish(state, error_lines, warning_lines)
 
 
+def _kill_entry(entry):
+    if entry.get("cancel"):
+        entry["cancel"].set()
+    proc = entry.get("proc")
+    if proc:
+        try:
+            proc.kill()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 class TexlibCancelBuildCommand(sublime_plugin.WindowCommand):
-    """Cancel the running native build (signals the loop and kills the process)."""
+    """Cancel the build for the ACTIVE document. Different documents build
+    concurrently, so this targets only the active view's build; use "Cancel All
+    Builds" to stop every running build at once."""
+
+    def _root(self):
+        view = self.window.active_view()
+        root, _ = _resolve_root(view) if view else (None, "")
+        return root
 
     def run(self):
-        cancel = _active.get("cancel")
-        if cancel:
-            cancel.set()
-        proc = _active.get("proc")
-        if proc:
-            try:
-                proc.kill()
-            except Exception:  # noqa: BLE001
-                pass
+        root = self._root()
+        with _builds_lock:
+            entry = _builds.get(root)
+        if not entry:
+            sublime.status_message("TeXLib: no build running for this document.")
+            return
+        _kill_entry(entry)
         sublime.status_message("TeXLib: cancelling build...")
 
     def is_enabled(self):
-        t = _active.get("thread")
-        return bool(t and t.is_alive())
+        return _build_active(self._root())
+
+
+class TexlibCancelAllBuildsCommand(sublime_plugin.WindowCommand):
+    """Cancel every running native build."""
+
+    def run(self):
+        with _builds_lock:
+            entries = list(_builds.values())
+        for entry in entries:
+            _kill_entry(entry)
+        sublime.status_message("TeXLib: cancelling all builds...")
+
+    def is_enabled(self):
+        with _builds_lock:
+            return any(e["thread"] and e["thread"].is_alive()
+                       for e in _builds.values())
 
 
 class TexlibBuildPickCommand(sublime_plugin.WindowCommand):

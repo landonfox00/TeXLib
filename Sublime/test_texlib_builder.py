@@ -66,7 +66,26 @@ def _install_latextools_stub():
 _install_latextools_stub()
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from texlib_builder import TexlibBuilder, GRADEBOOK_SHEETS  # noqa: E402
+
+def _install_texlib_package_stub():
+    """texlib_builder.py pulls its shared build core from the native TeXLib
+    Sublime package (`from TeXLib.texlib_build import TexlibBuildCore`). That
+    package name only exists inside Sublime (deploy-plugin.ps1 junctions
+    Sublime/texlib -> Packages/TeXLib), so register the native texlib_build
+    module under the TeXLib package name to make the import resolve headless."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, os.path.join(here, "texlib"))
+    import texlib_build as _native  # Sublime/texlib/texlib_build.py (sublime-free)
+    pkg = types.ModuleType("TeXLib")
+    pkg.__path__ = [os.path.join(here, "texlib")]
+    sys.modules.setdefault("TeXLib", pkg)
+    sys.modules.setdefault("TeXLib.texlib_build", _native)
+
+
+_install_texlib_package_stub()
+
+from texlib_builder import TexlibBuilder  # noqa: E402
+from texlib_build import GRADEBOOK_SHEETS, TexlibBuildCore  # noqa: E402  (native core)
 
 
 # --- 2. Harness ------------------------------------------------------------
@@ -725,29 +744,22 @@ def main():
           ab._resolve_aux_directory(proj))
 
     # ====================================================================== #
-    # (r2) _set_aux_target also exports TEXLIB_AUX_DIR for problem_engine.lua:
-    # raw Lua io.open bypasses -output-directory (unlike \openout, which
-    # kpathsea redirects), so the engine's own build-time scratch (per-version
-    # body files, .sco, .srcmap, per-problem SyncTeX-fallback files) needs this
-    # env var to follow the same routing instead of landing next to the source.
+    # (r2) _set_aux_target resolves the aux dir onto the PER-BUILD instance
+    # (self._aux_target). The runner injects THAT into each engine subprocess's
+    # own env as TEXLIB_AUX_DIR (so raw-Lua-io.open engine scratch follows the
+    # routing) rather than a shared os.environ -- concurrent builds of different
+    # documents must not race one global. Here we assert the per-instance
+    # resolution; the per-subprocess env injection is covered in
+    # test_texlib_runner.py ("aux env: ...injected into ITS subprocess env").
     # ====================================================================== #
-    saved_env = os.environ.get("TEXLIB_AUX_DIR")
-    try:
-        ab.aux_directory = ""
-        ab._set_aux_target(proj)
-        check("aux-dir: TEXLIB_AUX_DIR empty when routing disabled",
-              os.environ.get("TEXLIB_AUX_DIR") == "",
-              os.environ.get("TEXLIB_AUX_DIR"))
-        ab.aux_directory = abs_dir
-        ab._set_aux_target(proj)
-        check("aux-dir: TEXLIB_AUX_DIR matches the resolved aux dir",
-              os.environ.get("TEXLIB_AUX_DIR") == abs_dir,
-              os.environ.get("TEXLIB_AUX_DIR"))
-    finally:
-        if saved_env is None:
-            os.environ.pop("TEXLIB_AUX_DIR", None)
-        else:
-            os.environ["TEXLIB_AUX_DIR"] = saved_env
+    ab.aux_directory = ""
+    check("aux-dir: _aux_target is None when routing disabled",
+          ab._set_aux_target(proj) is None and ab._aux_target is None,
+          repr(ab._aux_target))
+    ab.aux_directory = abs_dir
+    check("aux-dir: _aux_target matches the resolved aux dir",
+          ab._set_aux_target(proj) == abs_dir and ab._aux_target == abs_dir,
+          repr(ab._aux_target))
 
     # ====================================================================== #
     # (s) _force_remove also clears a ReadOnly file (the other Errno-13 cause).
@@ -935,13 +947,13 @@ def main():
 
         # _external_python() must find a pypdf-capable interpreter (the one
         # running this test qualifies), and it must be cached.
-        TexlibBuilder._ext_python_cache = False  # reset any prior discovery
+        TexlibBuildCore._ext_python_cache = False  # reset (cache lives on the core)
         eb = TexlibBuilder()
         extpy = eb._external_python()
         check("external python: a pypdf-capable interpreter is found",
               bool(extpy), extpy)
         check("external python: result is cached",
-              getattr(TexlibBuilder, "_ext_python_cache", False) == extpy)
+              getattr(TexlibBuildCore, "_ext_python_cache", False) == extpy)
 
         # The CLI is what the fallback actually invokes: run it via subprocess
         # and confirm it slices + emits JSON, just as Sublime's build would.

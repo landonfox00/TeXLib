@@ -45,14 +45,42 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import types
 
-# --- Reuse the repo's own real-builder import (build_versions.py already
-# solves the LaTeXTools-stub dance; no reason to re-solve it here). ----------
+# --- Import the real builder headless. build_versions.py used to do the
+# LaTeXTools-stub dance and re-export TexlibBuilder; it was removed, and the
+# builder's shared core now lives in the native TeXLib package
+# (TeXLib.texlib_build.TexlibBuildCore). Stub LaTeXTools' PdfBuilder and the
+# TeXLib package, then import TexlibBuilder directly. -------------------------
 TEXLIB_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_HERE = os.path.dirname(os.path.abspath(__file__))  # Sublime/
 sys.path.insert(0, TEXLIB_ROOT)
-import build_versions  # noqa: E402
 
-TexlibBuilder = build_versions.TexlibBuilder
+
+class _StubPdfBuilder:
+    def __init__(self, *a, **k):
+        self._displayed = ""
+
+    def display(self, msg):
+        self._displayed += str(msg)
+
+
+for _name in (
+    "LaTeXTools", "LaTeXTools.plugins", "LaTeXTools.plugins.builder",
+    "LaTeXTools.plugins.builder.pdf_builder",
+):
+    sys.modules.setdefault(_name, types.ModuleType(_name))
+sys.modules["LaTeXTools.plugins.builder.pdf_builder"].PdfBuilder = _StubPdfBuilder
+
+sys.path.insert(0, _HERE)                            # texlib_builder.py
+sys.path.insert(0, os.path.join(_HERE, "texlib"))    # native texlib_build.py
+import texlib_build as _native_texlib_build  # noqa: E402
+_texlib_pkg = types.ModuleType("TeXLib")
+_texlib_pkg.__path__ = [os.path.join(_HERE, "texlib")]
+sys.modules.setdefault("TeXLib", _texlib_pkg)
+sys.modules.setdefault("TeXLib.texlib_build", _native_texlib_build)
+
+from texlib_builder import TexlibBuilder  # noqa: E402
 
 
 def _texinputs_env(tex_dir):

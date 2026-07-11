@@ -540,13 +540,14 @@ class TexlibBuildCore:
         \\openout, which kpathsea already routes -- why .aux/.log land in the
         aux dir but this engine's scratch always landed next to the source).
         TEXLIB_AUX_DIR lets problem_engine.lua's texlib_scratch_path mirror
-        that same routing; os.environ is inherited by the lualatex
-        subprocess LaTeXTools spawns for the command we yield. Empty string
-        (not None) when aux routing is disabled, so a stale value from a
-        previous build in the same process can't leak into this one.
+        that same routing. The runner (texlib._run_argv) injects this build's
+        _aux_target into each engine subprocess's OWN env rather than a shared
+        os.environ, so concurrent builds of different documents never race a
+        global -- each engine gets exactly its own build's aux dir (or "" when
+        aux routing is disabled). _aux_target is a per-instance (per-build)
+        attribute, so the Python-side post-steps that read it stay correct too.
         """
         self._aux_target = self._resolve_aux_directory(tex_dir)
-        os.environ["TEXLIB_AUX_DIR"] = self._aux_target or ""
         return self._aux_target
 
     def _resolve_aux_directory(self, tex_dir):
