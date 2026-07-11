@@ -1,0 +1,22 @@
+[
+    { "caption": "TeXLib: New Document", "command": "texlib_new_document" },
+    { "caption": "TeXLib: Build (pick mode)", "command": "texlib_build_pick" },
+    { "caption": "TeXLib: Build — Default", "command": "texlib_build", "args": { "mode": "default" } },
+    { "caption": "TeXLib: Build — Answer Key", "command": "texlib_build", "args": { "mode": "key" } },
+    { "caption": "TeXLib: Build — Solutions", "command": "texlib_build", "args": { "mode": "solutions" } },
+    { "caption": "TeXLib: Build — Student Copy", "command": "texlib_build", "args": { "mode": "student" } },
+    { "caption": "TeXLib: Build — Rubric", "command": "texlib_build", "args": { "mode": "rubric" } },
+    { "caption": "TeXLib: Build — Draft", "command": "texlib_build", "args": { "mode": "draft" } },
+    { "caption": "TeXLib: Build — Quick (single pass)", "command": "texlib_build", "args": { "mode": "quick" } },
+    { "caption": "TeXLib: Cancel Build", "command": "texlib_cancel_build" },
+    { "caption": "TeXLib: Cancel All Builds", "command": "texlib_cancel_all_builds" },
+    { "caption": "TeXLib: View PDF", "command": "texlib_view_pdf" },
+    { "caption": "TeXLib: Forward Sync (cursor → PDF)", "command": "texlib_forward_sync" },
+    { "caption": "TeXLib: Go to Bank Problem", "command": "texlib_goto_problem" },
+    { "caption": "TeXLib: Insert Bank Problem (\\getproblem)", "command": "texlib_insert_problem" },
+    { "caption": "TeXLib: Install Classes to TEXMF", "command": "texlib_install_texmf" },
+    { "caption": "TeXLib: Open coursemeta.tex", "command": "texlib_open_coursemeta" },
+    { "caption": "TeXLib: Reveal Aux Directory", "command": "texlib_reveal_aux" },
+    { "caption": "TeXLib: Clean Aux Directory", "command": "texlib_clean_aux" },
+    { "caption": "TeXLib: Package for LMS", "command": "texlib_package_lms" }
+]

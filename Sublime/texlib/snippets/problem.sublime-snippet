@@ -1,0 +1,8 @@
+<snippet>
+	<content><![CDATA[\begin{problem}{${1:id}}[${2:topic=}]
+	${0:problem statement}
+\end{problem}]]></content>
+	<tabTrigger>problem</tabTrigger>
+	<scope>text.tex.latex</scope>
+	<description>TeXLib: \begin{problem}{id}[attrs]</description>
+</snippet>

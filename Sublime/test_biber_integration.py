@@ -59,6 +59,17 @@ def _install_stub():
 
 _install_stub()
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# The shared build core lives in the native TeXLib Sublime package
+# (TeXLib.texlib_build.TexlibBuildCore); that package name only exists inside
+# Sublime, so register the native module under it for a headless import.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "texlib"))
+import texlib_build as _native_texlib_build  # noqa: E402
+_texlib_pkg = types.ModuleType("TeXLib")
+_texlib_pkg.__path__ = [os.path.join(os.path.dirname(os.path.abspath(__file__)), "texlib")]
+sys.modules.setdefault("TeXLib", _texlib_pkg)
+sys.modules.setdefault("TeXLib.texlib_build", _native_texlib_build)
+
 from texlib_builder import TexlibBuilder  # noqa: E402
 
 

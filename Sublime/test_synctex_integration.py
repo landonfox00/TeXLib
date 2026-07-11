@@ -47,18 +47,18 @@ import sys
 import tempfile
 import types
 
-# --- Import the real Sublime builder. build_versions.py used to do the
-# LaTeXTools-stub dance and re-export TexlibBuilder; it was removed with the
-# All-Versions builder, so stub PdfBuilder here (the same minimal stub
-# test_texlib_builder.py uses) before importing TexlibBuilder directly. -----
+# --- Import the real builder headless. build_versions.py used to do the
+# LaTeXTools-stub dance and re-export TexlibBuilder; it was removed, and the
+# builder's shared core now lives in the native TeXLib package
+# (TeXLib.texlib_build.TexlibBuildCore). Stub LaTeXTools' PdfBuilder and the
+# TeXLib package, then import TexlibBuilder directly. -------------------------
 TEXLIB_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_HERE = os.path.dirname(os.path.abspath(__file__))  # Sublime/
 sys.path.insert(0, TEXLIB_ROOT)
 
 
 class _StubPdfBuilder:
-    """Minimal stand-in for LaTeXTools' PdfBuilder."""
-
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *a, **k):
         self._displayed = ""
 
     def display(self, msg):
@@ -66,14 +66,19 @@ class _StubPdfBuilder:
 
 
 for _name in (
-    "LaTeXTools",
-    "LaTeXTools.plugins",
-    "LaTeXTools.plugins.builder",
+    "LaTeXTools", "LaTeXTools.plugins", "LaTeXTools.plugins.builder",
     "LaTeXTools.plugins.builder.pdf_builder",
 ):
     sys.modules.setdefault(_name, types.ModuleType(_name))
 sys.modules["LaTeXTools.plugins.builder.pdf_builder"].PdfBuilder = _StubPdfBuilder
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+sys.path.insert(0, _HERE)                            # texlib_builder.py
+sys.path.insert(0, os.path.join(_HERE, "texlib"))    # native texlib_build.py
+import texlib_build as _native_texlib_build  # noqa: E402
+_texlib_pkg = types.ModuleType("TeXLib")
+_texlib_pkg.__path__ = [os.path.join(_HERE, "texlib")]
+sys.modules.setdefault("TeXLib", _texlib_pkg)
+sys.modules.setdefault("TeXLib.texlib_build", _native_texlib_build)
 
 from texlib_builder import TexlibBuilder  # noqa: E402
 

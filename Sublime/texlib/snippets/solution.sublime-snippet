@@ -1,0 +1,8 @@
+<snippet>
+	<content><![CDATA[\begin{solution}
+	${0:answer}
+\end{solution}]]></content>
+	<tabTrigger>solution</tabTrigger>
+	<scope>text.tex.latex</scope>
+	<description>TeXLib: \begin{solution}</description>
+</snippet>
