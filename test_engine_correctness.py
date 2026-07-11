@@ -23,6 +23,12 @@ regression anywhere along the engine -> LaTeX -> PDF path is caught:
     letter equals that slot -- i.e. the KEY is actually CORRECT, not just
     present (emit_mc_tail's letter computation).  Also checks [fixed] order
     preservation, \\fchoice[i] slot pinning, and [choose=m] selection.
+  * Stretch (ppart-test): a shuffled exam of multi-part problems, checking each
+    problem's \\ppart parts stay contiguous, correctly sub-lettered, and never
+    leak to a neighbour (pbank_inject_part atomicity under \\shuffle).
+  * Stretch (import-test): \\importproblem renders a standalone file inline with
+    its overrides locking the file's own \\setvar/\\setrng, and push_scope/
+    pop_scope keeps the import's variables from leaking out.
   * Stretch (vmap-test): parses the engine-emitted .vmap version markers and
     pdftotext-slices each copy's page range (the marker EMISSION in
     autoexam_run_versions was never exercised -- only the builder's slicer was).
@@ -393,6 +399,37 @@ def scenario_ppart_atomicity():
 
 
 # =============================================================================
+# Stretch: \importproblem -- standalone file render + override lock + isolation
+# =============================================================================
+def scenario_importproblem():
+    print("\n=== Stretch: \\importproblem render + override lock + scope isolation (import-test) ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_engine_import_")
+    try:
+        pdf, _aux, log = build(tmp, "import-test.tex", "import-problem.tex")
+        check("PDF was produced", os.path.exists(pdf), log[-600:])
+        if not os.path.exists(pdf):
+            return
+        text = flat(pdftext(pdf))
+
+        # The standalone file renders inline, and the {a=3,b=4,c=5} overrides lock
+        # its own \setvar{a}{77} / out-of-range \setrng{b} (c comes straight from
+        # the override) -- same fixed[] semantics as \problem{id}[a=1,...].
+        check("\\importproblem renders the file with overrides locked "
+              "('IMPSTART 3 and 4 and 5 IMPEND')",
+              "IMPSTART 3 and 4 and 5 IMPEND" in text, text[:200])
+        # push_scope/pop_scope isolation: a variable the imported file set
+        # internally (leak=42, not overridden) must not survive the import, so the
+        # following \get{leak} reads undefined and prints "??".
+        check("a variable set inside the import does not leak past pop_scope "
+              "('AFTERIMP ?? ENDAFTER')",
+              "AFTERIMP ?? ENDAFTER" in text, text[:200])
+        check("...and the leaked value 42 specifically does not escape",
+              "AFTERIMP 42" not in text)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# =============================================================================
 # Stretch: engine-emitted .vmap version markers
 # =============================================================================
 def scenario_vmap_emission():
@@ -455,6 +492,7 @@ def main():
     scenario_mc_answer_key_basic()
     scenario_mc_answer_key_shuffle()
     scenario_ppart_atomicity()
+    scenario_importproblem()
     scenario_vmap_emission()
 
     print(f"\n{_PASS} passed, {_FAIL} failed")

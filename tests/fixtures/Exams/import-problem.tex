@@ -1,0 +1,10 @@
+% import-problem.tex -- a STANDALONE problem file for \importproblem, which
+% \inputs it inline (no \begin{problem} wrapper -- the content renders directly).
+% Its \setvar/\setrng are authored to DIFFER from the caller's overrides so a
+% rendered value proves the override actually locked them (pbank_apply_fix +
+% fixed[] guards).  \setvar{leak} is deliberately NOT overridden, so the caller
+% can also confirm push_scope/pop_scope kept it from leaking out of the import.
+\setvar{a}{77}%       a fixed override must beat this (never renders 77)
+\setrng{b}{20}{29}%   a fixed override must beat this (fixed value is out of range)
+\setvar{leak}{42}%    not overridden -> must stay scoped to the import
+IMPSTART \get{a} and \get{b} and \get{c} IMPEND
