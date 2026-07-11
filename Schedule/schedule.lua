@@ -653,12 +653,15 @@ end
 -- \schedcell boxes) instead of xltabular.  Same visual grid, but each cell
 -- ships eagerly so SyncTeX inverse search works per-cell (see the SyncTeX
 -- writeup above).  Toggled via the `box-grid` meta key.  nil/false -> xltabular.
--- Pull the xcolor spec out of a cell.color string ("\\cellcolor{orange!15}" ->
+-- Pull the xcolor spec out of a cell.color string ("\\SetCell{bg=orange!15}" ->
 -- "orange!15").  The box-grid renderer needs the bare color name for
 -- \schedcell's first argument; empty / unrecognised -> "white" (no fill).
+-- NB: cells carry their fill as tabularray's \SetCell{bg=<color>} (see the
+-- cell.color assignments above). Matching the pre-tabularray \cellcolor{...}
+-- here silently returned "white" for every cell, dropping all box-grid fills.
 local function cell_color_name(color_str)
 	if not color_str or color_str == "" then return "white" end
-	local name = color_str:match("\\cellcolor%s*{(.-)}")
+	local name = color_str:match("bg=([^,}%s]+)")
 	return name or "white"
 end
 
