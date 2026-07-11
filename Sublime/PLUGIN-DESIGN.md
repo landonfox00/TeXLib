@@ -288,9 +288,18 @@ code, not a delegated call.
     `%TEMP%\texlib-aux\<md5(tex_root)[:12]>` the build routes to — hash + tex_root
     resolution mirror the runner so it points at the same folder). `test_texlib_
     locate.py` covers both. **Live check pending.**
-  - Domain set essentially complete (bank / TEXMF / scaffold / locators). Optional
-    later: TeXLib-macro completions + snippets. **Phase 2 is next** (consolidate the
-    two brains + cut over; revisit the provisional log-parser decision).
+  - **Completions + snippets done (2026-07-10).** `texlib/texlib_complete.py` —
+    macro completions after `\` (\getproblem/\setvar/\picklist/…) and problem-**id**
+    completions inside `\getproblem{…}` (reuses the bank scanner). `snippets/` —
+    `problem`/`solution`/`parts`/`questions`/`getproblem`/`versions`.
+    `test_texlib_complete.py` covers the context classifier.
+  - **Utility commands done (2026-07-10).** `texlib/texlib_utils.py` — `Clean Aux
+    Directory` (rmtree the build's aux dir, reuses `aux_dir_for`) and `Package for
+    LMS` (shell out to `package_for_lms.py`). **Deferred:** `Show Resolved Metadata`
+    — an honest version needs the engine to dump resolved values (a build-time
+    `.metadump` sidecar), so skipped rather than showing half-resolved coursemeta.
+  - Domain set complete (bank / TEXMF / scaffold / locators / completions /
+    snippets / utils). Phase 2 (consolidation + cutover) is done above.
 - **Phase 4 — distribution.** Package via the installer repo / a Package Control
   custom repo; finish the settings split; document LaTeXTools as a companion.
 

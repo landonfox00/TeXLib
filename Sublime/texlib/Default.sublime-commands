@@ -15,5 +15,7 @@
     { "caption": "TeXLib: Insert Bank Problem (\\getproblem)", "command": "texlib_insert_problem" },
     { "caption": "TeXLib: Install Classes to TEXMF", "command": "texlib_install_texmf" },
     { "caption": "TeXLib: Open coursemeta.tex", "command": "texlib_open_coursemeta" },
-    { "caption": "TeXLib: Reveal Aux Directory", "command": "texlib_reveal_aux" }
+    { "caption": "TeXLib: Reveal Aux Directory", "command": "texlib_reveal_aux" },
+    { "caption": "TeXLib: Clean Aux Directory", "command": "texlib_clean_aux" },
+    { "caption": "TeXLib: Package for LMS", "command": "texlib_package_lms" }
 ]

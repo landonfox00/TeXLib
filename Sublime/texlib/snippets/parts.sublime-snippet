@@ -1,0 +1,9 @@
+<snippet>
+	<content><![CDATA[\begin{parts}
+	\part[${1:pts}] ${2:first part}
+	\part[${3:pts}] ${0:second part}
+\end{parts}]]></content>
+	<tabTrigger>parts</tabTrigger>
+	<scope>text.tex.latex</scope>
+	<description>TeXLib: \begin{parts} with \part[pts]</description>
+</snippet>

@@ -1,0 +1,8 @@
+<snippet>
+	<content><![CDATA[\begin{questions}
+	\question ${0:question text}
+\end{questions}]]></content>
+	<tabTrigger>questions</tabTrigger>
+	<scope>text.tex.latex</scope>
+	<description>TeXLib: \begin{questions} with \question</description>
+</snippet>
