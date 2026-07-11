@@ -36,8 +36,21 @@ jobs:
   #   * test_exam_seed.lua          -- pure-texlua unit test of set_exam_seed's
   #     per-version decorrelation (needs texlua, hence this job, not the fast
   #     Python-only one). Cheap; run first.
-  # The Python tests soft-skip if their tools are missing, so a toolchain hiccup
-  # degrades gracefully rather than failing the job.
+  #   * test_shuffle.lua -- the permutation core (problem_shuffle.lua) under
+  #     texlua alone: bijection, determinism, seed-sensitivity, extra-credit
+  #     pinning. Pure logic, but texlua ships only with TeX Live, so it rides
+  #     this job rather than the toolchain-free builder-logic one above. A
+  #     deliberately broken permutation fails CI here on every push (smoke.yml /
+  #     visual.yml are main-only, so this is the shuffle core's only feature-
+  #     branch gate).
+  #   * test_shuffle_integration.py -- the real-build end of the shuffle work
+  #     (added on this base branch by a sibling change); run when present.
+  #   * test_mode_effects.py -- differential leakage guard: builds one exam
+  #     fixture per assessment flag and asserts each flag CHANGES output (a
+  #     solution/answer/rubric never leaks into a student copy, and the answer
+  #     key is not a silent no-op). Needs lualatex + poppler's pdftotext.
+  # All soft-skip if their tools are missing, so a toolchain hiccup degrades
+  # gracefully rather than failing the job.
   #
   # Runs in the SAME pinned full-scheme TeX Live container as smoke.yml /
   # visual.yml (full bundles biber + lualatex + the class deps: tikz/pgfplots,
@@ -47,7 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Real biber + SyncTeX tests in pinned TeX Live
+      - name: Real biber + SyncTeX + shuffle + mode-effect tests in pinned TeX Live
         uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
           scheme: full
@@ -60,3 +73,17 @@ jobs:
             python3 Sublime/test_biber_integration.py
             python3 Sublime/test_synctex_integration.py
             python3 test_engine_correctness.py
+            # Shuffle permutation core -- texlua only, no build (see comment above).
+            texlua test_shuffle.lua
+            # Shuffle real-build integration test: added on this base branch by a
+            # sibling change, at the repo root or under Sublime/. Run it wherever
+            # it landed; skip (don't fail) if this branch predates it.
+            if [ -f test_shuffle_integration.py ]; then
+              python3 test_shuffle_integration.py
+            elif [ -f Sublime/test_shuffle_integration.py ]; then
+              python3 Sublime/test_shuffle_integration.py
+            else
+              echo "note: test_shuffle_integration.py not present on this branch -- skipping"
+            fi
+            # Assessment build-flag leakage guard (solutions/answers/rubric).
+            python3 test_mode_effects.py
