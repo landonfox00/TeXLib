@@ -54,6 +54,8 @@ Machine-local values belong in `Packages/User/TeXLib.sublime-settings`.
 - `texinputs` — value for the child engine's `TEXINPUTS` (point at the comma-free
   repo root so shared `.sty` resolve).
 - `open_pdf_on_build` — open/refresh + forward-sync the PDF after a build (default true).
+- `show_panel_on_build` — `"errors"` (default; hidden while building with a status-bar
+  message, pops open with a clickable error summary only on failure), `"always"`, or `"never"`.
 - `publish_shareable_copies` / `copy_published_path_to_clipboard` — publish toggles.
 - `class_source` — path to the TeXLib repo (for scaffolding / TEXMF install / LMS),
   if auto-detection can't find it.

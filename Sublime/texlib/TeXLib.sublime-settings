@@ -19,6 +19,15 @@
     //
     // "open_pdf_on_build": true
 
+    // show_panel_on_build: when to surface the build output panel.
+    //   "errors" (default) -- hidden while building (a "building..." status shows
+    //                         in the status bar); pops open only if the build
+    //                         fails, with a clickable error summary appended.
+    //   "always"           -- stream the panel live, every build.
+    //   "never"            -- never pop the panel; status bar only.
+    //
+    // "show_panel_on_build": "errors"
+
     // class_source: absolute path to the TeXLib class payload for the
     // "Install Classes to TEXMF" command. Leave unset to auto-detect (a bundled
     // latex/ dir in the package, else the repo root above the plugin). Set it if

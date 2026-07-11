@@ -183,5 +183,41 @@ ok &= check(_drive_delegation(pdf_exists=False, cancel_on_pass1=False) is False,
 ok &= check(_drive_delegation(pdf_exists=True, cancel_on_pass1=True) is False,
             "delegation: on_success skipped when the build was cancelled")
 
+# 5. Outcome classification + error collection (drives on_finish).
+def _drive_finish(script_lines):
+    captured = {}
+    texlib.subprocess.Popen = PopenFactory([script_lines])
+    with tempfile.TemporaryDirectory() as tmp:
+        root = os.path.join(tmp, "doc.tex")
+        with open(root, "w", encoding="utf-8") as fh:
+            fh.write("\\documentclass{pset}\n\\begin{document}\nx\n\\end{document}\n")
+        host = texlib_build.TexlibBuild(
+            tex_root=root, engine="pdflatex",
+            options=["--texlib-mode=default"], display=lambda t: None,
+            aux_directory="<<root>>")
+
+        def on_finish(state, errs):
+            captured["state"] = state
+            captured["errs"] = errs
+
+        texlib.TexlibBuildCommand()._drive(
+            host, tmp, lambda t: None, threading.Event(), "",
+            on_success=None, on_finish=on_finish)
+    return captured
+
+
+r = _drive_finish(["./doc.tex:14: Undefined control sequence.\n", "done\n"])
+ok &= check(r["state"] == "error", "classify: a file:line error -> state 'error'")
+ok &= check(r["errs"] == ["./doc.tex:14: Undefined control sequence."],
+            "classify: the source error line is collected for the summary")
+
+r = _drive_finish(["This is pdfTeX\n", "Output written on doc.pdf (1 page)\n"])
+ok &= check(r["state"] == "ok" and r["errs"] == [],
+            "classify: clean output -> state 'ok', no errors")
+
+r = _drive_finish(["/tmp/aux/doc.aux:12: Undefined control sequence.\n"])
+ok &= check(r["state"] == "error", "classify: an .aux error still marks failure")
+ok &= check(r["errs"] == [], "classify: .aux errors excluded from the summary")
+
 print("\nALL PASS" if ok else "\nFAILURES ABOVE")
 sys.exit(0 if ok else 1)

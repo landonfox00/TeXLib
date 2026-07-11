@@ -258,8 +258,13 @@ code, not a delegated call.
   now run the native build for TeX files (LaTeXTools' build system still reachable
   via Build With: TeXLib). Native side proven by the six suites; the LaTeXTools
   adapter path needs a **live re-test** (redeploy `texlib_builder.py` to
-  Packages/User + restart). **Log-parser revisit (Risk #1) still open** — pending a
-  live clickable-error check (introduce a typo, click the error) to get data first.
+  Packages/User + restart). **Log-parser (Risk #1) RESOLVED (2026-07-11):** a live
+  typo build confirmed `-file-line-error` emits accurate `./file.tex:14: message`
+  errors. Landed with two follow-ups: set `result_base_dir` so relative `./` paths
+  resolve on click, and a LaTeXTools-style `show_panel_on_build` ("errors" default) —
+  the panel stays hidden with a status-bar "building…" and pops open only on failure,
+  appending a clickable error summary (source errors; `.aux` consequences excluded).
+  No vendored parser needed.
 - **Phase 3 — domain features.** Scaffolding, coursemeta, bank commands.
   - **Bank navigation done (2026-07-10), `texlib/texlib_bank.py`** (own top-level
     file → hot-reloads independently). `TeXLib: Go to Bank Problem` and `TeXLib:

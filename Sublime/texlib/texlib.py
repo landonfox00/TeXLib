@@ -55,6 +55,10 @@ MODE_TOKENS = {m[0] for m in MODES}
 # file:line:col: message -- matches -file-line-error output (PLUGIN-DESIGN Risk
 # #1), identical to the current TeXLib.sublime-build windows file_regex.
 RESULT_FILE_REGEX = r"^((?:.:)?[^:\n\r]*):([0-9]+):?([0-9]+)?:? (.*)$"
+RESULT_RE = re.compile(RESULT_FILE_REGEX)
+# A build failed if it emits a file:line error OR one of these fatal markers
+# (which may lack a line number).
+FATAL_RE = re.compile(r"^!\s|! LaTeX Error|Emergency stop|Fatal error")
 
 PROGRAM_RE = re.compile(r"(?im)^%\s*!\s*T[Ee]X\s+program\s*=\s*(\S+)")
 ROOT_RE = re.compile(r"(?im)^%\s*!\s*T[Ee]X\s+root\s*=\s*(.+?)\s*$")
@@ -100,6 +104,9 @@ def _raw_engine(src):
 
 # --- Output panel ------------------------------------------------------------
 def _panel(window, base_dir):
+    """Create (but do NOT show) the build panel. Visibility is decided by the
+    show_panel_on_build setting: shown during the build only in 'always' mode,
+    and at the end only if the build failed."""
     panel = window.create_output_panel("texlib")
     s = panel.settings()
     s.set("result_file_regex", RESULT_FILE_REGEX)
@@ -109,7 +116,6 @@ def _panel(window, base_dir):
     s.set("word_wrap", False)
     s.set("line_numbers", False)
     s.set("scroll_past_end", False)
-    window.run_command("show_panel", {"panel": "output.texlib"})
     return panel
 
 
@@ -117,6 +123,16 @@ def _echo(panel, text):
     panel.run_command(
         "append", {"characters": text, "force": True, "scroll_to_end": True}
     )
+
+
+def _show_panel(window):
+    window.run_command("show_panel", {"panel": "output.texlib"})
+
+
+def _hide_panel(window):
+    """Hide the TeXLib panel, but only if it's the one currently showing."""
+    if window.active_panel() == "output.texlib":
+        window.run_command("hide_panel")
 
 
 # --- Engine runner (the new surface: async, streamed, cancellable) -----------
@@ -203,13 +219,22 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         tex_dir = os.path.dirname(root)
 
         panel = _panel(self.window, tex_dir)
+        window = self.window
+        base = os.path.basename(root)
 
         def emit(text):
             sublime.set_timeout(lambda t=text: _echo(panel, t), 0)
 
+        settings = sublime.load_settings("TeXLib.sublime-settings")
+        # Panel visibility, LaTeXTools-style: 'errors' (default) surfaces the
+        # panel only on failure; 'always' streams it live; 'never' keeps it hidden.
+        show_mode = (settings.get("show_panel_on_build") or "errors").lower()
+        if show_mode == "always":
+            sublime.set_timeout(lambda: _show_panel(window), 0)
+        view.set_status("texlib_build", "TeXLib: building %s..." % base)
+
         # Optional TEXINPUTS: real cross-package builds need the repo root on the
         # path (comma-free junction). Resolved on the main thread; blank inherits.
-        settings = sublime.load_settings("TeXLib.sublime-settings")
         texinputs = settings.get("texinputs") or ""
         if isinstance(texinputs, list):
             texinputs = os.pathsep.join(texinputs)
@@ -220,8 +245,7 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         )
         # Publish toggles: the native host has no LaTeXTools builder_settings, so
         # feed the sublime settings in (the brain's _setting_on reads them first,
-        # else falls back to the TEXLIB_PUBLISH* env vars). Lets a tester set
-        # "publish_shareable_copies": false to stop the desktop-shortcut clutter.
+        # else falls back to the TEXLIB_PUBLISH* env vars).
         toggles = {}
         for _k in ("publish_shareable_copies", "copy_published_path_to_clipboard"):
             _v = settings.get(_k)
@@ -229,20 +253,43 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                 toggles[_k] = _v
         if toggles:
             host.builder_settings = toggles
-        emit("TeXLib native build [%s] -- %s\n" % (mode, os.path.basename(root)))
-
-        # On success, delegate to LaTeXTools to open/refresh + forward-sync the
-        # PDF (Tier C). Marshaled to the main thread; the worker only signals.
-        window = self.window
+        emit("TeXLib native build [%s] -- %s\n" % (mode, base))
 
         def on_success():
+            # Post-build PDF open + forward sync (Tier C).
             sublime.set_timeout(lambda: _post_build_view(window), 0)
+
+        def on_finish(state, error_lines):
+            # Runs in the worker; marshal all UI changes to the main thread.
+            def apply():
+                if state == "cancelled":
+                    view.set_status("texlib_build", "TeXLib: build cancelled.")
+                elif state == "error":
+                    view.set_status(
+                        "texlib_build", "TeXLib: build failed -- %d error(s)"
+                        % (len(error_lines) or 1))
+                    if show_mode != "never":
+                        if error_lines:
+                            _echo(panel, "\n---- TeXLib: %d error(s) "
+                                  "(double-click / F4 to jump) ----\n"
+                                  % len(error_lines))
+                            for line in error_lines:
+                                _echo(panel, line + "\n")
+                        _show_panel(window)
+                else:  # ok
+                    view.set_status("texlib_build", "TeXLib: built %s" % base)
+                    if show_mode != "always":
+                        _hide_panel(window)
+                sublime.set_timeout(
+                    lambda: view.erase_status("texlib_build"),
+                    8000 if state == "error" else 4000)
+            sublime.set_timeout(apply, 0)
 
         cancel = threading.Event()
         _active["cancel"] = cancel
         th = threading.Thread(
             target=self._drive,
-            args=(host, tex_dir, emit, cancel, texinputs, on_success),
+            args=(host, tex_dir, emit, cancel, texinputs, on_success, on_finish),
         )
         th.daemon = True
         _active["thread"] = th
@@ -251,33 +298,53 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
     def is_enabled(self):
         return _is_tex(self.window.active_view())
 
-    def _drive(self, host, tex_dir, emit, cancel, texinputs, on_success=None):
+    def _drive(self, host, tex_dir, emit, cancel, texinputs,
+               on_success=None, on_finish=None):
         """Consume the brain's commands() coroutine: run each yielded argv, feed
-        its output back via host.out, resume. _postprocess runs inside commands()
-        at the end, so reaching StopIteration means the build is fully done; then
-        fire on_success (post-build viewer delegation) if the PDF was produced."""
+        its output back via host.out, resume, collecting file:line errors from the
+        stream to classify the outcome (ok / error / cancelled). _postprocess runs
+        inside commands(), so reaching StopIteration means the build is done."""
         gen = host.commands()
-        completed = False
+        error_lines = []
+        fatal = [False]
+
+        def collect(line):
+            emit(line)
+            s = line.rstrip("\r\n")
+            m = RESULT_RE.match(s)
+            if m:
+                fatal[0] = True
+                # Source-file errors are the actionable ones; skip generated .aux.
+                if not m.group(1).lower().endswith(".aux"):
+                    error_lines.append(s)
+            elif FATAL_RE.search(s):
+                fatal[0] = True
+
+        state = "error"
         try:
             item = next(gen)
             while True:
                 cmd, msg = item
                 emit(msg + "\n")
-                host.out = _run_argv(cmd, tex_dir, emit, cancel, texinputs)
+                host.out = _run_argv(cmd, tex_dir, collect, cancel, texinputs)
                 if cancel.is_set():
                     emit("TeXLib: build cancelled.\n")
-                    return
+                    state = "cancelled"
+                    break
                 item = next(gen)
         except StopIteration:
-            completed = True
+            state = "error" if fatal[0] else "ok"
         except Exception as exc:  # noqa: BLE001 - never let the worker die silently
             emit("TeXLib: build driver error: %s\n" % exc)
+            state = "error"
         finally:
             _active["thread"] = None
             _active["cancel"] = None
-        if completed and on_success and not cancel.is_set():
+        if state == "ok" and on_success:
             if os.path.exists(os.path.join(tex_dir, host.base_name + ".pdf")):
                 on_success()
+        if on_finish:
+            on_finish(state, error_lines)
 
 
 class TexlibCancelBuildCommand(sublime_plugin.WindowCommand):
