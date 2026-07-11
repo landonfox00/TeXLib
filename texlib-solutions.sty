@@ -11,13 +11,12 @@
 %   * the side-by-side multiple-choice key frame (\@mcframe@* override) and the
 %     left-shifted \choiceshook.
 % \ifsolutions / \ifrubric come from texlib-build; xcolor/environ from
-% texlib-corepkg / texlib-problembank.  No longer requires tcolorbox: the
-% {solution} box moved to plain \colorbox/\parbox (see its own comment below
-% for why) and nothing else here ever used it -- autoexam.cls/pset.cls/
-% didactic.cls load tcolorbox themselves for their own unrelated boxes, but
-% quiz.cls had no other source for it, so this package's own use was quiz's
-% only path to tcolorbox; quiz.cls itself never calls a tcolorbox command
-% directly, so dropping this require is safe.
+% texlib-corepkg / texlib-problembank.  Requires tcolorbox for the full-width
+% {solution} box (breakable across pages -- see the {solution} comment below).
+% quiz.cls has no other source for tcolorbox, so this \RequirePackage is
+% load-bearing there; autoexam/pset/didactic also load it themselves.
+
+\RequirePackage[many]{tcolorbox}
 
 % ===========================================================================
 % Rubric-overlay machinery
@@ -37,6 +36,7 @@
 
 \newbox\@partsol@box
 \newbox\@sol@box
+\newbox\@sol@rowbox
 \gdef\@partsol@rubric{}
 \gdef\@sol@rubric{}
 
@@ -106,11 +106,13 @@
 % that defeats reverse search regardless. Hence: plain \colorbox/\parbox below,
 % \box\@sol@box (not \unvbox), and the left accent hand-drawn with \vrule
 % (sized from \ht\@sol@box/\dp\@sol@box, read BEFORE \box empties the register)
-% instead of tcolorbox's borderline west. Trade-off: \box is a single rigid
-% unit, so this box can no longer break across a page boundary the way the old
-% breakable tcolorbox could -- accepted because every solution shipped in this
-% repo is a few lines of prose/math (surveyed 2026-07-04: none exceed ~7 lines,
-% none use tikz/tabular/multi-part content, no historical overflow incident).
+% instead of tcolorbox's borderline west. \box is a single rigid unit that
+% can't split across a page, so this rigid renderer (\@sol@thebox) is now used
+% ONLY for the narrow MC side-by-side column and its phantom reserve -- both of
+% which must NOT break anyway. The full-width free-response box uses the
+% breakable renderer \@sol@thebox@break (below): an enhanced breakable
+% tcolorbox that DOES split across pages, at the cost of reverse search into its
+% body (knowingly deferred -- see project-texlib-solution-breakable-synctex).
 % Outer vertical separation placed above and below the green solution box.
 % 10pt suits a full-width free-response box (breathing room between the problem
 % and its boxed solution).  The side-by-side multiple-choice key (\@mcframe@mid)
@@ -120,38 +122,63 @@
 % solution column outgrow the choices, pushing problems onto extra pages.
 \newlength{\@sol@outervsep}
 \setlength{\@sol@outervsep}{10pt}
-\let\solution\relax
-\let\endsolution\relax
-\newenvironment{solution}{%
-	\ifsolutions
-		\par
-		\gdef\@sol@rubric{}%
-		\@in@solutiontrue
-		\setbox\@sol@box\vbox\bgroup
-			\hsize\dimexpr\textwidth-12pt\relax
-	\else
-		\setbox\z@\vbox\bgroup
-	\fi
-}{%
-	\ifsolutions
-		\egroup
-		\@in@solutionfalse
-		\par\vspace{\@sol@outervsep}%
-		\setlength{\fboxsep}{6pt}%
-		\noindent
+% \if@sol@reserve -- true only inside the MC side-by-side right column (set by
+% \@mcframe@mid).  It makes a *blank* (student) build reserve the solution's exact
+% footprint with \phantom instead of discarding it, so the blank copy lines up
+% with the key page-for-page.  \phantom typesets the box only to measure it, then
+% ships an empty box of the same size -- the solution ink never reaches the PDF,
+% so there is no hidden/selectable answer to leak.
+\newif\if@sol@reserve  \@sol@reservefalse
+\newif\if@sol@capture  % computed per {solution}: render/measure vs discard
+% \if@sol@narrow -- true only inside the MC side-by-side right column (set by
+% \@mcframe@mid, cleared by \@mcframe@end). Controls \@sol@curwidth (below) and
+% tells {solution}/\@sol@wrap to stay on the CURRENT line (no \par/\noindent)
+% instead of starting a fresh full-width one -- see \@sol@curwidth's own
+% comment for why the MC column can't be a real nested box at all.
+\newif\if@sol@narrow  \@sol@narrowfalse
+% \@sol@curwidth -- the width {solution}'s capture (\hsize) and \@sol@thebox's
+% own \parbox both use, switched by \if@sol@narrow rather than read from an
+% enclosing box's \linewidth: the MC column used to be a real
+% \begin{minipage}[t]{\@mc@solw}, but ANY extra box nesting around a multi-
+% line wrapped, SyncTeX-redirected {solution} body -- \begin{minipage} with
+% any positional argument, or even a bare \vbox -- was found to make `synctex
+% edit` stop resolving every line but the first, while the identical content
+% spliced directly into the main vertical list (one level of nesting: just
+% \@sol@box itself) resolves correctly even wrapped across several lines.
+% \@mc@solw's narrowing is a plain \hsize/\parbox-width number, not a box, so
+% reusing it here keeps the column narrow without adding that fatal layer.
+\newcommand{\@sol@curwidth}{%
+	\if@sol@narrow\dimexpr\@mc@solw-1.5pt\relax\else\dimexpr\textwidth-13.5pt\relax\fi
+}
+
+% The green solution box itself (an \hbox: \colorbox wrapping a \parbox), factored
+% out so the closing can either ship it (key) or \phantom it (blank MC copy).
+% Reads \@sol@box, emptying it via \box.
+%
+% Left accent is a SLIVER OF A SECOND, DARKER COLORBOX showing through a
+% positive \kern -- not a \vrule positioned via \rlap/\smash. Both of those
+% (and even a hand-rolled negative-\hspace/\vrule/positive-\hspace triple that
+% nets to zero displacement) achieve "doesn't disturb what follows" by placing
+% real ink at an h-coordinate BEHIND where the enclosing box's own left-to-
+% right accounting says the next item starts -- \rlap and \smash do it by
+% \setbox-measuring their argument and forcibly overwriting the resulting
+% box's OWN width/height/depth to something smaller than its real content;
+% a bare negative \hspace does it directly. Every one of those was confirmed
+% (by bisecting commit c95e342, which introduced the original \smash, then by
+% separately trying an honest, non-smashed \rlap and a plain hspace/vrule/
+% hspace triple alongside \box\@sol@box) to defeat SyncTeX reverse search for
+% \box\@sol@box's own content -- `synctex edit` stops resolving anywhere in
+% the solution body once anything precedes it that way, even with perfectly
+% honest, non-forced dimensions. Nested colorboxes avoid the pattern
+% entirely: \@sol@rowbox is measured ONCE at its own true size, and the outer
+% colorbox reports ITS true (fractionally larger, by the sliver) size too --
+% nothing here ever claims to be smaller than it really is. \box (not
+% \unvbox) still inserts \@sol@box as a real nested box node, matching the
+% {solution}-content SyncTeX fix's own reasoning.
+\newcommand{\@sol@thebox}{%
+	\setbox\@sol@rowbox\hbox{%
 		\colorbox{green!3!white}{%
-			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
-					% Left accent, same total length as before but oriented DOWNWARD
-					% from the "Solution." baseline (height = just the header line,
-					% depth = the rest) and \smash'd so it adds nothing to the box's
-					% own height/depth. A rule with all its length in `height` (as
-					% this once was) makes the enclosing \parbox[t] that tall ABOVE
-					% its first baseline, so the green box reserved an empty band equal
-					% to the solution's own height -- doubling it.
-					\smash{\rlap{\hspace{-6pt}\textcolor{green!50!black}{%
-						\vrule width 1.5pt
-							height \dimexpr\ht\strutbox+3pt\relax
-							depth \dimexpr\ht\@sol@box+\dp\@sol@box+\dp\strutbox\relax}}}%
+			\parbox[t]{\@sol@curwidth}{%
 				\noindent\textbf{Solution.}%
 				\ifrubric
 					\ifx\@sol@rubric\@empty\else
@@ -162,7 +189,123 @@
 				\box\@sol@box
 			}%
 		}%
+	}%
+	{\setlength{\fboxsep}{0pt}%
+	\colorbox{green!50!black}{\kern1.5pt\box\@sol@rowbox}}%
+}
+% Vertical framing shared by the shipped and the reserved box so both occupy
+% identical space.  #1 is \@sol@thebox (key) or \phantom{\@sol@thebox} (blank).
+% The MC column (\if@sol@narrow) skips \par/\noindent entirely: it must stay
+% on the SAME implicit line as the choices minipage + \hfill that came before
+% it (see \@mcframe@mid/\@sol@curwidth) rather than starting a fresh
+% full-width paragraph the way the free-response case does.
+%
+% KNOWN REMAINING GAP (task_27d73860): a solution that WRAPS to 2+ lines here
+% still isn't `synctex edit`-reachable past its first line -- narrowed down to
+% the automatic line-container LaTeX's own paragraph line-breaker builds for
+% "choices-minipage + \hfill + this box" (a plain hbox from \@sol@thebox's
+% \colorbox) getting tagged "0" (no real \@@input active) rather than a real
+% file, in a single-version build. A hand-built \hbox (via \box/\unhbox
+% instead of relying on the line-breaker) reproduces the identical tag-0
+% container and the identical failure, so it isn't specifically about
+% automatic line-breaking. Forcing a real tag to be active immediately before
+% \@mcframe@end's own finalising \par (a deferred, correctly-staged dummy
+% redirect, and separately routing \@mcframe@end's own invocation through a
+% redirect) also left the container tagged "0". A build that already goes
+% through autoexam's \versions{...} per-version replay mechanism does NOT
+% show this failure (the SAME container gets a real tag there, from that
+% replay's own open file) -- but forcing that machinery to run for a
+% single-version build is a much larger change than fits here. Single-line
+% (non-wrapping) solutions, and every free-response case, resolve correctly.
+%
+% SECOND PASS (2026-07-09): tried LuaTeX's Lua-level SyncTeX override
+% (tex.set_synctex_mode(1) + tex.set_synctex_tag/set_synctex_line, documented
+% in the LuaTeX manual) as a more direct lever than another redirect-timing
+% variant. It genuinely can override a deferred line-breaker's tag/line --
+% confirmed in over a dozen isolated, non-TeXLib reproductions -- but ONLY
+% when the override-setting call is TeX source the engine reads directly
+% (typed inline, or a \directlua that is itself typed inline). The instant
+% the same call instead arrives as tokens tex.print'd by a Lua callback --
+% which is the ONLY way problem_engine.lua can ever reach TeX -- it silently
+% fails to survive to the deferred line-breaker, regardless of timing
+% relative to \egroup, regardless of which TeX group encloses it, even when
+% merged into one uninterrupted printed burst together with \egroup itself.
+% Full trail in pbank_stage_solution's own comment (problem_engine.lua) next
+% to where this was actually wired up and then reverted; node.direct.
+% set_synctex_fields (per-node rewriting) was ruled out too, independent of
+% the tex.print issue. This gap is UNCHANGED by this pass -- still open.
+\newcommand{\@sol@wrap}[1]{%
+	\setlength{\fboxsep}{6pt}%
+	\if@sol@narrow
+		#1%
+	\else
+		\par\vspace{\@sol@outervsep}%
+		\noindent #1%
 		\vspace{\@sol@outervsep}%
+	\fi
+}
+% Breakable full-width renderer. The body is captured into \@sol@box first (as
+% for the rigid renderer, so \rubric{}{} populates \@sol@rubric before the
+% header emits) then streamed with \unvbox into an enhanced breakable tcolorbox,
+% which lets the green box split across a page boundary. The borderline-west
+% accent matches the rigid box's hand-drawn sliver. Reverse search into the
+% streamed body is knowingly sacrificed here (see the {solution} comment above).
+\newtcolorbox{@sol@breakbox}{%
+	enhanced, breakable,
+	colback=green!3!white,
+	colframe=green!50!black,
+	sharp corners,
+	boxrule=0pt,
+	frame hidden,
+	borderline west={1.5pt}{0pt}{green!50!black},
+	boxsep=0pt,
+	left=6pt, right=6pt, top=6pt, bottom=6pt,
+}
+\newcommand{\@sol@thebox@break}{%
+	\par\vspace{\@sol@outervsep}%
+	\begin{@sol@breakbox}%
+		\noindent\textbf{Solution.}%
+		\ifrubric
+			\ifx\@sol@rubric\@empty\else
+				\@emit@rubric@overlay{\@sol@rubric}%
+			\fi
+		\fi
+		\par\vskip2pt
+		\unvbox\@sol@box
+	\end{@sol@breakbox}%
+	\vspace{\@sol@outervsep}%
+}
+\let\solution\relax
+\let\endsolution\relax
+\newenvironment{solution}{%
+	% Capture the body (to render OR to measure) for the key, and for the blank
+	% copy when the MC frame asked us to reserve its space; otherwise discard it
+	% (free-response blank copy, whose answer space comes from \workbox instead).
+	\ifsolutions\@sol@capturetrue\else\if@sol@reserve\@sol@capturetrue\else\@sol@capturefalse\fi\fi
+	\if@sol@capture
+		% MC column: no \par -- stay on the choices-minipage-plus-\hfill line
+		% that's already open (see \@sol@wrap's matching guard).
+		\if@sol@narrow\else\par\fi
+		\gdef\@sol@rubric{}%
+		\@in@solutiontrue
+		\setbox\@sol@box\vbox\bgroup
+			\hsize\@sol@curwidth
+	\else
+		\setbox\z@\vbox\bgroup
+	\fi
+}{%
+	\if@sol@capture
+		\egroup
+		\@in@solutionfalse
+		\ifsolutions
+			\if@sol@narrow
+				\@sol@wrap{\@sol@thebox}%         % narrow MC key: rigid box
+			\else
+				\@sol@thebox@break                % full-width key: breakable
+			\fi
+		\else
+			\@sol@wrap{\phantom{\@sol@thebox}}%   % blank MC copy: reserve, no ink
+		\fi
 	\else
 		\egroup
 	\fi
@@ -273,97 +416,122 @@
 \renewcommand{\choiceshook}{%
 	\setlength{\leftmargin}{2em}%
 	\setlength{\labelwidth}{\dimexpr\leftmargin-\labelsep\relax}%
-	% Solutions copy only: firm up the choice-list spacing a touch so the eight
-	% side-by-side MC keys pack four to a page across every shuffled version.  The
-	% blank copy keeps the exam class's default (looser) spacing untouched -- it is
-	% what students see, and its \stretch answer gap already fills the page.
-	\ifsolutions
-		\setlength{\topsep}{2pt}%
-		\setlength{\partopsep}{0pt}%
-		\setlength{\itemsep}{2pt}%
-		\setlength{\parsep}{0pt}%
-	\fi
+	% Firm up the (deliberately loose) exam-class choice spacing in BOTH copies, so
+	% the blank copy and the key share identical choice geometry and the eight MC
+	% problems pack four to a page across every shuffled version.
+	\setlength{\topsep}{2pt}%
+	\setlength{\partopsep}{0pt}%
+	\setlength{\itemsep}{2pt}%
+	\setlength{\parsep}{0pt}%
 }
 
-% Side-by-side applies to vertical {choices}.  An inline {oneparchoices} block
-% (\if@mc@inline) is rendered STACKED instead — choices inline, then the answer
-% line, then the solution full width below — since a one-line option list does
-% not suit a narrow column.
-% Side-by-side fires only for an instructor (\ifsolutions) build of a vertical
-% {choices} block (not \if@mc@inline); a student build, or an inline
-% {oneparchoices} block, renders STACKED (no minipages) so the answer line and
-% the solution sit full width below the choices.
-% Choices column is narrower than the solution column -- choices are short
-% (single terms/expressions), while solutions are prose and need the room.
+% Unified vertical-{choices} layout: BOTH the blank copy and the key use the same
+% side-by-side geometry -- choices in a left column, a right column, and the
+% "Answer:" box at the right column's foot -- so the two render identically and
+% the blank copy is just the key with the solution and answer letter absent.  The
+% key fills the right column with the green solution box and the correct letter;
+% the blank copy reserves the identical space (\phantom, see \if@sol@reserve) and
+% shows an empty answer box.  An inline {oneparchoices} block (\if@mc@inline) is
+% still rendered STACKED (choices inline, then a full-width answer line): a
+% one-line option list does not suit a narrow column.
 \newlength{\@mc@choicew}  \setlength{\@mc@choicew}{0.42\linewidth}
 \newlength{\@mc@solw}     \setlength{\@mc@solw}{0.54\linewidth}
 \renewcommand{\@mcframe@begin}[1]{%
 	\def\@mc@letter{#1}%
+	\@sol@reservefalse
 	\par
-	\ifsolutions \if@mc@inline\else
+	\if@mc@inline\else
 		\noindent\begin{minipage}[t]{\@mc@choicew}%
 		% \begin{choices} starts with glue (its topsep addvspace), not a box, so
 		% \vtop (what [t] positioning is built on) can't find a first box to
-		% align against and falls back to treating the WHOLE box as hanging
-		% below the baseline -- adding roughly a \baselineskip of extra gap
-		% here that the student build (no minipage, same list, but merged
-		% against the stem's own \parskip via \addvspace) never has. A strut
-		% gives \vtop a real first box to measure; the tuned remainder cancels
-		% the gap between a generic strut's height and the actual first
-		% choice line's, matching the student build pixel-for-pixel (verified
-		% against the tests/scenarios/exam/standard fixture).
+		% align against and falls back to treating the WHOLE box as hanging below
+		% the baseline -- a full \baselineskip of extra gap. A strut gives \vtop a
+		% real first box to measure; the tuned remainder cancels the gap between a
+		% generic strut's height and the actual first choice line's.
 		\strut\vspace*{-\dimexpr\ht\strutbox+\dp\strutbox+1.9pt\relax}%
-	\fi \fi
+	\fi
 }
-% Gap inserted between the last choice and the student answer line.  Empty by
-% default (a fixed \medskip is the only separation, as before); autoexam sets it
-% to \vspace{\stretch{1}} so the blank "Answer" rule floats to the bottom of the
-% page group -- the MC analogue of a free-response \workbox.  Only the blank
-% student build honors it; solution/key builds keep the answer beside/below the
-% choices unchanged.
+% Inline-only gap between the last inline option and its answer line (autoexam
+% sets it to \vspace{\stretch{1}}); the vertical-choices path spaces problems via
+% the inter-problem separator instead, so it does not use this.
 \providecommand{\@mc@answergap}{}
-% Right-aligned answer line; the letter is filled in for the key.  \noindent
-% leaves vertical mode before \hfill (which would otherwise error there).
-% Side-by-side (vertical {choices}, \ifsolutions, not \if@mc@inline) defers
-% printing the line until \@mcframe@end, once both minipages have closed --
-% printed here it would only \hfill across the narrow choices column instead
-% of the full \linewidth, landing well short of where the student build (and
-% the inline/stacked solutions build, which never opens a minipage) puts it.
 \renewcommand{\@mcframe@answer}{%
-	\ifsolutions
-		\if@mc@inline
-			\par\nobreak\medskip
+	\if@mc@inline
+		% Inline (oneparchoices): stacked, full-width answer line below the choices.
+		\par\nobreak\medskip
+		\ifsolutions
+			\@mc@answergap  % no-op in a key build (\stretch is neutralised there)
 			\noindent\hfill\textbf{Answer:}~\fbox{\strut\@mc@letter}%
-			\par
 		\else
-			\par
+			\@mc@answergap
+			\noindent\hfill\textbf{Answer:}~\rule{2.4cm}{0.4pt}%
 		\fi
+		\par
 	\else
-		\par\nobreak\medskip\@mc@answergap
-		\noindent\hfill\textbf{Answer:}~\rule{2.4cm}{0.4pt}%
+		% Vertical choices: the "Answer:" field is emitted at the foot of the RIGHT
+		% (solution) column in \@mcframe@end; here just close the choices paragraph.
 		\par
 	\fi
 }
 \renewcommand{\@mcframe@mid}{%
-	\ifsolutions \if@mc@inline\else
-		\end{minipage}\hfill\begin{minipage}[t]{\@mc@solw}%
-		% Drop the box's 10pt outer padding inside the narrow key column (local to
-		% this minipage) so the solution column doesn't outgrow the choices and the
-		% "Solution." header top-aligns with choice A.
+	\if@mc@inline\else
+		\end{minipage}\hfill
+		% No \begin{minipage} here for the solution column -- see \@sol@wrap's
+		% comment: nesting the redirected {solution} capture inside ANY extra box
+		% breaks SyncTeX reverse search for every wrapped line but the first.
+		% \@sol@curwidth supplies the same \@mc@solw-based narrowing directly to
+		% {solution}'s \hsize and \@sol@thebox's \parbox instead, and the whole
+		% construction is spliced straight into the current (choices-minipage +
+		% \hfill) line via \if@sol@narrow/\@sol@wrap.
+		\@sol@narrowtrue
+		% Drop the box's 10pt outer padding inside the narrow column so the
+		% solution column doesn't outgrow the choices and the "Solution." header
+		% top-aligns with choice A.
 		\setlength{\@sol@outervsep}{0pt}%
-	\fi \fi
+		% Blank copy: reserve the solution's exact space (\phantom) so the two
+		% copies line up.  A key build ignores this (\ifsolutions wins in {solution}).
+		\@sol@reservetrue
+	\fi
+}
+% \@mc@answerfield -- the "Answer:" slot at the bottom-left of an MC problem.
+% BOTH copies show the label and the underline (a fill-in rule); the key
+% additionally sets the correct letter, boxed, sitting ON the line.  The boxed
+% letter is \rlap'd (zero width) over the left end of the rule so the rule stays
+% in the same place in both copies -- the blank and key stay pixel-aligned apart
+% from the box.  \raisebox lifts the box so its bottom rests on the line.
+\newlength{\@mc@answerrule}  \setlength{\@mc@answerrule}{2.4cm}
+\newcommand{\@mc@answerfield}{%
+	\textbf{Answer:}~%
+	\ifsolutions
+		% The answer letter, boxed, CENTERED on the underline.  \makebox[..][c]
+		% centres it over the rule's width and the trailing negative \hspace backs
+		% out so the rule still starts at the same place as the blank copy; \smash
+		% so the raised box draws on the line but adds no height (otherwise the
+		% key's answer line would be taller and the two copies would drift apart).
+		{\setlength{\fboxsep}{2pt}%
+		 \makebox[\@mc@answerrule][c]{%
+			\smash{\raisebox{\dimexpr\fboxsep+\fboxrule\relax}{\fbox{\@mc@letter}}}}%
+		 \hspace{-\@mc@answerrule}}%
+	\fi
+	\rule{\@mc@answerrule}{0.4pt}%
 }
 \renewcommand{\@mcframe@end}{%
-	\ifsolutions \if@mc@inline\else
-		% Place the key letter at the FOOT of the (right) solution column, while it
-		% is still open -- not on a new full-width line below both columns.  On the
-		% choice-tall problems (stacked integrals, etc.) the short solution column
-		% has vertical slack here, so the letter costs no extra page height; this is
-		% what lets the eight MC keys pack four to a page like the blank copy.
+	\if@mc@inline\else
+		% Answer field at the bottom-right: foot of the (former) solution column,
+		% right-aligned, reproduced as a fixed-width \makebox rather than real
+		% nesting -- \@mc@answerfield carries no bank attribution of its own, so a
+		% real box around it is fine. \linewidth-\@mc@solw lands its left edge
+		% exactly where the solution column started: the whole prior line
+		% (choices minipage + \hfill + the \@mc@solw-wide solution box) fills
+		% \linewidth exactly, so that gap is deterministic regardless of how much
+		% the \hfill actually stretched.
 		\par\nobreak\vskip2pt
-		\noindent\hfill\textbf{Answer:}~\fbox{\strut\@mc@letter}%
-		\end{minipage}%
-	\fi \fi
+		\noindent\hspace{\dimexpr\linewidth-\@mc@solw\relax}%
+		\makebox[\@mc@solw][r]{\@mc@answerfield}%
+		\@sol@narrowfalse
+		\@sol@reservefalse
+		\setlength{\@sol@outervsep}{10pt}%
+	\fi
 	\par
 }
 
