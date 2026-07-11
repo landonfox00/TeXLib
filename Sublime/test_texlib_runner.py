@@ -147,5 +147,41 @@ texlib.TexlibBuildCommand().run(mode="default")  # returns at the guard
 ok &= check(len(factory.calls) == 0, "overlap: no engine spawned while a build runs")
 texlib._active["thread"] = None  # reset
 
+
+# 4. Post-build delegation (Tier C) fires only when the build completed AND a PDF
+#    exists AND it wasn't cancelled.
+def _drive_delegation(pdf_exists, cancel_on_pass1):
+    fired = {"v": False}
+    texlib.subprocess.Popen = PopenFactory([[]])  # one pass, settles immediately
+    ev = threading.Event()
+    with tempfile.TemporaryDirectory() as tmp:
+        root = os.path.join(tmp, "doc.tex")
+        with open(root, "w", encoding="utf-8") as fh:
+            fh.write("\\documentclass{pset}\n\\begin{document}\nx\n\\end{document}\n")
+        if pdf_exists:
+            open(os.path.join(tmp, "doc.pdf"), "wb").close()
+
+        def emit(text):
+            if cancel_on_pass1 and "run 1" in text:
+                ev.set()
+
+        host = texlib_build.TexlibBuild(
+            tex_root=root, engine="pdflatex",
+            options=["--texlib-mode=default"], display=lambda t: None,
+            aux_directory="<<root>>",
+        )
+        texlib.TexlibBuildCommand()._drive(
+            host, tmp, emit, ev, "",
+            on_success=lambda: fired.__setitem__("v", True))
+    return fired["v"]
+
+
+ok &= check(_drive_delegation(pdf_exists=True, cancel_on_pass1=False) is True,
+            "delegation: on_success fires after a completed build with a PDF")
+ok &= check(_drive_delegation(pdf_exists=False, cancel_on_pass1=False) is False,
+            "delegation: on_success skipped when no PDF was produced")
+ok &= check(_drive_delegation(pdf_exists=True, cancel_on_pass1=True) is False,
+            "delegation: on_success skipped when the build was cancelled")
+
 print("\nALL PASS" if ok else "\nFAILURES ABOVE")
 sys.exit(0 if ok else 1)

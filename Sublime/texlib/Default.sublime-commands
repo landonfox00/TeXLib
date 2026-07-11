@@ -7,5 +7,7 @@
     { "caption": "TeXLib: Build — Rubric", "command": "texlib_build", "args": { "mode": "rubric" } },
     { "caption": "TeXLib: Build — Draft", "command": "texlib_build", "args": { "mode": "draft" } },
     { "caption": "TeXLib: Build — Quick (single pass)", "command": "texlib_build", "args": { "mode": "quick" } },
-    { "caption": "TeXLib: Cancel Build", "command": "texlib_cancel_build" }
+    { "caption": "TeXLib: Cancel Build", "command": "texlib_cancel_build" },
+    { "caption": "TeXLib: View PDF", "command": "texlib_view_pdf" },
+    { "caption": "TeXLib: Forward Sync (cursor → PDF)", "command": "texlib_forward_sync" }
 ]

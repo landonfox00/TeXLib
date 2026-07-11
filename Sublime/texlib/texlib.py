@@ -1,12 +1,17 @@
 # texlib.py
 # ============================================================================
-# TeXLib -- native Sublime Text plugin (Phase 1: real build).
+# TeXLib -- native Sublime Text plugin (build + LaTeXTools delegation).
 #
 # The "complement, not replace" plugin from Sublime/PLUGIN-DESIGN.md. This file
 # is the HOST: it resolves the build target, then drives texlib_build.TexlibBuild
 # -- the host-agnostic build brain ported from the LaTeXTools builder -- running
 # each yielded engine command itself and streaming output to its own panel. It
 # replaces LaTeXTools' PdfBuilder host; nothing here needs LaTeXTools to build.
+#
+# For the editor smarts we DON'T rebuild (Tier C), we delegate to LaTeXTools via
+# run_command: a successful build opens/refreshes + forward-syncs the PDF, and
+# TexlibViewPdf / TexlibForwardSync expose those on demand. LaTeXTools stays a
+# companion we call by stable command name, not a base class we subclass.
 #
 # Still coexists with the LaTeXTools "texlib" builder: it binds no default key
 # and touches no Packages/User file, so both build paths work until Phase 2.
@@ -150,6 +155,26 @@ def _run_argv(cmd, cwd, emit, cancel, texinputs):
     return "".join(chunks)
 
 
+# --- Delegation to LaTeXTools (Tier C: complement, don't rebuild) ------------
+def _delegate(window, command, args=None):
+    """Invoke a LaTeXTools editor command by name. A silent no-op if LaTeXTools
+    isn't installed (Sublime ignores an unknown command_name) -- the graceful
+    degradation we want: the plugin still builds; only the editor extras rest on
+    the companion package."""
+    window.run_command(command, args or {})
+
+
+def _post_build_view(window):
+    """After a successful build, open/refresh the PDF and forward-sync via
+    LaTeXTools' jumpto_pdf (which honors its own forward_sync / keep_focus
+    settings, and falls back to the PDF next to the source -- where our copy-back
+    puts it). Gated by the TeXLib open_pdf_on_build setting (default on)."""
+    settings = sublime.load_settings("TeXLib.sublime-settings")
+    if not settings.get("open_pdf_on_build", True):
+        return
+    _delegate(window, "latextools_jumpto_pdf")
+
+
 class TexlibBuildCommand(sublime_plugin.WindowCommand):
     """Native TeXLib build. Palette: "TeXLib: Build ..."; arg {"mode": "<token>"}."""
 
@@ -202,10 +227,19 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         if toggles:
             host.builder_settings = toggles
         emit("TeXLib native build [%s] -- %s\n" % (mode, os.path.basename(root)))
+
+        # On success, delegate to LaTeXTools to open/refresh + forward-sync the
+        # PDF (Tier C). Marshaled to the main thread; the worker only signals.
+        window = self.window
+
+        def on_success():
+            sublime.set_timeout(lambda: _post_build_view(window), 0)
+
         cancel = threading.Event()
         _active["cancel"] = cancel
         th = threading.Thread(
-            target=self._drive, args=(host, tex_dir, emit, cancel, texinputs)
+            target=self._drive,
+            args=(host, tex_dir, emit, cancel, texinputs, on_success),
         )
         th.daemon = True
         _active["thread"] = th
@@ -214,11 +248,13 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
     def is_enabled(self):
         return _is_tex(self.window.active_view())
 
-    def _drive(self, host, tex_dir, emit, cancel, texinputs):
+    def _drive(self, host, tex_dir, emit, cancel, texinputs, on_success=None):
         """Consume the brain's commands() coroutine: run each yielded argv, feed
         its output back via host.out, resume. _postprocess runs inside commands()
-        at the end, so reaching StopIteration means the build is fully done."""
+        at the end, so reaching StopIteration means the build is fully done; then
+        fire on_success (post-build viewer delegation) if the PDF was produced."""
         gen = host.commands()
+        completed = False
         try:
             item = next(gen)
             while True:
@@ -230,12 +266,15 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                     return
                 item = next(gen)
         except StopIteration:
-            pass
+            completed = True
         except Exception as exc:  # noqa: BLE001 - never let the worker die silently
             emit("TeXLib: build driver error: %s\n" % exc)
         finally:
             _active["thread"] = None
             _active["cancel"] = None
+        if completed and on_success and not cancel.is_set():
+            if os.path.exists(os.path.join(tex_dir, host.base_name + ".pdf")):
+                on_success()
 
 
 class TexlibCancelBuildCommand(sublime_plugin.WindowCommand):
@@ -274,5 +313,26 @@ class TexlibBuildPickCommand(sublime_plugin.WindowCommand):
         return _is_tex(self.window.active_view())
 
 
+class TexlibViewPdfCommand(sublime_plugin.WindowCommand):
+    """Open/refresh the built PDF in the configured viewer (delegates to LaTeXTools)."""
+
+    def run(self):
+        _delegate(self.window, "latextools_view_pdf")
+
+    def is_enabled(self):
+        return _is_tex(self.window.active_view())
+
+
+class TexlibForwardSyncCommand(sublime_plugin.WindowCommand):
+    """Jump from the cursor to the matching place in the PDF (delegates to
+    LaTeXTools' jumpto_pdf; from_keybinding forces the forward sync)."""
+
+    def run(self):
+        _delegate(self.window, "latextools_jumpto_pdf", {"from_keybinding": True})
+
+    def is_enabled(self):
+        return _is_tex(self.window.active_view())
+
+
 def plugin_loaded():
-    print("TeXLib native plugin loaded (Phase 1: build runner).")
+    print("TeXLib native plugin loaded (build + LaTeXTools delegation).")

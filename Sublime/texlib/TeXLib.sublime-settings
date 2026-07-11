@@ -11,4 +11,11 @@
     // Leave unset (the default) to inherit the process environment.
     //
     // "texinputs": ".;C:/_texlibjunc//;"
+
+    // open_pdf_on_build: after a successful build, delegate to LaTeXTools'
+    // jumpto_pdf to open/refresh the PDF and forward-sync (it honors your
+    // LaTeXTools forward_sync / keep_focus settings for the sync + focus). Set
+    // false to build without popping the viewer. Default: true.
+    //
+    // "open_pdf_on_build": true
 }

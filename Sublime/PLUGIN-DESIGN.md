@@ -241,6 +241,15 @@ code, not a delegated call.
     `texlib/texlib_build.py` native). Intentional for coexistence; **Phase 2**
     consolidates — retire the LaTeXTools builder, or make it import the native
     core so there is one source.
+- **Delegation layer / Tier C (2026-07-10).** Built the "complement" half: a
+  successful build delegates to LaTeXTools' `jumpto_pdf` — open/refresh + forward
+  sync per LaTeXTools' own `forward_sync`/`keep_focus` settings, gated by the
+  TeXLib `open_pdf_on_build` setting; `jumpto_pdf` falls back to the PDF next to
+  the source (where copy-back puts it), so it always resolves. `TeXLib: View PDF`
+  and `TeXLib: Forward Sync` expose those on demand. Coupling is by stable command
+  name, never import. `test_texlib_runner.py` covers the on_success trigger (fires
+  only on completed build + PDF present + not cancelled). **Needs a live check:**
+  confirm the viewer pops/syncs after a build.
 - **Phase 2 — cut over.** Switch keymap/build to native; keep LaTeXTools for
   editor only; settle the log-parser decision (Risk #1).
 - **Phase 3 — domain features.** Scaffolding, coursemeta, bank commands.

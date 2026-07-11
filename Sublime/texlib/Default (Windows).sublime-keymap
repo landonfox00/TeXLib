@@ -7,5 +7,9 @@
     // { "keys": ["ctrl+alt+b"], "command": "texlib_build_pick",
     //   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
     // { "keys": ["ctrl+b"], "command": "texlib_build", "args": { "mode": "default" },
+    //   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
+    // { "keys": ["ctrl+alt+j"], "command": "texlib_forward_sync",
+    //   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
+    // { "keys": ["ctrl+alt+v"], "command": "texlib_view_pdf",
     //   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] }
 ]
