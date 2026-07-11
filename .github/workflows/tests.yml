@@ -20,6 +20,25 @@ jobs:
       - name: Builder logic + orchestration tests
         run: python Sublime/test_texlib_builder.py
 
+  # Pure-Lua unit tests for the class-local Lua engines. No TeX toolchain — a
+  # stock lua 5.3 runs them (the engines are tex-independent; the tests stub the
+  # tex.* globals) — so this stays in the fast, no-container lane.
+  #   test_shuffle.lua           -- problem_shuffle.lua permutation contract
+  #   Bingo/test_bingo.lua       -- bingo card generator (25 cells, free, distinct)
+  #   Report Cards/test_report_card.lua -- gradebook CSV -> \rcRenderStudent mapping
+  lua-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua 5.3
+        run: sudo apt-get update && sudo apt-get install -y lua5.3
+      - name: Pure-Lua unit tests
+        run: |
+          set -e
+          lua5.3 test_shuffle.lua
+          lua5.3 Bingo/test_bingo.lua
+          lua5.3 "Report Cards/test_report_card.lua"
+
   # Real end-to-end: drives the actual builder coroutines against a genuine
   # toolchain. Proofs run here:
   #   * test_biber_integration.py    -- pdflatex + biber on a biblatex fixture,
@@ -81,3 +100,6 @@ jobs:
             texlua test_shuffle.lua
             # Assessment build-flag leakage guard (solutions/answers/rubric).
             python3 test_mode_effects.py
+            # course-metadata.sty's directory-walk depth + class-option-over-
+            # coursemeta precedence (real pdflatex builds + pdftotext).
+            python3 test_metadata_resolution.py

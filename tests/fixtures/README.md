@@ -26,6 +26,7 @@ sibling or use any module's class.
 |--------|-------|-----------|
 | `Exams` | `fix-test.tex` (+ `fix-bank.tex`) | the `\problem{id}[a=1,b=2]` fix-overrides syntax |
 | `Metadata` | `metadata-test.tex` (+ `coursemeta.tex`) | `course-metadata.sty`'s arbitrary-key catch-all + `\Get<Key>` derivation |
+| `Notes` | `theorem-numbering.tex` | didactic's shared-counter, section-based theorem numbering (`Theorem 1.1`, `Definition 1.2`, … resetting per `\section`) |
 
 ## Adding a fixture
 

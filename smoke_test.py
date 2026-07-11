@@ -124,6 +124,11 @@ MODULES = [
     # absorbed and mint a working \Get<Key> getter. A regressed catch-all errors
     # under -halt-on-error; a regressed getter leaves \Get... undefined.
     ("tests/fixtures/Metadata", "metadata-test.tex"),
+    # didactic's shared-counter, section-based theorem numbering: several
+    # theorem-family boxes across two sections must number 1.1, 1.2, ..., 2.1, ...
+    # (EXPECT_TEXT below). The canonical Notes template only checks the word
+    # "Theorem"; a counter regression would pass it but fail here.
+    ("tests/fixtures/Notes", "theorem-numbering.tex"),
     # The end-to-end examples (examples/<Course>/) double as build fixtures so
     # the documented course folder can't silently rot when a class changes.
     # Build-only (no EXPECT_TEXT key): they share one coursemeta.tex across
@@ -226,6 +231,12 @@ EXPECT_TEXT = {
     # METAALIASMARK == the \meta->\metasetup alias still sets (and mints) a key.
     "tests/fixtures/Metadata": ["CMOFFICEHOURSMARK", "CMLECTHALLMARK", "CMTANAMEMARK",
                                 "SETCMDMARK", "METAALIASMARK"],
+    # Shared master counter, section-based, resetting per \section. All five must
+    # appear IN THIS FORM: per-family counters would renumber Definition to 1.1,
+    # a flat scheme would drop the ".1" suffix, and a missing section reset would
+    # make the section-2 boxes 1.4/1.5 — each failing at least one token.
+    "tests/fixtures/Notes": ["Theorem 1.1", "Definition 1.2", "Lemma 1.3",
+                             "Theorem 2.1", "Definition 2.2"],
 }
 
 # Substrings that must NOT appear in a module's rendered PDF (case-insensitive).
