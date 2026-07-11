@@ -1,4 +1,5 @@
 [
+    { "caption": "TeXLib: New Document", "command": "texlib_new_document" },
     { "caption": "TeXLib: Build (pick mode)", "command": "texlib_build_pick" },
     { "caption": "TeXLib: Build — Default", "command": "texlib_build", "args": { "mode": "default" } },
     { "caption": "TeXLib: Build — Answer Key", "command": "texlib_build", "args": { "mode": "key" } },

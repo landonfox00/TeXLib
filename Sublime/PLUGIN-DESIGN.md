@@ -270,7 +270,13 @@ code, not a delegated call.
     installer's function *for Sublime users* without making the classes editor-
     captive. Source auto-detected (bundled `latex/` else repo root) or `class_source`
     setting. `test_texlib_texmf.py` covers the gather. **Live check pending.**
-  - Next domain commands: new-doc scaffolding, coursemeta open/reveal.
+  - **Scaffolding done (2026-07-10), `texlib/texlib_scaffold.py`.** `TeXLib: New
+    Document` lists the `<class>-template.tex` files (class from filename; test
+    fixtures ignored), drops the chosen one into the active folder under a name you
+    pick, opens it, and warns if no `coursemeta.tex` is in scope. `test_texlib_
+    scaffold.py` covers discovery. **Live check pending.**
+  - Next domain commands: coursemeta open/reveal helpers; TeXLib-macro completions
+    + snippets. Then Phase 2 (consolidate the two brains + cut over).
 - **Phase 4 — distribution.** Package via the installer repo / a Package Control
   custom repo; finish the settings split; document LaTeXTools as a companion.
 
