@@ -1,0 +1,11 @@
+[
+    { "caption": "TeXLib: Build (pick mode)", "command": "texlib_build_pick" },
+    { "caption": "TeXLib: Build — Default", "command": "texlib_build", "args": { "mode": "default" } },
+    { "caption": "TeXLib: Build — Answer Key", "command": "texlib_build", "args": { "mode": "key" } },
+    { "caption": "TeXLib: Build — Solutions", "command": "texlib_build", "args": { "mode": "solutions" } },
+    { "caption": "TeXLib: Build — Student Copy", "command": "texlib_build", "args": { "mode": "student" } },
+    { "caption": "TeXLib: Build — Rubric", "command": "texlib_build", "args": { "mode": "rubric" } },
+    { "caption": "TeXLib: Build — Draft", "command": "texlib_build", "args": { "mode": "draft" } },
+    { "caption": "TeXLib: Build — Quick (single pass)", "command": "texlib_build", "args": { "mode": "quick" } },
+    { "caption": "TeXLib: Cancel Build", "command": "texlib_cancel_build" }
+]

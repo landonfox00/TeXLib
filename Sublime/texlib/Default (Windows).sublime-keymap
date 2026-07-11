@@ -1,0 +1,11 @@
+[
+    // Phase 0: bindings are intentionally commented so this package cannot
+    // steal Ctrl+B / Ctrl+Shift+B from the LaTeXTools "texlib" builder while
+    // both coexist. Uncomment (or move to Packages/User) once the native path
+    // is the one you build with.
+    //
+    // { "keys": ["ctrl+alt+b"], "command": "texlib_build_pick",
+    //   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
+    // { "keys": ["ctrl+b"], "command": "texlib_build", "args": { "mode": "default" },
+    //   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] }
+]
