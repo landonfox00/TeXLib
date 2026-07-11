@@ -1390,14 +1390,21 @@ end
 --                  those names become no-ops.  pop_scope() runs after the body
 --                  (and any \begin{solution}…\end{solution} block) so the next
 --                  problem starts with a clean state.
-function pbank_problem_item(pts_str, stretch_str, query, fix_str)
-	-- Emit inter-problem separator rule for all but the first problem on a page.
-	-- Use \csname...\endcsname to avoid catcode issues with @ in the name when
-	-- sprinting from Lua (@ is catcode 12 in the document body).
+-- Emit the inter-problem separator rule for all but the first problem on a page,
+-- then clear the first-on-page flag.  Shared by pbank_problem_item and the
+-- deferred extra-credit replay (\pbank@xc@sep in texlib-problembank.sty), so a
+-- bonus is divided from the graded problems by the same rule as every problem.
+-- Use \csname...\endcsname to avoid catcode issues with @ in the name when
+-- sprinting from Lua (@ is catcode 12 in the document body).
+function pbank_emit_sep()
 	if not pbank_first_on_page then
 		tex.print("\\csname autoexam@problem@sep\\endcsname")
 	end
 	pbank_first_on_page = false
+end
+
+function pbank_problem_item(pts_str, stretch_str, query, fix_str)
+	pbank_emit_sep()
 
 	-- Parse points list.
 	local pts_list = {}

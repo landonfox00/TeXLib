@@ -138,7 +138,15 @@
 		\@in@solutionfalse
 		\par\vspace{\@sol@outervsep}%
 		\setlength{\fboxsep}{6pt}%
-		\noindent
+		% Full-bleed to the true text margins.  {solution} renders inside the
+		% exam-class {questions} list body, whose left indent (\@totalleftmargin)
+		% \noindent does NOT remove; without this the full-\textwidth box is shifted
+		% right by that indent and overhangs the right margin.  Pulling back by
+		% -\@totalleftmargin lands both edges on the text block, matching the
+		% inter-problem separator rule (autoexam.cls:\autoexam@problem@sep) exactly.
+		% In the MC-key minipage \@totalleftmargin is 0 (minipage zeroes it), so this
+		% is a no-op there and the box keeps its narrow column.
+		\noindent\hspace*{-\@totalleftmargin}%
 		\colorbox{green!3!white}{%
 			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
 					% Left accent, same total length as before but oriented DOWNWARD
@@ -177,6 +185,10 @@
 		\gdef\@partsol@rubric{}%
 		\@in@partsolutiontrue
 		\setbox\@partsol@box\vbox\bgroup
+			% \textwidth (not \linewidth): the unvboxed prose below lands at the
+			% true left text margin, so a full-\textwidth measure reaches — and stops
+			% at — the right margin, spanning the text block exactly like the
+			% full-bleed {solution} box above (verified: no right-margin overhang).
 			\hsize\textwidth
 	\else
 		\setbox\z@\vbox\bgroup
