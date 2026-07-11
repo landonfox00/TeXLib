@@ -18,4 +18,11 @@
     // false to build without popping the viewer. Default: true.
     //
     // "open_pdf_on_build": true
+
+    // class_source: absolute path to the TeXLib class payload for the
+    // "Install Classes to TEXMF" command. Leave unset to auto-detect (a bundled
+    // latex/ dir in the package, else the repo root above the plugin). Set it if
+    // the plugin can't find your classes (e.g. an unusual layout).
+    //
+    // "class_source": "C:/Users/Landon/texlib-sublime-wt"
 }

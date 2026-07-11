@@ -259,8 +259,18 @@ code, not a delegated call.
     a sibling `bank.tex` for `\begin{problem}{id}[attrs]`, quick-panel to jump to
     a definition or insert `\getproblem{id}`. `test_texlib_bank.py` covers the
     pure scan (sources + ids + attrs + line, both inline and external patterns).
-    **Live check pending.** Next domain commands: new-doc scaffolding, coursemeta
-    open/reveal.
+    **Live check pending.**
+  - **TEXMF install done (2026-07-10), `texlib/texlib_texmf.py`.** `TeXLib: Install
+    Classes to TEXMF` copies the payload (8 `.cls` + 17 root `.sty` + 7 Lua engines;
+    unique basenames → flat copy) into `TEXMFHOME/tex/latex/texlib/` so *every* TeX
+    tool finds them, not just this plugin. This is the piece of the installer's job
+    worth pulling in — the **installer balance**: the repo stays the single source;
+    the installer and the plugin are *peer distribution channels* (editor-agnostic
+    turnkey vs. Sublime-integrated); this command lets the plugin subsume the
+    installer's function *for Sublime users* without making the classes editor-
+    captive. Source auto-detected (bundled `latex/` else repo root) or `class_source`
+    setting. `test_texlib_texmf.py` covers the gather. **Live check pending.**
+  - Next domain commands: new-doc scaffolding, coursemeta open/reveal.
 - **Phase 4 — distribution.** Package via the installer repo / a Package Control
   custom repo; finish the settings split; document LaTeXTools as a companion.
 
