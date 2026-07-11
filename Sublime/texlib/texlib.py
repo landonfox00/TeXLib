@@ -20,9 +20,11 @@
 # on save; editing texlib_build.py (an imported helper) still needs a restart.
 # ============================================================================
 
+import hashlib
 import os
 import re
 import subprocess
+import tempfile
 import threading
 
 import sublime
@@ -69,10 +71,17 @@ MAX_WARNINGS = 30
 BUILD_SYNTAX = "Packages/TeXLib/TeXLib Build Output.sublime-syntax"
 
 
-def _build_report(base, errors, warnings):
-    """The condensed failure report written to the panel: a header with counts,
-    the clickable file:line errors, then warnings (capped), then a full-log
-    pointer. Kept file:line lines unprefixed so result_file_regex still matches."""
+def _aux_log_path(tex_root, base):
+    """Absolute path of the build's <base>.log in the <<temp>> aux dir -- the same
+    md5(tex_root)[:12] key texlib_build routes aux files to."""
+    key = hashlib.md5((tex_root or "").encode("utf-8")).hexdigest()[:12]
+    return os.path.join(tempfile.gettempdir(), "texlib-aux", key, base + ".log")
+
+
+def _build_report(base, errors, warnings, log_path):
+    """The condensed failure report: a header with counts, the clickable file:line
+    errors, warnings (capped), and a clickable full-log link. Error and log lines
+    are unprefixed `path:line: msg` so result_file_regex makes them jump."""
     out = ["", "==== TeXLib: %s -- %d error(s), %d warning(s) ===="
            % (base, len(errors), len(warnings)), ""]
     out.extend(errors)
@@ -82,7 +91,8 @@ def _build_report(base, errors, warnings):
         out.extend(shown)
         if len(warnings) > MAX_WARNINGS:
             out.append("... (%d more)" % (len(warnings) - MAX_WARNINGS))
-    out += ["", "(full log: run  TeXLib: Reveal Aux Directory)"]
+    if log_path:
+        out += ["", "%s:1: [full build log -- double-click to open]" % log_path]
     return "\n".join(out) + "\n"
 
 PROGRAM_RE = re.compile(r"(?im)^%\s*!\s*T[Ee]X\s+program\s*=\s*(\S+)")
@@ -250,6 +260,7 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         panel = _panel(self.window, tex_dir)
         window = self.window
         base = os.path.basename(root)
+        log_path = _aux_log_path(root, base)
 
         settings = sublime.load_settings("TeXLib.sublime-settings")
         # Panel visibility, LaTeXTools-style: 'errors' (default) surfaces the panel
@@ -307,7 +318,8 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                         # Condensed, colored report. In 'errors' mode the panel
                         # was otherwise empty; in 'always' this appends after the
                         # streamed raw log.
-                        _echo(panel, _build_report(base, error_lines, warning_lines))
+                        _echo(panel, _build_report(
+                            base, error_lines, warning_lines, log_path))
                         _show_panel(window)
                 else:  # ok
                     view.set_status("texlib_build", "TeXLib: built %s" % base)

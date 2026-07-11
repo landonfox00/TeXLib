@@ -12,6 +12,11 @@ contexts:
     - match: '^(?:====|----).*$'
       scope: comment.line.texlib-build
 
+    # The full-log link line -- matched BEFORE the error rule so it reads as a
+    # muted link, not a red error (it's still path:line: so it stays clickable).
+    - match: '^.*: \[full build log.*$'
+      scope: comment.line.texlib-build
+
     # Error lines: file:line: message  (also clickable via result_file_regex).
     - match: '^((?:.:)?[^:]+)(:)(\d+)(:)(.*)$'
       captures:
@@ -22,7 +27,3 @@ contexts:
     # Warnings.
     - match: '^.*\bWarning:.*$'
       scope: markup.warning.texlib-build
-
-    # The full-log pointer.
-    - match: '^\(full log.*$'
-      scope: comment.line.texlib-build

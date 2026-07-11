@@ -10,6 +10,7 @@ cancel->kill path, and the single-build overlap guard. No Sublime, no TeX.
 
 Run:  python Sublime/test_texlib_runner.py
 """
+import hashlib
 import os
 import sys
 import tempfile
@@ -225,14 +226,21 @@ r = _drive_finish(["LaTeX Warning: Reference `x' undefined on input line 5.\n",
 ok &= check(r["state"] == "ok", "classify: warnings alone do NOT fail the build")
 ok &= check(len(r["warns"]) == 1, "classify: the warning is collected")
 
-# 6. _build_report: counts in the header, errors + warnings, unprefixed file:line.
+# 6. _aux_log_path reproduces the build's md5[:12] key; _build_report formats a
+#    clickable full-log link and keeps error lines unprefixed.
+log_path = texlib._aux_log_path("/some/doc.tex", "doc")
+expect_tail = os.path.join(
+    "texlib-aux", hashlib.md5(b"/some/doc.tex").hexdigest()[:12], "doc.log")
+ok &= check(log_path.endswith(expect_tail),
+            "aux log path: <tempdir>/texlib-aux/<md5[:12]>/doc.log")
 report = texlib._build_report(
     "doc", ["./doc.tex:14: Undefined control sequence."],
-    ["LaTeX Warning: Reference `x' undefined on input line 5."])
+    ["LaTeX Warning: Reference `x' undefined on input line 5."], log_path)
 ok &= check("1 error(s), 1 warning(s)" in report, "report: header counts")
 ok &= check("\n./doc.tex:14: Undefined control sequence.\n" in report,
             "report: error line kept unprefixed (stays clickable)")
-ok &= check("full log" in report, "report: full-log pointer present")
+ok &= check(("%s:1: [full build log" % log_path) in report,
+            "report: full-log link is a clickable path:1: line")
 
 print("\nALL PASS" if ok else "\nFAILURES ABOVE")
 sys.exit(0 if ok else 1)
