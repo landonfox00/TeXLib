@@ -3,9 +3,10 @@
 % Course metadata (title, course number, section, term) is picked up from
 % coursemeta.tex in this directory; only the per-exam fields are set below.
 %
-% Build the collated A/B/C exam:   lualatex exam-01.tex
-% Build one version (instructor):  lualatex "\def\Version{A}\input{exam-01.tex}"
-% Build the answer key:            lualatex "\def\ShowKey{}\input{exam-01.tex}"
+% Build the collated A/B/C student exams:  lualatex exam-01.tex
+% Build one version's student copy:         lualatex "\def\Version{A}\input{exam-01.tex}"
+% Build the answer keys (A/B/C, solutions): lualatex "\def\ShowKey{}\input{exam-01.tex}"
+% Build one version's answer key:           lualatex "\def\Version{A}\def\ShowKey{}\input{exam-01.tex}"
 
 % exam-date is intentionally NOT set here: with exam-number = 1, the cover date
 % comes from coursemeta's exam1-date — the same source the syllabus

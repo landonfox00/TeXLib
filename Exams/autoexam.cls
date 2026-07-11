@@ -145,9 +145,25 @@
 	\@ax@src@onlytrue
 	\if@ax@src@dual\else \def\AutoExamSolMode{only}\fi
 }
+% \keys — source-level answer-key request. An exam's answer key IS its instructor
+% copy, so \keys is exam-synonymous with \justsolutions (build the key copies
+% only); it additionally raises \ifkey so the cover label reads "Answer Key". Like
+% \justsolutions it does NOT force \solutionstrue here -- the version loop toggles
+% \ifsolutions per (instructor-only) copy. The documented compile-time
+% \def\ShowKey{} path above additionally sets \solutionstrue, so it also reveals
+% the key in a plain no-\versions document.
+\renewcommand{\keys}{\keytrue\justsolutions}
 % Compile-time flags for the builders. \ShowSolutions already set \solutionstrue
-% via texlib-build; record the matching mode. \ShowJustSolutions is the
-% instructor-only compile-time flag.
+% via texlib-build; record the matching mode. \ShowKey and \ShowJustSolutions are
+% the instructor-ONLY compile-time flags: an exam's answer key IS its instructor
+% copy, so both request an "only" build (the key copies alone, no blank student
+% copy) and force \solutionstrue -- for a plain (no-\versions) document that single
+% copy becomes the key; for a versioned one the loop emits one key per version.
+% This is what makes \def\ShowKey{} (the documented answer-key build) reveal the
+% solutions, MC answer letters, and -- with \ShowRubric -- the grading rubrics.
+% \ShowSolutions (dual: blank student AND instructor copies) is the fuller build,
+% so it is checked AFTER \ShowKey and wins if the two are ever combined.
+\ifdefined\ShowKey           \def\AutoExamSolMode{only}\solutionstrue\fi
 \ifdefined\ShowSolutions     \def\AutoExamSolMode{dual}\fi
 \ifdefined\ShowJustSolutions \def\AutoExamSolMode{only}\solutionstrue\fi
 % If BOTH source commands were used, warn and keep dual (\justsolutions ignored).
@@ -160,6 +176,12 @@
 		}%
 	\fi\fi
 }
+
+% Cover-page build-mode word: an \ifkey build (\ShowKey / \keys) labels its cover
+% "Answer Key" -- matching quiz.cls's \ifkey header -- while any other solutions
+% build (\ShowSolutions / \justsolutions) says "Solutions". \ifkey builds are
+% always instructor-only, so this word only ever appears on a key copy.
+\newcommand{\@autoexam@solword}{\ifkey Answer Key\else Solutions\fi}
 
 % texlib-problembank.sty loads problem_engine.lua and defines the shared
 % machinery: \setvar/\setrng/\calcvar/\get, \pick* commands, \getlist/\geti/
@@ -818,11 +840,12 @@
 		\vspace{0.1em}
 		\large \GetExamDate
 		% Build-mode label: shown in red when solutions and/or rubrics are on.
+		% "Answer Key" for an \ifkey build, else "Solutions" (see \@autoexam@solword).
 		\ifsolutions
 			\if@autoexam@rubric
-				\\ \large\textcolor{red}{\textbf{Solutions and Rubrics}}%
+				\\ \large\textcolor{red}{\textbf{\@autoexam@solword\space and Rubrics}}%
 			\else
-				\\ \large\textcolor{red}{\textbf{Solutions}}%
+				\\ \large\textcolor{red}{\textbf{\@autoexam@solword}}%
 			\fi
 		\else
 			\if@autoexam@rubric
