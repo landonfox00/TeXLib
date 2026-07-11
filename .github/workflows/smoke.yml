@@ -33,6 +33,7 @@ jobs:
             set -e
             apk add --no-cache python3 poppler-utils
             texlua Schedule/test_schedule_synctex.lua
+            texlua Schedule/test_schedule_quiz_exam.lua
             python3 Sublime/test_texlib_builder.py
             python3 smoke_test.py -v
 

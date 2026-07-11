@@ -724,7 +724,14 @@ function render_grid(month_pages)
 					if cell_date:to_key() > course_end_date:to_key() then is_after_end = true end
 				end
 
-				if not is_after_end and not cell.flags.holiday and not cell.flags.canceled and not cell.flags.no_auto_quiz then
+				-- Weekly quiz-day auto-quizzes are suppressed on exam days: an exam
+				-- and a quiz on the same day is virtually never intended. Only the
+				-- automatic quiz is skipped -- a manual \quiz on that date still
+				-- renders (L_quiz appends it directly, independent of this pass).
+				-- \noquiz and the exam's own noquiz option stay as the explicit
+				-- opt-outs for a single day / a whole exam week.
+				if not is_after_end and not cell.flags.holiday and not cell.flags.canceled
+					and not cell.flags.no_auto_quiz and not cell.flags.exam then
 					local manual_exists = false
 					for _, layer in pairs(cell.layers) do
 						for _, item in ipairs(layer) do
@@ -734,7 +741,7 @@ function render_grid(month_pages)
 					if not manual_exists then
 						cnt_quiz = cnt_quiz + 1
 						cell.flags.quiz = true
-						if not cell.flags.exam then cell.color = "\\SetCell{bg=orange!15}" end
+						cell.color = "\\SetCell{bg=orange!15}"
 						cell:append("\\textbf{Quiz " .. cnt_quiz .. "}", "top")
 					end
 				end
@@ -790,13 +797,12 @@ function render_grid(month_pages)
 	--   & <cell 2>
 	--   ...
 	--   <row terminator>
-	-- xltabular treats inter-cell whitespace (including newlines) as a single
+	-- longtblr treats inter-cell whitespace (including newlines) as a single
 	-- space, so splitting across lines is layout-neutral.
 	--
-	-- Row terminator: EVERY row, including the last in each table, ends with
-	-- `\tabularnewline \hline` (closes the row + draws the rule beneath it).
-	-- Paired with the empty `\endlastfoot` declared above, the last row's own
-	-- `\hline` is the table's clean bottom rule — no phantom trailing-row stub.
+	-- Row terminator: EVERY row ends with a bare `\\`.  longtblr's `hlines`
+	-- draws the rule beneath every row (including the table's bottom edge), so
+	-- unlike the old xltabular grid the terminator carries no per-row `\hline`.
 	-- Resolve the output (aux) directory if `-output-directory=X` was passed
 	-- to lualatex (the TeXLib Sublime builder routes EVERYTHING via that flag
 	-- with aux_directory="<<temp>>").  Both files we generate below — the
