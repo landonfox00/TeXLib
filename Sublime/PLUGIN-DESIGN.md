@@ -275,8 +275,14 @@ code, not a delegated call.
     fixtures ignored), drops the chosen one into the active folder under a name you
     pick, opens it, and warns if no `coursemeta.tex` is in scope. `test_texlib_
     scaffold.py` covers discovery. **Live check pending.**
-  - Next domain commands: coursemeta open/reveal helpers; TeXLib-macro completions
-    + snippets. Then Phase 2 (consolidate the two brains + cut over).
+  - **Coursemeta locators done (2026-07-10), `texlib/texlib_locate.py`.** `TeXLib:
+    Open coursemeta.tex` (upward walk) and `TeXLib: Reveal Aux Directory` (the
+    `%TEMP%\texlib-aux\<md5(tex_root)[:12]>` the build routes to — hash + tex_root
+    resolution mirror the runner so it points at the same folder). `test_texlib_
+    locate.py` covers both. **Live check pending.**
+  - Domain set essentially complete (bank / TEXMF / scaffold / locators). Optional
+    later: TeXLib-macro completions + snippets. **Phase 2 is next** (consolidate the
+    two brains + cut over; revisit the provisional log-parser decision).
 - **Phase 4 — distribution.** Package via the installer repo / a Package Control
   custom repo; finish the settings split; document LaTeXTools as a companion.
 
