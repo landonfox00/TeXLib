@@ -1,0 +1,20 @@
+% ppart-bank.tex -- two free-response problems with \ppart parts, for the
+% part-atomicity check.  Under \shuffle the two problems may swap order, but each
+% problem's parts must stay CONTIGUOUS beneath it and keep their authored a/b/c
+% sub-order (pbank_inject_part, problem_engine.lua) -- a part must never leak to
+% the neighbouring problem or come out mis-lettered.
+\begin{problem}{pone}[topic=fr]
+	PONESTEM first problem.
+	\begin{parts}
+		\ppart PONEPARTA alpha work.
+		\ppart PONEPARTB bravo work.
+		\ppart PONEPARTC charlie work.
+	\end{parts}
+\end{problem}
+\begin{problem}{ptwo}[topic=fr]
+	PTWOSTEM second problem.
+	\begin{parts}
+		\ppart PTWOPARTA delta work.
+		\ppart PTWOPARTB echo work.
+	\end{parts}
+\end{problem}

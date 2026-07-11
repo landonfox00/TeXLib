@@ -1,0 +1,15 @@
+% subst-test.tex -- retrieves subst-bank problems with every variable FIXED via
+% the \problem{id}[a=1,...] override, so the rendered output is deterministic.
+% test_engine_correctness.py builds this and asserts the exact substituted /
+% computed values via pdftotext.
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=1, date={Engine Test}}
+\loadbank{subst-bank.tex}
+
+\begin{document}
+\begin{problems}
+	\problem{quad}[a=1, b=2, c=3]
+	\problem{calc}[a=3, b=4, c=5]
+\end{problems}
+\end{document}

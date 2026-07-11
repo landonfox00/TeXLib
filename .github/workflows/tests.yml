@@ -21,7 +21,7 @@ jobs:
         run: python Sublime/test_texlib_builder.py
 
   # Real end-to-end: drives the actual builder coroutines against a genuine
-  # toolchain. Two proofs run here:
+  # toolchain. Proofs run here:
   #   * test_biber_integration.py    -- pdflatex + biber on a biblatex fixture,
   #     proving the biber-skip cache and rerun handling.
   #   * test_synctex_integration.py -- drives a real lualatex build then asks
@@ -29,7 +29,14 @@ jobs:
   #     a source file + line, exactly what SumatraPDF does before an inverse
   #     search jump. Needs poppler's pdftotext (-bbox support -- NOT any
   #     xpdf-flavored build) in addition to the toolchain the other two use.
-  # Both soft-skip if their tools are missing, so a toolchain hiccup
+  #   * test_engine_correctness.py  -- real lualatex build of committed bank
+  #     fixtures, reading the PDF back with pdftotext to prove the problem
+  #     engine renders the RIGHT substituted values, \calcvar results, and MC
+  #     answer letters (the "wrong number / wrong key" silent-failure class).
+  #   * test_exam_seed.lua          -- pure-texlua unit test of set_exam_seed's
+  #     per-version decorrelation (needs texlua, hence this job, not the fast
+  #     Python-only one). Cheap; run first.
+  # The Python tests soft-skip if their tools are missing, so a toolchain hiccup
   # degrades gracefully rather than failing the job.
   #
   # Runs in the SAME pinned full-scheme TeX Live container as smoke.yml /
@@ -49,5 +56,7 @@ jobs:
             apk add --no-cache python3 py3-pip poppler-utils
             pip install --break-system-packages --quiet pypdf \
               || pip install --quiet pypdf
+            texlua test_exam_seed.lua
             python3 Sublime/test_biber_integration.py
             python3 Sublime/test_synctex_integration.py
+            python3 test_engine_correctness.py
