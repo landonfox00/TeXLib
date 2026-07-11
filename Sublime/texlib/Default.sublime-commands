@@ -9,5 +9,7 @@
     { "caption": "TeXLib: Build — Quick (single pass)", "command": "texlib_build", "args": { "mode": "quick" } },
     { "caption": "TeXLib: Cancel Build", "command": "texlib_cancel_build" },
     { "caption": "TeXLib: View PDF", "command": "texlib_view_pdf" },
-    { "caption": "TeXLib: Forward Sync (cursor → PDF)", "command": "texlib_forward_sync" }
+    { "caption": "TeXLib: Forward Sync (cursor → PDF)", "command": "texlib_forward_sync" },
+    { "caption": "TeXLib: Go to Bank Problem", "command": "texlib_goto_problem" },
+    { "caption": "TeXLib: Insert Bank Problem (\\getproblem)", "command": "texlib_insert_problem" }
 ]

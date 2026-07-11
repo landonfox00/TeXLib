@@ -253,6 +253,14 @@ code, not a delegated call.
 - **Phase 2 — cut over.** Switch keymap/build to native; keep LaTeXTools for
   editor only; settle the log-parser decision (Risk #1).
 - **Phase 3 — domain features.** Scaffolding, coursemeta, bank commands.
+  - **Bank navigation done (2026-07-10), `texlib/texlib_bank.py`** (own top-level
+    file → hot-reloads independently). `TeXLib: Go to Bank Problem` and `TeXLib:
+    Insert Bank Problem` scan the doc + its `\loadbank`/`\importproblem` targets +
+    a sibling `bank.tex` for `\begin{problem}{id}[attrs]`, quick-panel to jump to
+    a definition or insert `\getproblem{id}`. `test_texlib_bank.py` covers the
+    pure scan (sources + ids + attrs + line, both inline and external patterns).
+    **Live check pending.** Next domain commands: new-doc scaffolding, coursemeta
+    open/reveal.
 - **Phase 4 — distribution.** Package via the installer repo / a Package Control
   custom repo; finish the settings split; document LaTeXTools as a companion.
 
