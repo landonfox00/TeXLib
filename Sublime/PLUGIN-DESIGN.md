@@ -334,3 +334,47 @@ spell-check words — those stay machine-local.
 - [ ] Keep the LaTeXTools builder as a fallback through Phases 0–2? (recommended:
       yes.)
 - [ ] Distribution channel: installer bundle vs. Package Control custom repo.
+
+## 14. Future features / backlog
+
+Ideas to revisit (flagged 2026-07-11, none started). The core plugin is
+feature-complete; these are "make it feel more alive", deeper domain tooling, and
+a few gated cross-cutting features.
+
+**High-value, low-effort — do these first**
+- [ ] **Live status-bar progress** — a spinner + the current step (`lualatex run
+      2…`, `biber…`, `slicing versions…`). The runner already emits these; just
+      surface the latest in the status bar. Best felt improvement; pairs with the
+      hide-panel-by-default UX.
+- [ ] **Editor-command delegations** → `Word Count` (`latextools_texcount`),
+      `Table of Contents` (`latextools_toc_quickpanel`), `Jump to \ref/\cite`
+      (`latextools_jumpto_anywhere`); add to the `Tools → TeXLib` menu.
+- [ ] **`TeXLib: Edit Settings`** — open/create `Packages/User/TeXLib.sublime-
+      settings` (onboarding; matters for distribution).
+
+**Domain depth — the plugin's real edge**
+- [ ] **Insert problem by topic/filter** — pick a topic → `\problem{topic=X}`
+      (the exam filter form); the bank scanner already extracts `[attrs]`.
+- [ ] **Bank report** — unused problems, duplicate ids, topic/difficulty
+      distribution for the active bank.
+- [ ] **Bank preview** — build a bank standalone via `\printbankcatalog`; ties
+      into the deferred [[bank-class-deferred]] decision.
+
+**Gated — needs a class change or a decision**
+- [ ] **Show Resolved Metadata** — needs `course-metadata.sty` to dump a
+      `.metadump` sidecar (the engine owns the resolution). Hold while class files
+      are being unified.
+- [ ] **Coursemeta key completions** — complete `\meta{key}` keys in
+      `coursemeta.tex`.
+- [ ] **Build-on-save** (opt-in setting).
+
+**Coordinate with the build-parallelization session (do NOT race it)**
+- [ ] Build parallelism lives in a separate session. Once it lands, the plugin
+      surfaces it: progress across parallel passes, or a dedicated command.
+      Confirm what that session produces before building any of this.
+
+**Polish nits**
+- [ ] Warning color robustness — `markup.warning` isn't colored on every theme;
+      switch to a more universal scope if needed.
+- [ ] Success-with-warnings status — `built (N warnings)` instead of silently
+      hiding the panel.
