@@ -1,19 +1,21 @@
 [
-    // Phase 0: bindings are intentionally commented so this package cannot
-    // steal Ctrl+B / Ctrl+Shift+B from the LaTeXTools "texlib" builder while
-    // both coexist. Uncomment (or move to Packages/User) once the native path
-    // is the one you build with.
-    //
-    // { "keys": ["ctrl+alt+b"], "command": "texlib_build_pick",
-    //   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
-    // { "keys": ["ctrl+b"], "command": "texlib_build", "args": { "mode": "default" },
-    //   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
-    // { "keys": ["ctrl+alt+j"], "command": "texlib_forward_sync",
-    //   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
-    // { "keys": ["ctrl+alt+v"], "command": "texlib_view_pdf",
-    //   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
-    // { "keys": ["ctrl+alt+p"], "command": "texlib_goto_problem",
-    //   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
-    // { "keys": ["ctrl+alt+i"], "command": "texlib_insert_problem",
-    //   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] }
+	// Cutover (2026-07-10): Ctrl+B / Ctrl+Shift+B run the NATIVE build for TeX
+	// files. LaTeXTools stays installed for editor smarts, and its build system
+	// is still reachable via Tools > Build With > TeXLib (the thin adapter). If
+	// Ctrl+B still triggers the old build, copy these two bindings into
+	// Packages/User (highest precedence).
+	{ "keys": ["ctrl+b"], "command": "texlib_build", "args": { "mode": "default" },
+	  "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
+	{ "keys": ["ctrl+shift+b"], "command": "texlib_build_pick",
+	  "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
+
+	// Editor-convenience bindings -- uncomment any you want:
+	// { "keys": ["ctrl+alt+j"], "command": "texlib_forward_sync",
+	//   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
+	// { "keys": ["ctrl+alt+v"], "command": "texlib_view_pdf",
+	//   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
+	// { "keys": ["ctrl+alt+p"], "command": "texlib_goto_problem",
+	//   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
+	// { "keys": ["ctrl+alt+i"], "command": "texlib_insert_problem",
+	//   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] }
 ]

@@ -237,10 +237,9 @@ code, not a delegated call.
     (kill mid-pass-1). **Phase 1 complete, committed as `23378b0`.** (Publish
     toggles wired: the runner feeds `publish_shareable_copies` /
     `copy_published_path_to_clipboard` from `TeXLib.sublime-settings`.)
-  - **Drift note:** the brain now exists twice (`texlib_builder.py` for LaTeXTools,
-    `texlib/texlib_build.py` native). Intentional for coexistence; **Phase 2**
-    consolidates — retire the LaTeXTools builder, or make it import the native
-    core so there is one source.
+  - **Drift note (RESOLVED 2026-07-10):** consolidated in Phase 2 — one core
+    (`TexlibBuildCore`), two thin hosts (native `TexlibBuild`, LaTeXTools
+    `TexlibBuilder` adapter). See the Phase 2 entry below.
 - **Delegation layer / Tier C (2026-07-10).** Built the "complement" half: a
   successful build delegates to LaTeXTools' `jumpto_pdf` — open/refresh + forward
   sync per LaTeXTools' own `forward_sync`/`keep_focus` settings, gated by the
@@ -250,8 +249,17 @@ code, not a delegated call.
   name, never import. `test_texlib_runner.py` covers the on_success trigger (fires
   only on completed build + PDF present + not cancelled). **Needs a live check:**
   confirm the viewer pops/syncs after a build.
-- **Phase 2 — cut over.** Switch keymap/build to native; keep LaTeXTools for
-  editor only; settle the log-parser decision (Risk #1).
+- **Phase 2 done (2026-07-10) — native-canonical + cutover.** Build logic is now
+  ONE source: `TexlibBuildCore` in `texlib_build.py`. The native `TexlibBuild`
+  subclasses it (adds the constructor); the LaTeXTools builder is a 113-line
+  adapter — `class TexlibBuilder(TexlibBuildCore, PdfBuilder)`, core first in the
+  bases so `commands()`/`_*` resolve to the core, PdfBuilder supplies `__init__` +
+  host attrs. 1690 → 113 lines; nothing left to drift. `Ctrl+B` / `Ctrl+Shift+B`
+  now run the native build for TeX files (LaTeXTools' build system still reachable
+  via Build With: TeXLib). Native side proven by the six suites; the LaTeXTools
+  adapter path needs a **live re-test** (redeploy `texlib_builder.py` to
+  Packages/User + restart). **Log-parser revisit (Risk #1) still open** — pending a
+  live clickable-error check (introduce a typo, click the error) to get data first.
 - **Phase 3 — domain features.** Scaffolding, coursemeta, bank commands.
   - **Bank navigation done (2026-07-10), `texlib/texlib_bank.py`** (own top-level
     file → hot-reloads independently). `TeXLib: Go to Bank Problem` and `TeXLib:

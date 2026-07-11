@@ -162,28 +162,17 @@ BIBER_RERUN_RE = re.compile(r"Please \(?re\)?(?:run|rerun) Biber", re.IGNORECASE
 MODE_OPT_RE = re.compile(r"^--texlib-mode=(.+)$")
 
 
-class TexlibBuild:
-    """Host-agnostic TeXLib build engine (ported from texlib_builder.py).
+class TexlibBuildCore:
+    """The single source of TeXLib build LOGIC -- host-agnostic.
 
-    The LaTeXTools PdfBuilder base is gone. A host constructs this with the
-    resolved target and a `display` callable, then drives commands() -- a
-    coroutine yielding (argv, message) pairs. After running each argv the host
-    feeds the command's combined output back via `self.out` before resuming, so
-    the rerun/biber checks (which read self.out) see the latest log. Everything
-    below the constructor is copied verbatim from the builder so behavior does
-    not drift.
+    Reads a small host contract -- self.display, self.tex_root, self.tex_name,
+    self.base_name, self.engine, self.options, self.out, self.aux_directory --
+    and drives commands(), a coroutine yielding (argv, message) pairs; after
+    running each argv the host feeds the command's output back via self.out
+    before resuming (rerun/biber checks read it). Two hosts supply that
+    contract: the native TexlibBuild (below, via __init__) and the LaTeXTools
+    TexlibBuilder (texlib_builder.py, via PdfBuilder). One core -> no drift.
     """
-
-    def __init__(self, tex_root, engine, options, display,
-                 aux_directory="<<temp>>"):
-        self.tex_root = tex_root
-        self.tex_name = os.path.basename(tex_root)
-        self.base_name = os.path.splitext(self.tex_name)[0]
-        self.engine = engine
-        self.options = list(options or [])
-        self.display = display
-        self.aux_directory = aux_directory
-        self.out = ""
 
     # ------------------------------------------------------------------ #
     # Entry point: a coroutine that yields (command, message) pairs and
@@ -1379,7 +1368,7 @@ class TexlibBuild:
         t = re.sub(r"\s+", "", term)
         core = f"{c}.{s}" if s else c
         name = f"{core}_{t}" if t else core
-        return TexlibBuild._sanitize_filename(name)
+        return TexlibBuildCore._sanitize_filename(name)
 
     @staticmethod
     def _sanitize_filename(name):
@@ -1543,7 +1532,7 @@ class TexlibBuild:
         PATH. The first whose `-c "import pypdf"` succeeds wins; the result
         (including None) is cached for the process.
         """
-        cached = getattr(TexlibBuild, "_ext_python_cache", False)
+        cached = getattr(TexlibBuildCore, "_ext_python_cache", False)
         if cached is not False:
             return cached
         candidates = []
@@ -1566,7 +1555,7 @@ class TexlibBuild:
             if probe.returncode == 0:
                 found = cand
                 break
-        TexlibBuild._ext_python_cache = found
+        TexlibBuildCore._ext_python_cache = found
         return found
 
     def _run_pdfpost(self, op, sidecar_path, pdf_path, out_dir):
@@ -1635,3 +1624,19 @@ class TexlibBuild:
         except ValueError:
             return [], ["TeXLib: PDF post-processing returned unreadable output."]
         return result.get("produced", []), result.get("messages", [])
+
+
+class TexlibBuild(TexlibBuildCore):
+    """Native host for the shared core: supplies the build contract via the
+    constructor; the runner in texlib.py then drives commands()."""
+
+    def __init__(self, tex_root, engine, options, display,
+                 aux_directory="<<temp>>"):
+        self.tex_root = tex_root
+        self.tex_name = os.path.basename(tex_root)
+        self.base_name = os.path.splitext(self.tex_name)[0]
+        self.engine = engine
+        self.options = list(options or [])
+        self.display = display
+        self.aux_directory = aux_directory
+        self.out = ""
