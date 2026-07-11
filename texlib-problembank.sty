@@ -318,6 +318,51 @@
 	)}%
 }
 
+% ---- Typeset-time shuffle: collect mode -----------------------------------
+% Inside {problems}/{mcproblems} the section env \let's \problem to
+% \@problem@collect (record the item, don't typeset), \newpage to a break
+% marker, and \extracredit to \@xc@collect (defer to section end, pinned last).
+% \@texlib@psection@end then emits the section permuted per version. See
+% pbank_emit_section in problem_engine.lua.
+\NewDocumentCommand{\@problem@collect}{O{} O{1} m O{}}{%
+	\pbank@lua{pbank_collect_item(
+		'\luaescapestring{#1}',
+		'\luaescapestring{#2}',
+		'\luaescapestring{#3}',
+		'\luaescapestring{#4}'
+	)}%
+}
+% Deferred extra-credit: append the invocation (authored order) to a per-section
+% macro, replayed after the shuffled problems so it always lands last.
+\newcommand{\pbank@xc@deferred}{}
+\NewDocumentCommand{\@xc@collect}{o +m}{%
+	\IfValueTF{#1}
+		{\g@addto@macro\pbank@xc@deferred{\@saved@xc[#1]{#2}}}
+		{\g@addto@macro\pbank@xc@deferred{\@saved@xc{#2}}}%
+}
+% The page break pbank_emit_section emits between authored page groups: a real
+% \newpage plus the first-on-page reset. @-free name so Lua \print's it directly
+% (in the document body @ is catcode 12).
+\newcommand{\PbankPageBreak}{\newpage\pbank@lua{pbank_first_on_page = true}}
+% Emit one collected problem in the permuted order. @-free wrapper so
+% pbank_emit_section can \sprint it; maps the four braced args onto
+% \@problem@item's [pts][stretch]{filter}[fix] so TeX typesets each problem
+% (and processes its SyncTeX redirect + \input) before the next is emitted.
+\newcommand{\PbankEmitItem}[4]{\@problem@item[#1][#2]{#3}[#4]}
+% A \section inside {problems} is a hard shuffle boundary (items before/after it
+% permute independently). Collect mode captures each heading into \pbank@sec@<n>
+% and records the boundary; pbank_emit_section replays the heading between runs.
+\newcounter{pbank@seccnt}
+\NewDocumentCommand{\@sec@collect}{s o m}{%
+	\stepcounter{pbank@seccnt}%
+	\IfBooleanTF{#1}
+		{\expandafter\gdef\csname pbank@sec@\arabic{pbank@seccnt}\endcsname{\@saved@section*{#3}}}%
+		{\IfValueTF{#2}
+			{\expandafter\gdef\csname pbank@sec@\arabic{pbank@seccnt}\endcsname{\@saved@section[#2]{#3}}}%
+			{\expandafter\gdef\csname pbank@sec@\arabic{pbank@seccnt}\endcsname{\@saved@section{#3}}}}%
+	\pbank@lua{pbank_collect_section(\arabic{pbank@seccnt})}%
+}
+
 % \loadbank{path}  — explicitly load a problem bank file.
 %
 % Calls pbank_set_bankfile() so the engine records the bank-file path on
@@ -499,15 +544,21 @@
 	% ---- inter-problem separator: first problem on a page gets no rule -------
 	\pbank@lua{pbank_first_on_page = true}%
 	\let\@problems@saved@newpage\newpage
-	\renewcommand{\newpage}{%
-		\@problems@saved@newpage
-		\pbank@lua{pbank_first_on_page = true}%
-	}%
 	% ---- open the question list, carrying the question number across sections -
 	\begin{questions}%
 	\setcounter{question}{\value{@texlib@qcarry}}%
+	% ---- COLLECT MODE: \problem / \newpage / \extracredit record instead of
+	%      typesetting; \@texlib@psection@end emits the section permuted --------
 	\let\@saved@problem\problem
-	\let\problem\@problem@item
+	\let\problem\@problem@collect
+	\let\@saved@xc\extracredit
+	\let\extracredit\@xc@collect
+	\let\@saved@section\section
+	\let\section\@sec@collect
+	\setcounter{pbank@seccnt}{0}%
+	\gdef\pbank@xc@deferred{}%
+	\renewcommand{\newpage}{\pbank@lua{pbank_collect_break()}}%
+	\pbank@lua{pbank_begin_collect()}%
 	% ---- auto "Part N — Label" heading (user label overrides the default) -----
 	\if 1#4%
 		\def\@texlib@ulbl{#3}%
@@ -518,9 +569,18 @@
 	\fi
 }
 \newcommand{\@texlib@psection@end}{%
-	\setcounter{@texlib@qcarry}{\value{question}}%
-	\let\problem\@saved@problem
+	% Restore \newpage BEFORE the emit so \PbankPageBreak's \newpage is the real
+	% one, then emit the collected problems permuted (the seed folds in the part
+	% number so equal-sized parts don't share an order), then the deferred
+	% extra-credit in authored order.
 	\let\newpage\@problems@saved@newpage
+	\pbank@lua{pbank_emit_section(\arabic{texlibpartno})}%
+	\pbank@xc@deferred
+	% Capture the running question count AFTER the emit added its \question items.
+	\setcounter{@texlib@qcarry}{\value{question}}%
+	\let\extracredit\@saved@xc
+	\let\section\@saved@section
+	\let\problem\@saved@problem
 	\end{questions}%
 	\problems@end@hook
 }

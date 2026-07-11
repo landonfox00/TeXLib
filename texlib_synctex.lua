@@ -78,13 +78,31 @@ end
 -- the two load orders. TEXLIB_AUX_DIR is exported by the Sublime builder (and
 -- build_versions.py) to mirror -output-directory; TEXMF_OUTPUT_DIRECTORY is set
 -- by TeX Live itself whenever -output-directory is used, covering a plain
--- command-line / agent build too. Raw Lua io.open honors neither on its own.
--- Both unset (a build with no aux routing) preserves writing next to the
--- source. Keep this in sync with problem_engine.lua's copy.
+-- command-line / agent build too. Failing both, tier 3 routes to a hashed
+-- per-document subdir of the system temp so even a bare `lualatex doc.tex`
+-- keeps this scratch out of the source folder. Raw Lua io.open honors none of
+-- these on its own. Keep this in sync with problem_engine.lua's copy.
+local texlib_fallback_dir   -- nil = unresolved; "" = failed; else a path
 local function texlib_scratch_path(name)
 	local dir = os.getenv("TEXLIB_AUX_DIR")
 	if not dir or dir == "" then
 		dir = os.getenv("TEXMF_OUTPUT_DIRECTORY")
+	end
+	if not dir or dir == "" then
+		if texlib_fallback_dir == nil then
+			local tmp = (os.getenv("TEMP") or os.getenv("TMP")
+				or os.getenv("TMPDIR") or "/tmp"):gsub('\\', '/')
+			local key = (lfs.currentdir() or "") .. "\0" .. (tex.jobname or "job")
+			local h = 5381
+			for i = 1, #key do h = (h * 33 + string.byte(key, i)) % 0x7FFFFFFF end
+			local base = tmp .. "/texlib-scratch"
+			local d = base .. "/" .. string.format("%08x", h)
+			lfs.mkdir(base)
+			lfs.mkdir(d)
+			texlib_fallback_dir =
+				(lfs.attributes(d, "mode") == "directory") and d or ""
+		end
+		dir = texlib_fallback_dir
 	end
 	if dir and dir ~= "" then
 		-- Normalize backslashes: these dirs are os.path.join'd, so backslashed
