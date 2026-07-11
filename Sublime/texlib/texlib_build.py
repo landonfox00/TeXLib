@@ -665,7 +665,7 @@ class TexlibBuildCore:
             if exe:
                 out = subprocess.run(
                     [exe, "--version"], capture_output=True, text=True,
-                    timeout=10,
+                    timeout=10, creationflags=_NO_WINDOW,
                 )
                 first = (out.stdout or "").strip().splitlines()
                 ver = first[0].strip() if first else ""
