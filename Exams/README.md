@@ -3,9 +3,10 @@
 The largest TeXLib class. Builds randomized, multi-version exams from
 a problem bank, with synchronized answer keys, optional rubrics, and
 per-problem inline-Lua randomization. Handles single-version edits
-("just typeset version A") and full multi-version builds (A, B, C,
-…) collated into one PDF, depending on whether the Python builder is
-calling it.
+("just typeset version A", via `\def\Version{A}`) and full
+multi-version builds (A, B, C, …) collated into one PDF — which the
+Sublime builder then automatically slices into one PDF per version
+(and per solutions-state).
 
 ## What it gives you
 
@@ -17,8 +18,9 @@ calling it.
 - Per-version randomization built on a Lua engine: `\setrng`,
 	`\calcvar`, `\picklist`, `\pickrange`, `\foreachpick`, with
 	`\get`/`\geti`/`\getlist` for retrieval.
-- A `solution`/`partsolution` environment pair that gates visibility
-	on `\ifsolutions`/`\ifkey` and renders only when building the key.
+- A `solution`/`partsolution` environment pair that renders only when
+	building the key — it gates on `\ifsolutions`, which `\ifkey`
+	(`\ShowKey`/`\keys`) now implies for this class.
 - Smart-columns environment (`problems`) that groups problems into
 	TWO-column or FULL-width layouts based on per-problem hints.
 - Rubric overlays, common-errors lists, and a scorepage option for
@@ -66,13 +68,18 @@ Then build:
 # Single-version edit pass
 lualatex \def\Version{A}\input{exam5.tex}
 
-# Or let Python builder cycle through versions and collate
-python3 build_exam.py exam5.tex
+# Full multi-version build (the Sublime builder also slices exam5_A.pdf,
+# exam5_B.pdf, ... out of the combined PDF automatically)
+lualatex exam5.tex
 ```
 
 For the answer key, redefine `\ShowKey` (or call `\keys` in source)
-and recompile to get a key version that interleaves problem statements
-with their solutions and rubrics.
+and recompile. This builds the instructor **key copies only** (no blank
+student copy) — each problem interleaved with its solution, and one key
+per version in a multi-version exam. Add `\def\ShowRubric{}` to also
+overlay the grading rubrics. To build the blank student copies **and**
+the keys together (the fuller production build the Sublime builder then
+slices apart), use `\def\ShowSolutions{}` instead.
 
 ---
 
@@ -134,6 +141,19 @@ never again.
 
 Compile-time toggles: `\ShowSolutions`, `\ShowKey`, `\ShowRubric`,
 `\Version{A}`. Source toggles: `\solutions`, `\keys`, `\rubrics`.
+
+Two answer-revealing builds, distinguished by *which* copies they emit:
+
+- `\ShowKey` / `\keys` → **key copies only** (`AutoExamSolMode=only`): the
+	instructor copy of each version, with `\ifsolutions` on. An exam's answer
+	key IS its instructor copy, so `\ifkey` implies `\ifsolutions`. The cover
+	reads "Answer Key".
+- `\ShowSolutions` / `\solutions` → **dual** (`AutoExamSolMode=dual`): the
+	blank student copies *and* the key copies, collated for the builder to
+	slice. The cover reads "Solutions".
+
+`\ShowRubric` / `\rubrics` overlays the grading rubrics on top of either
+(rubrics live inside a shown solution, so they need one of the above too).
 
 ### Problem bank workflow
 
@@ -253,13 +273,16 @@ Reserved blank space for student work.
 	relative-path search inside its `\directlua{dofile(...)}` loader, so
 	the file can also sit next to the class or alongside the .tex being
 	built.
-- **Builder mode vs. standalone mode:** the Python builder watches for
-	the `examversions` declaration via regex, then invokes lualatex
-	per-version with `\def\Version{X}`. Standalone mode (no builder)
-	loops over all versions in one compile.
+- **Normal build vs. forced single version:** a normal compile (no
+	`\Version` defined) loops over every declared version in one compile,
+	producing a combined PDF that the Sublime builder then slices into
+	`<jobname>_A.pdf`, `<jobname>_B.pdf`, ... afterward. Passing
+	`\def\Version{X}` externally (or on a raw command line) forces only
+	that one version to build.
 - **Filenames the builder produces:** `<jobname>_A.sco`,
-	`<jobname>_autoexam_body_A.tex`, `<jobname>.srcmap`, etc. — these
-	are intermediate artifacts you can ignore between rebuilds.
+	`<jobname>_autoexam_body_A.tex`, `<jobname>.srcmap`,
+	`<jobname>.vmap`, etc. — these are intermediate artifacts you can
+	ignore between rebuilds.
 
 ## Related
 

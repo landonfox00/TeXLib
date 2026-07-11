@@ -144,35 +144,39 @@
 	\title{\LARGE \GetQuizTitle}%
 	\SetTeXLibExamRules
 	\firstpageheadrule
-	% First page omits the left title -- the large "Quiz <n>" heading sits just
-	% below it. Running pages carry \GetQuizTitle on the left instead.
-	\firstpageheader{}{}{Name:\ \underline{\hspace{2.5in}}}%
+	% First page carries the course section number on the left (the large
+	% "Quiz <n>" heading sits just below it, so repeating the quiz title here
+	% would be redundant). Running pages carry \GetQuizTitle on the left instead.
+	\firstpageheader{\bfseries Section~\GetCourseSection}{}{Name:\ \underline{\hspace{2.5in}}}%
 	% Footer L: full course name via the shared \GetCourse ("Math 181 Calculus I").
 	\firstpagefooter{\GetCourse}{\thepage\ of \pageref{LastPage}}{\GetInstitution}%
 	\runningheader{\bfseries\GetQuizTitle}{}{Name:\ \underline{\hspace{2.5in}}}%
 	\runningfooter{\GetCourse}{\thepage\ of \pageref{LastPage}}{\GetInstitution}%
 }
 
+% \blankpage — ships the current page and starts a blank scratch leaf, keeping
+% the normal running header/footer (so the Name field and running "Quiz <n>"
+% left header still land on it). Call after \end{problems}, right before
+% \end{document}:
+%   \end{problems}
+%   \blankpage
+\newcommand{\blankpage}{%
+	\clearpage
+	\null
+}
+
 \renewcommand{\maketitle}{%
-	% Instructions: file overrides inline text overrides default.
-	% File content controls its own layout (no automatic box around it).
-	\IfQuizInstructionsFile{%
-		\begin{center}
-			{\LARGE \GetQuizTitle}%
-			\ifkey\par\vspace{0.4em}\textit{Answer~Key}\fi
-		\end{center}
-		\quiz@input@userinstructions
-	}{%
-		\begin{center}
-			{\LARGE \GetQuizTitle}%
-			\ifkey\par\vspace{0.4em}\textit{Answer~Key}\fi
-			\par\medskip
-			% Inline text typesets directly; the default wording is \input from
-			% quiz-instructions.tex so double-clicking it in the PDF lands on that
-			% source (inverse search).
-			\TeXLibInstructionsBox{\TeXLibInstructionsInlineOrDefault{quiz}}%
-		\end{center}
-	}%
+	\begin{center}
+		{\LARGE \GetQuizTitle}%
+		\ifkey\par\vspace{0.4em}\textit{Answer~Key}\fi
+	\end{center}
+	\par\medskip
+	% Instructions: file / inline / default alike are wrapped in the titled box
+	% (matching the exam cover page). The default wording is \input from
+	% quiz-instructions.tex so double-clicking it in the PDF lands on that source
+	% (inverse search). A doc can call \TeXLibInstructionsUnboxed to reclaim full
+	% layout control over its own instructions file (renders bare, no box).
+	\TeXLibInstructionsTitled{quiz}%
 }
 
 % Course-metadata aliases (\theCourse, \theCourseNumber, \theCourseTitle,

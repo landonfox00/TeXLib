@@ -83,15 +83,7 @@ Setting up TeXLib on a new machine or for a new course.
 
   Exit code is the number of failed builds.
 
-- [`build_versions.py`](build_versions.py) — standalone parallel builder for multi-version (`\versions{A,B,C}`) autoexam documents. Builds every version concurrently (one process each, reusing the Sublime builder's per-version pipeline so there's no logic drift), then merges them into one PDF or keeps them separate. Needs `lualatex`/`pdflatex` (+ `biber` if the exam cites) on PATH and `pypdf` for merging; no Sublime/LaTeXTools install required. Usage:
-
-  ```
-  python build_versions.py exam.tex            # combined exam.pdf
-  python build_versions.py exam.tex --separate # exam_A.pdf, exam_B.pdf, ...
-  python build_versions.py exam.tex --both -j 4 -v
-  ```
-
-- [`Sublime/`](Sublime/) — Sublime Text build system + LaTeXTools settings + custom builder (`texlib_builder.py`) that handles engine selection, rerun loops, the biber-skip cache, and PDF splitting. See [Sublime/README.md](Sublime/README.md) for deploy instructions.
+- [`Sublime/`](Sublime/) — Sublime Text build system + LaTeXTools settings + custom builder (`texlib_builder.py`) that handles engine selection, rerun loops, the biber-skip cache, and PDF splitting (including per-version/solutions PDFs sliced out of a single combined `\versions{A,B,C}` autoexam build). See [Sublime/README.md](Sublime/README.md) for deploy instructions.
 
 ### Modules
 

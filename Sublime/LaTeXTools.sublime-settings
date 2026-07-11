@@ -25,12 +25,21 @@
 			],
 			// kpathsea CANNOT resolve a TEXINPUTS entry that contains a comma.
 			// The real OneDrive folder name has one ("...Nevada, Reno..."), so
-			// we route via OneDriveUNR -- a comma-free directory junction to
-			// the same folder. Trailing // means "and all subdirs".
+			// we route via the comma-free junction. Trailing // means "and all
+			// subdirs".
 			"env" : {
-				"TEXINPUTS" : ".;C:\\Users\\Landon\\OneDriveUNR\\Documents\\TeXLib//;",
+				"TEXINPUTS" : ".;C:\\_texlibjunc//;",
 			}
-		}
+		},
+
+		// TeXLib publish step (syllabus / schedule): on a normal build the
+		// builder clones the PDF to <course>.<section>_<term>.pdf + a generic
+		// Syllabus.pdf / "Tentative Schedule.pdf", drops a "<course> <term>
+		// <noun>" shortcut in the desktop's "Course Materials" folder, and puts
+		// the shareable path on the clipboard. Both default ON; uncomment to
+		// disable (env TEXLIB_PUBLISH / TEXLIB_PUBLISH_CLIPBOARD also work).
+		// "publish_shareable_copies" : false,
+		// "copy_published_path_to_clipboard" : false,
 	},
 
 	"viewer" : "sumatra",

@@ -23,17 +23,17 @@ Soft-skips (exit 0) if lualatex, a poppler-flavored pdftotext (-bbox support),
 or the synctex CLI are missing -- matching test_biber_integration.py's
 degrade-don't-fail convention.
 
-NOTE on current known failures (tracked, not asserted as "expected" here --
-these scenarios assert the CORRECT behavior and will fail until fixed):
-  * Schedule per-cell attribution: xltabular defers real box shipout to
-    end-of-file, so EVERY typeset node in the calendar table is attributed by
-    real SyncTeX to the grid file's last line, never its actual source line.
-  * Document-attributed (non-bank) problem attribution: correct only until a
-    page has shipped out; after that it lands on whichever line most recently
-    shipped a page (e.g. \\maketitle's internals), not the problem's real
-    line, because that path redirects the file at ITSELF (unlike the bank
-    case, which redirects to a genuinely separate file) and self-reference's
-    line-tracking doesn't survive an intervening shipout.
+STATUS (2026-07-04): Schedule's default xltabular renderer is a confirmed
+fundamental limitation (not fixable by a redirect-timing patch -- see
+_rewrite_synctex_for_schedmap's docstring); scenarios 4/5 assert the honest
+grid-file fallback that ships today, not per-cell accuracy. A real per-cell
+fix (an opt-in box-grid renderer) exists on a separate, unmerged branch. The
+"document-attributed problem breaks after a page shipout" theory floated
+earlier in this investigation did NOT hold up -- that was a hardcoded-page
+bug in manual testing, not a real defect; scenario 3 confirms exact
+attribution. One remaining known gap: solution-box content had no working
+inverse search at all (a `tcolorbox`-internals issue, unrelated to
+Schedule's) -- fixed; scenario 2 asserts it outright now.
 
 Run:  python Sublime/test_synctex_integration.py     (exit 0 ok/skipped, 1 fail)
 """
@@ -45,14 +45,37 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import types
 
-# --- Reuse the repo's own real-builder import (build_versions.py already
-# solves the LaTeXTools-stub dance; no reason to re-solve it here). ----------
+# --- Import the real Sublime builder. build_versions.py used to do the
+# LaTeXTools-stub dance and re-export TexlibBuilder; it was removed with the
+# All-Versions builder, so stub PdfBuilder here (the same minimal stub
+# test_texlib_builder.py uses) before importing TexlibBuilder directly. -----
 TEXLIB_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, TEXLIB_ROOT)
-import build_versions  # noqa: E402
 
-TexlibBuilder = build_versions.TexlibBuilder
+
+class _StubPdfBuilder:
+    """Minimal stand-in for LaTeXTools' PdfBuilder."""
+
+    def __init__(self, *args, **kwargs):
+        self._displayed = ""
+
+    def display(self, msg):
+        self._displayed += str(msg)
+
+
+for _name in (
+    "LaTeXTools",
+    "LaTeXTools.plugins",
+    "LaTeXTools.plugins.builder",
+    "LaTeXTools.plugins.builder.pdf_builder",
+):
+    sys.modules.setdefault(_name, types.ModuleType(_name))
+sys.modules["LaTeXTools.plugins.builder.pdf_builder"].PdfBuilder = _StubPdfBuilder
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from texlib_builder import TexlibBuilder  # noqa: E402
 
 
 def _texinputs_env(tex_dir):
@@ -67,14 +90,22 @@ def _texinputs_env(tex_dir):
     containing a comma (the real OneDrive path has one, and Python's own
     __file__/getcwd resolution does not preserve "reached via the comma-free
     junction" -- it reports the real underlying path either way). Route
-    through the C:\\_texlibjunc junction when present (see CLAUDE.md /
-    reference-compiling-onedrive-path); harmless no-op on any host without
-    that junction (e.g. CI on Linux, where there's no comma to begin with).
+    through the C:\\_texlibjunc junction ONLY when TEXLIB_ROOT itself is the
+    comma-containing path -- i.e. this script is running from the live,
+    shared OneDrive checkout. A worktree (or any other checkout) elsewhere on
+    disk has no comma and must use ITS OWN files directly: the junction
+    always points at the live shared checkout, so unconditionally preferring
+    it here would silently compile against whatever's currently checked out
+    there instead of this worktree's own (possibly different, possibly
+    mid-conflict-resolution) content -- exactly the bug that produced a
+    confusing, non-reproducible-looking failure when this test was run from
+    an isolated worktree while the live checkout was mid-merge on a
+    different branch.
     """
     env = os.environ.copy()
     sep = ";" if os.name == "nt" else ":"
     root = TEXLIB_ROOT
-    if os.name == "nt" and os.path.isdir(r"C:\_texlibjunc"):
+    if os.name == "nt" and "," in root and os.path.isdir(r"C:\_texlibjunc"):
         root = r"C:\_texlibjunc"
     root = root.replace(os.sep, "/")
     env["TEXINPUTS"] = sep.join([".", root + "//", env.get("TEXINPUTS", "")])
@@ -89,10 +120,10 @@ _KNOWN_FAIL = 0
 
 
 def check(label, cond, detail="", known_issue=None):
-    """known_issue: pass a tracker reference (e.g. "task_27d73860") for an
+    """known_issue: pass a tracker reference (e.g. a spawned-task id) for an
     assertion that encodes CORRECT/intended behavior but is not expected to
     pass yet, pending separately-tracked follow-up work. Keeps the assertion
-    honest (it will start passing, loudly, the moment the real fix lands)
+    honest (it starts passing, loudly, the moment the real fix lands)
     without failing CI for a gap that's already known and deliberately not
     being fixed in the same change as everything else here."""
     global _PASS, _FAIL, _KNOWN_FAIL
@@ -142,13 +173,23 @@ PDFTOTEXT = _find_poppler_pdftotext()
 
 
 # --- Real-builder driver, mirroring test_biber_integration.py's run_build ---
-def run_build(tex_dir, tex_name, aux_directory="<<temp>>", options=None):
+def run_build(tex_dir, tex_name, aux_directory="<<temp>>", options=None, engine="pdflatex"):
+    """engine defaults to "pdflatex" -- matching a document with no %!TeX
+    program directive -- and is force-overridden to lualatex by the builder
+    itself for autoexam/quiz/schedule/report-card (see LUALATEX_CLASSES).
+    Classes NOT in that set (didactic, pset, syllabus, bingo) but that still
+    require lualatex for a specific reason (e.g. didactic's problem-bank
+    commands) rely on LaTeXTools resolving a %!TeX program magic comment
+    into self.engine BEFORE the builder ever runs -- pass engine="lualatex"
+    explicitly here to simulate that resolution; the plain default silently
+    fatals under pdflatex for such a document, same as a real misconfigured
+    build would."""
     b = TexlibBuilder()
     b.tex_root = os.path.join(tex_dir, tex_name)
     b.tex_name = tex_name
     b.base_name = os.path.splitext(tex_name)[0]
     b.tex_dir = tex_dir
-    b.engine = "pdflatex"  # overridden to lualatex by class-name detection
+    b.engine = engine
     b.options = options or []
     b.aux_directory = aux_directory
     b.out = ""
@@ -282,14 +323,41 @@ def scenario_bank_multiversion():
 
 
 def scenario_bank_solutions_mode():
-    """KNOWN ISSUE (task_27d73860, not fixed in this change): \\begin{solution}
-    is a tcolorbox (texlib-solutions.sty), and tcolorbox -- like xltabular --
-    defers real box shipout for internal measurement, so solution content
-    currently gets no working SyncTeX attribution at all (bulk check: every
-    bank.tex-attributed record in a solutions-mode build sits on the STEM's
-    line, none on the solution's). These assertions encode the CORRECT/
-    intended behavior and are expected to start passing, unprompted, the
-    moment that's fixed -- see the spawned follow-up task."""
+    """FIXED (task_27d73860). The original theory (tcolorbox defers shipout
+    for internal measurement, like xltabular, consuming the redirect before
+    real content ships) was WRONG -- disproved by ablation (stripping
+    tcolorbox out of {solution} entirely still failed identically). Two
+    separate bugs were actually stacked:
+
+      1. problem_engine.lua never staged a SyncTeX redirect for the solution
+         region at all -- p.solution was tex.print'd as a raw string with no
+         file backing, so its nodes inherited whatever (file,line) the STEM's
+         redirect last left active. Fixed by pbank_stage_solution/
+         emit_solution_block, which stage+\\@@input the solution's own
+         bank-file lines, deferred via a follow-up \\directlua token
+         (texlib_synctex.lua allows only one pending redirect at a time,
+         consumed by the next matching \\@@input -- same pattern as
+         pbank_print_catalog's per-id deferred calls).
+
+      2. Separately: tcolorbox's `enhanced` mode (needed for the old
+         `borderline west` accent) does its own internal box handling that
+         defeats `synctex edit`'s geometric reverse-search even for
+         correctly-tagged content -- confirmed generic, not about solution
+         content specifically (the tcolorbox-internal "Solution." header
+         text failed identically, untagged or not). Root cause: \\unvbox
+         splices nodes with no box-open record of its own, so reverse search
+         can't recover correctly-tagged content spliced inside a wrapper
+         whose own self-tag is the .sty file, not the bank -- confirmed by
+         swapping \\unvbox\\@sol@box for \\box\\@sol@box (a real nested box
+         node), which fixed it inside a plain \\colorbox+\\parbox and inside
+         tcolorbox's standard (non-enhanced) mode, but not enhanced mode.
+         Fixed by dropping tcolorbox for {solution} entirely: plain
+         \\colorbox+\\parbox, \\box (not \\unvbox), left accent hand-drawn
+         with \\vrule sized from \\ht\\@sol@box/\\dp\\@sol@box (read before
+         \\box empties the register). Trade-off accepted: \\box can't split
+         across a page the way the old breakable tcolorbox could -- surveyed
+         2026-07-04, every shipped solution is a few lines of prose/math,
+         none ever needed one."""
     print("\n=== Scenario 2: bank problem, Solutions mode ===")
     tmp = tempfile.mkdtemp(prefix="texlib_synctex_it_sol_")
     try:
@@ -308,11 +376,9 @@ def scenario_bank_solutions_mode():
         if pos:
             r = synctex_edit(pdf, *pos)
             check("click on the solution resolves to bank.tex",
-                  basename_matches(r["input"], "bank.tex"), r["raw"][:300],
-                  known_issue="task_27d73860")
+                  basename_matches(r["input"], "bank.tex"), r["raw"][:300])
             check(f"...at the correct source line ({BANK_SOLUTION_LINE})",
-                  r["line"] == BANK_SOLUTION_LINE, f"got line {r['line']!r}",
-                  known_issue="task_27d73860")
+                  r["line"] == BANK_SOLUTION_LINE, f"got line {r['line']!r}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -487,6 +553,182 @@ def scenario_schedule_plain_cli():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# --- Fixture: a multiple-choice bank problem -- exercises emit_mc_tail's own
+# call into emit_solution_block, a DIFFERENT code path than the FR case above
+# (Scenario 2), never previously covered. ------------------------------------
+MC_BANK_TEX = (
+    "\\begin{problem}{mc_one}[topic=mctest]\n"      # 1
+    "\tSolve SYNCNEEDLEMCSTEM for x.\n"              # 2
+    "\t\\begin{choices}\n"                           # 3
+    "\t\t\\cchoice SYNCNEEDLEMCCORRECT\n"             # 4
+    "\t\t\\choice SYNCNEEDLEMCWRONG\n"                # 5
+    "\t\\end{choices}\n"                              # 6
+    "\t\\begin{solution}\n"                          # 7
+    "\tSYNCNEEDLEMCSOLUTION explanation.\n"          # 8
+    "\t\\end{solution}\n"                            # 9
+    "\\end{problem}\n"                                # 10
+)
+MC_STEM_LINE = 2
+MC_SOLUTION_LINE = 8
+
+MC_AUTOEXAM_TEX = (
+    "\\documentclass[exam-number=1]{autoexam}\n"
+    "\\loadbank{mcbank.tex}\n"
+    "\\begin{document}\n"
+    "\\maketitle\n"
+    "\\begin{mcproblems}\n"
+    "\\problem{mc_one}\n"
+    "\\end{mcproblems}\n"
+    "\\end{document}\n"
+)
+
+
+def scenario_mc_bank_problem():
+    """MC (multiple-choice) bank problem, Solutions mode: emit_mc_tail calls
+    emit_solution_block on a DIFFERENT branch than the FR case in Scenario 2
+    -- never previously exercised by this suite. Choices themselves are
+    engine-selected/shuffled per version and intentionally have no fixed
+    source line to redirect to (not asserted here); the stem and solution
+    both should.
+
+    KNOWN ISSUE (task_dbeb33f6, not fixed in this change): the solution's
+    raw SyncTeX record DOES carry the correct source line (verified via bulk
+    inspection of the raw .synctex stream -- 9 records on the solution's
+    bank-file line, identical shape to the stem's), but the record's own
+    (h,v) position is ~200pt away from where the text actually renders, so
+    no click in that region resolves at all. Working theory: emit_mc_tail's
+    \\@mcframe@* side-by-side layout does its own box measurement on top of
+    the already-fixed {solution} environment, displacing the position. The
+    stem is unaffected (its own separate assertion below is a hard failure,
+    not a known-issue, since it's not expected to have this problem)."""
+    print("\n=== Scenario 6: MC bank problem, Solutions mode ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_synctex_it_mc_")
+    try:
+        write(tmp, "mcbank.tex", MC_BANK_TEX)
+        write(tmp, "mcautoexam.tex", MC_AUTOEXAM_TEX)
+        run_build(tmp, "mcautoexam.tex", aux_directory="<<temp>>",
+                  options=["--texlib-mode=solutions"])
+
+        pdf = os.path.join(tmp, "mcautoexam.pdf")
+        check("PDF was produced", os.path.exists(pdf))
+        if not os.path.exists(pdf):
+            return
+
+        pos = find_word(pdf, "SYNCNEEDLEMCSTEM")
+        check("found the MC stem needle in the PDF", pos is not None)
+        if pos:
+            r = synctex_edit(pdf, *pos)
+            check("click on the MC stem resolves to mcbank.tex",
+                  basename_matches(r["input"], "mcbank.tex"), r["raw"][:300])
+            check(f"...at the correct source line ({MC_STEM_LINE})",
+                  r["line"] == MC_STEM_LINE, f"got line {r['line']!r}")
+
+        pos2 = find_word(pdf, "SYNCNEEDLEMCSOLUTION")
+        check("found the MC solution needle in the PDF", pos2 is not None)
+        if pos2:
+            r2 = synctex_edit(pdf, *pos2)
+            check("click on the MC solution resolves to mcbank.tex",
+                  basename_matches(r2["input"], "mcbank.tex"), r2["raw"][:300],
+                  known_issue="task_dbeb33f6")
+            check(f"...at the correct source line ({MC_SOLUTION_LINE})",
+                  r2["line"] == MC_SOLUTION_LINE, f"got line {r2['line']!r}",
+                  known_issue="task_dbeb33f6")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# --- Fixture: the quiz class, a different root class from autoexam, using
+# its own \question \getproblem{id} retrieval style (not \problem{filter}
+# inside {problems}) -- shares texlib-problembank.sty but never previously
+# built through this suite. Reuses BANK_TEX (same needles/lines as Scenario
+# 1/2) since the bank format itself doesn't vary by class. --------------------
+QUIZ_TEX = (
+    "\\documentclass[quiz-number=1]{quiz}\n"
+    "\\loadbank{bank.tex}\n"
+    "\\begin{document}\n"
+    "\\maketitle\n"
+    "\\begin{questions}\n"
+    "\\question \\getproblem{quad_one}\n"
+    "\\end{questions}\n"
+    "\\end{document}\n"
+)
+
+
+def scenario_quiz_bank_problem():
+    print("\n=== Scenario 7: quiz class, bank problem via \\getproblem ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_synctex_it_quiz_")
+    try:
+        write(tmp, "bank.tex", BANK_TEX)
+        write(tmp, "quiz.tex", QUIZ_TEX)
+        run_build(tmp, "quiz.tex", aux_directory="<<temp>>")
+
+        pdf = os.path.join(tmp, "quiz.pdf")
+        check("PDF was produced", os.path.exists(pdf))
+        if not os.path.exists(pdf):
+            return
+
+        pos = find_word(pdf, "SYNCNEEDLESTEM")
+        check("found the stem needle in the PDF", pos is not None)
+        if pos:
+            r = synctex_edit(pdf, *pos)
+            check("click on the stem resolves to bank.tex",
+                  basename_matches(r["input"], "bank.tex"), r["raw"][:300])
+            check(f"...at the correct source line ({BANK_STEM_LINE})",
+                  r["line"] == BANK_STEM_LINE, f"got line {r['line']!r}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# --- Fixture: didactic (lecture notes), a non-exam class that also loads
+# texlib-problembank so a lecture handout can \getproblem{id} directly in
+# running prose -- never previously built through this suite. ---------------
+DIDACTIC_TEX = (
+    # didactic is NOT in the builder's auto-lualatex class list (only
+    # autoexam/quiz/schedule/report-card are) -- it silently defers its
+    # LuaLaTeX requirement until a bank command is actually used (see
+    # CLAUDE.md), so a document that calls \getproblem needs this magic
+    # comment or a plain pdflatex build fatals. Matches the real, documented
+    # gotcha (root chapterN.tex files needed this same fix 2026-06-16).
+    "% !TeX program = lualatex\n"
+    "\\documentclass{didactic}\n"
+    "\\loadbank{bank.tex}\n"
+    "\\begin{document}\n"
+    "\\getproblem{quad_one}\n"
+    "\\end{document}\n"
+)
+
+
+def scenario_didactic_bank_problem():
+    print("\n=== Scenario 8: didactic (lecture notes), bank problem via \\getproblem ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_synctex_it_didactic_")
+    try:
+        write(tmp, "bank.tex", BANK_TEX)
+        write(tmp, "didactic.tex", DIDACTIC_TEX)
+        # engine="lualatex": didactic isn't in the builder's forced-lualatex
+        # class list, so this simulates LaTeXTools having already resolved
+        # the %!TeX program magic comment in DIDACTIC_TEX before the builder
+        # runs -- a plain pdflatex default would silently fatal here (see
+        # DIDACTIC_TEX's own comment and CLAUDE.md's documented gotcha).
+        result = run_build(tmp, "didactic.tex", aux_directory="<<temp>>",
+                            engine="lualatex")
+
+        pdf = os.path.join(tmp, "didactic.pdf")
+        check("PDF was produced", os.path.exists(pdf), result["displayed"][:500])
+        if not os.path.exists(pdf):
+            return
+
+        pos = find_word(pdf, "SYNCNEEDLESTEM")
+        check("found the stem needle in the PDF", pos is not None)
+        if pos:
+            r = synctex_edit(pdf, *pos)
+            check("click on the stem resolves to bank.tex",
+                  basename_matches(r["input"], "bank.tex"), r["raw"][:300])
+            check(f"...at the correct source line ({BANK_STEM_LINE})",
+                  r["line"] == BANK_STEM_LINE, f"got line {r['line']!r}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # --- Fixture: schedule class in BOX-GRID mode (box-grid=true) ---------------
 # The box grid draws the calendar as stacked box rows instead of an xltabular,
 # so each cell ships eagerly and SyncTeX records it against its OWN grid-file
@@ -636,6 +878,9 @@ def main():
     scenario_document_attributed_problem()
     scenario_schedule_aux_routed()
     scenario_schedule_plain_cli()
+    scenario_mc_bank_problem()
+    scenario_quiz_bank_problem()
+    scenario_didactic_bank_problem()
     scenario_schedule_boxgrid_builder()
     scenario_schedule_boxgrid_plain_cli()
 

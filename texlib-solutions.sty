@@ -11,9 +11,13 @@
 %   * the side-by-side multiple-choice key frame (\@mcframe@* override) and the
 %     left-shifted \choiceshook.
 % \ifsolutions / \ifrubric come from texlib-build; xcolor/environ from
-% texlib-corepkg / texlib-problembank; tcolorbox is loaded here (quiz omits it).
-
-\RequirePackage[many]{tcolorbox}
+% texlib-corepkg / texlib-problembank.  No longer requires tcolorbox: the
+% {solution} box moved to plain \colorbox/\parbox (see its own comment below
+% for why) and nothing else here ever used it -- autoexam.cls/pset.cls/
+% didactic.cls load tcolorbox themselves for their own unrelated boxes, but
+% quiz.cls had no other source for it, so this package's own use was quiz's
+% only path to tcolorbox; quiz.cls itself never calls a tcolorbox command
+% directly, so dropping this require is safe.
 
 % ===========================================================================
 % Rubric-overlay machinery
@@ -21,8 +25,12 @@
 % \rubric{pts}{text} appends a rubric item to one of two accumulators depending
 % on which environment is active (\@sol@rubric inside {solution}, \@partsol@rubric
 % inside {partsolution}).  The accumulators hold \@rubricline tokens emitted into
-% a right-side overlay box with zero declared height/depth, so the solution
-% content below is not displaced.  The \if@in@* flags tell \rubric which one.
+% a right-side overlay box pinned to the "Solution." line via \hfill\llap.  The
+% overlay's height/depth are left natural (a zero-declared version was tried
+% first, but its real ink still extended below the "Solution." line -- just
+% uncounted by TeX's own spacing -- so it visually collided with the solution's
+% own first line whenever that line ran long enough to reach the same right-hand
+% region; see \@emit@rubric@overlay).  The \if@in@* flags tell \rubric which one.
 
 \newif\if@in@partsolution  \@in@partsolutionfalse
 \newif\if@in@solution      \@in@solutionfalse
@@ -45,22 +53,28 @@
 	#2\par\smallskip
 }
 
-% \@emit@rubric@overlay{accumulator} — right-side overlay box with zero
-% height/depth (so the solution below is not pushed down); \hfill\llap pins its
-% right edge at \textwidth.
+% \@emit@rubric@overlay{accumulator} — right-side overlay box pinned to the
+% "Solution." line via \hfill\llap (right edge at \textwidth).  Height/depth are
+% left natural (NOT zeroed) so \par charges the line for the overlay's real
+% vertical extent, pushing whatever comes next (the solution body) down far
+% enough to clear it -- a zero-height version let the overlay's ink bleed into
+% the solution's own first line whenever that line ran long. Trade-off: a short
+% solution now gets pushed down by however tall the rubric box is, even when it
+% wouldn't have collided -- accepted since this only affects instructor-facing
+% rubric builds, and the alternative (reflowing the solution's own already-
+% \box'd first lines around the overlay) needs a two-pass height measurement
+% that isn't worth it here.
 \newcommand{\@emit@rubric@overlay}[1]{%
 	\hfill
 	\llap{%
-		\raisebox{0pt}[0pt][0pt]{%
-			\setlength{\fboxsep}{4pt}%
-			\colorbox{teal!8}{%
-				\begin{minipage}[t]{\dimexpr\rubricboxwidth-8pt\relax}%
-					\raggedright\small\sffamily
-					\vspace{2pt}%
-					\textbf{\textcolor{teal!80!black}{Rubric:}}\\[0.25em]%
-					#1%
-				\end{minipage}%
-			}%
+		\setlength{\fboxsep}{4pt}%
+		\colorbox{teal!8}{%
+			\begin{minipage}[t]{\dimexpr\rubricboxwidth-8pt\relax}%
+				\raggedright\small\sffamily
+				\vspace{2pt}%
+				\textbf{\textcolor{teal!80!black}{Rubric:}}\\[0.25em]%
+				#1%
+			\end{minipage}%
 		}%
 	}%
 }
@@ -75,6 +89,37 @@
 % is emitted.  The exam class defines a native \solution; \let-ing it to \relax
 % lets \newenvironment redefine it (the engine emits {solution} only when the
 % problem actually has a non-empty solution).
+%
+% Rendering is plain \colorbox+\parbox, NOT tcolorbox, despite looking similar:
+% content that reaches a tcolorbox's interior via \unvbox (as this box's content
+% does -- \@sol@box above must be pre-collected so \rubric{}{} can populate the
+% overlay before the header renders) gets SyncTeX-orphaned. \unvbox splices
+% nodes into the current list with no box-open record of its own; the only
+% enclosing record left is the wrapper's OWN self-tag (this .sty file, not the
+% bank), and SyncTeX's reverse search (`synctex edit`, what a PDF viewer's
+% double-click resolves through) cannot recover the correctly-tagged nodes
+% spliced inside -- confirmed generic, not specific to solution content (even
+% the untagged "Solution." header text below is equally unreachable inside a
+% tcolorbox). \box (a real nested box node, unlike \unvbox's splice) fixes this
+% -- but ONLY up through tcolorbox's *standard* mode; its `enhanced` mode
+% (needed for the borderline-west accent) does further internal box surgery
+% that defeats reverse search regardless. Hence: plain \colorbox/\parbox below,
+% \box\@sol@box (not \unvbox), and the left accent hand-drawn with \vrule
+% (sized from \ht\@sol@box/\dp\@sol@box, read BEFORE \box empties the register)
+% instead of tcolorbox's borderline west. Trade-off: \box is a single rigid
+% unit, so this box can no longer break across a page boundary the way the old
+% breakable tcolorbox could -- accepted because every solution shipped in this
+% repo is a few lines of prose/math (surveyed 2026-07-04: none exceed ~7 lines,
+% none use tikz/tabular/multi-part content, no historical overflow incident).
+% Outer vertical separation placed above and below the green solution box.
+% 10pt suits a full-width free-response box (breathing room between the problem
+% and its boxed solution).  The side-by-side multiple-choice key (\@mcframe@mid)
+% shrinks it to 0pt locally: there the box lives in a narrow right-hand column
+% whose height competes with the answer-choices column, and the inter-problem
+% separator rule already spaces MC problems -- the 10pt chrome only made the
+% solution column outgrow the choices, pushing problems onto extra pages.
+\newlength{\@sol@outervsep}
+\setlength{\@sol@outervsep}{10pt}
 \let\solution\relax
 \let\endsolution\relax
 \newenvironment{solution}{%
@@ -83,7 +128,7 @@
 		\gdef\@sol@rubric{}%
 		\@in@solutiontrue
 		\setbox\@sol@box\vbox\bgroup
-			\hsize\textwidth
+			\hsize\dimexpr\textwidth-12pt\relax
 	\else
 		\setbox\z@\vbox\bgroup
 	\fi
@@ -91,23 +136,41 @@
 	\ifsolutions
 		\egroup
 		\@in@solutionfalse
-		\begin{tcolorbox}[
-			enhanced, breakable, sharp corners, frame hidden,
-			boxrule=0pt,
-			left=8pt, right=4pt, top=4pt, bottom=4pt,
-			before skip=10pt, after skip=10pt,
-			colback=green!3!white,
-			borderline west={1.5pt}{-6pt}{green!50!black},
-		]%
-			\noindent\textbf{Solution.}%
-			\ifrubric
-				\ifx\@sol@rubric\@empty\else
-					\@emit@rubric@overlay{\@sol@rubric}%
+		\par\vspace{\@sol@outervsep}%
+		\setlength{\fboxsep}{6pt}%
+		% Full-bleed to the true text margins.  {solution} renders inside the
+		% exam-class {questions} list body, whose left indent (\@totalleftmargin)
+		% \noindent does NOT remove; without this the full-\textwidth box is shifted
+		% right by that indent and overhangs the right margin.  Pulling back by
+		% -\@totalleftmargin lands both edges on the text block, matching the
+		% inter-problem separator rule (autoexam.cls:\autoexam@problem@sep) exactly.
+		% In the MC-key minipage \@totalleftmargin is 0 (minipage zeroes it), so this
+		% is a no-op there and the box keeps its narrow column.
+		\noindent\hspace*{-\@totalleftmargin}%
+		\colorbox{green!3!white}{%
+			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
+					% Left accent, same total length as before but oriented DOWNWARD
+					% from the "Solution." baseline (height = just the header line,
+					% depth = the rest) and \smash'd so it adds nothing to the box's
+					% own height/depth. A rule with all its length in `height` (as
+					% this once was) makes the enclosing \parbox[t] that tall ABOVE
+					% its first baseline, so the green box reserved an empty band equal
+					% to the solution's own height -- doubling it.
+					\smash{\rlap{\hspace{-6pt}\textcolor{green!50!black}{%
+						\vrule width 1.5pt
+							height \dimexpr\ht\strutbox+3pt\relax
+							depth \dimexpr\ht\@sol@box+\dp\@sol@box+\dp\strutbox\relax}}}%
+				\noindent\textbf{Solution.}%
+				\ifrubric
+					\ifx\@sol@rubric\@empty\else
+						\@emit@rubric@overlay{\@sol@rubric}%
+					\fi
 				\fi
-			\fi
-			\par\smallskip
-			\unvbox\@sol@box
-		\end{tcolorbox}
+				\par\vskip2pt
+				\box\@sol@box
+			}%
+		}%
+		\vspace{\@sol@outervsep}%
 	\else
 		\egroup
 	\fi
@@ -122,6 +185,10 @@
 		\gdef\@partsol@rubric{}%
 		\@in@partsolutiontrue
 		\setbox\@partsol@box\vbox\bgroup
+			% \textwidth (not \linewidth): the unvboxed prose below lands at the
+			% true left text margin, so a full-\textwidth measure reaches — and stops
+			% at — the right margin, spanning the text block exactly like the
+			% full-bleed {solution} box above (verified: no right-margin overhang).
 			\hsize\textwidth
 	\else
 		\setbox\z@\vbox\bgroup
@@ -189,6 +256,21 @@
 	\fi
 }
 
+% \stretch{n} — bank problems reserve extra student answer space INSIDE a
+% problem body (e.g. between \part 1a and 1b) with a bare \vspace{\stretch{n}},
+% not \workbox -- \workbox only covers the space AFTER the whole problem (the
+% engine emits one per \problem[pts][stretch]{...} retrieval), so authors reach
+% for raw \stretch for anything finer-grained.  Unlike \workbox that bare call
+% has no \ifsolutions guard of its own across every bank file that uses it, so
+% override the primitive itself here: \stretch is LaTeX's highest-precedence
+% ("fill") glue order, meaning in a solutions build it was winning ALL leftover
+% page height over \raggedbottom's own (lower-precedence "fil") bottom filler --
+% shoving the solution down to the page bottom instead of right below the
+% problem. Collapsing it to 0pt under \ifsolutions fixes every such call
+% without having to touch each bank file; student builds are unaffected.
+\let\texlib@stretch\stretch
+\renewcommand{\stretch}[1]{\ifsolutions \z@\else\texlib@stretch{#1}\fi}
+
 % ===========================================================================
 % Multiple-choice key frame (the {mcproblems} section)
 % ===========================================================================
@@ -203,6 +285,16 @@
 \renewcommand{\choiceshook}{%
 	\setlength{\leftmargin}{2em}%
 	\setlength{\labelwidth}{\dimexpr\leftmargin-\labelsep\relax}%
+	% Solutions copy only: firm up the choice-list spacing a touch so the eight
+	% side-by-side MC keys pack four to a page across every shuffled version.  The
+	% blank copy keeps the exam class's default (looser) spacing untouched -- it is
+	% what students see, and its \stretch answer gap already fills the page.
+	\ifsolutions
+		\setlength{\topsep}{2pt}%
+		\setlength{\partopsep}{0pt}%
+		\setlength{\itemsep}{2pt}%
+		\setlength{\parsep}{0pt}%
+	\fi
 }
 
 % Side-by-side applies to vertical {choices}.  An inline {oneparchoices} block
@@ -213,27 +305,77 @@
 % {choices} block (not \if@mc@inline); a student build, or an inline
 % {oneparchoices} block, renders STACKED (no minipages) so the answer line and
 % the solution sit full width below the choices.
-\newlength{\@mc@choicew}  \setlength{\@mc@choicew}{0.54\linewidth}
-\newlength{\@mc@solw}     \setlength{\@mc@solw}{0.42\linewidth}
+% Choices column is narrower than the solution column -- choices are short
+% (single terms/expressions), while solutions are prose and need the room.
+\newlength{\@mc@choicew}  \setlength{\@mc@choicew}{0.42\linewidth}
+\newlength{\@mc@solw}     \setlength{\@mc@solw}{0.54\linewidth}
 \renewcommand{\@mcframe@begin}[1]{%
 	\def\@mc@letter{#1}%
 	\par
-	\ifsolutions \if@mc@inline\else \noindent\begin{minipage}[t]{\@mc@choicew}\fi \fi
+	\ifsolutions \if@mc@inline\else
+		\noindent\begin{minipage}[t]{\@mc@choicew}%
+		% \begin{choices} starts with glue (its topsep addvspace), not a box, so
+		% \vtop (what [t] positioning is built on) can't find a first box to
+		% align against and falls back to treating the WHOLE box as hanging
+		% below the baseline -- adding roughly a \baselineskip of extra gap
+		% here that the student build (no minipage, same list, but merged
+		% against the stem's own \parskip via \addvspace) never has. A strut
+		% gives \vtop a real first box to measure; the tuned remainder cancels
+		% the gap between a generic strut's height and the actual first
+		% choice line's, matching the student build pixel-for-pixel (verified
+		% against the tests/scenarios/exam/standard fixture).
+		\strut\vspace*{-\dimexpr\ht\strutbox+\dp\strutbox+1.9pt\relax}%
+	\fi \fi
 }
+% Gap inserted between the last choice and the student answer line.  Empty by
+% default (a fixed \medskip is the only separation, as before); autoexam sets it
+% to \vspace{\stretch{1}} so the blank "Answer" rule floats to the bottom of the
+% page group -- the MC analogue of a free-response \workbox.  Only the blank
+% student build honors it; solution/key builds keep the answer beside/below the
+% choices unchanged.
+\providecommand{\@mc@answergap}{}
+% Right-aligned answer line; the letter is filled in for the key.  \noindent
+% leaves vertical mode before \hfill (which would otherwise error there).
+% Side-by-side (vertical {choices}, \ifsolutions, not \if@mc@inline) defers
+% printing the line until \@mcframe@end, once both minipages have closed --
+% printed here it would only \hfill across the narrow choices column instead
+% of the full \linewidth, landing well short of where the student build (and
+% the inline/stacked solutions build, which never opens a minipage) puts it.
 \renewcommand{\@mcframe@answer}{%
-	% Right-aligned answer line at the foot of the choices column (instructor) or
-	% under the choices (student); the letter is filled in for the key.  \noindent
-	% leaves vertical mode before \hfill (which would otherwise error there).
-	\par\nobreak\medskip
-	\noindent\hfill\textbf{Answer:}~%
-	\ifsolutions\fbox{\strut\@mc@letter}\else\rule{2.4cm}{0.4pt}\fi
-	\par
+	\ifsolutions
+		\if@mc@inline
+			\par\nobreak\medskip
+			\noindent\hfill\textbf{Answer:}~\fbox{\strut\@mc@letter}%
+			\par
+		\else
+			\par
+		\fi
+	\else
+		\par\nobreak\medskip\@mc@answergap
+		\noindent\hfill\textbf{Answer:}~\rule{2.4cm}{0.4pt}%
+		\par
+	\fi
 }
 \renewcommand{\@mcframe@mid}{%
-	\ifsolutions \if@mc@inline\else \end{minipage}\hfill\begin{minipage}[t]{\@mc@solw}\fi \fi
+	\ifsolutions \if@mc@inline\else
+		\end{minipage}\hfill\begin{minipage}[t]{\@mc@solw}%
+		% Drop the box's 10pt outer padding inside the narrow key column (local to
+		% this minipage) so the solution column doesn't outgrow the choices and the
+		% "Solution." header top-aligns with choice A.
+		\setlength{\@sol@outervsep}{0pt}%
+	\fi \fi
 }
 \renewcommand{\@mcframe@end}{%
-	\ifsolutions \if@mc@inline\else \end{minipage}\fi \fi
+	\ifsolutions \if@mc@inline\else
+		% Place the key letter at the FOOT of the (right) solution column, while it
+		% is still open -- not on a new full-width line below both columns.  On the
+		% choice-tall problems (stacked integrals, etc.) the short solution column
+		% has vertical slack here, so the letter costs no extra page height; this is
+		% what lets the eight MC keys pack four to a page like the blank copy.
+		\par\nobreak\vskip2pt
+		\noindent\hfill\textbf{Answer:}~\fbox{\strut\@mc@letter}%
+		\end{minipage}%
+	\fi \fi
 	\par
 }
 

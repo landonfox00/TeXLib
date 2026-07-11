@@ -1,0 +1,68 @@
+% mckey-bank.tex -- multiple-choice problems for proving the ANSWER KEY is
+% correct, not merely present.  Each problem marks exactly one \cchoice with a
+% distinctive needle; the test finds which rendered slot that needle lands in
+% and asserts the key's "Answer: X" letter equals that slot (emit_mc_tail's
+% letter computation, problem_engine.lua).  Distinct ALL-CAPS needles per option
+% so pdftotext can attribute each to a slot unambiguously.
+
+% Plain 4-option MC: correct authored 2nd.  Built WITHOUT \shuffle (mckey-basic),
+% so authored order is preserved and the key must read "B".
+\begin{problem}{mc_basic}[topic=mc]
+	BASICSTEM which option is right.
+	\begin{choices}
+		\choice BOPTA
+		\cchoice BCORRECT
+		\choice BOPTC
+		\choice BOPTD
+	\end{choices}
+\end{problem}
+
+% Shuffled: the correct option moves to an engine-chosen slot; the key must
+% follow it there.  The test reads the rendered slot of SCORRECT and compares.
+\begin{problem}{mc_shuf}[topic=mc]
+	SHUFSTEM which option is right.
+	\begin{choices}
+		\choice SW1
+		\cchoice SCORRECT
+		\choice SW3
+		\choice SW4
+		\choice SW5
+	\end{choices}
+\end{problem}
+
+% [fixed]: authored order must survive \shuffle -> A..D stay FX1,FCORRECT,FX3,FX4
+% and the key reads "B".
+\begin{problem}{mc_fixed}[topic=mc]
+	FIXEDSTEM which option is right.
+	\begin{choices}[fixed]
+		\choice FX1
+		\cchoice FCORRECT
+		\choice FX3
+		\choice FX4
+	\end{choices}
+\end{problem}
+
+% \fchoice[3] pins a (wrong) option to slot 3 regardless of the shuffle; the
+% correct option floats elsewhere and the key must still name its slot.
+\begin{problem}{mc_force}[topic=mc]
+	FORCESTEM which option is right.
+	\begin{choices}
+		\choice GW1
+		\cchoice GCORRECT
+		\fchoice[3] GFORCED
+		\choice GW4
+		\choice GW5
+	\end{choices}
+\end{problem}
+
+% [choose=3] must present exactly 3 options and always include the correct one.
+\begin{problem}{mc_choose}[topic=mc]
+	CHOOSESTEM which option is right.
+	\begin{choices}[choose=3]
+		\choice HW1
+		\cchoice HCORRECT
+		\choice HW3
+		\choice HW4
+		\choice HW5
+	\end{choices}
+\end{problem}

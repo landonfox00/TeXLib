@@ -15,42 +15,69 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install pypdf (merge tests)
+      - name: Install pypdf (PDF split/vmap-slicing tests)
         run: python -m pip install --quiet pypdf
       - name: Builder logic + orchestration tests
         run: python Sublime/test_texlib_builder.py
-      - name: Parallel version-builder tests
-        run: python test_build_versions.py
 
   # Real end-to-end: drives the actual builder coroutines against a genuine
-  # toolchain. Two proofs run here:
-  #   * test_biber_integration.py -- pdflatex + biber on a biblatex fixture,
+  # toolchain. Proofs run here:
+  #   * test_biber_integration.py    -- pdflatex + biber on a biblatex fixture,
   #     proving the biber-skip cache and rerun handling.
-  #   * test_build_versions.py    -- its gated real_build_check() does a genuine
-  #     2-version autoexam build with LUALATEX, proving the parallel driver
-  #     resolves the shared root .sty files (the comma-safe TEXINPUTS) and emits
-  #     two distinct single-version PDFs. This is the one check the fake-engine
-  #     suite cannot exercise, so it must run somewhere with a real toolchain.
-  # Both tests soft-skip if their tools are missing, so a toolchain hiccup
-  # degrades gracefully rather than failing the job.
+  #   * test_shuffle_integration.py -- drives a real lualatex build of a
+  #     3-version exam and reads the PDF back to assert the autoexam shuffle
+  #     GUARANTEES at the rendered-PDF level (same set per version, points
+  #     travel, extra credit last, sections unmixed, student order == solutions
+  #     order). Needs poppler's pdftotext (-bbox) + pdftoppm.
+  #   * test_synctex_integration.py -- drives a real lualatex build then asks
+  #     TeX Live's own `synctex edit` CLI to resolve a PDF-space point back to
+  #     a source file + line, exactly what SumatraPDF does before an inverse
+  #     search jump. Needs poppler's pdftotext (-bbox support -- NOT any
+  #     xpdf-flavored build) in addition to the toolchain the other two use.
+  #   * test_engine_correctness.py  -- real lualatex build of committed bank
+  #     fixtures, reading the PDF back with pdftotext to prove the problem
+  #     engine renders the RIGHT substituted values, \calcvar results, and MC
+  #     answer letters (the "wrong number / wrong key" silent-failure class).
+  #   * test_exam_seed.lua          -- pure-texlua unit test of set_exam_seed's
+  #     per-version decorrelation (needs texlua, hence this job, not the fast
+  #     Python-only one). Cheap; run first.
+  #   * test_shuffle.lua -- the permutation core (problem_shuffle.lua) under
+  #     texlua alone: bijection, determinism, seed-sensitivity, extra-credit
+  #     pinning. Pure logic, but texlua ships only with TeX Live, so it rides
+  #     this job rather than the toolchain-free builder-logic one above. A
+  #     deliberately broken permutation fails CI here on every push (smoke.yml /
+  #     visual.yml are main-only, so this is the shuffle core's only feature-
+  #     branch gate).
+  #   * test_mode_effects.py -- differential leakage guard: builds one exam
+  #     fixture per assessment flag and asserts each flag CHANGES output (a
+  #     solution/answer/rubric never leaks into a student copy, and the answer
+  #     key is not a silent no-op). Needs lualatex + poppler's pdftotext.
+  # All soft-skip if their tools are missing, so a toolchain hiccup degrades
+  # gracefully rather than failing the job.
   #
   # Runs in the SAME pinned full-scheme TeX Live container as smoke.yml /
   # visual.yml (full bundles biber + lualatex + the class deps: tikz/pgfplots,
   # lmodern, mathtools), so the whole CI shares one stable toolchain. pypdf
-  # (version-builder merge + the real check's PDF assertions) is pip-installed
-  # in the container.
+  # (the real check's PDF assertions) is pip-installed in the container.
   biber-integration:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Real biber + version-builder tests in pinned TeX Live
+      - name: Real biber + SyncTeX + shuffle + mode-effect tests in pinned TeX Live
         uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
           scheme: full
           run: |
             set -e
-            apk add --no-cache python3 py3-pip
+            apk add --no-cache python3 py3-pip poppler-utils
             pip install --break-system-packages --quiet pypdf \
               || pip install --quiet pypdf
+            texlua test_exam_seed.lua
             python3 Sublime/test_biber_integration.py
-            python3 test_build_versions.py
+            python3 Sublime/test_shuffle_integration.py
+            python3 Sublime/test_synctex_integration.py
+            python3 test_engine_correctness.py
+            # Shuffle permutation core -- texlua only, no build (see comment above).
+            texlua test_shuffle.lua
+            # Assessment build-flag leakage guard (solutions/answers/rubric).
+            python3 test_mode_effects.py

@@ -28,6 +28,7 @@ if (-not $dest) {
 # Dev-only files (README.md, test_texlib_builder.py, this script) are NOT copied.
 $files = @(
     'texlib_builder.py',
+    'texlib_pdfpost.py',
     'TeXLib.sublime-build',
     'LaTeXTools.sublime-settings',
     'LaTeX.sublime-settings',
@@ -37,19 +38,24 @@ $files = @(
     'Package Control.sublime-settings'
 )
 
-# --- safety: syntax-check the Python builder before copying a broken one -------
-$builder = Join-Path $src 'texlib_builder.py'
+# --- safety: syntax-check the Python files before copying a broken one --------
+$pyfiles = @('texlib_builder.py', 'texlib_pdfpost.py')
 $py = Get-Command python -ErrorAction SilentlyContinue
 if (-not $py) { $py = Get-Command py -ErrorAction SilentlyContinue }
-if ($py -and (Test-Path $builder)) {
-    & $py.Source -m py_compile $builder
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "ERROR: texlib_builder.py failed py_compile -- NOT deploying." -ForegroundColor Red
-        exit 1
+if ($py) {
+    foreach ($f in $pyfiles) {
+        $path = Join-Path $src $f
+        if (Test-Path $path) {
+            & $py.Source -m py_compile $path
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "ERROR: $f failed py_compile -- NOT deploying." -ForegroundColor Red
+                exit 1
+            }
+            Write-Host "syntax OK: $f"
+        }
     }
-    Write-Host "syntax OK: texlib_builder.py"
 } else {
-    Write-Host "note: python not found; skipping builder syntax check." -ForegroundColor Yellow
+    Write-Host "note: python not found; skipping syntax check." -ForegroundColor Yellow
 }
 
 # --- copy ---------------------------------------------------------------------

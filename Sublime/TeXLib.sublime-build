@@ -61,11 +61,6 @@
 			"name": "Quick (single pass, refs may be stale)",
 			"builder": "texlib",
 			"options": ["--texlib-mode=quick"]
-		},
-		{
-			"name": "All Versions (separate PDFs)",
-			"builder": "texlib",
-			"options": ["--texlib-mode=allversions"]
 		}
 	]
 }
