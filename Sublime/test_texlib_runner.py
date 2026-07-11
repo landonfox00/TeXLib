@@ -6,7 +6,9 @@ never touches the runner. This one imports texlib.py with sublime/sublime_plugin
 stubbed and a fake subprocess.Popen, so it exercises the ACTUAL driver surface --
 the new, riskiest code (PLUGIN-DESIGN Risk #2): feeding each command's output
 back to the brain (so a rerun signal actually re-runs THROUGH the runner), the
-cancel->kill path, and the single-build overlap guard. No Sublime, no TeX.
+cancel->kill path, the PER-DOCUMENT build registry that lets distinct documents
+build in parallel, and the per-build aux-env injection that keeps those parallel
+builds from racing a shared TEXLIB_AUX_DIR. No Sublime, no TeX.
 
 Run:  python Sublime/test_texlib_runner.py
 """
@@ -70,15 +72,18 @@ class FakePopen:
 
 
 class PopenFactory:
-    """Returns one scripted FakePopen per call; records the argv of each call."""
+    """Returns one scripted FakePopen per call; records the argv AND env of each
+    call (env is how we prove each build's aux dir reaches ITS own subprocess)."""
 
     def __init__(self, scripts):
         self.scripts = list(scripts)
         self.calls = []
+        self.envs = []
         self.last = None
 
     def __call__(self, cmd, **kw):
         self.calls.append(cmd)
+        self.envs.append(kw.get("env"))
         lines = self.scripts.pop(0) if self.scripts else []
         self.last = FakePopen(lines)
         return self.last
@@ -91,11 +96,13 @@ def check(cond, label):
 
 ok = True
 
-# 1. _run_argv streams output and, on cancel, kills the process mid-stream.
+# 1. _run_argv streams output, injects THIS build's aux dir into its subprocess
+#    env, parks proc on the build's entry, and on cancel kills mid-stream.
 factory = PopenFactory([["a\n", "b\n", "c\n"]])
 texlib.subprocess.Popen = factory
 cancel = threading.Event()
 emitted = []
+entry = {"thread": None, "cancel": cancel, "proc": None}
 
 
 def _emit_then_cancel(text):
@@ -103,13 +110,18 @@ def _emit_then_cancel(text):
     cancel.set()  # cancel right after the first line
 
 
-out = texlib._run_argv(["lualatex", "doc.tex"], HERE, _emit_then_cancel, cancel, "")
+out = texlib._run_argv(
+    ["lualatex", "doc.tex"], HERE, _emit_then_cancel, cancel, "",
+    r"C:\aux\buildA", entry)
 ok &= check(out == "a\n", "cancel: only the pre-cancel line was captured")
 ok &= check(factory.last.killed, "cancel: process was killed")
 ok &= check(len(emitted) == 1, "cancel: streaming stopped after the cancel")
-ok &= check(texlib._active["proc"] is None, "cancel: active-proc slot cleared")
+ok &= check(entry["proc"] is None, "cancel: this build's proc slot cleared")
+ok &= check(factory.envs[0].get("TEXLIB_AUX_DIR") == r"C:\aux\buildA",
+            "aux env: the build's own aux dir is injected into ITS subprocess env")
 
-# 2. _drive feeds output back so a rerun signal re-runs THROUGH the runner.
+# 2. _drive feeds output back so a rerun signal re-runs THROUGH the runner, and
+#    clears the build's registry entry when it finishes.
 factory = PopenFactory([
     ["Rerun to get cross-references right.\n"],  # pass 1 -> ask for a rerun
     [],                                          # pass 2 -> settled
@@ -125,28 +137,33 @@ with tempfile.TemporaryDirectory() as tmp:
         options=["--texlib-mode=default"], display=msgs.append,
         aux_directory="<<root>>",
     )
+    ev = threading.Event()
+    entry = {"thread": None, "cancel": ev, "proc": None}
+    texlib._builds[root] = entry  # simulate run()'s registration
     inst = texlib.TexlibBuildCommand()
-    inst._drive(host, tmp, msgs.append, threading.Event(), "")
+    inst._drive(host, tmp, msgs.append, ev, "", root, entry)
 ok &= check(len(factory.calls) == 2, "rerun: driver ran 2 passes via _run_argv")
 ok &= check(all("-file-line-error" in c for c in factory.calls),
             "rerun: every real engine invocation carried -file-line-error")
 ok &= check(host.out == "", "rerun: last pass output fed back (settled)")
-ok &= check(texlib._active["thread"] is None, "rerun: active-thread slot cleared")
+ok &= check(root not in texlib._builds, "rerun: registry entry removed on finish")
 
-# 3. Overlap guard: a second build is refused while one is 'running'.
-factory = PopenFactory([["x\n"]])
-texlib.subprocess.Popen = factory
-
-
+# 3. Per-document guard: the SAME document is seen as building (a second build is
+#    refused); a DIFFERENT document is free to build in parallel (the point).
 class _AliveThread:
     def is_alive(self):
         return True
 
 
-texlib._active["thread"] = _AliveThread()
-texlib.TexlibBuildCommand().run(mode="default")  # returns at the guard
-ok &= check(len(factory.calls) == 0, "overlap: no engine spawned while a build runs")
-texlib._active["thread"] = None  # reset
+rootA = os.path.join(HERE, "docA.tex")
+rootB = os.path.join(HERE, "docB.tex")
+texlib._builds[rootA] = {"thread": _AliveThread(), "cancel": None, "proc": None}
+ok &= check(texlib._build_active(rootA), "guard: same document is seen as building")
+ok &= check(not texlib._build_active(rootB),
+            "guard: a DIFFERENT document is free to build in parallel")
+ok &= check(texlib._panel_name(rootA) != texlib._panel_name(rootB),
+            "panel: concurrent builds get distinct output panels")
+texlib._builds.pop(rootA, None)  # reset
 
 
 # 4. Post-build delegation (Tier C) fires only when the build completed AND a PDF
@@ -171,8 +188,9 @@ def _drive_delegation(pdf_exists, cancel_on_pass1):
             options=["--texlib-mode=default"], display=lambda t: None,
             aux_directory="<<root>>",
         )
+        entry = {"thread": None, "cancel": ev, "proc": None}
         texlib.TexlibBuildCommand()._drive(
-            host, tmp, emit, ev, "",
+            host, tmp, emit, ev, "", root, entry,
             on_success=lambda: fired.__setitem__("v", True))
     return fired["v"]
 
@@ -202,8 +220,10 @@ def _drive_finish(script_lines):
             captured["errs"] = errs
             captured["warns"] = warns
 
+        ev = threading.Event()
+        entry = {"thread": None, "cancel": ev, "proc": None}
         texlib.TexlibBuildCommand()._drive(
-            host, tmp, lambda t: None, threading.Event(), "",
+            host, tmp, lambda t: None, ev, "", root, entry,
             on_success=None, on_finish=on_finish)
     return captured
 

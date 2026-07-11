@@ -9,6 +9,7 @@
 					{ "caption": "Build", "command": "texlib_build", "args": { "mode": "default" } },
 					{ "caption": "Build — Pick Mode…", "command": "texlib_build_pick" },
 					{ "caption": "Cancel Build", "command": "texlib_cancel_build" },
+					{ "caption": "Cancel All Builds", "command": "texlib_cancel_all_builds" },
 					{ "caption": "-" },
 					{ "caption": "View PDF", "command": "texlib_view_pdf" },
 					{ "caption": "Forward Sync (cursor → PDF)", "command": "texlib_forward_sync" },
