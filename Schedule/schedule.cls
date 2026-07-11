@@ -36,10 +36,19 @@
 \RequirePackage{geometry}
 \RequirePackage{fontspec}
 \RequirePackage{xcolor}
-\RequirePackage{xltabular}
-\RequirePackage{colortbl}
-\RequirePackage{multirow}
-\RequirePackage{booktabs}
+% The calendar grid is a tabularray longtblr: it page-breaks like longtable but
+% colors cells natively (\SetCell{bg=...}), avoiding the longtable+colortbl
+% empty-\special{} artifact that made LuaLaTeX log "Non-PDF special ignored!".
+\RequirePackage{tabularray}
+% Suppress longtblr's cross-page "(Continued)" head and "Continued on next page"
+% foot: the grid reads as one continuous calendar (the header row already
+% repeats via rowhead), and dropping them reclaims the vertical space they'd
+% consume at each break — which keeps a long schedule paginating as tightly as
+% the old xltabular did. The contfoot's `empty` template drops the foot outright;
+% the conthead's `empty` template is a no-op in this tabularray release, so we
+% blank its text macro instead (\AtBeginDocument, after tabularray sets it).
+\SetTblrTemplate{contfoot}{empty}
+\AtBeginDocument{\def\tblrcontheadname{}}
 \RequirePackage{xparse}
 \RequirePackage{expl3}
 \RequirePackage{etoolbox}
