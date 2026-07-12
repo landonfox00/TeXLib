@@ -114,6 +114,7 @@ MODULES = [
     ("Schedule",     "schedule-template.tex"),
     ("Syllabi",      "syllabus-template.tex"),
     ("Problem Sets", "pset-template.tex"),
+    ("Bank",         "bank-template.tex"),
     # Feature-test fixtures (live under tests/fixtures/<Module>/). Each is a
     # self-contained .tex that exercises something the canonical template
     # doesn't — e.g. the fix-overrides syntax \problem{id}[a=1,b=2]. Treated
@@ -144,7 +145,7 @@ MODULES = [
 
 # Classes that require lualatex (use \directlua, luaotfload, or sibling .lua
 # files; report-card's \gradebook reads its CSV via lualatex).
-LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "bingo", "report-card"}
+LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "bingo", "report-card", "bank"}
 
 # Maps a \documentclass to the module dir shipping its .cls and default include
 # files (instructions, title). Used to give a build whose source lives OUTSIDE
@@ -221,6 +222,10 @@ EXPECT_TEXT = {
     # the template's stable section headings.
     "Syllabi":      ["Course Description", "Office Hours"],
     "Problem Sets": ["Problem 1"],
+    # The bank catalog prints its coverage summary + every problem's solution
+    # (always shown). "Bank coverage" == the summary rendered; "Solution" == a
+    # cataloged solution rendered.
+    "Bank":         ["Bank coverage", "Solution"],
     # MULTILINEHEADEROK is the stem of the mlheader problem, whose [meta] header
     # wraps lines; its presence proves that problem rendered (paired with the
     # EXPECT_ABSENT leak token below).
