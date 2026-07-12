@@ -647,12 +647,15 @@ def scenario_mc_bank_problem():
         if pos2:
             r2 = synctex_edit(pdf, *pos2)
             # NARROWED (task_dbeb33f6): the FR solution fix (fill-inside-parbox,
-            # Scenario 2) does NOT reach the MC case, because the side-by-side MC key
-            # places the {solution} in a minipage set in a horizontal ROW next to the
-            # choices column -- that \hbox row re-orphans the content for reverse
-            # search (same class as the old \colorbox). Resolving it needs the MC key
-            # layout restructured so the solution column isn't \hbox-wrapped. Marked
-            # known so a real fix flips it loudly to PASS.
+            # Scenario 2) does NOT reach the MC case. Characterized 2026-07-11: in the
+            # side-by-side MC key the STEM resolves (mcbank.tex), and the "Solution."
+            # header even resolves -- but to the RETRIEVAL site (the exam file), not
+            # the bank source, and the solution BODY resolves to nothing. So unlike
+            # FR, the solution's bank REDIRECT does not take effect inside the MC key
+            # frame (it falls back to the ambient file) AND the pre-collected body box
+            # is unreachable there. Needs engine/layout work in the tuned side-by-side
+            # key (the "four MC keys per page" packing) -- higher risk than the FR fix.
+            # Marked known so a real fix flips it loudly to PASS.
             check("click on the MC solution resolves to mcbank.tex",
                   basename_matches(r2["input"], "mcbank.tex"), r2["raw"][:300],
                   known_issue="task_dbeb33f6")
