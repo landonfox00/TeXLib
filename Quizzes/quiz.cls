@@ -139,7 +139,7 @@
 	\begin{figure}[!h]
 		\centering
 		\includegraphics[width=0.5\textwidth, height=0.35\textwidth,
-							keepaspectratio, #1]{Figures/#2}
+							keepaspectratio, alt={#2}, #1]{Figures/#2}
 	\end{figure}%
 }
 

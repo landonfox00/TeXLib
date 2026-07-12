@@ -192,6 +192,19 @@ def main():
               "Solution." in text and "PSETSOLBODY" in text,
               "solution header or body missing")
 
+    # --- accessibility: \fig alt-text hook compiles (all three forms) -------
+    print("\n=== \\fig alt-text (accessibility hook) compiles ===")
+    figdoc = ("\\documentclass{didactic}\n"
+              "\\renewcommand{\\figdir}{}\n"  # example-image ships with TeX Live
+              "\\begin{document}\n"
+              "\\fig[A parabola]{example-image}\n"        # alt from caption
+              "\\fig[][alt={explicit alt}]{example-image}\n"  # explicit override
+              "\\fig{example-image}\n"                     # alt falls back to filename
+              "\\end{document}\n")
+    text, err = build(figdoc, "Notes/didactic.cls")
+    check("didactic \\fig with alt-text (caption / explicit / filename) compiles",
+          text is not None, err)
+
     return 1 if _FAIL else 0
 
 
