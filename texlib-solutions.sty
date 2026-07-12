@@ -147,15 +147,25 @@
 		% In the MC-key minipage \@totalleftmargin is 0 (minipage zeroes it), so this
 		% is a no-op there and the box keeps its narrow column.
 		\noindent\hspace*{-\@totalleftmargin}%
-		\colorbox{\texlibsoltint}{%
 			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
-					% Left accent, same total length as before but oriented DOWNWARD
-					% from the "Solution." baseline (height = just the header line,
-					% depth = the rest) and \smash'd so it adds nothing to the box's
-					% own height/depth. A rule with all its length in `height` (as
-					% this once was) makes the enclosing \parbox[t] that tall ABOVE
-					% its first baseline, so the green box reserved an empty band equal
-					% to the solution's own height -- doubling it.
+					% The green fill is a \smash\rlap'd rule drawn INSIDE the parbox's
+					% vertical list, BEHIND the content -- NOT a \colorbox.  \colorbox
+					% wraps its content in an \hbox whose inner nodes are orphaned for
+					% SyncTeX reverse search, so `synctex edit` on the solution
+					% resolved to nothing (task_b7217810 / task_dbeb33f6) even though
+					% the solution's redirected bank-file records were present.  An
+					% \rlap at the OUTER horizontal level orphans it the same way; drawn
+					% inside the parbox (like the accent) the content stays reachable,
+					% so clicking the solution in the PDF now inverse-searches.  The
+					% fill spans the header line down past the box, +6pt pad each side,
+					% matching the old \colorbox{}'s \fboxsep=6pt.
+					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsoltint}{%
+						\rule[-\dimexpr\ht\@sol@box+\dp\@sol@box+6pt\relax]%
+							{\dimexpr\textwidth\relax}%
+							{\dimexpr\ht\strutbox+\ht\@sol@box+\dp\@sol@box+12pt\relax}}}}%
+					% Left accent, oriented DOWNWARD from the "Solution." baseline
+					% (height = just the header line, depth = the rest) and \smash'd so
+					% it adds nothing to the box's own height/depth.
 					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsolrulecolor}{%
 						\vrule width 1.5pt
 							height \dimexpr\ht\strutbox+3pt\relax
@@ -169,7 +179,6 @@
 				\par\vskip2pt
 				\box\@sol@box
 			}%
-		}%
 		\vspace{\@sol@outervsep}%
 	\else
 		\egroup

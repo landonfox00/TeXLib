@@ -389,18 +389,15 @@ def scenario_bank_solutions_mode():
         check("found the solution needle in the PDF", pos is not None)
         if pos:
             r = synctex_edit(pdf, *pos)
-            # REGRESSED (task_b7217810): the solution's redirect is staged (bank.tex
-            # IS an Input record in the raw .synctex), and the STEM resolves fine,
-            # but `synctex edit` at the solution box's rendered (h,v) returns
-            # nothing -- a rendered-position vs record displacement in the pre-
-            # collected \box\@sol@box. Tracked; sibling to the MC case (Scenario 6,
-            # task_dbeb33f6). Marked known so a real fix flips it loudly to PASS.
+            # FIXED (task_b7217810): the solution's green fill is now a \smash\rlap'd
+            # rule drawn INSIDE the content parbox, not a \colorbox \hbox wrapper.
+            # \colorbox orphaned the inner nodes for SyncTeX reverse search (the
+            # redirect staged bank.tex fine, but `synctex edit` at the rendered box
+            # returned nothing); drawing the fill inside keeps the content reachable.
             check("click on the solution resolves to bank.tex",
-                  basename_matches(r["input"], "bank.tex"), r["raw"][:300],
-                  known_issue="task_b7217810")
+                  basename_matches(r["input"], "bank.tex"), r["raw"][:300])
             check(f"...at the correct source line ({BANK_SOLUTION_LINE})",
-                  r["line"] == BANK_SOLUTION_LINE, f"got line {r['line']!r}",
-                  known_issue="task_b7217810")
+                  r["line"] == BANK_SOLUTION_LINE, f"got line {r['line']!r}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -649,6 +646,13 @@ def scenario_mc_bank_problem():
         check("found the MC solution needle in the PDF", pos2 is not None)
         if pos2:
             r2 = synctex_edit(pdf, *pos2)
+            # NARROWED (task_dbeb33f6): the FR solution fix (fill-inside-parbox,
+            # Scenario 2) does NOT reach the MC case, because the side-by-side MC key
+            # places the {solution} in a minipage set in a horizontal ROW next to the
+            # choices column -- that \hbox row re-orphans the content for reverse
+            # search (same class as the old \colorbox). Resolving it needs the MC key
+            # layout restructured so the solution column isn't \hbox-wrapped. Marked
+            # known so a real fix flips it loudly to PASS.
             check("click on the MC solution resolves to mcbank.tex",
                   basename_matches(r2["input"], "mcbank.tex"), r2["raw"][:300],
                   known_issue="task_dbeb33f6")
