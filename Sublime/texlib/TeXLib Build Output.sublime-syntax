@@ -1,7 +1,11 @@
 %YAML 1.2
 ---
-# Coloring for the TeXLib build panel. Uses standard scopes (invalid.illegal,
-# constant.numeric, entity.name.class, comment) so it colors on any theme.
+# Coloring for the TeXLib build panel. Each token carries BOTH a theme-agnostic
+# region.*ish scope (region.redish / region.yellowish -- defined by every ST4
+# color scheme, so errors/warnings are reliably colored on any theme) AND its
+# semantic scope (invalid.illegal / markup.warning) for schemes that prefer it.
+# The region.*ish scope is listed first so it wins when a scheme defines both;
+# markup.warning alone was NOT colored on many themes (the reason for P5).
 name: TeXLib Build Output
 scope: text.texlib-build
 hidden: true
@@ -20,10 +24,11 @@ contexts:
     # Error lines: file:line: message  (also clickable via result_file_regex).
     - match: '^((?:.:)?[^:]+)(:)(\d+)(:)(.*)$'
       captures:
-        1: entity.name.class.texlib-build
+        1: region.redish entity.name.class.texlib-build
         3: constant.numeric.texlib-build
-        5: invalid.illegal.texlib-build
+        5: region.redish invalid.illegal.texlib-build
 
-    # Warnings.
+    # Warnings -- region.yellowish so they color on themes that ignore
+    # markup.warning (the whole point of P5).
     - match: '^.*\bWarning:.*$'
-      scope: markup.warning.texlib-build
+      scope: region.yellowish markup.warning.texlib-build
