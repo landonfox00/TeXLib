@@ -22,7 +22,7 @@ All are in the Command Palette (`Ctrl+Shift+P` → "TeXLib: …") and under
 | **Open coursemeta.tex** | Open the governing metadata file (walks up to 4 parents). |
 | **Reveal / Clean Aux Directory** | Open or delete the build's `%TEMP%\texlib-aux\<hash>`. |
 | **Package for LMS** | Run `package_for_lms.py` on the active course. |
-| **Install Classes to TEXMF** | Copy the `.cls/.sty/.lua` payload into `TEXMFHOME` so *all* TeX tools (CLI, other editors, CI) find them — the installer's job, for this machine. |
+| **Uninstall Classes from TEXMF** | Remove a stale TeXLib copy from `TEXMFHOME` so builds resolve the classes from your live checkout (via `texinputs`) instead of a shadowing install. System-wide install is the standalone TeXLib-Installer's job. |
 
 Plus **completions** (`\getproblem`/`\setvar`/… after `\`; problem ids inside
 `\getproblem{…}`) and **snippets** (`problem`, `solution`, `parts`, `questions`,
@@ -42,7 +42,7 @@ independently.
 | `texlib_scaffold.py` | New-document scaffolding. |
 | `texlib_locate.py` | Open coursemeta / reveal aux dir. |
 | `texlib_utils.py` | Clean aux dir, package for LMS. |
-| `texlib_texmf.py` | Install classes to TEXMF. |
+| `texlib_texmf.py` | Uninstall a stale class copy from TEXMF (un-shadow the checkout). |
 | `texlib_pdfpost.py` | External-Python pypdf helper (PDF split/slice). |
 | `snippets/` | `.sublime-snippet` files. |
 | `Default.sublime-commands`, `Default (Windows).sublime-keymap`, `Main.sublime-menu`, `TeXLib.sublime-settings` | Palette, keys, menu, settings. |
@@ -51,14 +51,16 @@ independently.
 
 Machine-local values belong in `Packages/User/TeXLib.sublime-settings`.
 
-- `texinputs` — value for the child engine's `TEXINPUTS` (point at the comma-free
-  repo root so shared `.sty` resolve).
+- `texinputs` — value for the child engine's `TEXINPUTS`; this is how the plugin's
+  builds resolve the TeXLib classes. Point it at the comma-free repo root — the
+  classes and their sibling `.lua` engines all load from your live checkout, so no
+  TEXMF install is needed (and none should shadow it).
 - `open_pdf_on_build` — open/refresh + forward-sync the PDF after a build (default true).
 - `show_panel_on_build` — `"errors"` (default; hidden while building with a status-bar
   message, pops open with a clickable error summary only on failure), `"always"`, or `"never"`.
 - `publish_shareable_copies` / `copy_published_path_to_clipboard` — publish toggles.
-- `class_source` — path to the TeXLib repo (for scaffolding / TEXMF install / LMS),
-  if auto-detection can't find it.
+- `class_source` — path to the TeXLib repo (for New-Document scaffolding and
+  Package-for-LMS), if auto-detection can't find it.
 
 ## Deploy / test
 

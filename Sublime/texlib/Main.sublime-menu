@@ -23,7 +23,7 @@
 					{ "caption": "Clean Aux Directory", "command": "texlib_clean_aux" },
 					{ "caption": "-" },
 					{ "caption": "Package for LMS", "command": "texlib_package_lms" },
-					{ "caption": "Install Classes to TEXMF", "command": "texlib_install_texmf" }
+					{ "caption": "Uninstall Classes from TEXMF", "command": "texlib_uninstall_texmf" }
 				]
 			}
 		]

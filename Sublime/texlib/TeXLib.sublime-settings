@@ -28,10 +28,11 @@
     //
     // "show_panel_on_build": "errors"
 
-    // class_source: absolute path to the TeXLib class payload for the
-    // "Install Classes to TEXMF" command. Leave unset to auto-detect (a bundled
-    // latex/ dir in the package, else the repo root above the plugin). Set it if
-    // the plugin can't find your classes (e.g. an unusual layout).
+    // class_source: absolute path to your TeXLib repo root. Used by "New
+    // Document" (template discovery) and "Package for LMS" (locating
+    // package_for_lms.py). Leave unset to auto-detect the repo root above the
+    // package; set it if the plugin can't find your classes (e.g. an unusual
+    // layout).
     //
     // "class_source": "C:/Users/Landon/texlib-sublime-wt"
 }

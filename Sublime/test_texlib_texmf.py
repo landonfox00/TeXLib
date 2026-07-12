@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Gather-logic coverage for the TEXMF install (texlib/texlib_texmf.py).
+"""Logic coverage for the TEXMF uninstall (texlib/texlib_texmf.py).
 
-No Sublime, no TeX: stubs sublime/sublime_plugin, builds a fake repo tree, and
-checks gather_class_files picks the .cls/.sty/.lua payload while excluding Lua
-tests, .tex, and infrastructure dirs (.git / Sublime / examples).
+No Sublime, no TeX: stubs sublime/sublime_plugin, builds a fake
+TEXMFHOME/tex/latex/texlib install, and checks the target-dir resolution and
+installed-file listing the uninstall command relies on.
 
 Run:  python Sublime/test_texlib_texmf.py
 """
@@ -23,11 +23,9 @@ sys.modules["sublime_plugin"] = _plugin
 import texlib_texmf  # noqa: E402
 
 
-def touch(root, rel):
-    path = os.path.join(root, *rel.split("/"))
+def touch(path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     open(path, "w").close()
-    return path
 
 
 def check(cond, label):
@@ -36,33 +34,30 @@ def check(cond, label):
 
 
 ok = True
+
+# target-dir resolution: always <TEXMFHOME>/tex/latex/texlib
+home = os.path.join("X", "texmf")
+ok &= check(
+    texlib_texmf.texmf_install_dir(home)
+    == os.path.join(home, "tex", "latex", "texlib"),
+    "install dir is <TEXMFHOME>/tex/latex/texlib")
+
+# absent install dir -> nothing to remove
 with tempfile.TemporaryDirectory() as root:
-    for rel in [
-        "texlib-corepkg.sty", "quiver.sty",             # root .sty
-        "Exams/autoexam.cls", "Problem Sets/pset.cls",   # .cls (incl. spaced dir)
-        "problem_engine.lua", "texlib_synctex.lua",      # engines
-        "Schedule/schedule.lua",
-        "Schedule/test_schedule_synctex.lua",            # Lua test -> excluded
-        "README.md", "notes.tex",                        # wrong ext -> excluded
-        "Sublime/texlib/texlib.py",                      # excluded dir
-        "examples/Math181/coursemeta.tex",               # excluded dir
-        ".git/config",                                   # excluded dir
-    ]:
-        touch(root, rel)
+    ok &= check(
+        texlib_texmf.installed_files(os.path.join(root, "texlib")) == [],
+        "absent install dir -> empty list (nothing to uninstall)")
 
-    got = {os.path.basename(p) for p in texlib_texmf.gather_class_files(root)}
-
-    ok &= check({"autoexam.cls", "pset.cls"} <= got, "gathers .cls from subfolders (incl. spaced dir)")
-    ok &= check({"texlib-corepkg.sty", "quiver.sty"} <= got, "gathers root .sty (incl. vendored quiver)")
-    ok &= check({"problem_engine.lua", "texlib_synctex.lua", "schedule.lua"} <= got,
-                "gathers Lua engines")
-    ok &= check("test_schedule_synctex.lua" not in got, "excludes Lua test files")
-    ok &= check("notes.tex" not in got and "README.md" not in got, "excludes non-payload extensions")
-    ok &= check("texlib.py" not in got, "excludes the Sublime/ plugin dir")
-    ok &= check(not any(p.replace("\\", "/").split("/")[-2:][0] == "Math181" for p in
-                        texlib_texmf.gather_class_files(root)),
-                "excludes examples/")
-    ok &= check(len(got) == 7, "gathers exactly the 7 payload files (no .git/config)")
+# populated install -> lists the .cls/.sty/.lua payload, ignores other files
+with tempfile.TemporaryDirectory() as root:
+    inst = texlib_texmf.texmf_install_dir(root)
+    for fn in ("autoexam.cls", "texlib-corepkg.sty", "schedule.lua",
+               "ls-R", "README.md"):
+        touch(os.path.join(inst, fn))
+    got = texlib_texmf.installed_files(inst)
+    ok &= check(
+        got == ["autoexam.cls", "schedule.lua", "texlib-corepkg.sty"],
+        "lists .cls/.sty/.lua payload (sorted), excludes ls-R / README.md")
 
 print("\nALL PASS" if ok else "\nFAILURES ABOVE")
 sys.exit(0 if ok else 1)
