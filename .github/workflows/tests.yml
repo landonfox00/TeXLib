@@ -127,3 +127,5 @@ jobs:
             # Theorem taxonomy + aliases + shared counter (C1) and solution
             # header (C2) render checks.
             python3 test_class_render.py
+            # MC answer-key marks the correct choice + schedule grid content.
+            python3 test_mc_schedule_render.py
