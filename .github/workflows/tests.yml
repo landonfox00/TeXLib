@@ -124,3 +124,6 @@ jobs:
             python3 test_metadata_resolution.py
             # bank.cls \printbankcatalog render check (part labels, solutions).
             python3 test_bank_catalog.py
+            # Theorem taxonomy + aliases + shared counter (C1) and solution
+            # header (C2) render checks.
+            python3 test_class_render.py
