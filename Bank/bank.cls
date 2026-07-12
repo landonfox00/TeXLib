@@ -65,6 +65,13 @@
 % reference listing, not a printable exam.)
 \pagestyle{plain}
 
+% Part labels: texlib-assessment sets \partlabel to \thequestion\thepartno. (e.g.
+% "1a."), but a catalog has no active \question, so \thequestion is 0 and parts
+% would render "0a. 0b.". Each catalog problem is already numbered ("1. <id>"),
+% so label its parts self-containedly as "(a) (b)" -- no dependency on the unset
+% question counter.
+\AtBeginDocument{\renewcommand{\partlabel}{\textbf{(\thepartno)}}}
+
 % A bank preview does NOT auto-load the coursemeta bank: the wrapper \loadbank's
 % the bank it wants explicitly, and auto-loading would list unrelated problems.
 % (quiz/autoexam auto-load via \pbank@load@coursebank; bank deliberately does not.)

@@ -122,3 +122,5 @@ jobs:
             # course-metadata.sty's directory-walk depth + class-option-over-
             # coursemeta precedence (real pdflatex builds + pdftotext).
             python3 test_metadata_resolution.py
+            # bank.cls \printbankcatalog render check (part labels, solutions).
+            python3 test_bank_catalog.py
