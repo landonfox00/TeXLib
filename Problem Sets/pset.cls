@@ -265,12 +265,9 @@
 % matching didactic. note/recall carry the gray note rule; remark stays plain
 % inline (no box). (note* is also defined, guarded, in the Category Theory
 % preamble; its \ifcsname check skips that copy when this one is present.)
-\TeXLibTheorems[numbering=flat]{
-	theorem, corollary, lemma, conjecture, proposition,
-	definition, convention, procedure, challenge,
-	example, notation,
-	remark, note, recall
-}
+% C1: the whole boxed taxonomy in one call, unified across the classes (adds
+% `exercise`, `question`, and the short aliases \thm \cor ... to pset's set).
+\TeXLibAllTheorems[numbering=flat, aliases=true]
 
 % ==============================================================================
 % 8. SOLUTION ENVIRONMENT — gated on \ShowKey/\ShowSolutions/\StudentMode
