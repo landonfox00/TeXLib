@@ -154,6 +154,31 @@ def _raw_engine(src):
     return m.group(1).strip().lower() if m else "pdflatex"
 
 
+# --- Shadow-install warning (N3) ---------------------------------------------
+_shadow_warned = [False]
+
+
+def _shadow_warning_line(settings):
+    """One-time nudge (N3): if `texinputs` points at your checkout but a TeXLib
+    copy is installed under TEXMFHOME, the .lua engine (LUAINPUTS) can still
+    resolve the stale install. Returns a warning string, or None."""
+    if _shadow_warned[0] or not settings.get("texinputs"):
+        return None
+    try:
+        from TeXLib import texlib_texmf
+    except ImportError:
+        try:
+            import texlib_texmf
+        except ImportError:
+            return None
+    if texlib_texmf.shadows_checkout():
+        _shadow_warned[0] = True
+        return ("TeXLib: warning — a TeXLib copy under TEXMFHOME may shadow your "
+                "checkout's .lua engine; run 'TeXLib: Uninstall Classes from "
+                "TEXMF' if builds seem stale.")
+    return None
+
+
 # --- Output panel ------------------------------------------------------------
 def _panel(window, root, base_dir):
     """Create (but do NOT show) this build's own output panel (named per tex-root
@@ -366,6 +391,10 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         if toggles:
             host.builder_settings = toggles
         emit("TeXLib native build [%s] -- %s\n" % (mode, base))
+        _sw = _shadow_warning_line(settings)
+        if _sw:
+            sublime.status_message(_sw)
+            emit(_sw + "\n")
 
         def on_success():
             # Post-build PDF open + forward sync (Tier C).
