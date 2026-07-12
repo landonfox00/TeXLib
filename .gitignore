@@ -39,6 +39,9 @@ course-metadata_old.sty
 # Sublime builder consumes it, but a CLI build that bypassed the builder leaves
 # it) and the package_for_lms.py bundle.
 *.pubmeta
+# Resolved-metadata dump (course-metadata.sty writes <base>.metadump every build;
+# the Sublime "Show Resolved Metadata" reads it -- a debug/inspection sidecar).
+*.metadump
 *_LMS.zip
 
 # autoexam / SyncTeX build scratch (generated next to the source by a
