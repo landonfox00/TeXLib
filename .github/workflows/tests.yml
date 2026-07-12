@@ -39,6 +39,25 @@ jobs:
           lua5.3 Bingo/test_bingo.lua
           lua5.3 "Report Cards/test_report_card.lua"
 
+  # Advisory chktex lint (N4). chktex was editor-side/manual (CLAUDE.md); this
+  # surfaces it in CI without blocking. It lints the module TEMPLATES + the
+  # example course (document-level LaTeX, what chktex is for -- not the .cls/.sty
+  # package code) with the repo chktexrc. -n1 quiets the intentional
+  # space-terminated section macros; the step never fails the build (|| true), so
+  # the report is visible in the logs as guidance, not a gate.
+  chktex:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install chktex
+        run: sudo apt-get update && sudo apt-get install -y chktex
+      - name: Lint templates + example docs (advisory)
+        run: |
+          mapfile -t files < <(find . \( -name '*-template.tex' \
+            -o -path './examples/*/*.tex' \) -not -path './.git/*')
+          echo "chktex: linting ${#files[@]} document(s) with chktexrc"
+          chktex -q -n1 -l chktexrc "${files[@]}" || true
+
   # Real end-to-end: drives the actual builder coroutines against a genuine
   # toolchain. Proofs run here:
   #   * test_biber_integration.py    -- pdflatex + biber on a biblatex fixture,
