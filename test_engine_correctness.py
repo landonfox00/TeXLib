@@ -52,6 +52,20 @@ FIXTURES = os.path.join(TEXLIB_ROOT, "tests", "fixtures", "Exams")
 
 
 # --- Toolchain routing / detection (mirrors test_synctex_integration.py) ------
+def _build_root():
+    r"""The checkout whose shared TeXLib files (.cls/.sty/.lua) the builds resolve
+    against.  Defaults to this repo; TEXLIB_TEST_ROOT overrides it to a SPECIFIC
+    checkout/worktree.  On Windows kpathsea cannot search an absolute TEXINPUTS
+    entry containing a comma (the real OneDrive path has one), so the default is
+    routed through the C:\_texlibjunc junction when present -- which resolves to
+    the MAIN working tree, NOT necessarily this checkout.  On CI (Linux) the repo
+    root is used directly."""
+    root = os.environ.get("TEXLIB_TEST_ROOT") or TEXLIB_ROOT
+    if root is TEXLIB_ROOT and os.name == "nt" and os.path.isdir(r"C:\_texlibjunc"):
+        root = r"C:\_texlibjunc"
+    return root
+
+
 def _texinputs_env(tex_dir):
     """Env for the engine, TEXINPUTS extended so the TeXLib-root shared files
     (classes, .sty, the Lua engine) resolve even though tex_dir is a scratch dir
@@ -62,14 +76,7 @@ def _texinputs_env(tex_dir):
     used directly).  Same helper as Sublime/test_synctex_integration.py."""
     env = os.environ.copy()
     sep = ";" if os.name == "nt" else ":"
-    # TEXLIB_TEST_ROOT lets a caller point the build at a SPECIFIC checkout's
-    # shared files (e.g. a worktree) via a comma-free path/junction, instead of
-    # the default root -- useful when validating a feature branch on Windows,
-    # where the default junction below resolves to the main working tree.
-    root = os.environ.get("TEXLIB_TEST_ROOT") or TEXLIB_ROOT
-    if root is TEXLIB_ROOT and os.name == "nt" and os.path.isdir(r"C:\_texlibjunc"):
-        root = r"C:\_texlibjunc"
-    root = root.replace(os.sep, "/")
+    root = _build_root().replace(os.sep, "/")
     env["TEXINPUTS"] = sep.join([".", root + "//", env.get("TEXINPUTS", "")])
     return env
 
@@ -481,6 +488,14 @@ def scenario_vmap_emission():
 
 def main():
     print("TeXLib problem-bank engine correctness tests\n")
+    _root = _build_root()
+    print(f"  build root: {_root}")
+    if (os.name == "nt" and not os.environ.get("TEXLIB_TEST_ROOT")
+            and os.path.normcase(_root) == os.path.normcase(r"C:\_texlibjunc")):
+        print(f"    NOTE: builds resolve against {_root} (your MAIN working tree),")
+        print("    NOT necessarily this checkout. Set TEXLIB_TEST_ROOT to a")
+        print("    comma-free path to test a specific worktree.")
+    print()
     if not LUALATEX:
         print("  SKIP  lualatex not found.")
         return 0
