@@ -58,6 +58,16 @@ DPI = 150   # pdftoppm rasterization DPI for the geometry pixel scans
 # ============================================================================
 # Toolchain discovery + TEXINPUTS
 # ============================================================================
+def _build_root():
+    """The checkout whose shared TeXLib files the build resolves against; see
+    _texinputs_env for the precedence + junction rationale."""
+    root = os.environ.get("TEXLIB_IT_ROOT") or TEXLIB_ROOT
+    if (not os.environ.get("TEXLIB_IT_ROOT") and os.name == "nt"
+            and "," in root and os.path.isdir(r"C:\_texlibjunc")):
+        root = r"C:\_texlibjunc"
+    return root
+
+
 def _texinputs_env():
     """Env with TEXINPUTS extended so the repo-root shared files resolve while
     building in a scratch dir OUTSIDE the repo.
@@ -75,11 +85,7 @@ def _texinputs_env():
     """
     env = os.environ.copy()
     sep = ";" if os.name == "nt" else ":"
-    root = os.environ.get("TEXLIB_IT_ROOT") or TEXLIB_ROOT
-    if (not os.environ.get("TEXLIB_IT_ROOT") and os.name == "nt"
-            and "," in root and os.path.isdir(r"C:\_texlibjunc")):
-        root = r"C:\_texlibjunc"
-    root = root.replace(os.sep, "/")
+    root = _build_root().replace(os.sep, "/")
     env["TEXINPUTS"] = sep.join([".", root + "//", env.get("TEXINPUTS", "")])
     return env
 
@@ -712,6 +718,7 @@ def scenario_geometry(pdf, copies, texts, wpages, tmp):
 # ============================================================================
 def main():
     print("TeXLib autoexam shuffle rendered-PDF integration test\n")
+    print(f"  build root: {_build_root()}\n")
     if not LUALATEX:
         print("  SKIP  lualatex not found.")
         return 0

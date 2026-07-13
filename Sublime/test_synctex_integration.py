@@ -61,6 +61,15 @@ from _testkit import install_native_builder  # noqa: E402
 TexlibBuilder = install_native_builder()
 
 
+def _build_root():
+    """The checkout whose shared TeXLib files the build resolves against; see
+    _texinputs_env for the comma/junction rationale."""
+    root = TEXLIB_ROOT
+    if os.name == "nt" and "," in root and os.path.isdir(r"C:\_texlibjunc"):
+        root = r"C:\_texlibjunc"
+    return root
+
+
 def _texinputs_env(tex_dir):
     """Env for the engine, TEXINPUTS extended so the TeXLib-root shared files
     resolve even though tex_dir is a scratch dir OUTSIDE the repo entirely
@@ -87,10 +96,7 @@ def _texinputs_env(tex_dir):
     """
     env = os.environ.copy()
     sep = ";" if os.name == "nt" else ":"
-    root = TEXLIB_ROOT
-    if os.name == "nt" and "," in root and os.path.isdir(r"C:\_texlibjunc"):
-        root = r"C:\_texlibjunc"
-    root = root.replace(os.sep, "/")
+    root = _build_root().replace(os.sep, "/")
     env["TEXINPUTS"] = sep.join([".", root + "//", env.get("TEXINPUTS", "")])
     # Pin LUAINPUTS too: the problem-bank engine (problem_engine.lua /
     # texlib_synctex.lua) is loaded by LuaTeX via LUAINPUTS, NOT TEXINPUTS. Without
@@ -839,6 +845,7 @@ def scenario_schedule_boxgrid_plain_cli():
 
 def main():
     print("TeXLib SyncTeX inverse-search integration test\n")
+    print(f"  build root: {_build_root()}\n")
     if not LUALATEX:
         print("  SKIP  lualatex not found.")
         return 0

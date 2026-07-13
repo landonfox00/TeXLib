@@ -52,6 +52,20 @@ FIXTURES = os.path.join(TEXLIB_ROOT, "tests", "fixtures", "Exams")
 
 
 # --- Toolchain routing / detection (mirrors test_synctex_integration.py) ------
+def _build_root():
+    r"""The checkout whose shared TeXLib files (.cls/.sty/.lua) the builds resolve
+    against.  Defaults to this repo; TEXLIB_TEST_ROOT overrides it to a SPECIFIC
+    checkout/worktree.  Windows kpathsea cannot search an absolute TEXINPUTS entry
+    containing a comma (the OneDrive checkout's path has one), so ONLY a comma path
+    is rerouted through the comma-free C:\_texlibjunc junction; a comma-free
+    worktree (or CI on Linux) is used directly, so the test builds against THIS
+    checkout.  Matches test_synctex_integration / test_shuffle_integration."""
+    root = os.environ.get("TEXLIB_TEST_ROOT") or TEXLIB_ROOT
+    if os.name == "nt" and "," in root and os.path.isdir(r"C:\_texlibjunc"):
+        root = r"C:\_texlibjunc"
+    return root
+
+
 def _texinputs_env(tex_dir):
     """Env for the engine, TEXINPUTS extended so the TeXLib-root shared files
     (classes, .sty, the Lua engine) resolve even though tex_dir is a scratch dir
@@ -62,14 +76,7 @@ def _texinputs_env(tex_dir):
     used directly).  Same helper as Sublime/test_synctex_integration.py."""
     env = os.environ.copy()
     sep = ";" if os.name == "nt" else ":"
-    # TEXLIB_TEST_ROOT lets a caller point the build at a SPECIFIC checkout's
-    # shared files (e.g. a worktree) via a comma-free path/junction, instead of
-    # the default root -- useful when validating a feature branch on Windows,
-    # where the default junction below resolves to the main working tree.
-    root = os.environ.get("TEXLIB_TEST_ROOT") or TEXLIB_ROOT
-    if root is TEXLIB_ROOT and os.name == "nt" and os.path.isdir(r"C:\_texlibjunc"):
-        root = r"C:\_texlibjunc"
-    root = root.replace(os.sep, "/")
+    root = _build_root().replace(os.sep, "/")
     env["TEXINPUTS"] = sep.join([".", root + "//", env.get("TEXINPUTS", "")])
     return env
 
@@ -481,6 +488,8 @@ def scenario_vmap_emission():
 
 def main():
     print("TeXLib problem-bank engine correctness tests\n")
+    print(f"  build root: {_build_root()}  (override with TEXLIB_TEST_ROOT)")
+    print()
     if not LUALATEX:
         print("  SKIP  lualatex not found.")
         return 0
