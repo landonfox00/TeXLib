@@ -28,8 +28,6 @@ quiz_idx_map = {}
 cnt_quiz = 0
 cnt_lecture = 0
 cnt_exam = 0
-skipped_quizzes = {}     
-
 -- UTILITIES
 function sanitize(str)
 	if not str then return "" end
@@ -44,7 +42,6 @@ function NewEvent(type_str, name_str, length_val, id_val)
 		name   = name_str,
 		length = length_val or 0,
 		id     = id_val or 0,
-		meta   = {},
 		-- source_line: set by each L_* directive to tex.inputlineno at the
 		-- time of the directive call so render_grid can attribute the
 		-- typeset row back to the user's .tex source via SyncTeX redirect.
@@ -189,17 +186,6 @@ end
 -- INITIALIZER
 -- ============================================================================
 function init_scheduler(start_str, end_str, lec_days, rec_days, q_days, cap_str, year_str)
-	-- AUTO-PATCH CALENDAR
-	if not Calendar.register_column_type_by_idx then
-		Calendar.register_column_type_by_idx = function(self, idx, type_tag)
-			self.column_rules[idx] = type_tag
-			local exists = false
-			for _, v in ipairs(self.active_col_indices) do if v==idx then exists=true end end
-			if not exists then table.insert(self.active_col_indices, idx) end
-			table.sort(self.active_col_indices)
-		end
-	end
-
 	-- 1. Parse Year (Allow fallback ONLY here, at runtime initialization)
 	local y_clean = year_str:gsub("%D", "")
 	sched_year = tonumber(y_clean) or tonumber(os.date("%Y"))
@@ -578,13 +564,6 @@ function L_meta(text, date_in, layer_in, color_in)
 	local layer = (layer_in and layer_in~="") and layer_in or "bottom"
 	cell:append({ event_ref = evt, duration = 0 }, layer)
 	tag_cell_source(cell, evt.source_line)
-end
-
-function L_homework(text, date_in)
-	-- "Homework" goes to the bottom layer
-	-- We can prepend "Due: " automatically if you like
-	local content = "\\textbf{Due:} " .. text
-	L_meta(content, date_in, "bottom", nil)
 end
 
 function L_debug_cursor()
@@ -1013,8 +992,4 @@ function render_grid(month_pages, box_grid)
 		end
 		mout:close()
 	end
-end
-
-function L_warn(msg)
-	tex.print("\\PackageWarning{schedule}{" .. msg .. "}")
 end

@@ -26,12 +26,9 @@ function Cell.new(date_obj, default_cap, week_num)
 
 	-- 1. Identity
 	self.date     = date_obj       -- Date Object
-	self.week_num = week_num or 0  -- Integer
 
 	-- 2. State & Math
-	self.capacity_max = default_cap or 1.0
 	self.capacity_cur = default_cap or 1.0 
-	self.lecture_num  = nil        -- Integer (assigned at render time)
 
 	-- 3. The Unified Flags Bundle
 	self.flags = {
@@ -142,21 +139,6 @@ function Calendar.new()
 	self.column_rules = {} 
 	self.active_col_indices = {} 
 	return self
-end
-
-function Calendar:register_column_type(day_str, type_tag)
-	if not day_str then return end
-	local str = day_str:upper():gsub("TH", "R")
-	local map = {M=1, T=2, W=3, R=4, F=5, S=6, U=7}
-	for char, idx in pairs(map) do
-		if str:find(char) then
-			self.column_rules[idx] = type_tag
-			local exists = false
-			for _, v in ipairs(self.active_col_indices) do if v==idx then exists=true end end
-			if not exists then table.insert(self.active_col_indices, idx) end
-		end
-	end
-	table.sort(self.active_col_indices)
 end
 
 function Calendar:register_column_type_by_idx(idx, type_tag)

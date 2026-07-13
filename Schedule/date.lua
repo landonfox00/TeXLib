@@ -58,13 +58,6 @@ function Date:add_days(n)
 	return Date.new(os.time(d))
 end
 
--- Math: Difference in days
-function Date:diff_days(other)
-	if not self.time or not other.time then return 0 end
-	local diff = os.difftime(self.time, other.time)
-	return math.floor(diff / 86400 + 0.5)
-end
-
 -- Getters
 function Date:weekday() -- 1=Mon ... 7=Sun
 	if not self.time then return 0 end
@@ -92,10 +85,6 @@ function Date:fmt_display()
 	
 	-- \smash prevents the superscript from pushing the box ceiling up
 	return m_str .. " " .. d .. "\\smash{\\textsuperscript{" .. suffix .. "}}"
-end
-
-function Date:fmt_iso()
-	return self.time and os.date("%Y-%m-%d", self.time) or "INVALID"
 end
 
 -- Operator Overloading

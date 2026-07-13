@@ -40,8 +40,7 @@
 --                   the multi-version loop needs intimate knowledge of the
 --                   problem bank: autoexam_run_versions, autoexam_versions,
 --                   autoexam_shuffle_pages, autoexam_write_srcmap,
---                   autoexam_read_body, autoexam_scorepage,
---                   autoexam_gradingrow.  These would only ever be called
+--                   autoexam_read_body, autoexam_scorepage.  These would only ever be called
 --                   by autoexam.cls; quiz.cls leaves them dormant.
 --
 -- Requires LuaLaTeX (texconfig, lua callbacks). Will not work under pdflatex
@@ -82,8 +81,8 @@ pbank_pending_fix = nil
 problem_db = {}
 autoexam_versions = {}
 
--- Part labels for multi-part score/grading rows (a, b, c, ...). Module-level so
--- the score-table and grading-row renderers share one definition; parts beyond
+-- Part labels for multi-part score rows (a, b, c, ...). Module-level so the
+-- score-table renderer has one definition; parts beyond
 -- the 8th fall back to a parenthesized index.
 local part_letters = {'a','b','c','d','e','f','g','h'}
 
@@ -517,16 +516,6 @@ local function parse_meta(meta_str)
 	return meta
 end
 
--- Typeset a problem record: content, then optional vspace, then solution.
--- stretch: nil or 0 = no extra space; positive number = \vspace{\stretch{n}}.
--- The vspace is sprinted AFTER \end{solution} so that it is tokenized after
--- the comment package restores catcodes — avoiding the pre-tokenized-token
--- issue that arises when trailing tokens follow \getproblem inside a macro.
---
--- \begingroup...\endgroup wraps the content to scope any paragraph-level
--- declarations (\centering, \raggedright, etc.) that problem bodies may set
--- via \par\centering before a TikZ diagram.  Without the group, those
--- declarations bleed into the next \question item in the list environment.
 -- Read the lines of a problem body directly from the bank file on disk.
 -- Returns an array of strings (without trailing newlines), spanning from
 -- the line after \begin{problem} up to (but not including) \solution or
@@ -1453,19 +1442,8 @@ end
 function pbank_problem_item(pts_str, stretch_str, query, fix_str)
 	pbank_emit_sep()
 
-	-- Parse points list.
-	local pts_list = {}
-	for v in pts_str:gmatch("[^,]+") do
-		v = v:match("^%s*(.-)%s*$")
-		if v ~= "" then table.insert(pts_list, v) end
-	end
-
-	-- Parse stretch list.
-	local stretch_list = {}
-	for v in stretch_str:gmatch("[^,]+") do
-		v = v:match("^%s*(.-)%s*$")
-		if v ~= "" then table.insert(stretch_list, v) end
-	end
+	local pts_list = split_csv(pts_str)
+	local stretch_list = split_csv(stretch_str)
 
 	-- Emit \question header based on |p|.
 	local is_multi = #pts_list > 1
@@ -1671,11 +1649,7 @@ end
 -- Safe version-setter: call from \directlua{set_autoexam_versions('A,B,C')}
 -- (avoids % and # catcode issues when defining versions inside .tex files)
 function set_autoexam_versions(str)
-	autoexam_versions = {}
-	for v in str:gmatch('[^,]+') do
-		v = v:match('^%s*(.-)%s*$')
-		if v ~= '' then table.insert(autoexam_versions, v) end
-	end
+	autoexam_versions = split_csv(str)
 end
 
 -- A problem-section environment is either {problems} (free response) or
@@ -2239,44 +2213,6 @@ function autoexam_scorepage(max_rows)
 	-- follows in the document will ship this page naturally, avoiding a
 	-- spurious empty page between the last score page and scratch work.
 	close_table(grand_total, true)
-end
-
--- ============================================================
--- GRADING TABLE
--- ============================================================
--- autoexam_gradingrow(qno, pts_str)
---   qno     : question label string, e.g. "1" or "Q1"
---   pts_str : comma-separated point values, e.g. "3,3,4" or "10"
---
--- Single-part problems emit one row with "---" in the Part column.
--- Multi-part problems emit one row per part (labelled a, b, c, ...),
--- a subtotal row, then \hline.
--- In both cases \addtocounter{autoexamtotal}{total} accumulates the grand total.
-function autoexam_gradingrow(qno, pts_str)
-	local parts = {}
-	for p in pts_str:gmatch('[^,]+') do
-		p = p:match('^%s*(.-)%s*$')
-		if p ~= '' then table.insert(parts, tonumber(p) or 0) end
-	end
-	local total = 0
-	for _, v in ipairs(parts) do total = total + v end
-
-	if #parts <= 1 then
-		local pts = parts[1] or 0
-		tex.print('\\textbf{' .. qno .. '} & {---} & ' .. pts .. ' & \\\\')
-		tex.print('\\hline')
-	else
-		for i, pts in ipairs(parts) do
-			local q_cell = (i == 1) and ('\\textbf{' .. qno .. '}') or ''
-			local lbl = part_letters[i] or ('(' .. i .. ')')
-			tex.print(q_cell .. ' & ' .. lbl .. ' & ' .. pts .. ' & \\\\')
-			if i < #parts then tex.print('\\cline{2-4}') end
-		end
-		tex.print('\\cline{2-4}')
-		tex.print(' & \\textit{Subtotal} & ' .. total .. ' & \\\\')
-		tex.print('\\hline')
-	end
-	tex.print('\\noalign{\\addtocounter{autoexamtotal}{' .. total .. '}}')
 end
 
 -- Publish the engine's private namespace as the single global `texlib`. Every

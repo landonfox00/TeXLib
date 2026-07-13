@@ -65,8 +65,7 @@
 #
 # No LaTeXTools/PdfBuilder dependency: the native runner (texlib.py) supplies
 # the host contract (display / out / tex_root / engine / options) and drives
-# commands(). Kept in sync with texlib_builder.py until that builder is retired
-# (Phase 2).
+# commands().
 # ============================================================================
 
 import csv
@@ -207,7 +206,6 @@ class TexlibBuildCore:
             )
             tex_dir = self._tex_dir()
             self._set_aux_target(tex_dir)
-            self._version_sources = []
             self._biber_ran = []
             base = self._base_engine_cmd(
                 "lualatex", self._aux_target, tex_dir, engine_options
@@ -660,8 +658,6 @@ class TexlibBuildCore:
             return cls._biber_version_cache
         ver = ""
         try:
-            import subprocess
-
             exe = shutil.which("biber")
             if exe:
                 out = subprocess.run(

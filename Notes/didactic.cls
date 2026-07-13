@@ -42,7 +42,6 @@
 \RequirePackage{basic-utilities}
 \RequirePackage{xstring}
 \RequirePackage{calc, adjustbox, changepage, needspace}
-\RequirePackage[shortlabels]{enumitem}
 \RequirePackage{fancyhdr, lastpage}
 \RequirePackage{tocloft, multirow}
 \RequirePackage[many]{tcolorbox}
@@ -126,16 +125,7 @@
 
 % Apply document metadata from the class option list now that the keys above and
 % coursemeta.tex are loaded (so document options override coursemeta defaults).
-% Read \@raw@classoptionslist, not \CurrentOption, to keep spaces in values.
-\ExplSyntaxOn
-\cs_if_exist:cT { @raw@classoptionslist } {
-	\tl_set:Nv    \l_tmpa_tl    { @raw@classoptionslist }
-	\clist_set:NV \l_tmpa_clist \l_tmpa_tl
-	\clist_map_inline:Nn \l_tmpa_clist {
-		\tl_if_in:nnT { #1 } { = } { \keys_set:nn { meta } { #1 } }
-	}
-}
-\ExplSyntaxOff
+\MetaApplyClassOptions
 
 % ==============================================================================
 % 4. PAGE LAYOUT -- METADATA-DRIVEN HEADERS
@@ -168,11 +158,7 @@
 
 % Title page (first page of lecture notes): no header, no header rule.
 % Shared footer remains in place.
-\fancypagestyle{titlepage}{%
-	\fancyhf{}%
-	\SetTeXLibFooter
-	\renewcommand{\headrulewidth}{0pt}%
-}
+\TeXLibFooterOnlyPagestyle{titlepage}
 % tocloft stamps the first TOC page \thispagestyle{plain} (bare centered page
 % number, no shared footer). Inside \maketitle the titlepage stamp fires later
 % and wins, but a \tableofcontents called after \maketitle re-stamps page 1

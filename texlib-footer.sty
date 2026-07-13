@@ -14,15 +14,8 @@
 %     \pagestyle{fancy}                 % the class sets up fancy + headers
 %     \SetTeXLibFooter                  % installs the shared footer
 %
-% \SetTeXLibFooter may also be called inside a \fancypagestyle{<name>}{...}
-% block to apply the same footer to a custom page style (e.g. a title page
-% style that suppresses the header but keeps the footer):
-%
-%     \fancypagestyle{titlepage}{%
-%         \fancyhf{}%
-%         \SetTeXLibFooter
-%         \renewcommand{\headrulewidth}{0pt}%
-%     }
+% For a page style that keeps only the footer (title/first pages that suppress
+% the header), use \TeXLibFooterOnlyPagestyle{<name>} (defined below).
 %
 % The left slot shows \GetCourse, the full "<Subject> <Number> <Title>" name
 % (e.g. "Math 181 Calculus I"). course-metadata.sty must be loaded before
@@ -38,6 +31,12 @@
 	\fancyfoot[C]{\thepage\ of \pageref{LastPage}}%
 	\fancyfoot[R]{\GetInstitution}%
 	\renewcommand{\footrulewidth}{0.4pt}%
+}
+
+% \TeXLibFooterOnlyPagestyle{<name>} -- a page style carrying only the shared
+% footer (no header rule); for title/first pages that suppress the header.
+\newcommand{\TeXLibFooterOnlyPagestyle}[1]{%
+	\fancypagestyle{#1}{\fancyhf{}\SetTeXLibFooter\renewcommand{\headrulewidth}{0pt}}%
 }
 
 % \SetTeXLibHeader{L}{C}{R} -- the header analog of \SetTeXLibFooter. Places the
