@@ -42,7 +42,6 @@
 \RequirePackage{basic-utilities}
 \RequirePackage{xstring}
 \RequirePackage{calc, adjustbox, changepage, needspace}
-\RequirePackage[shortlabels]{enumitem}
 \RequirePackage{fancyhdr, lastpage}
 \RequirePackage{tocloft, multirow}
 \RequirePackage[many]{tcolorbox}

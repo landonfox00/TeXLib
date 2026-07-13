@@ -138,7 +138,6 @@
 % rule + running head/foot rules into \SetTeXLibExamRules.  Quiz adds the
 % first-page header rule on top (its title page carries a name field).
 \RequirePackage{texlib-pagestyle}
-\RequirePackage{lastpage}    % \pageref{LastPage} for the shared "X of Y" footer
 % \title is auto-derived from metadata.
 \AtBeginDocument{%
 	\title{\LARGE \GetQuizTitle}%

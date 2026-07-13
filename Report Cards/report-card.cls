@@ -40,7 +40,6 @@
 \RequirePackage{basic-utilities}
 \captionsetup{skip=3pt}  % runtime override of caption's default vskip
 \RequirePackage{adjustbox, changepage, comment}
-\RequirePackage[shortlabels]{enumitem}
 \RequirePackage{fancyhdr, lastpage}
 \RequirePackage{needspace}
 \RequirePackage{booktabs, colortbl, multirow, makecell}

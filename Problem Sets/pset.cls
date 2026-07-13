@@ -53,7 +53,6 @@
 % caption, tasks, extra tikz libraries).
 \RequirePackage{basic-utilities}
 \RequirePackage{calc, adjustbox, changepage, needspace}
-\RequirePackage[shortlabels]{enumitem}
 \RequirePackage{fancyhdr, lastpage}
 \RequirePackage{tocloft, multirow}
 \RequirePackage[many]{tcolorbox}

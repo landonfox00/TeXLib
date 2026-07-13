@@ -67,10 +67,6 @@
 local active  = false
 local pending = nil       -- table set by texlib_synctex_stage; consumed by the callback
 
-local function sanitize_id(id)
-	return (id or 'redirect'):gsub('[^%w%-]', '_')
-end
-
 -- Resolve the write/read path for this file's own scratch (the served-content
 -- temp file below) the same way problem_engine.lua's texlib_scratch_path does
 -- -- this file loads first (see the loader in texlib-problembank.sty) and has

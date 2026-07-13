@@ -11,18 +11,11 @@
 
 	// Use the TeXLib custom builder (texlib_builder.py, deployed alongside
 	// this file). It handles engine selection, build modes, autoexam
-	// versions, the rerun loop, and the .spl PDF split. The line below is
-	// kept for reference -- script_commands is unused while builder = texlib,
-	// but if you ever fall back to the legacy script builder, the path is
-	// still right.
+	// versions, the rerun loop, and the .spl PDF split.
 	"builder" : "texlib",
 	// "builder" : "basic",
-	// "builder" : "script",
 	"builder_settings" : {
 		"windows" : {
-			"script_commands": [
-				"cmd /c python -u \"C:\\Users\\Landon\\OneDriveUNR\\Documents\\TeXLib\\Sublime\\onetex_build.py\" \"$file\""
-			],
 			// kpathsea CANNOT resolve a TEXINPUTS entry that contains a comma.
 			// The real OneDrive folder name has one ("...Nevada, Reno..."), so
 			// we route via the comma-free junction. Trailing // means "and all
