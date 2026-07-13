@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bank Studio</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">&Sigma;</div>
+      <div>
+        <div class="brand-title">Bank Studio</div>
+        <div class="brand-sub" id="exam-name">&mdash;</div>
+      </div>
+    </div>
+    <span id="render-badge" class="render-badge off">rendering&hellip;</span>
+    <div class="spacer"></div>
+    <div class="insert-toggle" title="How each added problem is written into the exam source">
+      <span>Insert&nbsp;as</span>
+      <div class="seg" role="group" aria-label="Insert mode">
+        <button data-mode="id" aria-pressed="true">{id}</button>
+        <button data-mode="filter" aria-pressed="false">{topic=&hellip;}</button>
+      </div>
+    </div>
+    <button class="icon-btn" id="theme-btn" title="Toggle light / dark" aria-label="Toggle theme">&#9680;</button>
+  </header>
+
+  <main class="desk">
+    <!-- left: filter + list -->
+    <section class="rail">
+      <div class="rail-head">
+        <input class="search" id="search" type="search" placeholder="Search stems, ids, topics&hellip;" aria-label="Search problems">
+        <div class="filters" id="filters"></div>
+      </div>
+      <div class="count" id="count"></div>
+      <div class="rowlist" id="rows"></div>
+    </section>
+
+    <!-- center: rendered preview -->
+    <section class="preview" id="preview">
+      <div class="empty">Loading bank&hellip;</div>
+    </section>
+
+    <!-- right: exam tray -->
+    <section class="tray">
+      <div class="tray-head">
+        <h2>Exam in progress</h2>
+        <span class="n" id="tray-n"></span>
+      </div>
+      <div class="examlist" id="examlist"></div>
+      <div class="tray-foot">
+        <div class="tray-total"><span>Problems &middot; points</span><b id="tray-total">0 &middot; 0</b></div>
+        <button class="btn primary" style="width:100%" id="copy-btn"><span>&#9106;</span> Copy exam body</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
