@@ -104,6 +104,20 @@
 	syllabus-title   .tl_gset:c = { g__meta_short-title_tl },  % alias for short-title
 }
 
+% Apply =-valued class options as metadata keys. Each class reads
+% \@raw@classoptionslist (not \CurrentOption) so values keep their spaces;
+% only key=value options reach here (bare options went to the base class).
+% Called once per class after coursemeta load, so document options still win.
+\cs_new_protected:Npn \MetaApplyClassOptions {
+	\cs_if_exist:cT { @raw@classoptionslist } {
+		\tl_set:Nv    \l_tmpa_tl    { @raw@classoptionslist }
+		\clist_set:NV \l_tmpa_clist \l_tmpa_tl
+		\clist_map_inline:Nn \l_tmpa_clist {
+			\tl_if_in:nnT { ##1 } { = } { \keys_set:nn { meta } { ##1 } }
+		}
+	}
+}
+
 % Warn on terminal when a field is auto-created (catches typos like instuctor=).
 % Documents that use custom keys deliberately call \MetaAllowCustomKeys to
 % downgrade this to a log-only note.
