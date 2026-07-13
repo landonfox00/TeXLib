@@ -68,3 +68,37 @@ def find_poppler(tool="pdftotext"):
         if "poppler" in ((proc.stdout or "") + (proc.stderr or "")).lower():
             return cand
     return None
+
+
+class _StubPdfBuilder:
+    """Minimal stand-in for LaTeXTools' PdfBuilder base class."""
+    def __init__(self, *a, **k):
+        self._displayed = ""
+
+    def display(self, msg):
+        self._displayed += str(msg)
+
+
+def install_native_builder():
+    """Stub LaTeXTools' PdfBuilder and register the native TeXLib package so
+    `from texlib_builder import TexlibBuilder` imports headless, and return the
+    TexlibBuilder class. The shared build core lives in TeXLib.texlib_build
+    (a package name that only exists inside Sublime), so register the native
+    module under it. Idempotent."""
+    here = os.path.dirname(os.path.abspath(__file__))  # Sublime/
+    for name in ("LaTeXTools", "LaTeXTools.plugins",
+                 "LaTeXTools.plugins.builder",
+                 "LaTeXTools.plugins.builder.pdf_builder"):
+        sys.modules.setdefault(name, types.ModuleType(name))
+    sys.modules["LaTeXTools.plugins.builder.pdf_builder"].PdfBuilder = _StubPdfBuilder
+    tdir = os.path.join(here, "texlib")
+    for pth in (here, tdir):
+        if pth not in sys.path:
+            sys.path.insert(0, pth)
+    import texlib_build as _native
+    pkg = types.ModuleType("TeXLib")
+    pkg.__path__ = [tdir]
+    sys.modules.setdefault("TeXLib", pkg)
+    sys.modules.setdefault("TeXLib.texlib_build", _native)
+    from texlib_builder import TexlibBuilder
+    return TexlibBuilder

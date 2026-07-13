@@ -57,30 +57,8 @@ _HERE = os.path.dirname(os.path.abspath(__file__))  # Sublime/
 sys.path.insert(0, TEXLIB_ROOT)
 
 
-class _StubPdfBuilder:
-    def __init__(self, *a, **k):
-        self._displayed = ""
-
-    def display(self, msg):
-        self._displayed += str(msg)
-
-
-for _name in (
-    "LaTeXTools", "LaTeXTools.plugins", "LaTeXTools.plugins.builder",
-    "LaTeXTools.plugins.builder.pdf_builder",
-):
-    sys.modules.setdefault(_name, types.ModuleType(_name))
-sys.modules["LaTeXTools.plugins.builder.pdf_builder"].PdfBuilder = _StubPdfBuilder
-
-sys.path.insert(0, _HERE)                            # texlib_builder.py
-sys.path.insert(0, os.path.join(_HERE, "texlib"))    # native texlib_build.py
-import texlib_build as _native_texlib_build  # noqa: E402
-_texlib_pkg = types.ModuleType("TeXLib")
-_texlib_pkg.__path__ = [os.path.join(_HERE, "texlib")]
-sys.modules.setdefault("TeXLib", _texlib_pkg)
-sys.modules.setdefault("TeXLib.texlib_build", _native_texlib_build)
-
-from texlib_builder import TexlibBuilder  # noqa: E402
+from _testkit import install_native_builder  # noqa: E402
+TexlibBuilder = install_native_builder()
 
 
 def _texinputs_env(tex_dir):
