@@ -39,7 +39,7 @@
 % plus heavy-class extras (siunitx, caption, tasks, extra tikz libraries).
 \RequirePackage{basic-utilities}
 \captionsetup{skip=3pt}  % runtime override of caption's default vskip
-\RequirePackage{adjustbox, changepage, comment}
+\RequirePackage{adjustbox, changepage}
 \RequirePackage{fancyhdr, lastpage}
 \RequirePackage{needspace}
 \RequirePackage{booktabs, colortbl, multirow, makecell}

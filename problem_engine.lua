@@ -1204,7 +1204,7 @@ end
 -- parsed stretch list in pbank_stretch_list before calling this function.
 -- get_problem reads it (and immediately clears it), then uses part_count from
 -- the resolved record to determine trailing vs per-part stretch behaviour.
--- Callers that bypass pbank_problem_item (\getproblem, use_problem, etc.)
+-- Callers that bypass pbank_problem_item (\getproblem, etc.)
 -- see pbank_stretch_list={} and therefore get no stretch — correct.
 function get_problem(query_str, pts_list)
 	query_str = query_str:match("^%s*(.-)%s*$")
@@ -1600,9 +1600,6 @@ function pbank_emit_section(partno)   -- `partno` arg unused; see pbank_emit_par
 	flush()
 end
 
--- Backward-compat wrappers (pbank_stretch_list already {} after reset)
-function use_problem(id)   pbank_stretch_list = {}; get_problem(id) end
-function random_problem(f) pbank_stretch_list = {}; get_problem(f)  end
 
 -- ============================================================
 -- MULTI-VERSION BODY READER

@@ -219,9 +219,3 @@ end
 function texlib_synctex_is_active()
 	return active
 end
-
--- Diagnostic: clear the pending redirect (does NOT unregister the callback).
--- Useful for tests or aborted operations.
-function texlib_synctex_clear()
-	pending = nil
-end

@@ -397,16 +397,6 @@
 }
 \newcommand{\AutoExamVmapClose}{\immediate\closeout\vmapfile}
 
-% Horizontal Separator
-\newcommand{\qsep}{%
-	\par\vspace{1em}
-	\begingroup
-		\noindent\hspace*{-\@totalleftmargin}%
-		\rule{\textwidth}{0.4pt}% 
-	\endgroup
-	\par\vspace{1em}
-}
-
 % Smart Nested Columns
 \newif\ifinparts
 \inpartsfalse
