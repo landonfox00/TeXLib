@@ -74,46 +74,15 @@ SUBLIME_DIR = os.path.dirname(os.path.abspath(__file__))
 
 LUALATEX = shutil.which("lualatex")
 
-_PASS = 0
-_FAIL = 0
+from _testkit import Checker  # noqa: E402
+_c = Checker()
+check = _c.check
 
 
-def check(label, cond, detail=""):
-    global _PASS, _FAIL
-    if cond:
-        _PASS += 1
-        print(f"  PASS  {label}")
-    else:
-        _FAIL += 1
-        print(f"  FAIL  {label}")
-        if detail:
-            print(f"        {detail}")
+from _testkit import find_poppler  # noqa: E402
 
 
-# --- Poppler pdftotext detection (avoid Git's xpdf build) --------------------
-def _find_poppler_pdftotext():
-    """A poppler-flavored pdftotext. Git for Windows ships an xpdf pdftotext
-    earlier on PATH whose page/text handling differs; prefer the first
-    candidate whose version banner says poppler (mirrors
-    test_synctex_integration.py's probe)."""
-    candidates = []
-    which = shutil.which("pdftotext")
-    if which:
-        candidates.append(which)
-    candidates.append(r"C:\texlive\2025\bin\windows\pdftotext.exe")
-    for cand in candidates:
-        try:
-            proc = subprocess.run([cand, "-v"], capture_output=True, text=True,
-                                   encoding="utf-8", errors="replace", timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        banner = (proc.stdout or "") + (proc.stderr or "")
-        if "poppler" in banner.lower():
-            return cand
-    return None
-
-
-PDFTOTEXT = _find_poppler_pdftotext()
+PDFTOTEXT = find_poppler()
 
 
 # --- Build-dir assembly ------------------------------------------------------
@@ -668,8 +637,8 @@ def main():
     scenario_ppart_atomicity()
     scenario_importproblem_stem()
 
-    print(f"\n{_PASS} passed, {_FAIL} failed")
-    return 1 if _FAIL else 0
+    print(f"\n{_c.passed} passed, {_c.failed} failed")
+    return 1 if _c.failed else 0
 
 
 if __name__ == "__main__":

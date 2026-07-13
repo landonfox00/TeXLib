@@ -38,56 +38,14 @@ if "sublime" in sys.modules:
 
 
 # --- Stub LaTeXTools' PdfBuilder and import the real builder -----------------
-class _StubPdfBuilder:
-    def __init__(self, *a, **k):
-        self._displayed = ""
-
-    def display(self, msg):
-        self._displayed += str(msg)
-
-
-def _install_stub():
-    for name in (
-        "LaTeXTools",
-        "LaTeXTools.plugins",
-        "LaTeXTools.plugins.builder",
-        "LaTeXTools.plugins.builder.pdf_builder",
-    ):
-        sys.modules.setdefault(name, types.ModuleType(name))
-    sys.modules["LaTeXTools.plugins.builder.pdf_builder"].PdfBuilder = _StubPdfBuilder
-
-
-_install_stub()
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-# The shared build core lives in the native TeXLib Sublime package
-# (TeXLib.texlib_build.TexlibBuildCore); that package name only exists inside
-# Sublime, so register the native module under it for a headless import.
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "texlib"))
-import texlib_build as _native_texlib_build  # noqa: E402
-_texlib_pkg = types.ModuleType("TeXLib")
-_texlib_pkg.__path__ = [os.path.join(os.path.dirname(os.path.abspath(__file__)), "texlib")]
-sys.modules.setdefault("TeXLib", _texlib_pkg)
-sys.modules.setdefault("TeXLib.texlib_build", _native_texlib_build)
-
-from texlib_builder import TexlibBuilder  # noqa: E402
+from _testkit import install_native_builder  # noqa: E402
+TexlibBuilder = install_native_builder()
 
 
 # --- Tiny result tracker -----------------------------------------------------
-_PASS = 0
-_FAIL = 0
-
-
-def check(label, condition, detail=""):
-    global _PASS, _FAIL
-    if condition:
-        _PASS += 1
-        print(f"  PASS  {label}")
-    else:
-        _FAIL += 1
-        print(f"  FAIL  {label}")
-        if detail:
-            print(f"        {detail}")
+from _testkit import Checker  # noqa: E402
+_c = Checker()
+check = _c.check
 
 
 # --- Fixture -----------------------------------------------------------------
@@ -226,8 +184,8 @@ def main():
     finally:
         shutil.rmtree(tex_dir, ignore_errors=True)
 
-    print(f"\n{_PASS} passed, {_FAIL} failed")
-    return _FAIL
+    print(f"\n{_c.passed} passed, {_c.failed} failed")
+    return _c.failed
 
 
 if __name__ == "__main__":

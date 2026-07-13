@@ -84,67 +84,21 @@ def _texinputs_env():
     return env
 
 
-def _find_poppler(tool):
-    """A poppler-flavored `tool` (pdftotext/pdftoppm). Git for Windows ships an
-    xpdf-flavored pdftotext that shadows poppler's on PATH and silently lacks
-    -bbox (prints its usage instead of erroring), so probe the version banner
-    and take the first candidate whose banner says poppler."""
-    candidates = []
-    which = shutil.which(tool)
-    if which:
-        candidates.append(which)
-    candidates.append(rf"C:\texlive\2025\bin\windows\{tool}.exe")
-    for cand in candidates:
-        try:
-            proc = subprocess.run([cand, "-v"], capture_output=True, text=True,
-                                   encoding="utf-8", errors="replace", timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        if "poppler" in ((proc.stdout or "") + (proc.stderr or "")).lower():
-            return cand
-    return None
+from _testkit import find_poppler  # noqa: E402
 
 
 LUALATEX = shutil.which("lualatex")
-PDFTOTEXT = _find_poppler("pdftotext")
-PDFTOPPM = _find_poppler("pdftoppm")
+PDFTOTEXT = find_poppler("pdftotext")
+PDFTOPPM = find_poppler("pdftoppm")
 
 
 # ============================================================================
 # Pass/fail bookkeeping (mirrors test_synctex_integration.py)
 # ============================================================================
-_PASS = 0
-_FAIL = 0
-_KNOWN_FAIL = 0
-_SKIP = 0
-
-
-def check(label, cond, detail="", known_issue=None):
-    """known_issue: a tracker reference for an assertion that encodes the
-    CORRECT/intended behavior but is not expected to pass yet, pending
-    separately-tracked follow-up. Keeps the assertion honest (it flips to PASS
-    the moment the real fix lands) without failing CI for a known, deliberately
-    out-of-scope gap."""
-    global _PASS, _FAIL, _KNOWN_FAIL
-    if cond:
-        _PASS += 1
-        print(f"  PASS  {label}")
-    elif known_issue:
-        _KNOWN_FAIL += 1
-        print(f"  KNOWN {label}  (tracked: {known_issue})")
-        if detail:
-            print(f"        {detail}")
-    else:
-        _FAIL += 1
-        print(f"  FAIL  {label}")
-        if detail:
-            print(f"        {detail}")
-
-
-def skip(label):
-    global _SKIP
-    _SKIP += 1
-    print(f"  SKIP  {label}")
+from _testkit import Checker  # noqa: E402
+_c = Checker()
+check = _c.check
+skip = _c.skip
 
 
 # ============================================================================
@@ -769,7 +723,7 @@ def main():
     try:
         check("combined A/B/C student+solutions PDF was produced", pdf is not None)
         if pdf is None:
-            return 1 if _FAIL else 0
+            return 1 if _c.failed else 0
 
         texts = page_texts(pdf)
         wpages = word_pages(pdf)
@@ -782,7 +736,7 @@ def main():
         check("six copies emitted: A/B/C student, then A/B/C solutions",
               got == expected, f"got={got}")
         if got != expected:
-            return 1 if _FAIL else 0
+            return 1 if _c.failed else 0
 
         parts_by = {(c["ver"], c["sol"]): copy_parts(c, texts, wpages) for c in copies}
         points_by = {(c["ver"], c["sol"]): copy_points(c, texts) for c in copies}
@@ -792,13 +746,13 @@ def main():
     finally:
         shutil.rmtree(root, ignore_errors=True)
 
-    summary = f"\n{_PASS} passed, {_FAIL} failed"
-    if _KNOWN_FAIL:
-        summary += f", {_KNOWN_FAIL} known (tracked, not blocking)"
-    if _SKIP:
-        summary += f", {_SKIP} skipped"
+    summary = f"\n{_c.passed} passed, {_c.failed} failed"
+    if _c.known:
+        summary += f", {_c.known} known (tracked, not blocking)"
+    if _c.skipped:
+        summary += f", {_c.skipped} skipped"
     print(summary)
-    return 1 if _FAIL else 0
+    return 1 if _c.failed else 0
 
 
 if __name__ == "__main__":

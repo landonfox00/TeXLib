@@ -57,30 +57,8 @@ _HERE = os.path.dirname(os.path.abspath(__file__))  # Sublime/
 sys.path.insert(0, TEXLIB_ROOT)
 
 
-class _StubPdfBuilder:
-    def __init__(self, *a, **k):
-        self._displayed = ""
-
-    def display(self, msg):
-        self._displayed += str(msg)
-
-
-for _name in (
-    "LaTeXTools", "LaTeXTools.plugins", "LaTeXTools.plugins.builder",
-    "LaTeXTools.plugins.builder.pdf_builder",
-):
-    sys.modules.setdefault(_name, types.ModuleType(_name))
-sys.modules["LaTeXTools.plugins.builder.pdf_builder"].PdfBuilder = _StubPdfBuilder
-
-sys.path.insert(0, _HERE)                            # texlib_builder.py
-sys.path.insert(0, os.path.join(_HERE, "texlib"))    # native texlib_build.py
-import texlib_build as _native_texlib_build  # noqa: E402
-_texlib_pkg = types.ModuleType("TeXLib")
-_texlib_pkg.__path__ = [os.path.join(_HERE, "texlib")]
-sys.modules.setdefault("TeXLib", _texlib_pkg)
-sys.modules.setdefault("TeXLib.texlib_build", _native_texlib_build)
-
-from texlib_builder import TexlibBuilder  # noqa: E402
+from _testkit import install_native_builder  # noqa: E402
+TexlibBuilder = install_native_builder()
 
 
 def _texinputs_env(tex_dir):
@@ -126,62 +104,15 @@ def _texinputs_env(tex_dir):
 SYNCTEX = shutil.which("synctex")
 LUALATEX = shutil.which("lualatex")
 
-_PASS = 0
-_FAIL = 0
-_KNOWN_FAIL = 0
+from _testkit import Checker  # noqa: E402
+_c = Checker()
+check = _c.check
 
 
-def check(label, cond, detail="", known_issue=None):
-    """known_issue: pass a tracker reference (e.g. a spawned-task id) for an
-    assertion that encodes CORRECT/intended behavior but is not expected to
-    pass yet, pending separately-tracked follow-up work. Keeps the assertion
-    honest (it starts passing, loudly, the moment the real fix lands)
-    without failing CI for a gap that's already known and deliberately not
-    being fixed in the same change as everything else here."""
-    global _PASS, _FAIL, _KNOWN_FAIL
-    if cond:
-        _PASS += 1
-        print(f"  PASS  {label}")
-    elif known_issue:
-        _KNOWN_FAIL += 1
-        print(f"  KNOWN {label}  (tracked: {known_issue})")
-        if detail:
-            print(f"        {detail}")
-    else:
-        _FAIL += 1
-        print(f"  FAIL  {label}")
-        if detail:
-            print(f"        {detail}")
+from _testkit import find_poppler  # noqa: E402
 
 
-# --- Poppler pdftotext detection ---------------------------------------------
-def _find_poppler_pdftotext():
-    """A poppler-flavored pdftotext (the one that supports -bbox).
-
-    On some Windows dev setups, Git for Windows ships its own xpdfreader
-    pdftotext earlier on PATH; that build silently lacks -bbox (it just
-    prints its own usage text instead of erroring), which would make every
-    find_word() call below return no matches with no obvious cause. Probe
-    candidates and pick the first whose version banner mentions poppler.
-    """
-    candidates = []
-    which = shutil.which("pdftotext")
-    if which:
-        candidates.append(which)
-    candidates.append(r"C:\texlive\2025\bin\windows\pdftotext.exe")
-    for cand in candidates:
-        try:
-            proc = subprocess.run([cand, "-v"], capture_output=True, text=True,
-                                   encoding="utf-8", errors="replace", timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        banner = (proc.stdout or "") + (proc.stderr or "")
-        if "poppler" in banner.lower():
-            return cand
-    return None
-
-
-PDFTOTEXT = _find_poppler_pdftotext()
+PDFTOTEXT = find_poppler()
 
 
 # --- Real-builder driver, mirroring test_biber_integration.py's run_build ---
@@ -929,11 +860,11 @@ def main():
     scenario_schedule_boxgrid_builder()
     scenario_schedule_boxgrid_plain_cli()
 
-    summary = f"\n{_PASS} passed, {_FAIL} failed"
-    if _KNOWN_FAIL:
-        summary += f", {_KNOWN_FAIL} known (tracked, not blocking)"
+    summary = f"\n{_c.passed} passed, {_c.failed} failed"
+    if _c.known:
+        summary += f", {_c.known} known (tracked, not blocking)"
     print(summary)
-    return 1 if _FAIL else 0
+    return 1 if _c.failed else 0
 
 
 if __name__ == "__main__":

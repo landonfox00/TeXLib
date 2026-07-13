@@ -11,7 +11,6 @@ Run:  python Sublime/test_texlib_domain.py
 """
 import os
 import sys
-import types
 
 try:  # keep unicode in labels from crashing a cp1252 Windows console
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -21,24 +20,14 @@ except Exception:  # noqa: BLE001
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "texlib"))
 
-_s = types.ModuleType("sublime")
-_s.INHIBIT_WORD_COMPLETIONS = 8
-sys.modules["sublime"] = _s
-_p = types.ModuleType("sublime_plugin")
-_p.WindowCommand = object
-_p.EventListener = object
-_p.ViewEventListener = object
-sys.modules["sublime_plugin"] = _p
+from _testkit import stub_sublime, check, report  # noqa: E402
+stub_sublime("WindowCommand", "EventListener", "ViewEventListener",
+             INHIBIT_WORD_COMPLETIONS=8)
 
 import texlib_topic       # noqa: E402
 import texlib_bankreport  # noqa: E402
 import texlib_meta        # noqa: E402
 import texlib_complete    # noqa: E402
-
-
-def check(cond, label):
-    print("  [%s] %s" % ("OK " if cond else "FAIL", label))
-    return cond
 
 
 ok = True
@@ -116,5 +105,4 @@ if os.path.isfile(real):
     ok &= check({"course-number", "lecture-days", "exam1-date"} <= set(rk),
                 "D5: real course-metadata.sty keys extracted (%d keys)" % len(rk))
 
-print("\nALL PASS" if ok else "\nFAILURES ABOVE")
-sys.exit(0 if ok else 1)
+report(ok)

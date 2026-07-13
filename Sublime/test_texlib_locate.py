@@ -11,22 +11,14 @@ import hashlib
 import os
 import sys
 import tempfile
-import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "texlib"))
 
-sys.modules["sublime"] = types.ModuleType("sublime")
-_plugin = types.ModuleType("sublime_plugin")
-_plugin.WindowCommand = object
-sys.modules["sublime_plugin"] = _plugin
+from _testkit import stub_sublime, check, report  # noqa: E402
+stub_sublime("WindowCommand")
 
 import texlib_locate  # noqa: E402
-
-
-def check(cond, label):
-    print("  [%s] %s" % ("OK " if cond else "FAIL", label))
-    return cond
 
 
 ok = True
@@ -58,5 +50,4 @@ ok &= check(len(os.path.basename(got)) == 12 and all(
                 c in "0123456789abcdef" for c in os.path.basename(got)),
             "aux_dir_for: 12 hex chars")
 
-print("\nALL PASS" if ok else "\nFAILURES ABOVE")
-sys.exit(0 if ok else 1)
+report(ok)

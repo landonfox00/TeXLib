@@ -41,50 +41,8 @@ if "sublime" in sys.modules:  # only true inside Sublime's plugin host
 
 # --- 1. Stub the LaTeXTools PdfBuilder base class ---------------------------
 
-class _StubPdfBuilder:
-    """Minimal stand-in for LaTeXTools' PdfBuilder."""
-
-    def __init__(self, *args, **kwargs):
-        self._displayed = ""
-
-    def display(self, msg):
-        self._displayed += str(msg)
-
-
-def _install_latextools_stub():
-    """Make `from LaTeXTools.plugins.builder.pdf_builder import PdfBuilder` work."""
-    for name in (
-        "LaTeXTools",
-        "LaTeXTools.plugins",
-        "LaTeXTools.plugins.builder",
-        "LaTeXTools.plugins.builder.pdf_builder",
-    ):
-        sys.modules.setdefault(name, types.ModuleType(name))
-    sys.modules["LaTeXTools.plugins.builder.pdf_builder"].PdfBuilder = _StubPdfBuilder
-
-
-_install_latextools_stub()
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-
-def _install_texlib_package_stub():
-    """texlib_builder.py pulls its shared build core from the native TeXLib
-    Sublime package (`from TeXLib.texlib_build import TexlibBuildCore`). That
-    package name only exists inside Sublime (deploy-plugin.ps1 junctions
-    Sublime/texlib -> Packages/TeXLib), so register the native texlib_build
-    module under the TeXLib package name to make the import resolve headless."""
-    here = os.path.dirname(os.path.abspath(__file__))
-    sys.path.insert(0, os.path.join(here, "texlib"))
-    import texlib_build as _native  # Sublime/texlib/texlib_build.py (sublime-free)
-    pkg = types.ModuleType("TeXLib")
-    pkg.__path__ = [os.path.join(here, "texlib")]
-    sys.modules.setdefault("TeXLib", pkg)
-    sys.modules.setdefault("TeXLib.texlib_build", _native)
-
-
-_install_texlib_package_stub()
-
-from texlib_builder import TexlibBuilder  # noqa: E402
+from _testkit import install_native_builder  # noqa: E402
+TexlibBuilder = install_native_builder()
 from texlib_build import GRADEBOOK_SHEETS, TexlibBuildCore  # noqa: E402  (native core)
 
 
