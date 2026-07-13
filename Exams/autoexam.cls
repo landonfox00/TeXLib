@@ -397,17 +397,6 @@
 }
 \newcommand{\AutoExamVmapClose}{\immediate\closeout\vmapfile}
 
-% Minimal Key Generation (Writes to .key file)
-\newwrite\keyfile
-\immediate\openout\keyfile=\jobname.key
-
-\newcommand{\key}[1]{%
-	\immediate\write\keyfile{Q\thequestion: #1}%
-	\ifsolutions
-		\par\noindent\fbox{\textbf{Key:} #1}
-	\fi
-}
-
 % Horizontal Separator
 \newcommand{\qsep}{%
 	\par\vspace{1em}
