@@ -646,22 +646,38 @@ def scenario_mc_bank_problem():
         check("found the MC solution needle in the PDF", pos2 is not None)
         if pos2:
             r2 = synctex_edit(pdf, *pos2)
-            # NARROWED (task_dbeb33f6): the FR solution fix (fill-inside-parbox,
-            # Scenario 2) does NOT reach the MC case. Characterized 2026-07-11: in the
-            # side-by-side MC key the STEM resolves (mcbank.tex), and the "Solution."
-            # header even resolves -- but to the RETRIEVAL site (the exam file), not
-            # the bank source, and the solution BODY resolves to nothing. So unlike
-            # FR, the solution's bank REDIRECT does not take effect inside the MC key
-            # frame (it falls back to the ambient file) AND the pre-collected body box
-            # is unreachable there. Needs engine/layout work in the tuned side-by-side
-            # key (the "four MC keys per page" packing) -- higher risk than the FR fix.
-            # Marked known so a real fix flips it loudly to PASS.
+            # TRADE-OFF (task_dbeb33f6): the DEFAULT side-by-side MC key sets the
+            # solution in a minipage whose box orphans it for SyncTeX reverse search,
+            # so the MC solution is not inverse-searchable in that (compact "four keys
+            # per page") layout. This is now a deliberate trade-off, not an open bug:
+            # the \TeXLibMCKeyStacked opt-in renders the solution stacked and IS
+            # searchable (proven with hard checks below). These two stay `known` so
+            # the compact default's non-searchability is documented, not a silent fail.
             check("click on the MC solution resolves to mcbank.tex",
                   basename_matches(r2["input"], "mcbank.tex"), r2["raw"][:300],
                   known_issue="task_dbeb33f6")
             check(f"...at the correct source line ({MC_SOLUTION_LINE})",
                   r2["line"] == MC_SOLUTION_LINE, f"got line {r2['line']!r}",
                   known_issue="task_dbeb33f6")
+
+        # FIXED via opt-in: the side-by-side layout above is a deliberate trade-off
+        # (the compact "four keys per page" packing) whose minipage box orphans the
+        # solution for reverse search. \TeXLibMCKeyStacked renders the MC solution
+        # STACKED (full-width below the choices, in the vertical list), so it DOES
+        # inverse-search. Prove that here with HARD checks -- a regression fails loud.
+        write(tmp, "mcstacked.tex", MC_AUTOEXAM_TEX.replace(
+            "\\begin{document}", "\\TeXLibMCKeyStacked\n\\begin{document}", 1))
+        run_build(tmp, "mcstacked.tex", aux_directory="<<temp>>",
+                  options=["--texlib-mode=solutions"])
+        spdf = os.path.join(tmp, "mcstacked.pdf")
+        sp = find_word(spdf, "SYNCNEEDLEMCSOLUTION")
+        check("[\\TeXLibMCKeyStacked] found the MC solution needle", sp is not None)
+        if sp:
+            sr = synctex_edit(spdf, *sp)
+            check("[\\TeXLibMCKeyStacked] MC solution resolves to mcbank.tex",
+                  basename_matches(sr["input"], "mcbank.tex"), sr["raw"][:300])
+            check(f"[\\TeXLibMCKeyStacked] ...at line {MC_SOLUTION_LINE}",
+                  sr["line"] == MC_SOLUTION_LINE, f"got line {sr['line']!r}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

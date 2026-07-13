@@ -318,10 +318,20 @@
 % (single terms/expressions), while solutions are prose and need the room.
 \newlength{\@mc@choicew}  \setlength{\@mc@choicew}{0.42\linewidth}
 \newlength{\@mc@solw}     \setlength{\@mc@solw}{0.54\linewidth}
+% MC-key layout: side-by-side (default -- choices | solution columns, compact so
+% four keys pack to a page) vs STACKED (solution full-width below the choices).
+% Side-by-side is more compact, but it sets the {solution} in a minipage whose box
+% orphans the content for SyncTeX reverse search, so the MC solution is not
+% inverse-searchable there (task_dbeb33f6). \TeXLibMCKeyStacked opts into the
+% stacked layout, which keeps the solution in the vertical list -- so clicking an
+% MC solution in the key inverse-searches to the bank -- at the cost of the
+% four-per-page packing.
+\newif\if@mc@keystacked  \@mc@keystackedfalse
+\newcommand{\TeXLibMCKeyStacked}{\@mc@keystackedtrue}
 \renewcommand{\@mcframe@begin}[1]{%
 	\def\@mc@letter{#1}%
 	\par
-	\ifsolutions \if@mc@inline\else
+	\ifsolutions \if@mc@inline\else \if@mc@keystacked\else
 		\noindent\begin{minipage}[t]{\@mc@choicew}%
 		% \begin{choices} starts with glue (its topsep addvspace), not a box, so
 		% \vtop (what [t] positioning is built on) can't find a first box to
@@ -334,7 +344,7 @@
 		% choice line's, matching the student build pixel-for-pixel (verified
 		% against the tests/scenarios/exam/standard fixture).
 		\strut\vspace*{-\dimexpr\ht\strutbox+\dp\strutbox+1.9pt\relax}%
-	\fi \fi
+	\fi \fi \fi
 }
 % Gap inserted between the last choice and the student answer line.  Empty by
 % default (a fixed \medskip is the only separation, as before); autoexam sets it
@@ -367,10 +377,15 @@
 }
 \renewcommand{\@mcframe@mid}{%
 	\ifsolutions \if@mc@inline\else
-		\end{minipage}\hfill\begin{minipage}[t]{\@mc@solw}%
-		% Drop the box's 10pt outer padding inside the narrow key column (local to
-		% this minipage) so the solution column doesn't outgrow the choices and the
-		% "Solution." header top-aligns with choice A.
+		\if@mc@keystacked
+			\par\smallskip% stacked: solution full-width below the choices (in the
+			              % vertical list, so it inverse-searches to the bank)
+		\else
+			% Side-by-side: close the choices column, open the (narrow) solution
+			% column. Drop the box's outer padding so the "Solution." header
+			% top-aligns with choice A and the column doesn't outgrow the choices.
+			\end{minipage}\hfill\begin{minipage}[t]{\@mc@solw}%
+		\fi
 		\setlength{\@sol@outervsep}{0pt}%
 	\fi \fi
 }
@@ -383,7 +398,7 @@
 		% what lets the eight MC keys pack four to a page like the blank copy.
 		\par\nobreak\vskip2pt
 		\noindent\hfill\textbf{Answer:}~\fbox{\strut\@mc@letter}%
-		\end{minipage}%
+		\if@mc@keystacked\else\end{minipage}\fi% side-by-side: close the solution column
 	\fi \fi
 	\par
 }
