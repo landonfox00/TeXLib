@@ -158,11 +158,7 @@
 
 % Title page (first page of lecture notes): no header, no header rule.
 % Shared footer remains in place.
-\fancypagestyle{titlepage}{%
-	\fancyhf{}%
-	\SetTeXLibFooter
-	\renewcommand{\headrulewidth}{0pt}%
-}
+\TeXLibFooterOnlyPagestyle{titlepage}
 % tocloft stamps the first TOC page \thispagestyle{plain} (bare centered page
 % number, no shared footer). Inside \maketitle the titlepage stamp fires later
 % and wins, but a \tableofcontents called after \maketitle re-stamps page 1

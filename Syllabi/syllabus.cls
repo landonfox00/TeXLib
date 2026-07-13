@@ -151,11 +151,7 @@
 
 % Title page (\maketitle uses \thispagestyle{plain}): keep the shared footer,
 % suppress the header + its rule.
-\fancypagestyle{plain}{%
-	\fancyhf{}%
-	\SetTeXLibFooter
-	\renewcommand{\headrulewidth}{0pt}%
-}
+\TeXLibFooterOnlyPagestyle{plain}
 
 \renewcommand{\thefootnote}{\fnsymbol{footnote}}
 

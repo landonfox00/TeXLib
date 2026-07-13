@@ -148,11 +148,7 @@
 % header and its rule are suppressed so the title block sits at the top
 % of page 1 cleanly. Applied automatically by \maketitle below; users who
 % want the header back on page 1 can call \thispagestyle{fancy} after it.
-\fancypagestyle{firstpage}{%
-	\fancyhf{}%
-	\SetTeXLibFooter
-	\renewcommand{\headrulewidth}{0pt}%
-}
+\TeXLibFooterOnlyPagestyle{firstpage}
 
 % ==============================================================================
 % 5. TITLE BLOCK

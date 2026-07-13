@@ -160,11 +160,7 @@
 
 % Title-page style: same footer as `fancy`, but header + rule suppressed so the
 % \maketitle block sits cleanly at the top of page 1 (matches pset/syllabus).
-\fancypagestyle{firstpage}{%
-	\fancyhf{}%
-	\SetTeXLibFooter
-	\renewcommand{\headrulewidth}{0pt}%
-}
+\TeXLibFooterOnlyPagestyle{firstpage}
 
 % ==============================================================================
 % 5. TITLE BLOCKS
