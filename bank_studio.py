@@ -188,10 +188,12 @@ class Handler(BaseHTTPRequestHandler):
         problem = CTX["by_id"].get(pid) or {p.id: p for p in refresh_bank()}.get(pid)
         if not problem:
             return self._json({"error": "unknown problem: " + pid}, 404)
+        after = (body or {}).get("after", None)
+        after = int(after) if after is not None else None
         with _write_lock:
             text, nl = read_exam(CTX["exam"])
             text = exam_writer.add_problem(text, _arg_for(problem, mode),
-                                           problem.is_mc)
+                                           problem.is_mc, after_index=after)
             write_exam(CTX["exam"], text, nl)
         self._json(exam_state())
 

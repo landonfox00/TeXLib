@@ -166,6 +166,18 @@ class ExamWriterTests(unittest.TestCase):
         self.assertLess(out.index(r"\end{problems}"),
                         out.index(r"\end{document}"))
 
+    def test_add_after_index_inserts_at_caret(self):
+        out = exam_writer.add_problem(EXAM, "ivt-root", is_mc=False, after_index=0)
+        self.assertEqual([e["arg"] for e in exam_writer.public_entries(out)],
+                         ["topic=limit", "ivt-root", "topic=continuity"])
+
+    def test_add_after_index_wrong_env_appends(self):
+        # caret is on an FR entry but the new problem is MC -> append to MC env
+        out = exam_writer.add_problem(EXAM, "deriv-mc", is_mc=True, after_index=0)
+        mc = [e for e in exam_writer.public_entries(out) if e["env"] == "mc"]
+        self.assertEqual(len(mc), 1)
+        self.assertEqual(mc[0]["arg"], "deriv-mc")
+
     def test_remove(self):
         out = exam_writer.remove_problem(EXAM, 0)
         entries = exam_writer.public_entries(out)

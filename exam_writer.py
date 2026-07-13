@@ -96,10 +96,25 @@ def _insert_new_env(text, env, line):
     return text + block
 
 
-def add_problem(text, arg, is_mc):
-    """Append ``\\problem{arg}`` to the right environment, creating it if needed."""
+def add_problem(text, arg, is_mc, after_index=None):
+    """Add ``\\problem{arg}`` to the right environment, creating it if needed.
+
+    With `after_index` (document-order), insert right after that entry when it
+    lives in the matching environment (the Composer's "insert at caret");
+    otherwise append.
+    """
     env = ENV_MC if is_mc else ENV_FR
+    kind = "mc" if is_mc else "fr"
     line = _detect_indent(text) + "\\problem{" + arg + "}"
+
+    if after_index is not None:
+        entries = parse_exam(text)
+        if 0 <= after_index < len(entries) and entries[after_index]["env"] == kind:
+            e = entries[after_index]
+            le = text.find("\n", e["end"])
+            le = len(text) if le == -1 else le
+            return text[:le] + "\n" + line + text[le:]
+
     span = _env_span(text, env)
     if not span:
         return _insert_new_env(text, env, line)
