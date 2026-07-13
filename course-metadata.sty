@@ -29,9 +29,16 @@
 }
 \cs_generate_variant:Nn \meta_create_getter:nn { VV }
 
+% N1 metadump: record every field key as it is created so \AtEndDocument can
+% dump the RESOLVED values to <jobname>.metadump (the Sublime "Show Resolved
+% Metadata" command reads it). A real tab separates key from value.
+\seq_new:N \g__meta_fields_seq
+\tl_const:Nn \c__meta_tab_tl { \char_generate:nn { 9 } { 12 } }
+
 \cs_new_protected:Npn \meta_create_var:nn #1 #2 {
 	\tl_new:c { g__meta_#1_tl }
 	\keys_define:nn { meta } { #1 .tl_gset:c = { g__meta_#1_tl } }
+	\seq_gput_right:Nn \g__meta_fields_seq {#1}
 	\meta_create_getter:nn {#2} {#1}
 }
 
@@ -134,6 +141,8 @@
 		\tl_set:NV \l_tmpa_tl \l_keys_key_tl
 		\tl_if_exist:cF { g__meta_ \l_tmpa_tl _tl } {
 			\tl_new:c { g__meta_ \l_tmpa_tl _tl }
+			\seq_gput_right:NV \g__meta_fields_seq \l_tmpa_tl
+
 			% Loud by default so a typo'd key surfaces; quiet (log-only) once the
 			% document has opted in to custom keys.  Either way it stays traceable.
 			\bool_if:NTF \g__meta_warn_custom_bool
@@ -277,6 +286,29 @@
 \NewDocumentCommand{\MetaHumanMonthDay}{ m } {
 	\exp_args:Ne \__meta_md_human:n { #1 }
 }
+
+% N1 metadump writer. Dumps every resolved field to <jobname>.metadump at end of
+% build (course-metadata is loaded by every class, so it is written for every
+% document). Routed to the aux dir on -output-directory builds like .pubmeta, and
+% gitignored. Empty values mean the field is unset. The seq_map runs inside its
+% own macro so \AtEndDocument never has to double the inline-function #1.
+\iow_new:N \g__meta_dump_stream
+\cs_new_protected:Npn \__meta_write_dump: {
+	\iow_open:Nn \g__meta_dump_stream { \c_sys_jobname_str .metadump }
+	\iow_now:Nx \g__meta_dump_stream
+		{ coursemeta-dir \c__meta_tab_tl \cs_if_exist_use:N \GetCourseMetaDir }
+	\iow_now:Nx \g__meta_dump_stream { term \c__meta_tab_tl \GetTerm }
+	% `term` is emitted above with its derived value; skip its (usually empty) raw
+	% store in the field loop so it isn't listed twice.
+	\seq_map_inline:Nn \g__meta_fields_seq {
+		\str_if_eq:nnF { ##1 } { term } {
+			\iow_now:Nx \g__meta_dump_stream
+				{ ##1 \c__meta_tab_tl \tl_use:c { g__meta_ ##1 _tl } }
+		}
+	}
+	\iow_close:N \g__meta_dump_stream
+}
+\AtEndDocument { \__meta_write_dump: }
 
 \ExplSyntaxOff
 

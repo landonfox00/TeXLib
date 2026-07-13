@@ -1,0 +1,22 @@
+%% !TeX program = lualatex
+% =============================================================================
+% Problem-bank catalog / preview.
+%
+% Loads a bank fragment and lists EVERY problem in it -- running number, id,
+% [attrs], the full stem/parts/choices, and the solution (always shown, for
+% instructor perusal). Use it to see a whole bank at a glance, spot topic gaps,
+% or proofread solutions. Build with lualatex.
+%
+% The bank you \loadbank must be a BARE FRAGMENT (a file of \begin{problem}{id}
+% ... \end{problem} blocks with NO \documentclass) -- the same file your exams
+% and quizzes \loadbank. This wrapper is the only thing that carries
+% \documentclass{bank}.
+% =============================================================================
+\documentclass{bank}
+\begin{document}
+
+\loadbank{bank}      % <-- your bank fragment (drop the .tex; e.g. \loadbank{bank})
+
+\printbankcatalog
+
+\end{document}

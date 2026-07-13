@@ -1,63 +1,31 @@
 # texlib_texmf.py
 # ============================================================================
-# TeXLib -- install the class payload into the user's TEXMF tree.
+# TeXLib -- UNINSTALL a stale class copy from the user's TEXMF tree (M1).
 #
-# The plugin bundles/points at the TeXLib classes and injects TEXINPUTS so its
-# OWN builds resolve them. This command does the OTHER half -- the job the
-# TeXLib-Installer does for coworkers -- for THIS machine: copy every .cls/.sty/
-# .lua into TEXMFHOME/tex/latex/texlib/ so *every* TeX tool (CLI, other editors,
-# CI) finds them, not just this plugin. See PLUGIN-DESIGN.md (installer balance).
+# The plugin's builds already resolve the TeXLib classes from your live checkout
+# via the `texinputs` setting -- so a copy of the classes under TEXMFHOME does
+# NOT help the plugin; it *shadows* the checkout (kpathsea / LUAINPUTS can find
+# the stale TEXMFHOME copy first), which silently builds teaching docs against
+# old packages. This command finds and removes that copy so builds resolve from
+# your checkout again. System-wide install for coworkers is the standalone
+# TeXLib-Installer's job (a peer distribution channel); the plugin no longer
+# copies classes into TEXMF. See PLUGIN-DESIGN.md (installer balance).
 #
-# It's a copy (a snapshot), not a symlink -- re-run after changing the classes
-# to refresh what non-plugin tools see. Own top-level file (hot-reloads alone).
+# installed_texlib_dir() / installed_files() are shared detection helpers that
+# TeXLib: Doctor (N2) and the build-time shadow warning (N3) also use.
 # ============================================================================
 
 import os
 import shutil
 import subprocess
-import threading
 
 import sublime
 import sublime_plugin
 
 _NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 
-# The class payload: document classes (.cls), shared packages (.sty), and the
-# Lua engines (.lua). Skips infrastructure dirs and Lua test files.
+# What an install looks like -- the payload the old installer/plugin copied in.
 CLASS_EXTS = (".cls", ".sty", ".lua")
-EXCLUDE_DIRS = {".git", ".claude", "Sublime", "tests", "examples", "__pycache__"}
-
-
-def gather_class_files(root):
-    """Sorted absolute paths of the .cls/.sty/.lua payload under `root`,
-    excluding infrastructure dirs and Lua test files (test_*.lua / *_test*.lua).
-    Basenames are unique across the library, so the result copies flat."""
-    out = []
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames
-                       if d not in EXCLUDE_DIRS and not d.startswith(".")]
-        for fn in filenames:
-            ext = os.path.splitext(fn)[1].lower()
-            if ext not in CLASS_EXTS:
-                continue
-            if ext == ".lua" and (fn.startswith("test_") or "_test" in fn):
-                continue
-            out.append(os.path.join(dirpath, fn))
-    return sorted(out)
-
-
-def _class_source(settings, plugin_dir):
-    """Where the class payload lives. Order: explicit class_source setting; a
-    bundled latex/ inside the package (the future distributed layout); else the
-    repo root two dirs above the package (the dev/junction layout,
-    Sublime/texlib -> Sublime -> repo)."""
-    override = settings.get("class_source")
-    if override:
-        return override
-    bundled = os.path.join(plugin_dir, "latex")
-    if os.path.isdir(bundled):
-        return bundled
-    return os.path.dirname(os.path.dirname(plugin_dir))
 
 
 def _kpsewhich(*args):
@@ -74,60 +42,75 @@ def _kpsewhich(*args):
         return ""
 
 
-def _texmfhome():
-    """The user-writable TEXMFHOME (searched live, no ls-R needed), or a
-    ~/texmf fallback if kpsewhich isn't on PATH."""
+def texmfhome():
+    """The user-writable TEXMFHOME (searched live), or a ~/texmf fallback."""
     return _kpsewhich("-var-value=TEXMFHOME") or os.path.join(
         os.path.expanduser("~"), "texmf")
 
 
-class TexlibInstallTexmfCommand(sublime_plugin.WindowCommand):
-    """Copy the TeXLib class payload into TEXMFHOME so all TeX tools find it."""
+def installed_texlib_dir():
+    """The TEXMFHOME/tex/latex/texlib directory (whether or not it exists)."""
+    return os.path.join(texmfhome(), "tex", "latex", "texlib")
+
+
+def installed_files(target=None):
+    """Sorted .cls/.sty/.lua files currently installed under the texlib dir
+    (empty if none). Pure enough to unit-test against a temp tree."""
+    target = target or installed_texlib_dir()
+    if not os.path.isdir(target):
+        return []
+    out = []
+    for fn in os.listdir(target):
+        if os.path.splitext(fn)[1].lower() in CLASS_EXTS:
+            out.append(os.path.join(target, fn))
+    return sorted(out)
+
+
+def shadows_checkout():
+    """True if a TeXLib class copy is installed under TEXMFHOME -- i.e. it can
+    shadow the live checkout that the plugin's builds resolve via texinputs."""
+    return bool(installed_files())
+
+
+class TexlibUninstallTexmfCommand(sublime_plugin.WindowCommand):
+    """Remove a stale TeXLib copy from TEXMFHOME so builds resolve from checkout."""
 
     def run(self):
-        settings = sublime.load_settings("TeXLib.sublime-settings")
-        plugin_dir = os.path.dirname(os.path.realpath(__file__))
-        src = _class_source(settings, plugin_dir)
-        files = gather_class_files(src)
+        target = installed_texlib_dir()
+        files = installed_files(target)
         if not files:
-            sublime.error_message(
-                "TeXLib: no .cls/.sty/.lua found under\n%s\n\n"
-                "Set \"class_source\" in TeXLib.sublime-settings to your TeXLib "
-                "repo (or its bundled latex/ dir)." % src)
+            sublime.message_dialog(
+                "TeXLib: nothing to uninstall.\n\nNo TeXLib classes are installed "
+                "under\n%s\n\nThe plugin already resolves the classes from your "
+                "checkout via the \"texinputs\" setting." % target)
             return
-        target = os.path.join(_texmfhome(), "tex", "latex", "texlib")
         if not sublime.ok_cancel_dialog(
-                "Install %d TeXLib class file(s) to:\n%s\n\n"
-                "Makes them available to ALL TeX tools (CLI, other editors, CI) "
-                "-- not just this plugin. Existing files there are overwritten."
-                % (len(files), target), "Install"):
+                "Remove %d installed TeXLib class file(s) from:\n%s\n\n"
+                "This UN-shadows your live checkout, so builds resolve the classes "
+                "from your repo (via \"texinputs\") instead of this stale copy. "
+                "System-wide install is the standalone TeXLib-Installer's job."
+                % (len(files), target), "Uninstall"):
             return
-        threading.Thread(
-            target=self._install, args=(files, target), daemon=True).start()
-
-    def _install(self, files, target):
         try:
-            os.makedirs(target, exist_ok=True)
-            for f in files:
-                shutil.copy2(f, os.path.join(target, os.path.basename(f)))
-        except Exception as exc:  # noqa: BLE001 - report, never crash the host
-            self._dialog("TeXLib: install failed: %s" % exc, error=True)
+            shutil.rmtree(target)
+        except OSError as exc:
+            sublime.error_message("TeXLib: could not remove %s\n%s" % (target, exc))
             return
-        # TEXMFHOME is searched live, so files resolve immediately; confirm it.
-        resolved = _kpsewhich("autoexam.cls")
-        ok = bool(resolved)
-        self._dialog(
-            "TeXLib: installed %d file(s) to\n%s\n\n%s"
-            % (len(files), target,
-               "Verified: autoexam.cls now resolves via kpsewhich."
-               if ok else
-               "Copied. kpsewhich could not confirm resolution yet -- if a CLI "
-               "build can't find the classes, run 'mktexlsr'."))
+        # Refresh the filename database so tools stop finding the removed copy.
+        mktexlsr = shutil.which("mktexlsr") or shutil.which("texhash")
+        if mktexlsr:
+            try:
+                subprocess.run([mktexlsr], capture_output=True,
+                               creationflags=_NO_WINDOW, timeout=60)
+            except Exception:  # noqa: BLE001
+                pass
+        sublime.message_dialog(
+            "TeXLib: removed %d file(s) from\n%s\n\nBuilds now resolve the classes "
+            "from your checkout." % (len(files), target))
 
-    def _dialog(self, msg, error=False):
-        fn = sublime.error_message if error else sublime.message_dialog
-        sublime.set_timeout(lambda: fn(msg), 0)
+    def is_enabled(self):
+        return shadows_checkout()
 
 
 def plugin_loaded():
-    print("TeXLib TEXMF install loaded.")
+    print("TeXLib TEXMF uninstall loaded.")

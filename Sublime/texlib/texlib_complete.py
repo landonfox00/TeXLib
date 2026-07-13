@@ -41,6 +41,65 @@ MACROS = [
 # Cursor sits inside the braces of a by-id retrieval command.
 PROBLEM_CMD_RE = re.compile(r"\\(?:getproblem|useproblem|reqproblem)\{[^}]*$")
 
+# --- coursemeta key completions (D5) ----------------------------------------
+# Inside a \metasetup{ ... } block, at a key position, offer the course-metadata
+# field keys (course-number, lecture-days, exam1-date, ...).
+META_KEY_RE = re.compile(r"\\meta_create_var:nn\s*\{\s*([A-Za-z][\w-]*)\s*\}")
+META_ALIAS_RE = re.compile(r"(?m)^\s*([A-Za-z][\w-]*)\s+\.tl_gset:c")
+# A key position: line start (own-line key) or just after a '{' / ',' separator,
+# with the partial key being typed at the end.
+KEYPOS_RE = re.compile(r"(?:^|[,{])\s*[A-Za-z][\w-]*$")
+_META_KEYS_CACHE = [None]
+
+
+def coursemeta_keys(sty_text):
+    """Field keys declared in course-metadata.sty: the \\meta_create_var canonical
+    keys plus the .tl_gset:c alias keys. Sorted, unique."""
+    keys = set(META_KEY_RE.findall(sty_text))
+    keys |= set(META_ALIAS_RE.findall(sty_text))
+    return sorted(keys)
+
+
+def in_metasetup(text_before):
+    r"""True if the last \metasetup{ before the cursor is still open (its brace
+    depth has not returned to zero)."""
+    i = text_before.rfind("\\metasetup{")
+    if i == -1:
+        return False
+    depth = 1
+    for ch in text_before[i + len("\\metasetup{"):]:
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return False
+    return True
+
+
+def _key_position(left_full):
+    return bool(KEYPOS_RE.search(left_full))
+
+
+def _repo_root():
+    settings = sublime.load_settings("TeXLib.sublime-settings")
+    override = settings.get("class_source")
+    if override:
+        return override
+    plugin_dir = os.path.dirname(os.path.realpath(__file__))
+    return os.path.dirname(os.path.dirname(plugin_dir))
+
+
+def _meta_keys():
+    if _META_KEYS_CACHE[0] is None:
+        path = os.path.join(_repo_root(), "course-metadata.sty")
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                _META_KEYS_CACHE[0] = coursemeta_keys(fh.read())
+        except OSError:
+            _META_KEYS_CACHE[0] = []
+    return _META_KEYS_CACHE[0]
+
 
 def completion_context(left_full, char_before_prefix):
     """Pure classifier. left_full = line text up to the cursor (incl. the prefix
@@ -63,6 +122,17 @@ class TexlibCompletions(sublime_plugin.EventListener):
         left_full = view.substr(sublime.Region(line_begin, pt))
         bp = pt - len(prefix) - 1
         char_before = view.substr(bp) if bp >= line_begin else ""
+
+        # D5: coursemeta field keys inside a \metasetup{ ... } block.
+        if _key_position(left_full):
+            before = view.substr(sublime.Region(max(0, pt - 4000), pt))
+            if in_metasetup(before):
+                keys = _meta_keys()
+                if keys:
+                    return ([sublime.CompletionItem.snippet_completion(
+                                k, k + " = ${1}",
+                                annotation="TeXLib · coursemeta key")
+                             for k in keys], sublime.INHIBIT_WORD_COMPLETIONS)
 
         ctx = completion_context(left_full, char_before)
         if ctx == "ids":

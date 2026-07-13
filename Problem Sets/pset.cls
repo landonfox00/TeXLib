@@ -251,12 +251,9 @@
 % matching didactic. note/recall carry the gray note rule; remark stays plain
 % inline (no box). (note* is also defined, guarded, in the Category Theory
 % preamble; its \ifcsname check skips that copy when this one is present.)
-\TeXLibTheorems[numbering=flat]{
-	theorem, corollary, lemma, conjecture, proposition,
-	definition, convention, procedure, challenge,
-	example, notation,
-	remark, note, recall
-}
+% C1: the whole boxed taxonomy in one call, unified across the classes (adds
+% `exercise`, `question`, and the short aliases \thm \cor ... to pset's set).
+\TeXLibAllTheorems[numbering=flat, aliases=true]
 
 % ==============================================================================
 % 8. SOLUTION ENVIRONMENT — gated on \ShowKey/\ShowSolutions/\StudentMode
@@ -283,16 +280,16 @@
 	code={
 		\ifsolutions
 			\tcbset{
-				colback=green!3!white,
-				borderline west={\texlibrulewidth}{0pt}{green!50!black},
-				before upper={\textbf{Solution.}\par\smallskip},
+				colback=\texlibsoltint,
+				borderline west={\texlibrulewidth}{0pt}{\texlibsolrulecolor},
+				before upper={\texlibsolheader\par\smallskip},
 			}
 		\else
 			\ifkey
 				\tcbset{
-					colback=green!3!white,
-					borderline west={\texlibrulewidth}{0pt}{green!50!black},
-					before upper={\textbf{Solution.}\par\smallskip},
+					colback=\texlibsoltint,
+					borderline west={\texlibrulewidth}{0pt}{\texlibsolrulecolor},
+					before upper={\texlibsolheader\par\smallskip},
 				}
 			\else
 				\ifstudent
@@ -300,7 +297,7 @@
 						height=#1,
 						upperbox=invisible,
 						colback=white,
-						borderline west={\texlibrulewidth}{0pt}{black!40, dash pattern=on 3pt off 2pt},
+						borderline west={\texlibrulewidth}{0pt}{\texlibsolblankrulecolor, dash pattern=on 3pt off 2pt},
 						watermark text={\textit{Show your work here}},
 						watermark color=black!10,
 					}

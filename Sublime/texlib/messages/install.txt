@@ -1,0 +1,33 @@
+TeXLib for Sublime Text
+=======================
+
+Thanks for installing TeXLib — the native build + domain commands for the
+TeXLib LuaLaTeX teaching-document library.
+
+TeXLib COMPLEMENTS LaTeXTools; it does not replace it. Keep LaTeXTools
+installed for completions, the log parser, and the PDF viewer wiring — TeXLib
+delegates to them by command name (Word Count, Table of Contents, Forward
+Sync, View PDF).
+
+First steps
+-----------
+1.  Run  Tools → TeXLib → Edit Settings  and set "texinputs" to your comma-free
+    TeXLib checkout, e.g.:
+
+        "texinputs": ".;C:/_texlibjunc//;"
+
+    This is how builds resolve the shared texlib-*.sty and the class files —
+    from your live checkout, so you never need to copy classes into TEXMF.
+
+2.  If a previous install copied the classes into TEXMFHOME, run
+    Tools → TeXLib → Uninstall Classes from TEXMF  to remove that copy, so it
+    can't shadow your checkout.
+
+3.  Run  Tools → TeXLib → Doctor  to check your toolchain (lualatex, biber,
+    synctex, pypdf) and configuration.
+
+Build with Ctrl+B (default mode) or Ctrl+Shift+B (pick a mode: Answer Key,
+Solutions, Student Copy, Rubric, Draft, Quick).
+
+System-wide install (for coworkers, CI, other editors) is handled by the
+separate TeXLib-Installer, not this plugin.

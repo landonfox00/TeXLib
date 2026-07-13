@@ -114,6 +114,7 @@ MODULES = [
     ("Schedule",     "schedule-template.tex"),
     ("Syllabi",      "syllabus-template.tex"),
     ("Problem Sets", "pset-template.tex"),
+    ("Bank",         "bank-template.tex"),
     # Feature-test fixtures (live under tests/fixtures/<Module>/). Each is a
     # self-contained .tex that exercises something the canonical template
     # doesn't — e.g. the fix-overrides syntax \problem{id}[a=1,b=2]. Treated
@@ -124,6 +125,11 @@ MODULES = [
     # absorbed and mint a working \Get<Key> getter. A regressed catch-all errors
     # under -halt-on-error; a regressed getter leaves \Get... undefined.
     ("tests/fixtures/Metadata", "metadata-test.tex"),
+    # didactic's shared-counter, section-based theorem numbering: several
+    # theorem-family boxes across two sections must number 1.1, 1.2, ..., 2.1, ...
+    # (EXPECT_TEXT below). The canonical Notes template only checks the word
+    # "Theorem"; a counter regression would pass it but fail here.
+    ("tests/fixtures/Notes", "theorem-numbering.tex"),
     # The end-to-end examples (examples/<Course>/) double as build fixtures so
     # the documented course folder can't silently rot when a class changes.
     # Build-only (no EXPECT_TEXT key): they share one coursemeta.tex across
@@ -139,7 +145,7 @@ MODULES = [
 
 # Classes that require lualatex (use \directlua, luaotfload, or sibling .lua
 # files; report-card's \gradebook reads its CSV via lualatex).
-LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "bingo", "report-card"}
+LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "bingo", "report-card", "bank"}
 
 # Maps a \documentclass to the module dir shipping its .cls and default include
 # files (instructions, title). Used to give a build whose source lives OUTSIDE
@@ -216,6 +222,10 @@ EXPECT_TEXT = {
     # the template's stable section headings.
     "Syllabi":      ["Course Description", "Office Hours"],
     "Problem Sets": ["Problem 1"],
+    # The bank catalog prints its coverage summary + every problem's solution
+    # (always shown). "Bank coverage" == the summary rendered; "Solution" == a
+    # cataloged solution rendered.
+    "Bank":         ["Bank coverage", "Solution"],
     # MULTILINEHEADEROK is the stem of the mlheader problem, whose [meta] header
     # wraps lines; its presence proves that problem rendered (paired with the
     # EXPECT_ABSENT leak token below).
@@ -226,6 +236,12 @@ EXPECT_TEXT = {
     # METAALIASMARK == the \meta->\metasetup alias still sets (and mints) a key.
     "tests/fixtures/Metadata": ["CMOFFICEHOURSMARK", "CMLECTHALLMARK", "CMTANAMEMARK",
                                 "SETCMDMARK", "METAALIASMARK"],
+    # Shared master counter, section-based, resetting per \section. All five must
+    # appear IN THIS FORM: per-family counters would renumber Definition to 1.1,
+    # a flat scheme would drop the ".1" suffix, and a missing section reset would
+    # make the section-2 boxes 1.4/1.5 — each failing at least one token.
+    "tests/fixtures/Notes": ["Theorem 1.1", "Definition 1.2", "Lemma 1.3",
+                             "Theorem 2.1", "Definition 2.2"],
 }
 
 # Substrings that must NOT appear in a module's rendered PDF (case-insensitive).

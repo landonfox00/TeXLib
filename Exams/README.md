@@ -215,6 +215,17 @@ List common student errors; renders only in solutions/key build.
 `\ppart`
 Insert a part marker compatible with the autoexam shuffler.
 
+`\TeXLibMCKeyStacked` (preamble)
+Make multiple-choice answer keys **inverse-searchable**. By default a shown MC
+`{solution}` sits in a compact minipage *beside* the choices ("four keys per
+page" packing), but that side-by-side box hides the solution from SyncTeX
+reverse search — double-clicking it in the PDF won't jump to the bank source.
+Put `\TeXLibMCKeyStacked` in the preamble to render the MC solution *stacked*
+beneath the choices instead; it stays reachable, so inverse search lands on the
+`\begin{solution}` in the bank. The trade-off is vertical space (fewer keys per
+page). Affects only shown MC solutions (`\ifsolutions`); the free-response
+solution box is inverse-searchable in both layouts.
+
 ### Smart columns
 
 `\begin{problems} ... \end{problems}`

@@ -154,6 +154,31 @@ def _raw_engine(src):
     return m.group(1).strip().lower() if m else "pdflatex"
 
 
+# --- Shadow-install warning (N3) ---------------------------------------------
+_shadow_warned = [False]
+
+
+def _shadow_warning_line(settings):
+    """One-time nudge (N3): if `texinputs` points at your checkout but a TeXLib
+    copy is installed under TEXMFHOME, the .lua engine (LUAINPUTS) can still
+    resolve the stale install. Returns a warning string, or None."""
+    if _shadow_warned[0] or not settings.get("texinputs"):
+        return None
+    try:
+        from TeXLib import texlib_texmf
+    except ImportError:
+        try:
+            import texlib_texmf
+        except ImportError:
+            return None
+    if texlib_texmf.shadows_checkout():
+        _shadow_warned[0] = True
+        return ("TeXLib: warning — a TeXLib copy under TEXMFHOME may shadow your "
+                "checkout's .lua engine; run 'TeXLib: Uninstall Classes from "
+                "TEXMF' if builds seem stale.")
+    return None
+
+
 # --- Output panel ------------------------------------------------------------
 def _panel(window, root, base_dir):
     """Create (but do NOT show) this build's own output panel (named per tex-root
@@ -190,6 +215,51 @@ def _hide_panel(window, root):
     """Hide this build's panel, but only if it's the one currently showing."""
     if window.active_panel() == "output." + _panel_name(root):
         window.run_command("hide_panel")
+
+
+# --- Live status-bar progress (spinner + current step) -----------------------
+# One main-thread ticker animates a status-bar spinner for EVERY running build.
+# Each build's registry entry carries its own view / base / current step, so
+# concurrent builds animate independently on the view that launched them (with a
+# "(+N more building)" tail); a finished build is popped from _builds, so the
+# ticker stops touching its view. The ticker reschedules only while builds run.
+SPIN_FRAMES = "⣾⣽⣻⢿⡿⣟⣯⣷"  # braille spinner
+_spin_on = [False]
+
+
+def _status_line(frame, base, step, n_running):
+    """Compose one build's status-bar line: spinner frame, base name, current
+    step, and a "(+N more building)" tail when several builds run at once.
+    Pure (no Sublime) so it's unit-tested headlessly."""
+    ch = SPIN_FRAMES[frame % len(SPIN_FRAMES)]
+    extra = "   (+%d more building)" % (n_running - 1) if n_running > 1 else ""
+    return "%s  TeXLib: %s — %s%s" % (ch, base, (step or "starting…")[:70], extra)
+
+
+def _spin_tick():
+    with _builds_lock:
+        entries = [e for e in _builds.values()
+                   if e.get("thread") and e["thread"].is_alive()]
+    if not entries:
+        _spin_on[0] = False
+        return
+    n = len(entries)
+    for e in entries:
+        view = e.get("view")
+        if view is None:
+            continue
+        f = e.get("frame", 0)
+        e["frame"] = f + 1
+        view.set_status("texlib_build",
+                        _status_line(f, e.get("base", ""), e.get("step"), n))
+    sublime.set_timeout(_spin_tick, 110)
+
+
+def _spin_ensure():
+    """Start the shared status-bar ticker if it isn't already running."""
+    if not _spin_on[0]:
+        _spin_on[0] = True
+        sublime.set_timeout(_spin_tick, 0)
 
 
 # --- Engine runner (the new surface: async, streamed, cancellable) -----------
@@ -321,6 +391,10 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         if toggles:
             host.builder_settings = toggles
         emit("TeXLib native build [%s] -- %s\n" % (mode, base))
+        _sw = _shadow_warning_line(settings)
+        if _sw:
+            sublime.status_message(_sw)
+            emit(_sw + "\n")
 
         def on_success():
             # Post-build PDF open + forward sync (Tier C).
@@ -343,9 +417,23 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                             base, error_lines, warning_lines, log_path))
                         _show_panel(window, root)
                 else:  # ok
-                    view.set_status("texlib_build", "TeXLib: built %s" % base)
-                    if show_mode != "always":
-                        _hide_panel(window, root)
+                    nwarn = len(warning_lines)
+                    if nwarn:
+                        # Success-with-warnings: report the count, and DON'T
+                        # silently swallow them -- populate this build's panel
+                        # with a warnings-only report so "Show Build Output" has
+                        # something useful (we don't steal focus by popping it on
+                        # a successful build).
+                        view.set_status(
+                            "texlib_build",
+                            "TeXLib: built %s — %d warning(s)" % (base, nwarn))
+                        if show_mode == "errors":
+                            _echo(panel, _build_report(
+                                base, [], warning_lines, log_path))
+                    else:
+                        view.set_status("texlib_build", "TeXLib: built %s" % base)
+                        if show_mode != "always":
+                            _hide_panel(window, root)
                 sublime.set_timeout(
                     lambda: view.erase_status("texlib_build"),
                     8000 if state == "error" else 4000)
@@ -353,7 +441,8 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
 
         cancel = threading.Event()
         entry = {"thread": None, "cancel": cancel, "proc": None,
-                 "panel": _panel_name(root)}
+                 "panel": _panel_name(root), "view": view, "base": base,
+                 "step": None, "frame": 0}
         th = threading.Thread(
             target=self._drive,
             args=(host, tex_dir, emit, cancel, texinputs, root, entry,
@@ -366,6 +455,7 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         with _builds_lock:
             _builds[root] = entry
         th.start()
+        _spin_ensure()  # animate the status bar until this (and any peer) build ends
 
     def is_enabled(self):
         return _is_tex(self.window.active_view())
@@ -400,6 +490,7 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             item = next(gen)
             while True:
                 cmd, msg = item
+                entry["step"] = msg.rstrip(". …")  # current step for the spinner
                 emit(msg + "\n")
                 host.out = _run_argv(cmd, tex_dir, collect, cancel, texinputs,
                                      getattr(host, "_aux_target", None), entry)
@@ -506,6 +597,38 @@ class TexlibForwardSyncCommand(sublime_plugin.WindowCommand):
 
     def run(self):
         _delegate(self.window, "latextools_jumpto_pdf", {"from_keybinding": True})
+
+    def is_enabled(self):
+        return _is_tex(self.window.active_view())
+
+
+class TexlibBuildStatusCommand(sublime_plugin.WindowCommand):
+    """List every running native build and its current step (parallel builds)."""
+
+    def run(self):
+        with _builds_lock:
+            rows = [(e.get("base", os.path.basename(r)), e.get("step") or "starting…")
+                    for r, e in _builds.items()
+                    if e.get("thread") and e["thread"].is_alive()]
+        if not rows:
+            sublime.status_message("TeXLib: no builds running.")
+            return
+        items = [[b, "current step: %s" % s] for (b, s) in rows]
+        self.window.show_quick_panel(items, lambda i: None)
+
+
+class TexlibShowOutputCommand(sublime_plugin.WindowCommand):
+    """Show the output panel for the active document's build (running or last).
+    Makes the success-with-warnings report reachable without stealing focus."""
+
+    def run(self):
+        view = self.window.active_view()
+        root, _ = _resolve_root(view) if view else (None, "")
+        if not root:
+            sublime.status_message("TeXLib: no document.")
+            return
+        self.window.run_command(
+            "show_panel", {"panel": "output." + _panel_name(root)})
 
     def is_enabled(self):
         return _is_tex(self.window.active_view())

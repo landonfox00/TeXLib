@@ -1,0 +1,46 @@
+% Scenario: quiz / solutions   (tier: core)
+% The instructor/answer-key layout: same problems as quiz/standard but with
+% \solutions, so the shown FREE-RESPONSE {solution} box (green fill + accent +
+% "Solution." header) and the multiple-choice answer key render on page 1. Quiz
+% is single-copy, so unlike the autoexam dual copy the solution box lands on the
+% first page and is pixel-guarded here -- this is the visual reference for the
+% \colorbox->\rlap solution-box fix (task_b7217810). Seed-pinned, self-contained.
+\documentclass{quiz}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	term           = {Fall 2026},
+}
+\meta{ quiz-number = 1 }
+\setexamseed{42}
+\solutions          % instructor copy: renders the green {solution} box + MC key
+
+\begin{problem}{int-fr}
+	Evaluate $\displaystyle\int_0^1 x \, dx$.
+	\begin{solution} By the power rule, $\bigl[\tfrac{x^2}{2}\bigr]_0^1 = \tfrac{1}{2}$. \end{solution}
+\end{problem}
+
+\begin{problem}{deriv-mc}
+	Which is $\dfrac{d}{dx}\!\left[\sin x\right]$?
+	\begin{choices}
+		\cchoice $\cos x$
+		\choice  $-\cos x$
+		\choice  $-\sin x$
+	\end{choices}
+	\begin{solution} The derivative of $\sin x$ is $\cos x$. \end{solution}
+\end{problem}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem{int-fr}
+\end{problems}
+\begin{mcproblems}
+	\problem{deriv-mc}
+\end{mcproblems}
+\end{document}

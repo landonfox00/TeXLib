@@ -1293,6 +1293,41 @@ end
 -- instead lets TeX fully resolve each problem's redirect, in order, before
 -- advancing to the next -- the same guarantee that makes ordinary sequential
 -- \getproblem{a}\getproblem{b} calls safe.
+-- Sort ids by bank source order (file, then \begin{problem} line).
+local function pbank_catalog_source_sort(group)
+	table.sort(group, function(a, b)
+		local pa, pb = problem_db[a], problem_db[b]
+		if pa.source_file ~= pb.source_file then return pa.source_file < pb.source_file end
+		if pa.source_line ~= pb.source_line then return pa.source_line < pb.source_line end
+		return a < b
+	end)
+end
+
+-- Emit one cataloged problem (rule + running number + id + [meta] + the problem
+-- itself). The retrieval is a SEPARATE deferred \csname pbank@lua\endcsname{...}
+-- call per id -- see the note atop this function -- so the SyncTeX redirect for
+-- each problem is fully consumed before the next is staged.
+local function pbank_catalog_emit(n, id)
+	local p = problem_db[id]
+	local metaparts = {}
+	for k, v in pairs(p.meta) do
+		if k ~= 'id' then table.insert(metaparts, k .. '=' .. tostring(v)) end
+	end
+	table.sort(metaparts)
+	-- \@totalleftmargin: @ is catcode-12 in the body, so \csname keeps the real name.
+	tex.print("\\par\\medskip\\noindent\\hspace*{-\\csname @totalleftmargin\\endcsname}" ..
+		"\\rule{\\linewidth}{0.4pt}\\par\\smallskip")
+	tex.print("\\noindent\\textbf{" .. n .. ". " .. pbank_texify(id) .. "}")
+	if #metaparts > 0 then
+		tex.print("\\hfill{\\normalfont\\itshape\\footnotesize " ..
+			pbank_texify(table.concat(metaparts, ", ")) .. "}")
+	end
+	tex.print("\\par\\smallskip\\noindent")
+	tex.print("\\csname pbank@lua\\endcsname{pbank_section_mode=" ..
+		pbank_lua_quote(p.is_mc and 'mc' or 'fr') ..
+		" get_problem(" .. pbank_lua_quote(id) .. ")}")
+end
+
 function pbank_print_catalog()
 	local ids = {}
 	for id in pairs(problem_db) do table.insert(ids, id) end
@@ -1301,37 +1336,49 @@ function pbank_print_catalog()
 			"\\string\\loadbank\\space before \\string\\printbankcatalog]}")
 		return
 	end
-	table.sort(ids, function(a, b)
-		local pa, pb = problem_db[a], problem_db[b]
-		if pa.source_file ~= pb.source_file then return pa.source_file < pb.source_file end
-		if pa.source_line ~= pb.source_line then return pa.source_line < pb.source_line end
-		return a < b
-	end)
 
-	for n, id in ipairs(ids) do
-		local p = problem_db[id]
-		local metaparts = {}
-		for k, v in pairs(p.meta) do
-			if k ~= 'id' then table.insert(metaparts, k .. '=' .. tostring(v)) end
+	-- Group by topic; tally topic + difficulty for the coverage summary.
+	local by_topic, topic_order, topic_count, diff_count = {}, {}, {}, {}
+	for _, id in ipairs(ids) do
+		local topic = problem_db[id].meta.topic or '(untagged)'
+		if not by_topic[topic] then by_topic[topic] = {}; table.insert(topic_order, topic) end
+		table.insert(by_topic[topic], id)
+		topic_count[topic] = (topic_count[topic] or 0) + 1
+		local d = problem_db[id].meta.difficulty or '(none)'
+		diff_count[d] = (diff_count[d] or 0) + 1
+	end
+	table.sort(topic_order)
+
+	-- Coverage summary (plain text; no deferred retrievals here).
+	tex.print("\\noindent\\textbf{Bank coverage.}~" .. #ids .. " problem" ..
+		(#ids == 1 and '' or 's') .. " across " .. #topic_order .. " topic" ..
+		(#topic_order == 1 and '' or 's') .. ".\\par\\smallskip")
+	local tparts = {}
+	for _, t in ipairs(topic_order) do
+		table.insert(tparts, pbank_texify(t) .. "~(" .. topic_count[t] .. ")")
+	end
+	tex.print("\\noindent\\textit{By topic:}~" .. table.concat(tparts, ",\\quad ") .. "\\par")
+	local dkeys = {}
+	for d in pairs(diff_count) do table.insert(dkeys, d) end
+	table.sort(dkeys)
+	local dparts = {}
+	for _, d in ipairs(dkeys) do
+		table.insert(dparts, pbank_texify(d) .. "~(" .. diff_count[d] .. ")")
+	end
+	tex.print("\\noindent\\textit{By difficulty:}~" .. table.concat(dparts, ",\\quad ") .. "\\par")
+
+	-- Emit each topic group under a heading, numbering continuously.
+	local n = 0
+	for _, topic in ipairs(topic_order) do
+		local group = by_topic[topic]
+		pbank_catalog_source_sort(group)
+		tex.print("\\par\\bigskip\\noindent{\\large\\bfseries " .. pbank_texify(topic) ..
+			"}\\quad{\\normalfont\\itshape\\footnotesize " .. #group .. " problem" ..
+			(#group == 1 and '' or 's') .. "}\\par")
+		for _, id in ipairs(group) do
+			n = n + 1
+			pbank_catalog_emit(n, id)
 		end
-		table.sort(metaparts)
-
-		-- \@totalleftmargin: @ is catcode-12 in the document body, so a literal
-		-- \@totalleftmargin would tokenise as \@ (end-of-sentence) + stray text
-		-- "totalleftmargin" (same guard used by \@mcframe@* above). The control
-		-- sequence's real name keeps the @ -- \csname must too.
-		tex.print("\\par\\bigskip\\noindent\\hspace*{-\\csname @totalleftmargin\\endcsname}" ..
-			"\\rule{\\linewidth}{0.4pt}\\par\\smallskip")
-		tex.print("\\noindent\\textbf{" .. n .. ". " .. pbank_texify(id) .. "}")
-		if #metaparts > 0 then
-			tex.print("\\hfill{\\normalfont\\itshape\\footnotesize " ..
-				pbank_texify(table.concat(metaparts, ", ")) .. "}")
-		end
-		tex.print("\\par\\smallskip\\noindent")
-
-		tex.print("\\csname pbank@lua\\endcsname{pbank_section_mode=" ..
-			pbank_lua_quote(p.is_mc and 'mc' or 'fr') ..
-			" get_problem(" .. pbank_lua_quote(id) .. ")}")
 	end
 end
 

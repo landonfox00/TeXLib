@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-"""Gather-logic coverage for the TEXMF install (texlib/texlib_texmf.py).
+r"""Coverage for the TEXMF UNINSTALL detection (texlib/texlib_texmf.py, M1).
 
-No Sublime, no TeX: stubs sublime/sublime_plugin, builds a fake repo tree, and
-checks gather_class_files picks the .cls/.sty/.lua payload while excluding Lua
-tests, .tex, and infrastructure dirs (.git / Sublime / examples).
+No Sublime, no TeX: stubs sublime/sublime_plugin, builds a fake installed tree
+under TEXMFHOME/tex/latex/texlib, and checks installed_files / shadows_checkout.
 
 Run:  python Sublime/test_texlib_texmf.py
 """
@@ -37,32 +36,32 @@ def check(cond, label):
 
 ok = True
 with tempfile.TemporaryDirectory() as root:
-    for rel in [
-        "texlib-corepkg.sty", "quiver.sty",             # root .sty
-        "Exams/autoexam.cls", "Problem Sets/pset.cls",   # .cls (incl. spaced dir)
-        "problem_engine.lua", "texlib_synctex.lua",      # engines
-        "Schedule/schedule.lua",
-        "Schedule/test_schedule_synctex.lua",            # Lua test -> excluded
-        "README.md", "notes.tex",                        # wrong ext -> excluded
-        "Sublime/texlib/texlib.py",                      # excluded dir
-        "examples/Math181/coursemeta.tex",               # excluded dir
-        ".git/config",                                   # excluded dir
-    ]:
+    target = os.path.join(root, "tex", "latex", "texlib")
+
+    # Nothing installed yet.
+    ok &= check(texlib_texmf.installed_files(target) == [],
+                "absent install dir -> empty list (nothing to uninstall)")
+
+    # Populate a fake install: the payload + a stray README (excluded).
+    for rel in ["tex/latex/texlib/autoexam.cls",
+                "tex/latex/texlib/texlib-corepkg.sty",
+                "tex/latex/texlib/problem_engine.lua",
+                "tex/latex/texlib/ls-R", "tex/latex/texlib/README.md"]:
         touch(root, rel)
 
-    got = {os.path.basename(p) for p in texlib_texmf.gather_class_files(root)}
+    got = [os.path.basename(p) for p in texlib_texmf.installed_files(target)]
+    ok &= check(got == ["autoexam.cls", "problem_engine.lua", "texlib-corepkg.sty"],
+                "lists .cls/.sty/.lua payload (sorted), excludes ls-R / README.md")
 
-    ok &= check({"autoexam.cls", "pset.cls"} <= got, "gathers .cls from subfolders (incl. spaced dir)")
-    ok &= check({"texlib-corepkg.sty", "quiver.sty"} <= got, "gathers root .sty (incl. vendored quiver)")
-    ok &= check({"problem_engine.lua", "texlib_synctex.lua", "schedule.lua"} <= got,
-                "gathers Lua engines")
-    ok &= check("test_schedule_synctex.lua" not in got, "excludes Lua test files")
-    ok &= check("notes.tex" not in got and "README.md" not in got, "excludes non-payload extensions")
-    ok &= check("texlib.py" not in got, "excludes the Sublime/ plugin dir")
-    ok &= check(not any(p.replace("\\", "/").split("/")[-2:][0] == "Math181" for p in
-                        texlib_texmf.gather_class_files(root)),
-                "excludes examples/")
-    ok &= check(len(got) == 7, "gathers exactly the 7 payload files (no .git/config)")
+    # shadows_checkout() reflects whatever installed_texlib_dir() points at.
+    texlib_texmf.installed_texlib_dir = lambda t=target: t
+    ok &= check(texlib_texmf.shadows_checkout() is True,
+                "shadows_checkout: True when a copy is installed")
+
+    import shutil
+    shutil.rmtree(target)
+    ok &= check(texlib_texmf.shadows_checkout() is False,
+                "shadows_checkout: False after the copy is removed")
 
 print("\nALL PASS" if ok else "\nFAILURES ABOVE")
 sys.exit(0 if ok else 1)

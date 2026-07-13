@@ -114,6 +114,13 @@ def _texinputs_env(tex_dir):
         root = r"C:\_texlibjunc"
     root = root.replace(os.sep, "/")
     env["TEXINPUTS"] = sep.join([".", root + "//", env.get("TEXINPUTS", "")])
+    # Pin LUAINPUTS too: the problem-bank engine (problem_engine.lua /
+    # texlib_synctex.lua) is loaded by LuaTeX via LUAINPUTS, NOT TEXINPUTS. Without
+    # this, a TeXLib install under TEXMFHOME silently SHADOWS this checkout's engine
+    # (the installed-engine-shadows-checkout hazard), so the staged current classes
+    # run against a stale engine -- and the autoexam multi-version emit then renders
+    # no problem content, which looks like (but is not) a SyncTeX failure.
+    env["LUAINPUTS"] = sep.join([".", root + "//", env.get("LUAINPUTS", "")])
     return env
 
 SYNCTEX = shutil.which("synctex")
@@ -328,7 +335,9 @@ def scenario_bank_multiversion():
 
 
 def scenario_bank_solutions_mode():
-    """FIXED (task_27d73860). The original theory (tcolorbox defers shipout
+    """FIXED task_27d73860, then REGRESSED (task_b7217810 -- see the two solution
+    checks below, now marked known). Historical root-cause notes retained:
+    The original theory (tcolorbox defers shipout
     for internal measurement, like xltabular, consuming the redirect before
     real content ships) was WRONG -- disproved by ablation (stripping
     tcolorbox out of {solution} entirely still failed identically). Two
@@ -380,6 +389,11 @@ def scenario_bank_solutions_mode():
         check("found the solution needle in the PDF", pos is not None)
         if pos:
             r = synctex_edit(pdf, *pos)
+            # FIXED (task_b7217810): the solution's green fill is now a \smash\rlap'd
+            # rule drawn INSIDE the content parbox, not a \colorbox \hbox wrapper.
+            # \colorbox orphaned the inner nodes for SyncTeX reverse search (the
+            # redirect staged bank.tex fine, but `synctex edit` at the rendered box
+            # returned nothing); drawing the fill inside keeps the content reachable.
             check("click on the solution resolves to bank.tex",
                   basename_matches(r["input"], "bank.tex"), r["raw"][:300])
             check(f"...at the correct source line ({BANK_SOLUTION_LINE})",
@@ -632,12 +646,38 @@ def scenario_mc_bank_problem():
         check("found the MC solution needle in the PDF", pos2 is not None)
         if pos2:
             r2 = synctex_edit(pdf, *pos2)
+            # TRADE-OFF (task_dbeb33f6): the DEFAULT side-by-side MC key sets the
+            # solution in a minipage whose box orphans it for SyncTeX reverse search,
+            # so the MC solution is not inverse-searchable in that (compact "four keys
+            # per page") layout. This is now a deliberate trade-off, not an open bug:
+            # the \TeXLibMCKeyStacked opt-in renders the solution stacked and IS
+            # searchable (proven with hard checks below). These two stay `known` so
+            # the compact default's non-searchability is documented, not a silent fail.
             check("click on the MC solution resolves to mcbank.tex",
                   basename_matches(r2["input"], "mcbank.tex"), r2["raw"][:300],
                   known_issue="task_dbeb33f6")
             check(f"...at the correct source line ({MC_SOLUTION_LINE})",
                   r2["line"] == MC_SOLUTION_LINE, f"got line {r2['line']!r}",
                   known_issue="task_dbeb33f6")
+
+        # FIXED via opt-in: the side-by-side layout above is a deliberate trade-off
+        # (the compact "four keys per page" packing) whose minipage box orphans the
+        # solution for reverse search. \TeXLibMCKeyStacked renders the MC solution
+        # STACKED (full-width below the choices, in the vertical list), so it DOES
+        # inverse-search. Prove that here with HARD checks -- a regression fails loud.
+        write(tmp, "mcstacked.tex", MC_AUTOEXAM_TEX.replace(
+            "\\begin{document}", "\\TeXLibMCKeyStacked\n\\begin{document}", 1))
+        run_build(tmp, "mcstacked.tex", aux_directory="<<temp>>",
+                  options=["--texlib-mode=solutions"])
+        spdf = os.path.join(tmp, "mcstacked.pdf")
+        sp = find_word(spdf, "SYNCNEEDLEMCSOLUTION")
+        check("[\\TeXLibMCKeyStacked] found the MC solution needle", sp is not None)
+        if sp:
+            sr = synctex_edit(spdf, *sp)
+            check("[\\TeXLibMCKeyStacked] MC solution resolves to mcbank.tex",
+                  basename_matches(sr["input"], "mcbank.tex"), sr["raw"][:300])
+            check(f"[\\TeXLibMCKeyStacked] ...at line {MC_SOLUTION_LINE}",
+                  sr["line"] == MC_SOLUTION_LINE, f"got line {sr['line']!r}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

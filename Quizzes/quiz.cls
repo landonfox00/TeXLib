@@ -44,6 +44,15 @@
 % Provided by texlib-build (loaded via texlib-assessment): \ifsolutions, \ifkey,
 % \ifrubric, \ifdraft, \ifstudent, \ifinstructor and the matching CLI toggles.
 
+% \ShowKey / \keys build the quiz answer key. A quiz is a single copy, so (unlike
+% the versioned exam, whose per-copy loop toggles \ifsolutions) \ifkey simply
+% IMPLIES \ifsolutions: the compile-time \def\ShowKey{} path (texlib-build turned
+% it into \keytrue) is caught here, and the source-level \keys is renewed to force
+% it too. So an answer key reveals the {solution} boxes + MC key, with the cover
+% labelled "Answer Key" (\maketitle). Matches autoexam/pset ShowKey convergence.
+\ifkey\solutionstrue\fi
+\renewcommand{\keys}{\keytrue\solutionstrue}
+
 \ExplSyntaxOn
 
 \tl_new:N \g__quiz_number_tl
@@ -121,7 +130,7 @@
 	\begin{figure}[!h]
 		\centering
 		\includegraphics[width=0.5\textwidth, height=0.35\textwidth,
-							keepaspectratio, #1]{Figures/#2}
+							keepaspectratio, alt={#2}, #1]{Figures/#2}
 	\end{figure}%
 }
 
