@@ -74,20 +74,9 @@ SUBLIME_DIR = os.path.dirname(os.path.abspath(__file__))
 
 LUALATEX = shutil.which("lualatex")
 
-_PASS = 0
-_FAIL = 0
-
-
-def check(label, cond, detail=""):
-    global _PASS, _FAIL
-    if cond:
-        _PASS += 1
-        print(f"  PASS  {label}")
-    else:
-        _FAIL += 1
-        print(f"  FAIL  {label}")
-        if detail:
-            print(f"        {detail}")
+from _testkit import Checker  # noqa: E402
+_c = Checker()
+check = _c.check
 
 
 from _testkit import find_poppler  # noqa: E402
@@ -648,8 +637,8 @@ def main():
     scenario_ppart_atomicity()
     scenario_importproblem_stem()
 
-    print(f"\n{_PASS} passed, {_FAIL} failed")
-    return 1 if _FAIL else 0
+    print(f"\n{_c.passed} passed, {_c.failed} failed")
+    return 1 if _c.failed else 0
 
 
 if __name__ == "__main__":

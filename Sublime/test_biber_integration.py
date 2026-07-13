@@ -43,20 +43,9 @@ TexlibBuilder = install_native_builder()
 
 
 # --- Tiny result tracker -----------------------------------------------------
-_PASS = 0
-_FAIL = 0
-
-
-def check(label, condition, detail=""):
-    global _PASS, _FAIL
-    if condition:
-        _PASS += 1
-        print(f"  PASS  {label}")
-    else:
-        _FAIL += 1
-        print(f"  FAIL  {label}")
-        if detail:
-            print(f"        {detail}")
+from _testkit import Checker  # noqa: E402
+_c = Checker()
+check = _c.check
 
 
 # --- Fixture -----------------------------------------------------------------
@@ -195,8 +184,8 @@ def main():
     finally:
         shutil.rmtree(tex_dir, ignore_errors=True)
 
-    print(f"\n{_PASS} passed, {_FAIL} failed")
-    return _FAIL
+    print(f"\n{_c.passed} passed, {_c.failed} failed")
+    return _c.failed
 
 
 if __name__ == "__main__":

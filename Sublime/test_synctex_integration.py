@@ -104,32 +104,9 @@ def _texinputs_env(tex_dir):
 SYNCTEX = shutil.which("synctex")
 LUALATEX = shutil.which("lualatex")
 
-_PASS = 0
-_FAIL = 0
-_KNOWN_FAIL = 0
-
-
-def check(label, cond, detail="", known_issue=None):
-    """known_issue: pass a tracker reference (e.g. a spawned-task id) for an
-    assertion that encodes CORRECT/intended behavior but is not expected to
-    pass yet, pending separately-tracked follow-up work. Keeps the assertion
-    honest (it starts passing, loudly, the moment the real fix lands)
-    without failing CI for a gap that's already known and deliberately not
-    being fixed in the same change as everything else here."""
-    global _PASS, _FAIL, _KNOWN_FAIL
-    if cond:
-        _PASS += 1
-        print(f"  PASS  {label}")
-    elif known_issue:
-        _KNOWN_FAIL += 1
-        print(f"  KNOWN {label}  (tracked: {known_issue})")
-        if detail:
-            print(f"        {detail}")
-    else:
-        _FAIL += 1
-        print(f"  FAIL  {label}")
-        if detail:
-            print(f"        {detail}")
+from _testkit import Checker  # noqa: E402
+_c = Checker()
+check = _c.check
 
 
 from _testkit import find_poppler  # noqa: E402
@@ -883,11 +860,11 @@ def main():
     scenario_schedule_boxgrid_builder()
     scenario_schedule_boxgrid_plain_cli()
 
-    summary = f"\n{_PASS} passed, {_FAIL} failed"
-    if _KNOWN_FAIL:
-        summary += f", {_KNOWN_FAIL} known (tracked, not blocking)"
+    summary = f"\n{_c.passed} passed, {_c.failed} failed"
+    if _c.known:
+        summary += f", {_c.known} known (tracked, not blocking)"
     print(summary)
-    return 1 if _FAIL else 0
+    return 1 if _c.failed else 0
 
 
 if __name__ == "__main__":

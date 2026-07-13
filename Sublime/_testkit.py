@@ -102,3 +102,30 @@ def install_native_builder():
     sys.modules.setdefault("TeXLib.texlib_build", _native)
     from texlib_builder import TexlibBuilder
     return TexlibBuilder
+
+
+class Checker:
+    """Family-B result tracker. Assign `check = _c.check` so call sites keep
+    the bare check(label, cond, detail='', known_issue=None) form; counts live
+    on the instance (self.passed / self.failed / self.known)."""
+    def __init__(self):
+        self.passed = self.failed = self.known = self.skipped = 0
+
+    def check(self, label, cond, detail="", known_issue=None):
+        if cond:
+            self.passed += 1
+            print(f"  PASS  {label}")
+        elif known_issue:
+            self.known += 1
+            print(f"  KNOWN {label}  (tracked: {known_issue})")
+            if detail:
+                print(f"        {detail}")
+        else:
+            self.failed += 1
+            print(f"  FAIL  {label}")
+            if detail:
+                print(f"        {detail}")
+
+    def skip(self, label):
+        self.skipped += 1
+        print(f"  SKIP  {label}")
