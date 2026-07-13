@@ -31,6 +31,7 @@
 
 \cs_new_protected:Npn \meta_create_var:nn #1 #2 {
 	\tl_new:c { g__meta_#1_tl }
+	\keys_define:nn { meta } { #1 .tl_gset:c = { g__meta_#1_tl } }
 	\meta_create_getter:nn {#2} {#1}
 }
 
@@ -95,44 +96,10 @@
 \meta_create_var:nn { class-time-alt } { ClassTimeAlt }
 \tl_new:c { g__meta_short-title_tl }
 
+% Aliases + the getter-less short-title store; every other key is registered
+% by \meta_create_var above.
 \keys_define:nn { meta } {
-	institution     .tl_gset:c = { g__meta_institution_tl },
-	instructor      .tl_gset:c = { g__meta_instructor_tl },
-	term            .tl_gset:c = { g__meta_term_tl },
-	year            .tl_gset:c = { g__meta_year_tl },
-	season          .tl_gset:c = { g__meta_season_tl },
-	course-subject  .tl_gset:c = { g__meta_course-subject_tl },
-	course-number   .tl_gset:c = { g__meta_course-number_tl },
-	course-title    .tl_gset:c = { g__meta_course-title_tl },
-	course-section  .tl_gset:c = { g__meta_course-section_tl },
-	course-room     .tl_gset:c = { g__meta_course-room_tl },
-	lecture-days    .tl_gset:c = { g__meta_lecture-days_tl },
-	lecture-times   .tl_gset:c = { g__meta_lecture-times_tl },
-	start-date      .tl_gset:c = { g__meta_start-date_tl },
-	end-date        .tl_gset:c = { g__meta_end-date_tl },
-	final-date      .tl_gset:c = { g__meta_final-date_tl },
-	final-time      .tl_gset:c = { g__meta_final-time_tl },
-	exam1-date      .tl_gset:c = { g__meta_exam1-date_tl },
-	exam2-date      .tl_gset:c = { g__meta_exam2-date_tl },
-	exam3-date      .tl_gset:c = { g__meta_exam3-date_tl },
-	exam4-date      .tl_gset:c = { g__meta_exam4-date_tl },
-	exam5-date      .tl_gset:c = { g__meta_exam5-date_tl },
-	bank-path       .tl_gset:c = { g__meta_bank-path_tl },
-	gradebook-path  .tl_gset:c = { g__meta_gradebook-path_tl },
-	preamble-file   .tl_gset:c = { g__meta_preamble-file_tl },
-	publish-name    .tl_gset:c = { g__meta_publish-name_tl },
-	quiz-instructions-file  .tl_gset:c = { g__meta_quiz-instructions-file_tl },
-	exam-instructions-file  .tl_gset:c = { g__meta_exam-instructions-file_tl },
-	bingo-instructions-file .tl_gset:c = { g__meta_bingo-instructions-file_tl },
-	pset-instructions-file  .tl_gset:c = { g__meta_pset-instructions-file_tl },
-	% Promoted class fields (course-wide defaults; see the var block above).
-	email            .tl_gset:c = { g__meta_email_tl },
 	instructor-email .tl_gset:c = { g__meta_email_tl },        % alias for email
-	office           .tl_gset:c = { g__meta_office_tl },
-	office-hours     .tl_gset:c = { g__meta_office-hours_tl },
-	organizer        .tl_gset:c = { g__meta_organizer_tl },
-	class-time       .tl_gset:c = { g__meta_class-time_tl },
-	class-time-alt   .tl_gset:c = { g__meta_class-time-alt_tl },
 	short-title      .tl_gset:c = { g__meta_short-title_tl },
 	syllabus-title   .tl_gset:c = { g__meta_short-title_tl },  % alias for short-title
 }
