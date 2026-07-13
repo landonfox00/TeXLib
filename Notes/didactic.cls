@@ -239,12 +239,9 @@
 % (plain/definition/remark) and tcolorbox style lives in texlib-thmenv.sty.
 % `remark`/`remark*` stay plain inline (no box); `recall`/`notation` use the
 % gray note rule.
-\TeXLibTheorems[numbering=section, aliases=true]{
-	theorem, corollary, lemma, conjecture, proposition,
-	definition, convention, procedure, challenge,
-	exercise, example, notation,
-	remark, question, recall
-}
+% C1: the whole boxed taxonomy in one call, unified across the classes (adds
+% `note` to didactic's set; the full list now lives once in texlib-thmenv.sty).
+\TeXLibAllTheorems[numbering=section, aliases=true]
 
 % ==============================================================================
 % 6b. CONTEXT-SENSITIVE ENUMERATE LABELS

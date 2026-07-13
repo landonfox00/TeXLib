@@ -5,7 +5,14 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # N5: run the full smoke on a feature branch on demand (Actions -> smoke -> Run
+  # workflow -> pick the branch). Optionally smoke only a subset of modules.
   workflow_dispatch:
+    inputs:
+      modules:
+        description: "Space-separated module subset to smoke (blank = all)"
+        required: false
+        default: ""
 
 jobs:
   smoke:
@@ -35,7 +42,7 @@ jobs:
             texlua Schedule/test_schedule_synctex.lua
             texlua Schedule/test_schedule_quiz_exam.lua
             python3 Sublime/test_texlib_builder.py
-            python3 smoke_test.py -v
+            python3 smoke_test.py -v ${{ github.event.inputs.modules }}
 
       - name: Upload failed-build logs
         if: failure()

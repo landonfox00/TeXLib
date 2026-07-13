@@ -1,12 +1,17 @@
 {
     // TeXLib native plugin settings.
     //
-    // texinputs: value for the child engine's TEXINPUTS env var. Real
-    // cross-package builds need the shared texlib-*.sty at the repo root on the
-    // path, and kpathsea cannot search a path segment containing a comma -- so
-    // point at the comma-free junction, NOT the OneDrive path. A trailing "//"
-    // means "and all subdirectories"; the empty first segment keeps the default
-    // search path. May be a string or a list of segments.
+    // Edit your machine-local copy via  Tools > TeXLib > Edit Settings  (it opens
+    // this default next to your Packages/User/TeXLib.sublime-settings override).
+
+    // texinputs: value for the child engine's TEXINPUTS env var -- this is how
+    // the plugin's builds resolve the TeXLib classes and shared texlib-*.sty.
+    // Point it at your comma-free repo checkout (kpathsea cannot search a path
+    // segment containing a comma, so use the junction, NOT the OneDrive path). A
+    // trailing "//" means "and all subdirectories"; the empty first segment keeps
+    // the default search path. May be a string or a list of segments. Because the
+    // classes load from your checkout, NO TEXMF install is needed (and none
+    // should shadow it -- see "Uninstall Classes from TEXMF" / Doctor).
     //
     // Leave unset (the default) to inherit the process environment.
     //
@@ -14,24 +19,31 @@
 
     // open_pdf_on_build: after a successful build, delegate to LaTeXTools'
     // jumpto_pdf to open/refresh the PDF and forward-sync (it honors your
-    // LaTeXTools forward_sync / keep_focus settings for the sync + focus). Set
-    // false to build without popping the viewer. Default: true.
+    // LaTeXTools forward_sync / keep_focus settings). Default: true.
     //
     // "open_pdf_on_build": true
 
     // show_panel_on_build: when to surface the build output panel.
-    //   "errors" (default) -- hidden while building (a "building..." status shows
-    //                         in the status bar); pops open only if the build
-    //                         fails, with a clickable error summary appended.
+    //   "errors" (default) -- hidden while building (a spinner + current step
+    //                         shows in the status bar); pops open only if the
+    //                         build fails, with a clickable error summary. A
+    //                         successful build with warnings reports the count in
+    //                         the status bar and keeps the panel populated
+    //                         (Show Build Output) without stealing focus.
     //   "always"           -- stream the panel live, every build.
     //   "never"            -- never pop the panel; status bar only.
     //
     // "show_panel_on_build": "errors"
 
-    // class_source: absolute path to the TeXLib class payload for the
-    // "Install Classes to TEXMF" command. Leave unset to auto-detect (a bundled
-    // latex/ dir in the package, else the repo root above the plugin). Set it if
-    // the plugin can't find your classes (e.g. an unusual layout).
+    // build_on_save: rebuild a LaTeX document (default mode) every time it is
+    // saved. Off by default; toggle from Tools > TeXLib > Toggle Build on Save.
     //
-    // "class_source": "C:/Users/Landon/texlib-sublime-wt"
+    // "build_on_save": false
+
+    // class_source: absolute path to your TeXLib repo checkout. Used to locate
+    // package_for_lms.py and course-metadata.sty (for coursemeta key
+    // completions). Leave unset to auto-detect the repo root above the plugin;
+    // set it only if the plugin can't find your repo (an unusual layout).
+    //
+    // "class_source": "C:/_texlibjunc"
 }

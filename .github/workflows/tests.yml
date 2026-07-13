@@ -20,6 +20,44 @@ jobs:
       - name: Builder logic + orchestration tests
         run: python Sublime/test_texlib_builder.py
 
+  # Pure-Lua unit tests for the class-local Lua engines. No TeX toolchain — a
+  # stock lua 5.3 runs them (the engines are tex-independent; the tests stub the
+  # tex.* globals) — so this stays in the fast, no-container lane.
+  #   test_shuffle.lua           -- problem_shuffle.lua permutation contract
+  #   Bingo/test_bingo.lua       -- bingo card generator (25 cells, free, distinct)
+  #   Report Cards/test_report_card.lua -- gradebook CSV -> \rcRenderStudent mapping
+  lua-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua 5.3
+        run: sudo apt-get update && sudo apt-get install -y lua5.3
+      - name: Pure-Lua unit tests
+        run: |
+          set -e
+          lua5.3 test_shuffle.lua
+          lua5.3 Bingo/test_bingo.lua
+          lua5.3 "Report Cards/test_report_card.lua"
+
+  # Advisory chktex lint (N4). chktex was editor-side/manual (CLAUDE.md); this
+  # surfaces it in CI without blocking. It lints the module TEMPLATES + the
+  # example course (document-level LaTeX, what chktex is for -- not the .cls/.sty
+  # package code) with the repo chktexrc. -n1 quiets the intentional
+  # space-terminated section macros; the step never fails the build (|| true), so
+  # the report is visible in the logs as guidance, not a gate.
+  chktex:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install chktex
+        run: sudo apt-get update && sudo apt-get install -y chktex
+      - name: Lint templates + example docs (advisory)
+        run: |
+          mapfile -t files < <(find . \( -name '*-template.tex' \
+            -o -path './examples/*/*.tex' \) -not -path './.git/*')
+          echo "chktex: linting ${#files[@]} document(s) with chktexrc"
+          chktex -q -n1 -l chktexrc "${files[@]}" || true
+
   # Real end-to-end: drives the actual builder coroutines against a genuine
   # toolchain. Proofs run here:
   #   * test_biber_integration.py    -- pdflatex + biber on a biblatex fixture,
@@ -81,3 +119,13 @@ jobs:
             texlua test_shuffle.lua
             # Assessment build-flag leakage guard (solutions/answers/rubric).
             python3 test_mode_effects.py
+            # course-metadata.sty's directory-walk depth + class-option-over-
+            # coursemeta precedence (real pdflatex builds + pdftotext).
+            python3 test_metadata_resolution.py
+            # bank.cls \printbankcatalog render check (part labels, solutions).
+            python3 test_bank_catalog.py
+            # Theorem taxonomy + aliases + shared counter (C1) and solution
+            # header (C2) render checks.
+            python3 test_class_render.py
+            # MC answer-key marks the correct choice + schedule grid content.
+            python3 test_mc_schedule_render.py

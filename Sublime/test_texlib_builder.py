@@ -1104,8 +1104,8 @@ def main():
           r"\loadbank{doc.tex}" in arg, arg)
     check("bank fragment -> \\printbankcatalog in synthesized arg",
           r"\printbankcatalog" in arg, arg)
-    check("bank fragment -> quiz.cls harness synthesized",
-          r"\documentclass{quiz}" in arg, arg)
+    check("bank fragment -> bank.cls catalog harness synthesized",
+          r"\documentclass{bank}" in arg, arg)
     check("bank fragment -> detection message shown",
           "printbankcatalog listing" in disp, repr(disp))
 

@@ -97,22 +97,24 @@
 }
 
 %                          env           label         style       box                alias
-\__texlib_thm_entry:nnnnn {theorem}     {Theorem}     {plain}      {texlibtheorem}     {}
-\__texlib_thm_entry:nnnnn {corollary}   {Corollary}   {plain}      {texlibtheorem}     {}
-\__texlib_thm_entry:nnnnn {lemma}       {Lemma}       {plain}      {texlibtheorem}     {}
-\__texlib_thm_entry:nnnnn {conjecture}  {Conjecture}  {plain}      {texlibtheorem}     {}
-\__texlib_thm_entry:nnnnn {proposition} {Proposition} {plain}      {texlibproposition} {}
+% Every catalog entry now carries a short alias (C1), so \thm \cor \lem \defn ...
+% are available wherever the boxed taxonomy is enabled with aliases=true.
+\__texlib_thm_entry:nnnnn {theorem}     {Theorem}     {plain}      {texlibtheorem}     {thm}
+\__texlib_thm_entry:nnnnn {corollary}   {Corollary}   {plain}      {texlibtheorem}     {cor}
+\__texlib_thm_entry:nnnnn {lemma}       {Lemma}       {plain}      {texlibtheorem}     {lem}
+\__texlib_thm_entry:nnnnn {conjecture}  {Conjecture}  {plain}      {texlibtheorem}     {conj}
+\__texlib_thm_entry:nnnnn {proposition} {Proposition} {plain}      {texlibproposition} {prop}
 \__texlib_thm_entry:nnnnn {definition}  {Definition}  {definition} {texlibdefinition}  {defn}
 \__texlib_thm_entry:nnnnn {convention}  {Convention}  {definition} {texlibdefinition}  {conv}
-\__texlib_thm_entry:nnnnn {procedure}   {Procedure}   {definition} {texlibprocedure}   {}
+\__texlib_thm_entry:nnnnn {procedure}   {Procedure}   {definition} {texlibprocedure}   {proc}
 \__texlib_thm_entry:nnnnn {challenge}   {Challenge}   {definition} {texlibquestion}    {chal}
 \__texlib_thm_entry:nnnnn {exercise}    {Exercise}    {definition} {texlibexample}     {exer}
 \__texlib_thm_entry:nnnnn {example}     {Example}     {definition} {texlibexample}     {exam}
 \__texlib_thm_entry:nnnnn {notation}    {Notation}    {definition} {texlibnote}        {notn}
 \__texlib_thm_entry:nnnnn {question}    {Question}    {remark}     {texlibquestion}    {ques}
-\__texlib_thm_entry:nnnnn {remark}      {Remark}      {remark}     {none}              {}
-\__texlib_thm_entry:nnnnn {recall}      {Recall}      {remark}     {texlibnote}        {}
-\__texlib_thm_entry:nnnnn {note}        {Note}        {remark}     {texlibnote}        {}
+\__texlib_thm_entry:nnnnn {remark}      {Remark}      {remark}     {none}              {rmk}
+\__texlib_thm_entry:nnnnn {recall}      {Recall}      {remark}     {texlibnote}        {rcl}
+\__texlib_thm_entry:nnnnn {note}        {Note}        {remark}     {texlibnote}        {nte}
 
 % ------------------------------------------------------------------------------
 % Options
@@ -218,6 +220,21 @@
 }
 
 \ExplSyntaxOff
+
+% ------------------------------------------------------------------------------
+% Public: \TeXLibAllTheorems[options] — the whole boxed taxonomy in one call (C1)
+% ------------------------------------------------------------------------------
+% Declares every environment in the catalog (theorem first, so it owns the shared
+% counter) with the canonical shared styling, keeping the full list in exactly one
+% place. Options forward to \TeXLibTheorems (numbering, aliases). Exam-derived
+% classes that cannot take the `question` box — exam.cls already defines \question
+% — call \TeXLibTheorems directly with the list minus `question` instead.
+\newcommand{\TeXLibAllTheorems}[1][]{%
+	\TeXLibTheorems[#1]{%
+		theorem, corollary, lemma, conjecture, proposition,
+		definition, convention, procedure, challenge, exercise,
+		example, notation, question, remark, recall, note}%
+}
 
 % ------------------------------------------------------------------------------
 % Public: \TeXLibStarredThms — the lightweight unboxed short-name family

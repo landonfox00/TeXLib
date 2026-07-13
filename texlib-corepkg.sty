@@ -67,4 +67,20 @@
 	citecolor=black   % citations likewise
 }
 
+% ==============================================================================
+% Shared solution-box appearance (C2)
+% ==============================================================================
+% ONE source for the solution box's colours + header, referenced by BOTH the
+% exam/quiz shared box (texlib-solutions.sty) and pset's own box, so the solution
+% look retunes in one place.  The two boxes deliberately keep DIFFERENT
+% mechanisms: the shared box is \colorbox/\box/\vrule (a real nested box node) so
+% SyncTeX reverse search survives -- tcolorbox's `enhanced` mode defeats it --
+% while pset's is a tcolorbox because it needs the \StudentMode watermarked
+% blank-answer box.  corepkg is loaded by every class, so both see these macros.
+% (Full mechanism-level "one box" is blocked by that SyncTeX constraint.)
+\providecommand{\texlibsoltint}{green!3!white}          % box fill
+\providecommand{\texlibsolrulecolor}{green!50!black}     % left accent (shown)
+\providecommand{\texlibsolblankrulecolor}{black!40}      % dashed rule (student blank)
+\providecommand{\texlibsolheader}{\textbf{Solution.}}    % bold run-in header
+
 \endinput

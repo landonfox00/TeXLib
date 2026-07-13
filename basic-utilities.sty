@@ -68,13 +68,20 @@
 % Directory prefix for \fig images. Override per document with
 % \renewcommand{\figdir}{path/to/figs/} (keep the trailing slash).
 \providecommand{\figdir}{Figures/}
+% Accessibility (tagged-PDF first step): derive alt-text from the caption, or the
+% file name when there is no caption, and pass it to \includegraphics's alt= key
+% -- LaTeX's official image-accessibility hook.  It is inert until PDF tagging is
+% enabled (\DocumentMetadata{...}); once it is, every \fig carries real alt text.
+% Override per image with an explicit alt= in the options arg (it wins, being
+% placed after this default).
+\newcommand{\@fig@alt}[2]{\if\relax\detokenize{#1}\relax #2\else #1\fi}
 \NewDocumentCommand{\fig}{ s O{} O{} m }{%
 	\begin{figure}[!ht]
 	\IfBooleanTF{#1}{\raggedleft}{\centering}
 	\if\relax\detokenize{#3}\relax
-		\includegraphics[width=0.5\textwidth,height=0.35\textwidth,keepaspectratio]{\figdir #4}
+		\includegraphics[width=0.5\textwidth,height=0.35\textwidth,keepaspectratio,alt={\@fig@alt{#2}{#4}}]{\figdir #4}
 	\else
-		\includegraphics[#3]{\figdir #4}
+		\includegraphics[alt={\@fig@alt{#2}{#4}},#3]{\figdir #4}
 	\fi
 	\if\relax\detokenize{#2}\relax
 		\AutoLabel{fig}{#4}

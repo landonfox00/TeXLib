@@ -100,7 +100,7 @@ _NO_WINDOW = 0x08000000 if os.name == "nt" else 0  # CREATE_NO_WINDOW
 
 # Document classes that must be compiled with lualatex.
 # report-card uses \directlua (the gradebook engine), so it belongs here too.
-LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "report-card"}
+LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "report-card", "bank"}
 
 # Document classes whose gradebook.xlsx is auto-converted to a report-view CSV
 # before the build (see _convert_gradebooks). The report-view tab name tried in
@@ -493,17 +493,17 @@ class TexlibBuildCore:
             yield (cmd, f"{label} rerun {run}...")
 
     def _build_bank_catalog(self, base, engine):
-        """Build a problem-bank fragment directly: synthesize a minimal quiz.cls
-        harness on the command line (the same \\def...\\input trick _build_once
-        uses for mode injection) that \\loadbank's this file and calls
-        \\printbankcatalog, so a bank can be perused without hand-authoring a
-        companion root document. --jobname pins the output to
-        <base>.pdf/.log/... like every other build, so _postprocess's copy-back
-        (which globs by self.base_name) needs no changes. quiz.cls's "X of Y"
-        footer needs the usual second pass, handled by the normal rerun loop.
+        """Build a problem-bank fragment directly: synthesize a minimal
+        \\documentclass{bank} harness on the command line (the same \\def...\\input
+        trick _build_once uses for mode injection) that \\loadbank's this file and
+        calls \\printbankcatalog, so a bank can be perused without hand-authoring a
+        companion root document. bank.cls is the first-class catalog/preview class
+        (it replaced the old synthesized-quiz harness). --jobname pins the output
+        to <base>.pdf/.log/... like every other build, so _postprocess's copy-back
+        (which globs by self.base_name) needs no changes.
         """
         arg = (
-            r"\documentclass{quiz}\begin{document}"
+            r"\documentclass{bank}\begin{document}"
             f"\\loadbank{{{self.tex_name}}}"
             r"\printbankcatalog\end{document}"
         )

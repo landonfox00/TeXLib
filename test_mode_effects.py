@@ -1,49 +1,30 @@
 #!/usr/bin/env python3
-"""
-Build-mode leakage guard: prove the assessment flags actually CHANGE output.
+r"""
+Build-mode leakage guard, parametrized across the assessment classes (C3).
 
-smoke_test.py builds every module under each mode (\\StudentMode, \\ShowKey,
-\\ShowSolutions, \\ShowRubric) but checks EXPECT_TEXT/EXPECT_ABSENT by module
-only -- so `Exams --default` and `Exams --solutions` are asserted against the
-identical token list. Nothing there verifies that a flag gates content: a flag
-silently becoming a no-op -- or, worse, a solution/answer/rubric LEAKING into a
-student copy (a FERPA-adjacent failure) -- passes that suite untouched.
+smoke_test.py builds every module under each mode but checks EXPECT_TEXT by
+module, so `--default` and `--solutions` are asserted against the identical token
+list -- nothing there verifies that a flag GATES content: a flag silently
+becoming a no-op, or a solution/answer/rubric LEAKING into a student copy (a
+FERPA-adjacent failure), passes that suite untouched.
 
-This test closes that hole with a differential, mode-keyed real build. It
-compiles ONE self-contained autoexam fixture (one free-response problem with a
-\\begin{solution}, one multiple-choice problem with choices + a \\rubric) once
-per flag combination, extracts the rendered text, and asserts that each build
-flag reveals exactly what it should and nothing it shouldn't:
+This closes that hole with a differential, mode-keyed REAL build, now for all
+three assessment classes in ONE parametrized file (was exam-only):
 
-  * a solution token is ABSENT from every student-facing build and PRESENT once
-    solutions are shown,
-  * the multiple-choice correct-answer badge (the boxed answer LETTER after
-    "Answer:") is ABSENT from a student build and PRESENT in the answers build,
-  * a \\rubric token overlays only when rubrics are shown, and never otherwise.
+  * autoexam + quiz -- share the bank + {problems}/{mcproblems} structure and the
+    shared texlib-solutions box, so they reuse one fixture (one free-response
+    problem with a \begin{solution}, one multiple-choice problem with choices + a
+    \rubric). Asserts the solution tokens, the MC correct-answer badge, and the
+    \rubric overlay each appear only under the right flag.
+  * pset -- its own fixture ({problem} + a gated {solution} box). Asserts the
+    solution tokens appear only when shown and that StudentMode emits the blank
+    "Show your work here" answer box instead of the answer.
 
-The flags are injected the way the builder injects them -- \\def\\Show...{} on the
-command line before \\input -- so this exercises the real compile-time path, not
-a source-level \\solutions in the document.
+Flags are injected the way the builder injects them (\def\Show...{} before
+\input), exercising the real compile-time path. Soft-skips (exit 0) if lualatex
+or a poppler-flavored pdftotext is missing. Every build runs in its own temp dir.
 
-IMPORTANT (autoexam specifics): for the exam class the answer key is produced by
-either \\ShowSolutions or \\ShowKey. \\ShowSolutions drives the class's dual
-student+instructor copy loop (AutoExamSolMode=dual) and sets \\ifsolutions for the
-instructor copy; \\ShowKey (and source \\keys) requests the instructor-ONLY build
-(AutoExamSolMode=only) -- an exam's answer key IS its instructor copy -- and
-autoexam.cls forces \\ifsolutions for it, so \\ifkey now IMPLIES \\ifsolutions.
-Both flags therefore reveal the same content. The {solution}/{partsolution}
-boxes, the side-by-side multiple-choice key, and the \\rubric overlay (all in
-texlib-solutions.sty) gate on \\ifsolutions; rubrics additionally require
-\\ShowRubric. The mode table below asserts \\ShowKey and \\ShowSolutions reveal
-identically for this (no-\\versions) fixture -- if \\ShowKey ever regresses to a
-no-op the ShowKey row starts failing.
-
-Soft-skips (exit 0) if lualatex or a poppler-flavored pdftotext is missing,
-matching test_synctex_integration.py / test_biber_integration.py's
-degrade-don't-fail convention. Every build runs in its own temp dir (all aux
-lands there and is removed), so nothing touches the real module folders.
-
-Run:  python test_mode_effects.py     (exit 0 ok/skipped, 1 on a leak/no-op)
+Run:  python test_mode_effects.py    (exit 0 ok/skipped, 1 on a leak/no-op)
 """
 
 from __future__ import annotations
@@ -56,20 +37,11 @@ import sys
 import tempfile
 
 TEXLIB_ROOT = os.path.dirname(os.path.abspath(__file__))
-EXAMS_DIR = os.path.join(TEXLIB_ROOT, "Exams")
-
 LUALATEX = shutil.which("lualatex")
 
 
 # --- Poppler pdftotext detection (mirrors test_synctex_integration.py) --------
 def _find_poppler_pdftotext() -> str | None:
-    """A poppler-flavored pdftotext, NOT Git-for-Windows' xpdfreader build.
-
-    On some Windows dev setups Git ships its own xpdf pdftotext earlier on PATH;
-    it silently mangles layout differently from poppler. Probe candidates and
-    pick the first whose version banner mentions poppler, so a green local run
-    means the same thing as the poppler-utils CI container.
-    """
     candidates: list[str] = []
     which = shutil.which("pdftotext")
     if which:
@@ -89,11 +61,7 @@ def _find_poppler_pdftotext() -> str | None:
 PDFTOTEXT = _find_poppler_pdftotext()
 
 
-# --- Fixture: metadata from examples/Math181-Fall2026/, one FR + one MC --------
-# Distinctive ALL-CAPS needles (never real words) so a substring match can't
-# collide with boilerplate. STEMANCHOR* render in EVERY build (a sanity anchor
-# that the doc typeset and extraction works); SOLLEAK*/RUBRICLEAK* are the
-# leakage tokens that must appear only when their flag is set.
+# --- Shared fixture pieces ----------------------------------------------------
 COURSEMETA_TEX = r"""\metasetup{
 	institution     = {University of Nevada, Reno},
 	instructor      = {Test Instructor},
@@ -114,6 +82,8 @@ COURSEMETA_TEX = r"""\metasetup{
 }
 """
 
+# One FR (with \begin{solution} + \rubric) and one MC (choices + \rubric), for
+# the bank-driven exam/quiz fixture.
 BANK_TEX = r"""\begin{problem}{fr-one}[topic=fr]
 	Evaluate STEMANCHORFR.
 	\begin{solution}
@@ -136,9 +106,6 @@ BANK_TEX = r"""\begin{problem}{fr-one}[topic=fr]
 \end{problem}
 """
 
-# No \versions: default/student builds are a single student copy (nothing to
-# leak from), while \ShowSolutions drives the class's dual student+instructor
-# loop so the instructor copy carries the revealed content.
 EXAM_TEX = r"""\documentclass[exam-number=1]{autoexam}
 \loadbank{bank.tex}
 \begin{document}
@@ -152,38 +119,71 @@ EXAM_TEX = r"""\documentclass[exam-number=1]{autoexam}
 \end{document}
 """
 
-STEM_NEEDLES = ["STEMANCHORFR", "STEMANCHORMC"]
+# Quiz shares the bank + section structure; quiz auto-loads the sibling bank.tex
+# at \begin{document}, so the fixture does NOT \loadbank (that would double-load).
+QUIZ_TEX = r"""\documentclass{quiz}
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem{topic=fr}
+\end{problems}
+\begin{mcproblems}
+	\problem{topic=mc}
+\end{mcproblems}
+\end{document}
+"""
+
+# pset: its own structure. A {problem} with a gated {solution}; no MC, no bank.
+PSET_TEX = r"""\documentclass{pset}
+\begin{document}
+\begin{problem}
+	Evaluate STEMANCHORFR.
+	\begin{solution}
+	SOLLEAKFR is the answer.
+	\end{solution}
+\end{problem}
+\end{document}
+"""
+
+STEM_NEEDLES_MC = ["STEMANCHORFR", "STEMANCHORMC"]
+STEM_NEEDLES_FR = ["STEMANCHORFR"]
 SOLUTION_NEEDLES = ["SOLLEAKFR", "SOLLEAKMC"]
+SOLUTION_NEEDLES_FR = ["SOLLEAKFR"]
 RUBRIC_NEEDLES = ["RUBRICLEAKFR", "RUBRICLEAKMC"]
-# The correct-answer badge is the boxed answer LETTER printed after "Answer:"
-# in an instructor build; a student build prints "Answer:" then a blank rule
-# (no letter). \cchoice is authored first and the fixture never \shuffle-s, so
-# the correct option is A -- but any A-E after "Answer:" means "the key letter
-# was revealed", which is the leakage-relevant signal.
 ANSWER_BADGE_RE = re.compile(r"Answer:\s*[A-E]\b")
+STUDENT_BOX_RE = re.compile(r"Show your work here")
 
 
-# --- Mode table: (label, injected macros, expected reveals) -------------------
-# sol = solution tokens shown, ans = MC answer letter shown, rub = rubric shown.
-MODES = [
-    ("default",                 "",
-     dict(sol=False, ans=False, rub=False)),
-    ("StudentMode",             r"\def\StudentMode{}",
-     dict(sol=False, ans=False, rub=False)),
-    # \ShowKey builds the exam's answer key (instructor-only "only" mode; wired in
-    # autoexam.cls so \ifkey implies \ifsolutions). For this no-\versions fixture
-    # that is a single key copy revealing the solution and the MC answer letter --
-    # identical reveals to \ShowSolutions. Rubrics still need \ShowRubric.
-    ("ShowKey",                 r"\def\ShowKey{}",
-     dict(sol=True,  ans=True,  rub=False)),
-    ("ShowSolutions",           r"\def\ShowSolutions{}",
-     dict(sol=True,  ans=True,  rub=False)),
+# --- Per-class mode tables ----------------------------------------------------
+# checks: which signals to assert -- sol (solution tokens), ans (MC badge),
+# rub (rubric overlay), blank (pset student answer box present).
+EXAM_QUIZ_MODES = [
+    ("default",   "",                 dict(sol=False, ans=False, rub=False)),
+    ("StudentMode", r"\def\StudentMode{}", dict(sol=False, ans=False, rub=False)),
+    ("ShowKey",   r"\def\ShowKey{}",   dict(sol=True,  ans=True,  rub=False)),
+    ("ShowSolutions", r"\def\ShowSolutions{}", dict(sol=True, ans=True, rub=False)),
     ("ShowSolutions+ShowRubric", r"\def\ShowSolutions{}\def\ShowRubric{}",
-     dict(sol=True,  ans=True,  rub=True)),
-    # \ShowRubric alone reveals nothing: the rubric overlays inside a SHOWN
-    # solution, so with solutions hidden there is no box to overlay onto.
-    ("ShowRubric",              r"\def\ShowRubric{}",
-     dict(sol=False, ans=False, rub=False)),
+     dict(sol=True, ans=True, rub=True)),
+    ("ShowRubric", r"\def\ShowRubric{}", dict(sol=False, ans=False, rub=False)),
+]
+
+PSET_MODES = [
+    ("default",     "",                    dict(sol=False, blank=False)),
+    ("StudentMode", r"\def\StudentMode{}", dict(sol=False, blank=True)),
+    ("ShowKey",     r"\def\ShowKey{}",     dict(sol=True,  blank=False)),
+    ("ShowSolutions", r"\def\ShowSolutions{}", dict(sol=True, blank=False)),
+]
+
+CLASSES = [
+    dict(name="autoexam", module_dir="Exams", doc=EXAM_TEX, with_bank=True,
+         skip=("autoexam-template.tex", "bank.tex"), modes=EXAM_QUIZ_MODES,
+         stems=STEM_NEEDLES_MC, sols=SOLUTION_NEEDLES, kind="examquiz"),
+    dict(name="quiz", module_dir="Quizzes", doc=QUIZ_TEX, with_bank=True,
+         skip=("quiz-template.tex", "bank.tex"), modes=EXAM_QUIZ_MODES,
+         stems=STEM_NEEDLES_MC, sols=SOLUTION_NEEDLES, kind="examquiz"),
+    dict(name="pset", module_dir="Problem Sets", doc=PSET_TEX, with_bank=False,
+         skip=("pset-template.tex",), modes=PSET_MODES,
+         stems=STEM_NEEDLES_FR, sols=SOLUTION_NEEDLES_FR, kind="pset"),
 ]
 
 
@@ -204,67 +204,56 @@ def check(label: str, cond: bool, detail: str = "") -> None:
             print(f"        {detail}")
 
 
-# --- Build + extract ----------------------------------------------------------
 def _norm(text: str) -> str:
-    """Extraction-proof the text: join words TeX hyphenated across a line break
-    (the narrow 4.5cm rubric overlay wraps 'RUBRICLEAKFR' as 'RUBRICLEAK-\\nFR'),
-    then collapse remaining whitespace so a needle survives -layout column
-    padding."""
-    text = re.sub(r"-\s*\n\s*", "", text)   # dehyphenate line breaks first
-    text = re.sub(r"\s+", " ", text)        # then flatten remaining whitespace
+    text = re.sub(r"-\s*\n\s*", "", text)
+    text = re.sub(r"\s+", " ", text)
     return text
 
 
-def _copy_build_inputs(tmp: str) -> None:
-    """Populate an isolated build dir the comma-safe way (a TEXINPUTS entry with
-    a comma -- the OneDrive '...Nevada, Reno...' path has one -- is silently
-    unsearchable by kpathsea, so we copy shared files into cwd instead, mirroring
-    smoke_test.py). Fixture files are written by the caller first and win."""
+def _copy_build_inputs(tmp: str, module_dir: str, skip: tuple) -> None:
+    """Populate the isolated build dir the comma-safe way (copy shared files into
+    cwd rather than adding the comma-bearing OneDrive path to TEXINPUTS)."""
     for entry in os.listdir(TEXLIB_ROOT):
         src = os.path.join(TEXLIB_ROOT, entry)
         if os.path.isfile(src) and entry.lower().endswith((".sty", ".lua", ".cls")):
             dest = os.path.join(tmp, entry)
             if not os.path.exists(dest):
                 shutil.copy2(src, dest)
-    # The exam class and its default includes (autoexam-instructions.tex, ...),
-    # skipping the shipped template/bank that the fixture replaces.
-    for entry in os.listdir(EXAMS_DIR):
-        src = os.path.join(EXAMS_DIR, entry)
+    mod = os.path.join(TEXLIB_ROOT, module_dir)
+    for entry in os.listdir(mod):
+        src = os.path.join(mod, entry)
         if not os.path.isfile(src):
             continue
-        if entry in ("autoexam-template.tex", "bank.tex") or entry.lower().endswith(".md"):
+        if entry in skip or entry.lower().endswith(".md"):
             continue
         dest = os.path.join(tmp, entry)
         if not os.path.exists(dest):
             shutil.copy2(src, dest)
 
 
-def build(macro: str, timeout: int = 180) -> tuple[str | None, str]:
-    """Compile the fixture with `macro` injected before \\input. Returns
-    (normalized_text, error). text is None if the build or extraction failed."""
+def build(cfg: dict, macro: str, timeout: int = 180) -> tuple[str | None, str]:
     tmp = tempfile.mkdtemp(prefix="texlib_modefx_")
     try:
-        for name, content in (("coursemeta.tex", COURSEMETA_TEX),
-                              ("bank.tex", BANK_TEX),
-                              ("exam.tex", EXAM_TEX)):
+        files = [("coursemeta.tex", COURSEMETA_TEX), ("doc.tex", cfg["doc"])]
+        if cfg["with_bank"]:
+            files.append(("bank.tex", BANK_TEX))
+        for name, content in files:
             with open(os.path.join(tmp, name), "w", encoding="utf-8") as fh:
                 fh.write(content)
-        _copy_build_inputs(tmp)
+        _copy_build_inputs(tmp, cfg["module_dir"], cfg["skip"])
 
-        arg = (f"{macro}\\input{{exam.tex}}") if macro else "exam.tex"
+        arg = f"{macro}\\input{{doc.tex}}" if macro else "doc.tex"
         cmd = [LUALATEX, "-interaction=nonstopmode", "-halt-on-error",
-               "-shell-escape", "-jobname=exam", arg]
-        # Two passes: the dual-copy version loop and \pageref{LastPage} settle on
-        # the second run (as latexmk / the Sublime builder do).
+               "-shell-escape", "-jobname=doc", arg]
         rc = 0
         for _ in range(2):
             proc = subprocess.run(cmd, cwd=tmp, capture_output=True, text=True,
                                   encoding="utf-8", errors="replace", timeout=timeout)
             rc = proc.returncode
-        pdf = os.path.join(tmp, "exam.pdf")
+        pdf = os.path.join(tmp, "doc.pdf")
         if rc != 0 or not os.path.exists(pdf):
-            return None, f"lualatex exit={rc}, pdf={'yes' if os.path.exists(pdf) else 'no'}"
-
+            tail = "\n".join((proc.stdout or "").splitlines()[-8:])
+            return None, f"lualatex exit={rc}, pdf={'yes' if os.path.exists(pdf) else 'no'}\n{tail}"
         raw = subprocess.run([PDFTOTEXT, "-layout", pdf, "-"], capture_output=True,
                              text=True, encoding="utf-8", errors="replace",
                              timeout=60).stdout
@@ -275,66 +264,64 @@ def build(macro: str, timeout: int = 180) -> tuple[str | None, str]:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _mismatch(kind: str, needles: list[str], text: str, expected: bool) -> str:
+    present = [n for n in needles if n in text]
+    if expected:
+        return f"expected {kind} shown, missing: {[n for n in needles if n not in text]}"
+    return f"LEAK: {kind} appeared in a build that must hide it: {present}"
+
+
+def run_class(cfg: dict) -> None:
+    print(f"\n#### class: {cfg['name']} ####")
+    for label, macro, expect in cfg["modes"]:
+        print(f"=== {cfg['name']} / {label} ({macro or 'no flags'}) ===")
+        text, err = build(cfg, macro)
+        if text is None:
+            check(f"[{cfg['name']}/{label}] builds + extracts", False, err)
+            continue
+        stems_ok = all(n in text for n in cfg["stems"])
+        check(f"[{cfg['name']}/{label}] fixture rendered (stems present)", stems_ok,
+              "stem anchors missing -- build or extraction broken")
+        if not stems_ok:
+            continue
+
+        sol = any(n in text for n in cfg["sols"])
+        check(f"[{cfg['name']}/{label}] solution {'present' if expect['sol'] else 'absent'}",
+              sol == expect["sol"], _mismatch("solution", cfg["sols"], text, expect["sol"]))
+
+        if cfg["kind"] == "examquiz":
+            ans = bool(ANSWER_BADGE_RE.search(text))
+            check(f"[{cfg['name']}/{label}] MC answer letter {'present' if expect['ans'] else 'absent'}",
+                  ans == expect["ans"],
+                  f"badge {'matched' if ans else 'no match'}, expected {expect['ans']}")
+            rub = any(n in text for n in RUBRIC_NEEDLES)
+            check(f"[{cfg['name']}/{label}] rubric {'present' if expect['rub'] else 'absent'}",
+                  rub == expect["rub"], _mismatch("rubric", RUBRIC_NEEDLES, text, expect["rub"]))
+        else:  # pset: check the StudentMode blank answer box
+            blank = bool(STUDENT_BOX_RE.search(text))
+            check(f"[{cfg['name']}/{label}] student blank box {'present' if expect['blank'] else 'absent'}",
+                  blank == expect["blank"],
+                  f"'Show your work here' {'found' if blank else 'absent'}, expected {expect['blank']}")
+        print()
+
+
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(errors="backslashreplace")  # type: ignore[attr-defined]
         except (AttributeError, ValueError):
             pass
-
-    print("TeXLib build-mode leakage guard\n")
+    print("TeXLib build-mode leakage guard (exam / quiz / pset)\n")
     if not LUALATEX:
         print("  SKIP  lualatex not found.")
         return 0
     if not PDFTOTEXT:
-        print("  SKIP  no poppler-flavored pdftotext (avoiding Git's xpdf build).")
+        print("  SKIP  no poppler-flavored pdftotext.")
         return 0
-
-    for label, macro, expect in MODES:
-        print(f"=== mode: {label} ({macro or 'no flags'}) ===")
-        text, err = build(macro)
-        if text is None:
-            check(f"[{label}] fixture builds + extracts", False, err)
-            continue
-
-        # Sanity anchor: if the stems didn't render, the build/extraction is
-        # broken -- report THAT, so a broken toolchain isn't misread as a flag
-        # correctly hiding content.
-        stems_ok = all(n in text for n in STEM_NEEDLES)
-        check(f"[{label}] fixture rendered (stems present)", stems_ok,
-              "stem anchors missing -- build or pdftotext extraction is broken")
-        if not stems_ok:
-            continue
-
-        sol = any(n in text for n in SOLUTION_NEEDLES)
-        ans = bool(ANSWER_BADGE_RE.search(text))
-        rub = any(n in text for n in RUBRIC_NEEDLES)
-
-        # Solutions: leak (present when it must be absent) OR no-op (absent when
-        # it must be present) both fail here.
-        check(f"[{label}] solution tokens {'present' if expect['sol'] else 'absent'}",
-              sol == expect["sol"],
-              _mismatch("solution", SOLUTION_NEEDLES, text, expect["sol"]))
-        # MC correct-answer badge.
-        check(f"[{label}] MC answer letter {'present' if expect['ans'] else 'absent'}",
-              ans == expect["ans"],
-              f"ANSWER_BADGE_RE {'matched' if ans else 'no match'}, "
-              f"expected {'match' if expect['ans'] else 'no match'}")
-        # Rubric overlay.
-        check(f"[{label}] rubric tokens {'present' if expect['rub'] else 'absent'}",
-              rub == expect["rub"],
-              _mismatch("rubric", RUBRIC_NEEDLES, text, expect["rub"]))
-        print()
-
+    for cfg in CLASSES:
+        run_class(cfg)
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
-
-
-def _mismatch(kind: str, needles: list[str], text: str, expected: bool) -> str:
-    present = [n for n in needles if n in text]
-    if expected:
-        return f"expected {kind} tokens shown, missing: {[n for n in needles if n not in text]}"
-    return f"LEAK: {kind} tokens appeared in a build that must hide them: {present}"
 
 
 if __name__ == "__main__":
