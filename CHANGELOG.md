@@ -4,6 +4,8 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-07-13
+
 ### Changed
 
 - **The native Sublime plugin gains a live status bar, editor delegations, domain depth, and a Doctor — and no longer installs classes into TEXMF (it *uninstalls* a shadowing copy instead).** Builds show a status-bar spinner + current step (parallel-safe across concurrent document builds), report success-with-warnings, and color the panel theme-agnostically (`region.redish`/`region.yellowish`). New commands: Word Count / Table of Contents / Jump-to-`\ref` (delegated to LaTeXTools), Edit Settings, Insert Problem by Topic, Bank Report, Bank Preview (via `bank.cls`), Show Resolved Metadata, Toggle Build on Save, and **`TeXLib: Doctor`** (checks the toolchain, `texinputs`, coursemeta resolution, and whether a `TEXMFHOME` copy shadows your checkout). Coursemeta keys complete inside `\metasetup{ }`. The former "Install Classes to TEXMF" is replaced by **Uninstall Classes from TEXMF**: the plugin's builds already resolve the classes from your checkout via `texinputs`, so a `TEXMFHOME` copy only *shadows* it (kpathsea/LUAINPUTS can find the stale copy first); the command removes it, and a one-time build-time warning nudges you when a shadow is present. System-wide install stays the standalone TeXLib-Installer's job; the plugin's own distribution channel is decided as a Package Control custom repository (`messages.json` scaffolded).
@@ -248,7 +250,8 @@ Initial public-on-GitHub release. Snapshot of TeXLib after the documentation pas
 - `course-metadata_old.sty` (v7) was archived on the `archive/old-metadata` branch before deletion. Recoverable from there if ever needed.
 - A handful of pre-class-consolidation prototypes (`Bingo/bingo.tex`, `Bingo/bingo_og.tex`, `Bingo/Math 181 Su25 *.tex`) and dev-test files (`Notes/test_aliases.*`, `Notes/test_conv_fix.*`, `Notes/test_labeledsection.*`) were deleted from disk before the first commit, so they have no history in this repo.
 
-[Unreleased]: https://github.com/landonfox00/TeXLib/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/landonfox00/TeXLib/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/landonfox00/TeXLib/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/landonfox00/TeXLib/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/landonfox00/TeXLib/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/landonfox00/TeXLib/releases/tag/v0.1.1
