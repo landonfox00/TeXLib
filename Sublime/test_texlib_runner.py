@@ -22,6 +22,8 @@ import types
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "texlib"))  # texlib.py + texlib_build.py
 
+from _testkit import check  # noqa: E402
+
 # --- Stub the Sublime API so texlib.py imports outside the editor ------------
 _sublime = types.ModuleType("sublime")
 _sublime.set_timeout = lambda fn, ms=0: fn()  # run marshaled callbacks inline
@@ -87,11 +89,6 @@ class PopenFactory:
         lines = self.scripts.pop(0) if self.scripts else []
         self.last = FakePopen(lines)
         return self.last
-
-
-def check(cond, label):
-    print("  [%s] %s" % ("OK " if cond else "FAIL", label))
-    return cond
 
 
 ok = True
