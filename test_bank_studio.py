@@ -15,6 +15,7 @@ import unittest
 import bank_parser
 import bank_studio
 import exam_writer
+import usage_scan
 
 
 BANK = r"""
@@ -206,6 +207,42 @@ class ExamWriterTests(unittest.TestCase):
         out2 = exam_writer.move_problem(out, mc_index, -1)
         self.assertEqual(exam_writer.public_entries(out2),
                          exam_writer.public_entries(out))
+
+
+class UsageScanTests(unittest.TestCase):
+    def setUp(self):
+        self.d = tempfile.mkdtemp(prefix="bankstudio-usage-")
+        self._w("bank.tex", BANK)
+        # frac-lim (topic=limit), deriv-mc (topic=derivative)
+        self._w("exam-01.tex", r"\begin{problems}\problem{topic=limit}\end{problems}")
+        self._w("quiz-02.tex", r"\begin{questions}\question\getproblem{frac-lim}\end{questions}")
+        self._w("review.tex", r"\getproblem{topic=derivative}  % by topic")
+        _, self.probs = bank_parser.discover(os.path.join(self.d, "exam-01.tex"))
+
+    def _w(self, name, text):
+        with open(os.path.join(self.d, name), "w", encoding="utf-8") as fh:
+            fh.write(text)
+
+    def test_scans_id_and_topic_uses(self):
+        # exclude the bank + the current exam (mirrors the server)
+        exclude = {os.path.join(self.d, "bank.tex"), os.path.join(self.d, "exam-01.tex")}
+        usage = usage_scan.scan(self.d, self.probs, exclude)
+        # frac-lim referenced by id in quiz-02
+        self.assertIn({"file": "quiz-02.tex", "by": "id"}, usage["frac-lim"])
+        # deriv-mc referenced by topic in review.tex
+        self.assertIn({"file": "review.tex", "by": "topic"}, usage["deriv-mc"])
+        # excluded files never appear
+        files = [h["file"] for hits in usage.values() for h in hits]
+        self.assertNotIn("bank.tex", files)
+        self.assertNotIn("exam-01.tex", files)
+
+    def test_definition_is_not_a_use(self):
+        # a \begin{problem}{frac-lim} definition must not count as usage
+        self._w("otherbank.tex", r"\begin{problem}{frac-lim}[topic=x]stem\end{problem}")
+        usage = usage_scan.scan(self.d, self.probs,
+                                {os.path.join(self.d, "bank.tex")})
+        files = [h["file"] for h in usage["frac-lim"]]
+        self.assertNotIn("otherbank.tex", files)
 
 
 class ServerHelperTests(unittest.TestCase):

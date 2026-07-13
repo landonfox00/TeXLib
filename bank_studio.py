@@ -29,6 +29,7 @@ from urllib.parse import urlparse, parse_qs, unquote
 import bank_parser
 import bank_render
 import exam_writer
+import usage_scan
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bank_studio_web")
 _MIME = {
@@ -159,8 +160,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def _api_bank(self):
         problems = refresh_bank()
+        usage = usage_scan.scan(os.path.dirname(CTX["exam"]), problems,
+                                set(CTX["sources"]))
+        dicts = []
+        for p in problems:
+            d = p.to_dict()
+            d["used_in"] = usage.get(p.id, [])
+            dicts.append(d)
         self._json({
-            "problems": [p.to_dict() for p in problems],
+            "problems": dicts,
             "render_available": bank_render.available(),
             "sources": CTX["sources"],
             "exam": exam_state(),

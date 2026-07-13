@@ -110,7 +110,33 @@ button{font:inherit}
 .chip.pts{color:var(--ink-2); background:var(--panel-2); border:1px solid var(--line); font-family:var(--mono); font-weight:600}
 .chip.sec{color:var(--ink-2); background:transparent; border:1px dashed var(--line); font-family:var(--mono); font-weight:600}
 .chip.dup{color:var(--warn); background:var(--mc-weak)}
+.chip.used{color:var(--mc); background:var(--mc-weak)}
 .in-exam-dot{margin-left:auto; color:var(--ok); font-size:11px; font-weight:700}
+
+/* used-before line in the preview */
+.pv-used{font-size:12.5px; color:var(--ink-2); margin:0 0 16px}
+.fresh-tag{color:var(--ok); font-weight:600}
+.used-file{display:inline-flex; align-items:center; gap:4px; font-family:var(--mono); font-size:12px;
+  background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:2px 7px; margin:0 4px 4px 0}
+.used-file em{font-style:normal; font-size:9.5px; color:var(--mc); text-transform:uppercase; letter-spacing:.03em}
+
+/* coverage / points-budget meter */
+.coverage{margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--line)}
+.cov-row{display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--ink-2); margin:0 0 5px}
+.cov-row b{color:var(--ink); font-family:var(--mono); font-size:13px}
+.cov-target{width:52px; font:inherit; font-family:var(--mono); font-size:12px; text-align:right;
+  border:1px solid var(--line); border-radius:6px; padding:2px 5px; background:var(--panel); color:var(--ink)}
+.cov-bar{height:7px; background:var(--panel-2); border:1px solid var(--line); border-radius:20px; overflow:hidden; margin:0 0 10px}
+.cov-bar i{display:block; height:100%; background:var(--accent); border-radius:20px; transition:width .25s}
+.cov-bar i.over{background:var(--ok)}
+.cov-topics{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px}
+.cov-chip{font-size:11px; font-family:var(--mono); padding:3px 8px; border-radius:6px;
+  background:var(--panel-2); border:1px solid var(--line); color:var(--ink-2)}
+.cov-chip b{color:var(--ink)}
+.cov-chip.zero{border-style:dashed; color:var(--ink-3); opacity:.85}
+.cov-chip.zero b{color:var(--warn)}
+.approx{font-style:normal; font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-3);
+  border:1px solid var(--line); border-radius:4px; padding:0 4px; margin-left:4px}
 
 /* ---------- preview ---------- */
 .preview{overflow-y:auto; flex:1; padding:22px 26px; background:var(--panel)}

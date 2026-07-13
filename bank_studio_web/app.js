@@ -8,7 +8,8 @@ const S = {
   problems: [], byId: {}, exam: { entries: [] }, sources: [], renderAvailable: false,
   tab: "desk", insertMode: "id",
   // desk
-  selected: null, pvMode: "rendered", showSol: true, filters: { q: "", topic: "all", type: "all" },
+  selected: null, pvMode: "rendered", showSol: true, target: 100,
+  filters: { q: "", topic: "all", type: "all", fresh: false },
   // composer
   compMode: "rendered", caret: "end", flashArg: null,
   // wall
@@ -93,9 +94,11 @@ function topics() { const t = []; S.problems.forEach((p) => { if (p.topic && !t.
 function matchWith(p, f) {
   if (f.topic !== "all" && p.topic !== f.topic) return false;
   if (f.type !== "all" && p.type !== f.type) return false;
+  if (f.fresh && (p.used_in || []).length) return false;
   if (f.q) { const hay = `${p.id} ${p.topic} ${p.section} ${p.preview}`.toLowerCase(); if (!hay.includes(f.q.toLowerCase())) return false; }
   return true;
 }
+function usedFiles(p) { return [...new Set((p.used_in || []).map((u) => u.file))]; }
 function inExam(id) { const p = S.byId[id] || {}; return S.exam.entries.some((e) => e.arg === id || e.arg === "topic=" + p.topic); }
 function argFor(p) { return (S.insertMode === "filter" && p.topic) ? "topic=" + p.topic : p.id; }
 
@@ -108,20 +111,24 @@ function renderDeskFilters() {
   topics().forEach((t) => { h += `<button class="fchip" data-topic="${esc(t)}" aria-pressed="${f.topic === t}">${esc(t)}</button>`; });
   h += `<button class="fchip" data-type="fr" aria-pressed="${f.type === "fr"}">FR</button>`;
   h += `<button class="fchip" data-type="mc" aria-pressed="${f.type === "mc"}">MC</button>`;
+  h += `<button class="fchip" data-fresh="1" aria-pressed="${!!f.fresh}" title="Only problems not used in your other assessments">&#10022; Fresh only</button>`;
   $("#filters").innerHTML = h;
 }
 function renderRows() {
   const rows = S.problems.filter((p) => matchWith(p, S.filters));
   $("#count").textContent = `${rows.length} of ${S.problems.length} problems`;
-  $("#rows").innerHTML = rows.map((p) => `
+  $("#rows").innerHTML = rows.map((p) => {
+    const uf = usedFiles(p);
+    return `
     <div class="prow" data-pid="${esc(p.id)}" aria-current="${S.selected === p.id}" tabindex="0" role="button">
       <div class="r1"><span class="pid">${esc(p.id)}</span></div>
       <div class="r2">${typeChip(p)}
         ${p.section ? `<span class="chip sec">&sect;${esc(p.section)}</span>` : ""}
         ${p.points != null ? `<span class="chip pts">${p.points} pts</span>` : ""}
         ${p.duplicate ? `<span class="chip dup">dup id</span>` : ""}
+        ${uf.length ? `<span class="chip used" title="Used in: ${esc(uf.join(", "))}">used &times;${uf.length}</span>` : ""}
         ${inExam(p.id) ? `<span class="in-exam-dot">&#10003; in exam</span>` : ""}</div>
-    </div>`).join("") || `<div class="empty">No problems match.</div>`;
+    </div>`; }).join("") || `<div class="empty">No problems match.</div>`;
 }
 function renderPreview() {
   const p = S.byId[S.selected]; const box = $("#preview");
@@ -135,6 +142,7 @@ function renderPreview() {
       ${p.topic ? `<span>topic: <b>${esc(p.topic)}</b></span>` : ""}
       ${p.source ? `<span>source: ${esc(p.source)}</span>` : ""}
       ${p.points != null ? `<span class="chip pts">${p.points} pts</span>` : ""}</div>
+    <div class="pv-used">${usedText(p)}</div>
     <div class="pv-toolbar">
       <div class="seg" role="group" aria-label="View">
         <button data-pv="rendered" aria-pressed="${S.pvMode === "rendered"}">Rendered</button>
@@ -173,8 +181,43 @@ function renderTray() {
   }
   $("#tray-n").textContent = `${entries.length} q`;
   $("#tray-total").innerHTML = `${entries.length} &middot; ${knownPoints()}`;
+  renderCoverage();
 }
-function knownPoints() { let n = 0; S.exam.entries.forEach((e) => { const p = S.byId[e.arg]; if (p && p.points != null) n += p.points; }); return n; }
+function filterRep(arg) { const m = /topic=([^,]+)/.exec(arg); if (!m) return null; const t = m[1].trim(); return S.problems.find((p) => p.topic === t && p.points != null) || null; }
+function knownPoints() {
+  let n = 0;
+  S.exam.entries.forEach((e) => {
+    if (e.is_filter) { const c = filterRep(e.arg); if (c) n += c.points; }
+    else { const p = S.byId[e.arg]; if (p && p.points != null) n += p.points; }
+  });
+  return n;
+}
+function pointsApprox() { return S.exam.entries.some((e) => e.is_filter && filterRep(e.arg)); }
+function usedText(p) {
+  const u = p.used_in || [];
+  if (!u.length) return `<span class="fresh-tag">&#10022; Fresh &mdash; not used in your other assessments</span>`;
+  return `Used in: ` + u.map((h) => `<span class="used-file">${esc(h.file)}<em>${h.by}</em></span>`).join(" ");
+}
+
+/* coverage / points-budget meter (desk tray) */
+function renderCoverage() {
+  const el = $("#coverage"); if (!el) return;
+  const pts = knownPoints(), target = S.target;
+  const pct = target > 0 ? Math.min(100, Math.round((pts / target) * 100)) : 0;
+  const tps = topics();
+  const examCount = (t) => S.exam.entries.filter((e) => e.arg === "topic=" + t || (S.byId[e.arg] && S.byId[e.arg].topic === t)).length;
+  const availCount = (t) => S.problems.filter((p) => p.topic === t).length;
+  const covered = tps.filter((t) => examCount(t) > 0).length;
+  el.innerHTML = `
+    <div class="cov-row"><span>Points budget${pointsApprox() ? ` <em class="approx" title="includes topic-filter estimates">approx</em>` : ""}</span>
+      <span><b>${pts}</b> / <input class="cov-target" id="cov-target" type="number" min="0" step="5" value="${target}"></span></div>
+    <div class="cov-bar"><i style="width:${pct}%" class="${pts > target ? "over" : ""}"></i></div>
+    <div class="cov-row"><span>Topic coverage</span><span>${covered}/${tps.length} topics</span></div>
+    <div class="cov-topics">${tps.map((t) => {
+      const c = examCount(t), a = availCount(t);
+      return `<span class="cov-chip ${c ? "" : "zero"}" title="${c} on exam of ${a} available">${esc(t)} <b>${c}</b>/${a}</span>`;
+    }).join("")}</div>`;
+}
 
 /* =======================================================================
    COMPOSER
@@ -384,13 +427,14 @@ function copyText(txt, msg) {
 
 /* ---------- events ---------- */
 document.addEventListener("click", (ev) => {
-  const el = ev.target.closest("[data-tab],[data-pid],[data-topic],[data-type],[data-pv],[data-mode],[data-comp-view],[data-caret],[data-pal],[data-card],[data-wadd],[data-wtopic],[data-wtype],[data-act]");
+  const el = ev.target.closest("[data-tab],[data-pid],[data-topic],[data-type],[data-fresh],[data-pv],[data-mode],[data-comp-view],[data-caret],[data-pal],[data-card],[data-wadd],[data-wtopic],[data-wtype],[data-act]");
   if (!el) return;
   const d = el.dataset;
   if (d.tab) switchTab(d.tab);
   else if (d.pid != null && d.act == null) { S.selected = d.pid; renderRows(); renderPreview(); }
   else if (d.topic != null) { S.filters.topic = d.topic; renderDeskFilters(); renderRows(); }
   else if (d.type != null) { S.filters.type = S.filters.type === d.type ? "all" : d.type; renderDeskFilters(); renderRows(); }
+  else if (d.fresh != null) { S.filters.fresh = !S.filters.fresh; renderDeskFilters(); renderRows(); }
   else if (d.pv != null) { S.pvMode = d.pv; renderPreview(); }
   else if (d.mode != null) { S.insertMode = d.mode; $$('[data-mode]').forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === S.insertMode)); if (S.tab === "desk") renderPreview(); }
   else if (d.compView != null) { S.compMode = d.compView; $$('[data-comp-view]').forEach((b) => b.setAttribute("aria-pressed", b.dataset.compView === S.compMode)); renderComposer(); }
@@ -413,7 +457,10 @@ function handleAct(a, d) {
   else if (a === "modal-remove") { removeByPid(d.pid).then(() => openModal(d.pid)); }
   else if (a === "close-modal") closeModal();
 }
-document.addEventListener("change", (ev) => { if (ev.target.id === "sol-toggle") { S.showSol = ev.target.checked; renderDeskSlot(); } });
+document.addEventListener("change", (ev) => {
+  if (ev.target.id === "sol-toggle") { S.showSol = ev.target.checked; renderDeskSlot(); }
+  else if (ev.target.id === "cov-target") { S.target = Math.max(0, +ev.target.value || 0); renderCoverage(); }
+});
 document.addEventListener("keydown", (ev) => {
   if ($("#palette-overlay").classList.contains("open")) {
     if (ev.key === "Escape") { closePalette(); ev.preventDefault(); }
