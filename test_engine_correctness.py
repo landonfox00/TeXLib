@@ -55,13 +55,13 @@ FIXTURES = os.path.join(TEXLIB_ROOT, "tests", "fixtures", "Exams")
 def _build_root():
     r"""The checkout whose shared TeXLib files (.cls/.sty/.lua) the builds resolve
     against.  Defaults to this repo; TEXLIB_TEST_ROOT overrides it to a SPECIFIC
-    checkout/worktree.  On Windows kpathsea cannot search an absolute TEXINPUTS
-    entry containing a comma (the real OneDrive path has one), so the default is
-    routed through the C:\_texlibjunc junction when present -- which resolves to
-    the MAIN working tree, NOT necessarily this checkout.  On CI (Linux) the repo
-    root is used directly."""
+    checkout/worktree.  Windows kpathsea cannot search an absolute TEXINPUTS entry
+    containing a comma (the OneDrive checkout's path has one), so ONLY a comma path
+    is rerouted through the comma-free C:\_texlibjunc junction; a comma-free
+    worktree (or CI on Linux) is used directly, so the test builds against THIS
+    checkout.  Matches test_synctex_integration / test_shuffle_integration."""
     root = os.environ.get("TEXLIB_TEST_ROOT") or TEXLIB_ROOT
-    if root is TEXLIB_ROOT and os.name == "nt" and os.path.isdir(r"C:\_texlibjunc"):
+    if os.name == "nt" and "," in root and os.path.isdir(r"C:\_texlibjunc"):
         root = r"C:\_texlibjunc"
     return root
 
@@ -488,13 +488,7 @@ def scenario_vmap_emission():
 
 def main():
     print("TeXLib problem-bank engine correctness tests\n")
-    _root = _build_root()
-    print(f"  build root: {_root}")
-    if (os.name == "nt" and not os.environ.get("TEXLIB_TEST_ROOT")
-            and os.path.normcase(_root) == os.path.normcase(r"C:\_texlibjunc")):
-        print(f"    NOTE: builds resolve against {_root} (your MAIN working tree),")
-        print("    NOT necessarily this checkout. Set TEXLIB_TEST_ROOT to a")
-        print("    comma-free path to test a specific worktree.")
+    print(f"  build root: {_build_root()}  (override with TEXLIB_TEST_ROOT)")
     print()
     if not LUALATEX:
         print("  SKIP  lualatex not found.")
