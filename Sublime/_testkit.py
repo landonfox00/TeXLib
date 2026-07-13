@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Shared scaffolding for the TeXLib Sublime test suite: stub modules and tiny
-result helpers copy-pasted across test_*.py. Dev-only -- deploy.ps1 excludes it.
-Because Python puts a script's own directory on sys.path, `import _testkit`
-resolves from any Sublime/test_*.py with no extra path setup."""
+"""Shared scaffolding for the TeXLib Sublime test suite: stub modules, tiny
+result helpers, and toolchain probes copy-pasted across test_*.py. Dev-only --
+deploy.ps1 excludes it. Because Python puts a script's own directory on sys.path,
+`import _testkit` resolves from any Sublime/test_*.py with no extra path setup."""
 import os
+import shutil
+import subprocess
 import sys
 import types
 
@@ -45,3 +47,24 @@ def touch(root, rel, body=""):
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(body)
     return path
+
+
+def find_poppler(tool="pdftotext"):
+    """Absolute path to a poppler-flavored `tool` (pdftotext/pdftoppm), or None.
+    Git for Windows ships an xpdf-flavored pdftotext that shadows poppler's on
+    PATH and silently lacks -bbox (prints usage instead of erroring), so probe
+    the -v banner and take the first candidate whose banner says poppler."""
+    candidates = []
+    which = shutil.which(tool)
+    if which:
+        candidates.append(which)
+    candidates.append(rf"C:\texlive\2025\bin\windows\{tool}.exe")
+    for cand in candidates:
+        try:
+            proc = subprocess.run([cand, "-v"], capture_output=True, text=True,
+                                  encoding="utf-8", errors="replace", timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if "poppler" in ((proc.stdout or "") + (proc.stderr or "")).lower():
+            return cand
+    return None

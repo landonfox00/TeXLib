@@ -90,30 +90,10 @@ def check(label, cond, detail=""):
             print(f"        {detail}")
 
 
-# --- Poppler pdftotext detection (avoid Git's xpdf build) --------------------
-def _find_poppler_pdftotext():
-    """A poppler-flavored pdftotext. Git for Windows ships an xpdf pdftotext
-    earlier on PATH whose page/text handling differs; prefer the first
-    candidate whose version banner says poppler (mirrors
-    test_synctex_integration.py's probe)."""
-    candidates = []
-    which = shutil.which("pdftotext")
-    if which:
-        candidates.append(which)
-    candidates.append(r"C:\texlive\2025\bin\windows\pdftotext.exe")
-    for cand in candidates:
-        try:
-            proc = subprocess.run([cand, "-v"], capture_output=True, text=True,
-                                   encoding="utf-8", errors="replace", timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        banner = (proc.stdout or "") + (proc.stderr or "")
-        if "poppler" in banner.lower():
-            return cand
-    return None
+from _testkit import find_poppler  # noqa: E402
 
 
-PDFTOTEXT = _find_poppler_pdftotext()
+PDFTOTEXT = find_poppler()
 
 
 # --- Build-dir assembly ------------------------------------------------------

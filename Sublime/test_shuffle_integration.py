@@ -84,30 +84,12 @@ def _texinputs_env():
     return env
 
 
-def _find_poppler(tool):
-    """A poppler-flavored `tool` (pdftotext/pdftoppm). Git for Windows ships an
-    xpdf-flavored pdftotext that shadows poppler's on PATH and silently lacks
-    -bbox (prints its usage instead of erroring), so probe the version banner
-    and take the first candidate whose banner says poppler."""
-    candidates = []
-    which = shutil.which(tool)
-    if which:
-        candidates.append(which)
-    candidates.append(rf"C:\texlive\2025\bin\windows\{tool}.exe")
-    for cand in candidates:
-        try:
-            proc = subprocess.run([cand, "-v"], capture_output=True, text=True,
-                                   encoding="utf-8", errors="replace", timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        if "poppler" in ((proc.stdout or "") + (proc.stderr or "")).lower():
-            return cand
-    return None
+from _testkit import find_poppler  # noqa: E402
 
 
 LUALATEX = shutil.which("lualatex")
-PDFTOTEXT = _find_poppler("pdftotext")
-PDFTOPPM = _find_poppler("pdftoppm")
+PDFTOTEXT = find_poppler("pdftotext")
+PDFTOPPM = find_poppler("pdftoppm")
 
 
 # ============================================================================

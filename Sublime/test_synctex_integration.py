@@ -154,34 +154,10 @@ def check(label, cond, detail="", known_issue=None):
             print(f"        {detail}")
 
 
-# --- Poppler pdftotext detection ---------------------------------------------
-def _find_poppler_pdftotext():
-    """A poppler-flavored pdftotext (the one that supports -bbox).
-
-    On some Windows dev setups, Git for Windows ships its own xpdfreader
-    pdftotext earlier on PATH; that build silently lacks -bbox (it just
-    prints its own usage text instead of erroring), which would make every
-    find_word() call below return no matches with no obvious cause. Probe
-    candidates and pick the first whose version banner mentions poppler.
-    """
-    candidates = []
-    which = shutil.which("pdftotext")
-    if which:
-        candidates.append(which)
-    candidates.append(r"C:\texlive\2025\bin\windows\pdftotext.exe")
-    for cand in candidates:
-        try:
-            proc = subprocess.run([cand, "-v"], capture_output=True, text=True,
-                                   encoding="utf-8", errors="replace", timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        banner = (proc.stdout or "") + (proc.stderr or "")
-        if "poppler" in banner.lower():
-            return cand
-    return None
+from _testkit import find_poppler  # noqa: E402
 
 
-PDFTOTEXT = _find_poppler_pdftotext()
+PDFTOTEXT = find_poppler()
 
 
 # --- Real-builder driver, mirroring test_biber_integration.py's run_build ---
