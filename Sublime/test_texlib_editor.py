@@ -11,26 +11,16 @@ Run:  python Sublime/test_texlib_editor.py
 """
 import os
 import sys
-import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "texlib"))
 
 # Minimal sublime / sublime_plugin stubs (WindowCommand is subclassed).
-sys.modules["sublime"] = types.ModuleType("sublime")
-_plugin = types.ModuleType("sublime_plugin")
-_plugin.WindowCommand = object
-_plugin.EventListener = object
-_plugin.ViewEventListener = object
-sys.modules["sublime_plugin"] = _plugin
+from _testkit import stub_sublime, check, report  # noqa: E402
+stub_sublime("WindowCommand", "EventListener", "ViewEventListener")
 
 import texlib          # noqa: E402
 import texlib_editor   # noqa: E402
-
-
-def check(cond, label):
-    print("  [%s] %s" % ("OK " if cond else "FAIL", label))
-    return cond
 
 
 ok = True
@@ -71,5 +61,4 @@ ok &= check(texlib_editor.TexlibWordCountCommand.latextools_command
 ok &= check(hasattr(texlib_editor, "TexlibEditSettingsCommand"),
             "P3: TexlibEditSettingsCommand present")
 
-print("\nALL PASS" if ok else "\nFAILURES ABOVE")
-sys.exit(0 if ok else 1)
+report(ok)

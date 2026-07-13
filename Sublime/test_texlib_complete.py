@@ -9,23 +9,14 @@ Run:  python Sublime/test_texlib_complete.py
 """
 import os
 import sys
-import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "texlib"))
 
-sys.modules["sublime"] = types.ModuleType("sublime")
-_plugin = types.ModuleType("sublime_plugin")
-_plugin.EventListener = object
-_plugin.WindowCommand = object  # texlib_bank defines WindowCommands at import
-sys.modules["sublime_plugin"] = _plugin
+from _testkit import stub_sublime, check, report  # noqa: E402
+stub_sublime("EventListener", "WindowCommand")
 
 import texlib_complete as tc  # noqa: E402
-
-
-def check(cond, label):
-    print("  [%s] %s" % ("OK " if cond else "FAIL", label))
-    return cond
 
 
 ctx = tc.completion_context
@@ -43,5 +34,4 @@ ok &= check(ctx("plain words her", "r") is None, "ordinary prose -> None")
 ok &= check(ctx("\\setvar{x}{y}", "}") is None,
             "a non-id macro is not treated as ids")
 
-print("\nALL PASS" if ok else "\nFAILURES ABOVE")
-sys.exit(0 if ok else 1)
+report(ok)

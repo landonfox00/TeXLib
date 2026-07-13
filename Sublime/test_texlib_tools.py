@@ -2,22 +2,14 @@
 """Headless coverage for the course-tool wrappers (texlib/texlib_tools.py)."""
 import os
 import sys
-import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "texlib"))
 
-sys.modules["sublime"] = types.ModuleType("sublime")
-_p = types.ModuleType("sublime_plugin")
-_p.WindowCommand = object
-sys.modules["sublime_plugin"] = _p
+from _testkit import stub_sublime, check, report  # noqa: E402
+stub_sublime("WindowCommand")
 
 import texlib_tools as TT  # noqa: E402
-
-
-def check(cond, label):
-    print("  [%s] %s" % ("OK " if cond else "FAIL", label))
-    return cond
 
 
 ok = True
@@ -38,5 +30,4 @@ for cls in (TT.TexlibBankMatrixCommand, TT.TexlibCollateKeysCommand,
             TT.TexlibVersionDiffCommand, TT.TexlibCoursemetaLintCommand):
     ok &= check(cls.script in TT.TOOL_ARG, "%s.script is a known tool" % cls.__name__)
 
-print("\nALL PASS" if ok else "\nFAILURES ABOVE")
-sys.exit(0 if ok else 1)
+report(ok)

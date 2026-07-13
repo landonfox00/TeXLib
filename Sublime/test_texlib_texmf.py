@@ -9,29 +9,14 @@ Run:  python Sublime/test_texlib_texmf.py
 import os
 import sys
 import tempfile
-import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "texlib"))
 
-sys.modules["sublime"] = types.ModuleType("sublime")
-_plugin = types.ModuleType("sublime_plugin")
-_plugin.WindowCommand = object
-sys.modules["sublime_plugin"] = _plugin
+from _testkit import stub_sublime, check, report, touch  # noqa: E402
+stub_sublime("WindowCommand")
 
 import texlib_texmf  # noqa: E402
-
-
-def touch(root, rel):
-    path = os.path.join(root, *rel.split("/"))
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    open(path, "w").close()
-    return path
-
-
-def check(cond, label):
-    print("  [%s] %s" % ("OK " if cond else "FAIL", label))
-    return cond
 
 
 ok = True
@@ -63,5 +48,4 @@ with tempfile.TemporaryDirectory() as root:
     ok &= check(texlib_texmf.shadows_checkout() is False,
                 "shadows_checkout: False after the copy is removed")
 
-print("\nALL PASS" if ok else "\nFAILURES ABOVE")
-sys.exit(0 if ok else 1)
+report(ok)

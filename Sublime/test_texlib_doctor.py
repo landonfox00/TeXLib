@@ -8,7 +8,6 @@ Run:  python Sublime/test_texlib_doctor.py
 """
 import os
 import sys
-import types
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -18,20 +17,12 @@ except Exception:  # noqa: BLE001
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "texlib"))
 
-sys.modules["sublime"] = types.ModuleType("sublime")
-_p = types.ModuleType("sublime_plugin")
-_p.WindowCommand = object
-_p.EventListener = object
-sys.modules["sublime_plugin"] = _p
+from _testkit import stub_sublime, check, report  # noqa: E402
+stub_sublime("WindowCommand", "EventListener")
 
 import texlib          # noqa: E402
 import texlib_doctor   # noqa: E402
 import texlib_texmf    # noqa: E402
-
-
-def check(cond, label):
-    print("  [%s] %s" % ("OK " if cond else "FAIL", label))
-    return cond
 
 
 ok = True
@@ -79,5 +70,4 @@ texlib._shadow_warned[0] = False
 ok &= check(texlib._shadow_warning_line(_Settings({"texinputs": "x"})) is None,
             "N3: no shadow -> no warning")
 
-print("\nALL PASS" if ok else "\nFAILURES ABOVE")
-sys.exit(0 if ok else 1)
+report(ok)
