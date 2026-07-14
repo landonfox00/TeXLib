@@ -19,6 +19,7 @@
     { "caption": "TeXLib: Jump to \\ref / \\cite Under Cursor", "command": "texlib_jump_to_ref" },
     { "caption": "TeXLib: Go to Bank Problem", "command": "texlib_goto_problem" },
     { "caption": "TeXLib: Insert Bank Problem (\\getproblem)", "command": "texlib_insert_problem" },
+    { "caption": "TeXLib: Open Bank Studio", "command": "texlib_open_bank_studio" },
     { "caption": "TeXLib: Insert Problem by Topic", "command": "texlib_insert_by_topic" },
     { "caption": "TeXLib: Bank Report (coverage)", "command": "texlib_bank_report" },
     { "caption": "TeXLib: Bank Preview (catalog PDF)", "command": "texlib_bank_preview" },
