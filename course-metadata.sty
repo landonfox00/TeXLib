@@ -219,7 +219,7 @@
 \bool_new:N \g__meta_found_bool
 \tl_new:N   \g__meta_path_tl
 \tl_new:N   \g__meta_dir_tl
-\clist_map_inline:nn { ., .., ../.., ../../.. } {
+\clist_map_inline:nn { ., .., ../.., ../../.., ../../../.., ../../../../.. } {
 	\file_if_exist:nT { #1/coursemeta.tex } {
 		\tl_gset:Nn \g__meta_path_tl { #1/coursemeta.tex }
 		\tl_gset:Nn \g__meta_dir_tl  { #1/ }
@@ -242,8 +242,9 @@
 % working while pointing at the likely cause.
 \msg_new:nnn { course-metadata } { no-coursemeta }
 	{
-		No~coursemeta.tex~found~(looked~in~.,~..,~../..,~../../..~relative~to~
-		the~job).~Course~metadata~will~be~empty~unless~provided~via~class~
+		No~coursemeta.tex~found~(looked~in~.,~..,~../..,~../../..,~../../../..,~
+		../../../../..~relative~to~the~job).~Course~metadata~will~be~empty~
+		unless~provided~via~class~
 		options~or~the~metasetup~command.~See~
 		examples/Math181-Fall2026/coursemeta.tex~for~the~expected~file.
 	}
