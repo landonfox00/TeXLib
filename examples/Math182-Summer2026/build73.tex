@@ -1,0 +1,21 @@
+%!TeX program = lualatex
+% =============================================================================
+% Math 182 (Summer 2026) --- standalone build of section 7.3 (Trigonometric Substitution)
+%
+% Compiles this one section on its own. Numbering (7.3, theorems 7.3.x)
+% is pinned by hand because \setcounter{section} normally fires inside
+% \maketitle, which a single-section build skips.
+% =============================================================================
+\documentclass[
+	unit   = Chapter,
+	number = 7,
+	title  = {Techniques of Integration},
+]{didactic}
+
+\begin{document}
+
+	\setcounter{section}{7}
+	\setcounter{subsection}{2}
+	\input{section-3}
+
+\end{document}

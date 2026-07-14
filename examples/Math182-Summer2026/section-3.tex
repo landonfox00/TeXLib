@@ -1,0 +1,455 @@
+% !TeX root = ../chapter7.tex
+
+% -----------------------------------------------------------------------------
+\subsection{Trigonometric Substitution}
+
+When an integrand contains a square root of a quadratic---$\sqrt{a^2 - x^2}$,
+$\sqrt{a^2 + x^2}$, or $\sqrt{x^2 - a^2}$---neither substitution nor parts
+applies, since there is nothing to cancel or to hand off. Instead, we replace
+$x$ with a trig function of a new angle $\theta$, chosen so that a Pythagorean
+identity rewrites the radicand as a perfect square.
+
+For instance, taking $x = 2\sin\theta$ in $\sqrt{4 - x^2}$ gives
+\[
+	\sqrt{4 - x^2}
+	   = \sqrt{4 - 4\sin^2\theta}
+	   = \sqrt{4(1 - \sin^2\theta)}
+	   = \sqrt{4\cos^2\theta}
+	   = 2\cos\theta,
+\]
+using the identity $1 - \sin^2\theta = \cos^2\theta$. Each of the three radicals
+above pairs with a substitution that does the same.
+
+\begin{theorem}[Three standard trig substitutions]
+	When the integrand involves the indicated radical, the substitution
+	listed turns it into a clean trigonometric integral:
+	\begin{center}
+		\begin{tabular}{lll}
+			\hline
+			Radical & Substitution & Identity \\
+			\hline
+			$\sqrt{a^2 - x^2}$ & $x = a\sin\theta$ & $1 - \sin^2\theta = \cos^2\theta$ \\
+			$\sqrt{a^2 + x^2}$ & $x = a\tan\theta$ & $1 + \tan^2\theta = \sec^2\theta$ \\
+			$\sqrt{x^2 - a^2}$ & $x = a\sec\theta$ & $\sec^2\theta - 1 = \tan^2\theta$ \\
+			\hline
+		\end{tabular}
+	\end{center}
+\end{theorem}
+
+After integrating in $\theta$, we convert back to $x$ by drawing a right
+triangle whose sides reflect the substitution. In each case the substitution
+sets one ratio of sides; the third side comes from the Pythagorean theorem and
+is exactly the radical in the integrand.
+
+\begin{question}
+	Once I have an answer in $\theta$, how do I get back to $x$?
+
+	\answer Draw the triangle. The substitution fixes two sides---$\sin\theta =
+	x/a$ makes the opposite side $x$ and the hypotenuse $a$---and the Pythagorean
+	theorem gives the third side as the radical. From the triangle we read off
+	$\sin\theta$, $\cos\theta$, and $\tan\theta$ as expressions in $x$, which
+	converts a $\theta$-answer back to the original variable.
+\end{question}
+
+\begin{center}
+\begin{tikzpicture}[>=Stealth, scale=1.0]
+	% ===== Triangle 1: x = a sin(theta), radical sqrt(a^2 - x^2) =====
+	\begin{scope}
+		\fill[teal!25] (0,0) -- (3,0) -- (3,1.6) -- cycle;
+		\draw[blue!65!black, very thick] (0,0) -- (3,0) -- (3,1.6) -- cycle;
+		% right-angle mark
+		\draw[gray!70] (2.7,0) -- (2.7,0.3) -- (3,0.3);
+		% angle theta at origin
+		\draw[orange!85!black, thick] (0.7,0) arc[start angle=0, end angle=28, radius=0.7];
+		\node[orange!85!black] at (0.95,0.18) {\small $\theta$};
+		% side labels
+		\node[blue!65!black, above, rotate=28] at (1.5,0.62) {\small $a$};
+		\node[blue!65!black, right] at (3.0,0.8) {\small $x$};
+		\node[blue!65!black, below] at (1.5,0) {\small $\sqrt{a^2 - x^2}$};
+		\node at (1.5,-0.75) {$x = a\sin\theta$};
+	\end{scope}
+	% ===== Triangle 2: x = a tan(theta), radical sqrt(a^2 + x^2) =====
+	\begin{scope}[shift={(5.3,0)}]
+		\fill[teal!25] (0,0) -- (3,0) -- (3,1.6) -- cycle;
+		\draw[blue!65!black, very thick] (0,0) -- (3,0) -- (3,1.6) -- cycle;
+		\draw[gray!70] (2.7,0) -- (2.7,0.3) -- (3,0.3);
+		\draw[orange!85!black, thick] (0.7,0) arc[start angle=0, end angle=28, radius=0.7];
+		\node[orange!85!black] at (0.95,0.18) {\small $\theta$};
+		\node[blue!65!black, above, rotate=28] at (1.35,0.70) {\small $\sqrt{a^2 + x^2}$};
+		\node[blue!65!black, right] at (3.0,0.8) {\small $x$};
+		\node[blue!65!black, below] at (1.5,0) {\small $a$};
+		\node at (1.5,-0.75) {$x = a\tan\theta$};
+	\end{scope}
+	% ===== Triangle 3: x = a sec(theta), radical sqrt(x^2 - a^2) =====
+	\begin{scope}[shift={(10.6,0)}]
+		\fill[teal!25] (0,0) -- (3,0) -- (3,1.6) -- cycle;
+		\draw[blue!65!black, very thick] (0,0) -- (3,0) -- (3,1.6) -- cycle;
+		\draw[gray!70] (2.7,0) -- (2.7,0.3) -- (3,0.3);
+		\draw[orange!85!black, thick] (0.7,0) arc[start angle=0, end angle=28, radius=0.7];
+		\node[orange!85!black] at (0.95,0.18) {\small $\theta$};
+		\node[blue!65!black, above, rotate=28] at (1.5,0.62) {\small $x$};
+		\node[blue!65!black, right] at (3.0,0.8) {\small $\sqrt{x^2 - a^2}$};
+		\node[blue!65!black, below] at (1.5,0) {\small $a$};
+		\node at (1.5,-0.75) {$x = a\sec\theta$};
+	\end{scope}
+\end{tikzpicture}
+\end{center}
+
+% -- Worked example ------------------------------------------------------------
+\begin{example}
+	Compute $\ds \int{\frac{x^2}{\sqrt{4 - x^2}}}$.
+
+	\solution
+	The radical has the form $\sqrt{a^2 - x^2}$ with $a = 2$, so substitute
+	$x = 2\sin\theta$. Differentiating gives $dx$, and the radical collapses to
+	$2\cos\theta$ as above:
+	\[
+		\begin{aligned}
+			x &= 2\sin\theta   &  dx &= 2\cos\theta\dtheta \\
+			\sqrt{4 - x^2} &= 2\cos\theta. &&
+		\end{aligned}
+	\]
+	Substitute every piece and the integral becomes trigonometric:
+	\[
+		\int{\frac{x^2}{\sqrt{4 - x^2}}}
+		   = \int{\frac{4\sin^2\theta}{2\cos\theta} \cdot 2\cos\theta}[\theta]
+		   = 4\int{\sin^2\theta}[\theta]
+		   = 2\theta - 2\sin\theta\cos\theta + C.
+	\]
+	To return to $x$, read the reference triangle for $x = 2\sin\theta$: here
+	$\sin\theta = x/2$, $\cos\theta = \sqrt{4 - x^2}/2$, and
+	$\theta = \arcsin\tfrac{x}{2}$, so $2\sin\theta\cos\theta = \tfrac{x\sqrt{4 - x^2}}{2}$ and
+	\[
+		\int{\frac{x^2}{\sqrt{4 - x^2}}}
+		   = \boxed{\,2\arcsin\tfrac{x}{2} - \tfrac{x\sqrt{4 - x^2}}{2} + C\,}.
+	\]
+\end{example}
+
+% -- Exercises -----------------------------------------------------------------
+
+\begin{exercise}
+	Compute $\ds \int{\frac{1}{(x^2 + 9)^{3/2}}}$.
+\end{exercise}
+\begin{solution}[2.5in]
+	Let $x = 3\tan\theta$, $dx = 3\sec^2\theta\dtheta$,
+	$x^2 + 9 = 9\sec^2\theta$:
+	\[
+		\int{\frac{3\sec^2\theta}{27\sec^3\theta}}[\theta]
+		   = \tfrac{1}{9}\int{\cos\theta}[\theta]
+		   = \tfrac{\sin\theta}{9} + C.
+	\]
+	From the right triangle $\sin\theta = x/\sqrt{x^2 + 9}$:
+	\[
+		\int{\frac{1}{(x^2 + 9)^{3/2}}}
+		   = \boxed{\frac{x}{9\sqrt{x^2 + 9}} + C}.
+	\]
+\end{solution}
+
+\begin{exercise}
+	Compute $\ds \int{\frac{\sqrt{x^2 - 4}}{x}}$.
+\end{exercise}
+\begin{solution}[2.75in]
+	The radical $\sqrt{x^2 - 4}$ has the form $\sqrt{x^2 - a^2}$ with
+	$a = 2$, so let $x = 2\sec\theta$, $dx = 2\sec\theta\tan\theta\dtheta$,
+	and $\sqrt{x^2 - 4} = 2\tan\theta$:
+	\[
+		\int{\frac{2\tan\theta}{2\sec\theta}\cdot 2\sec\theta\tan\theta}[\theta]
+		   = 2\int{\tan^2\theta}[\theta]
+		   = 2\int{\sec^2\theta - 1}[\theta]
+		   = 2\tan\theta - 2\theta + C.
+	\]
+	From the third reference triangle, $\tan\theta = \sqrt{x^2 - 4}/2$ and
+	$\theta = \arccos(2/x)$, so
+	\[
+		\int{\frac{\sqrt{x^2 - 4}}{x}}
+		   = \boxed{\sqrt{x^2 - 4} - 2\arccos\tfrac{2}{x} + C}.
+	\]
+\end{solution}
+
+\begin{exercise}
+	Evaluate $\ds \int{\frac{x^3}{\sqrt{x^2 + 9}}}$ using the substitution
+	$x = 3\tan\theta$, and sketch the associated right triangle.
+\end{exercise}
+\begin{solution}[2.75in]
+	With $x = 3\tan\theta$ we get $dx = 3\sec^2\theta\dtheta$,
+	$\sqrt{x^2 + 9} = 3\sec\theta$, and $x^3 = 27\tan^3\theta$:
+	\[
+		\int{\frac{27\tan^3\theta}{3\sec\theta} \cdot 3\sec^2\theta}[\theta]
+		   = 27\int{\tan^3\theta\sec\theta}[\theta]
+		   = 27\int{(\sec^2\theta - 1)\sec\theta\tan\theta}[\theta].
+	\]
+	The substitution $u = \sec\theta$, $du = \sec\theta\tan\theta\dtheta$, turns
+	this into a polynomial:
+	\[
+		27\int{(u^2 - 1)}[u]
+		   = 9\sec^3\theta - 27\sec\theta + C.
+	\]
+	The triangle for $x = 3\tan\theta$ has legs $x$ and $3$ with hypotenuse
+	$\sqrt{x^2 + 9}$, so $\sec\theta = \sqrt{x^2 + 9}/3$ and
+	\[
+		\int{\frac{x^3}{\sqrt{x^2 + 9}}}
+		   = \boxed{\tfrac13\sqrt{x^2 + 9}\,(x^2 - 18) + C}.
+	\]
+\end{solution}
+
+\begin{exercise}
+	Evaluate $\ds \int{\frac{x^3}{\sqrt{16 - x^2}}}$ using the substitution
+	$x = 4\sin\theta$, and sketch the associated right triangle.
+\end{exercise}
+\begin{solution}[2.75in]
+	Here $dx = 4\cos\theta\dtheta$, $\sqrt{16 - x^2} = 4\cos\theta$, and
+	$x^3 = 64\sin^3\theta$:
+	\[
+		\int{\frac{64\sin^3\theta}{4\cos\theta} \cdot 4\cos\theta}[\theta]
+		   = 64\int{\sin^3\theta}[\theta]
+		   = 64\int{(1 - \cos^2\theta)\sin\theta}[\theta].
+	\]
+	With $u = \cos\theta$, $du = -\sin\theta\dtheta$,
+	\[
+		64\int{(u^2 - 1)}[u]
+		   = \tfrac{64}{3}\cos^3\theta - 64\cos\theta + C.
+	\]
+	The triangle for $x = 4\sin\theta$ gives $\cos\theta = \sqrt{16 - x^2}/4$, so
+	\[
+		\int{\frac{x^3}{\sqrt{16 - x^2}}}
+		   = \boxed{-\tfrac13\sqrt{16 - x^2}\,(x^2 + 32) + C}.
+	\]
+\end{solution}
+
+\begin{exercise}
+	Evaluate $\ds \int[0][2]{x^3\sqrt{4 - x^2}}$.
+\end{exercise}
+\begin{solution}[2.75in]
+	Let $x = 2\sin\theta$, $dx = 2\cos\theta\dtheta$, $\sqrt{4 - x^2} = 2\cos\theta$;
+	the limits become $x = 0 \to \theta = 0$ and $x = 2 \to \theta = \tfrac{\pi}{2}$:
+	\[
+		\int[0][2]{x^3\sqrt{4 - x^2}}
+		   = \int[0][\pi/2]{8\sin^3\theta \cdot 2\cos\theta \cdot 2\cos\theta}[\theta]
+		   = 32\int[0][\pi/2]{(1 - \cos^2\theta)\cos^2\theta\sin\theta}[\theta].
+	\]
+	Substituting $u = \cos\theta$ (so $u : 1 \to 0$),
+	\[
+		32\int[0][1]{(u^2 - u^4)}[u]
+		   = 32\Bigl(\tfrac13 - \tfrac15\Bigr)
+		   = \boxed{\tfrac{64}{15}}.
+	\]
+\end{solution}
+
+\begin{exercise}
+	Evaluate $\ds \int{\frac{t^5}{\sqrt{t^2 + 4}}}[t]$.
+\end{exercise}
+\begin{solution}[3in]
+	Let $t = 2\tan\theta$, $dt = 2\sec^2\theta\dtheta$, and
+	$\sqrt{t^2 + 4} = 2\sec\theta$, so $t^5 = 32\tan^5\theta$:
+	\[
+		\int{\frac{32\tan^5\theta}{2\sec\theta} \cdot 2\sec^2\theta}[\theta]
+		   = 32\int{\tan^5\theta\sec\theta}[\theta]
+		   = 32\int{(\sec^2\theta - 1)^2\sec\theta\tan\theta}[\theta].
+	\]
+	With $u = \sec\theta$, $du = \sec\theta\tan\theta\dtheta$, the integral is a
+	polynomial:
+	\[
+		32\int{(u^2 - 1)^2}[u]
+		   = 32\Bigl(\tfrac{u^5}{5} - \tfrac{2u^3}{3} + u\Bigr) + C.
+	\]
+	Since $u = \sec\theta = \sqrt{t^2 + 4}/2$, collecting the terms over
+	$\sqrt{t^2 + 4}$ gives
+	\[
+		\int{\frac{t^5}{\sqrt{t^2 + 4}}}[t]
+		   = \boxed{\tfrac{1}{15}\sqrt{t^2 + 4}\,(3t^4 - 16t^2 + 128) + C}.
+	\]
+\end{solution}
+
+\begin{exercise}
+	Evaluate $\ds \int[\sqrt2][2]{\frac{1}{t^3\sqrt{t^2 - 1}}}[t]$.
+\end{exercise}
+\begin{solution}[2.75in]
+	Let $t = \sec\theta$, $dt = \sec\theta\tan\theta\dtheta$,
+	$\sqrt{t^2 - 1} = \tan\theta$. The limits convert with $\cos\theta = 1/t$:
+	$t = \sqrt2 \to \theta = \tfrac{\pi}{4}$ and $t = 2 \to \theta = \tfrac{\pi}{3}$:
+	\[
+		\int[\sqrt2][2]{\frac{1}{t^3\sqrt{t^2 - 1}}}[t]
+		   = \int[\pi/4][\pi/3]{\frac{\sec\theta\tan\theta}{\sec^3\theta\tan\theta}}[\theta]
+		   = \int[\pi/4][\pi/3]{\cos^2\theta}[\theta].
+	\]
+	Power-reducing and evaluating,
+	\[
+		\eval{\tfrac{\theta}{2} + \tfrac{\sin 2\theta}{4}}{\pi/4}{\pi/3}
+		   = \Bigl(\tfrac{\pi}{6} + \tfrac{\sqrt3}{8}\Bigr) - \Bigl(\tfrac{\pi}{8} + \tfrac14\Bigr)
+		   = \boxed{\tfrac{\pi}{24} + \tfrac{\sqrt3}{8} - \tfrac14}.
+	\]
+\end{solution}
+
+\begin{exercise}
+	Evaluate $\ds \int{\sqrt{1 - 9x^2}}$.
+\end{exercise}
+\begin{solution}[2.25in]
+	The coefficient rides inside the radical, so match $9x^2$ to $\sin^2\theta$:
+	let $3x = \sin\theta$, giving $x = \tfrac13\sin\theta$,
+	$dx = \tfrac13\cos\theta\dtheta$, and $\sqrt{1 - 9x^2} = \cos\theta$:
+	\[
+		\int{\cos\theta \cdot \tfrac13\cos\theta}[\theta]
+		   = \tfrac13\int{\cos^2\theta}[\theta]
+		   = \tfrac16\bigl(\theta + \sin\theta\cos\theta\bigr) + C.
+	\]
+	With $\theta = \arcsin(3x)$ and $\sin\theta\cos\theta = 3x\sqrt{1 - 9x^2}$,
+	\[
+		\int{\sqrt{1 - 9x^2}}
+		   = \boxed{\tfrac16\arcsin(3x) + \tfrac{x\sqrt{1 - 9x^2}}{2} + C}.
+	\]
+\end{solution}
+
+\begin{exercise}
+	Evaluate $\ds \int{\frac{1}{\sqrt{4x^2 + 1}}}$.
+\end{exercise}
+\begin{solution}[2in]
+	Match $4x^2$ to $\tan^2\theta$: let $2x = \tan\theta$, so
+	$x = \tfrac12\tan\theta$, $dx = \tfrac12\sec^2\theta\dtheta$, and
+	$\sqrt{4x^2 + 1} = \sec\theta$:
+	\[
+		\int{\frac{\tfrac12\sec^2\theta}{\sec\theta}}[\theta]
+		   = \tfrac12\int{\sec\theta}[\theta]
+		   = \tfrac12\ln\abs{\sec\theta + \tan\theta} + C.
+	\]
+	Since $\sec\theta = \sqrt{4x^2 + 1}$ and $\tan\theta = 2x$,
+	\[
+		\int{\frac{1}{\sqrt{4x^2 + 1}}}
+		   = \boxed{\tfrac12\ln\abs{2x + \sqrt{4x^2 + 1}} + C}.
+	\]
+\end{solution}
+
+\begin{exercise}
+	Evaluate $\ds \int{\frac{x}{\sqrt{x^2 - 7}}}$. \emph{Look before substituting.}
+\end{exercise}
+\begin{solution}[1.5in]
+	No trig substitution is needed---the numerator is almost the derivative of the
+	radicand. Let $u = x^2 - 7$, so $du = 2x\dx$:
+	\[
+		\int{\frac{x}{\sqrt{x^2 - 7}}}
+		   = \tfrac12\int{\frac{1}{\sqrt{u}}}[u]
+		   = \sqrt{u} + C
+		   = \boxed{\sqrt{x^2 - 7} + C}.
+	\]
+	Trig substitution would also finish it, but plain $u$-substitution is far
+	shorter---always check for it first.
+\end{solution}
+
+\begin{exercise}
+	Evaluate $\ds \int{\frac{x^3}{\sqrt{x^2 - 16}}}$.
+\end{exercise}
+\begin{solution}[2.75in]
+	Let $x = 4\sec\theta$, $dx = 4\sec\theta\tan\theta\dtheta$,
+	$\sqrt{x^2 - 16} = 4\tan\theta$, and $x^3 = 64\sec^3\theta$:
+	\[
+		\int{\frac{64\sec^3\theta}{4\tan\theta} \cdot 4\sec\theta\tan\theta}[\theta]
+		   = 64\int{\sec^4\theta}[\theta]
+		   = 64\int{(1 + \tan^2\theta)\sec^2\theta}[\theta].
+	\]
+	Now an even power of $\sec\theta$ remains, so take $u = \tan\theta$,
+	$du = \sec^2\theta\dtheta$:
+	\[
+		64\int{(1 + u^2)}[u]
+		   = 64\tan\theta + \tfrac{64}{3}\tan^3\theta + C.
+	\]
+	With $\tan\theta = \sqrt{x^2 - 16}/4$,
+	\[
+		\int{\frac{x^3}{\sqrt{x^2 - 16}}}
+		   = \boxed{\tfrac13\sqrt{x^2 - 16}\,(x^2 + 32) + C}.
+	\]
+\end{solution}
+
+\begin{exercise}
+	Evaluate $\ds \int[0][\sqrt3]{\frac{x^3}{\sqrt{x^2 + 1}}}$.
+\end{exercise}
+\begin{solution}[2.5in]
+	Let $x = \tan\theta$, $dx = \sec^2\theta\dtheta$, $\sqrt{x^2 + 1} = \sec\theta$;
+	the limits become $x = 0 \to \theta = 0$ and
+	$x = \sqrt3 \to \theta = \tfrac{\pi}{3}$:
+	\[
+		\int[0][\sqrt3]{\frac{x^3}{\sqrt{x^2 + 1}}}
+		   = \int[0][\pi/3]{\tan^3\theta\sec\theta}[\theta]
+		   = \int[0][\pi/3]{(\sec^2\theta - 1)\sec\theta\tan\theta}[\theta].
+	\]
+	With $u = \sec\theta$ (so $u : 1 \to 2$),
+	\[
+		\int[1][2]{(u^2 - 1)}[u]
+		   = \eval{\tfrac{u^3}{3} - u}{1}{2}
+		   = \tfrac23 - \Bigl(-\tfrac23\Bigr)
+		   = \boxed{\tfrac43}.
+	\]
+\end{solution}
+
+\begin{exercise}
+	Evaluate $\ds \int{\frac{t^3}{\sqrt{9 - t^2}}}[t]$.
+\end{exercise}
+\begin{solution}[2.5in]
+	Let $t = 3\sin\theta$, $dt = 3\cos\theta\dtheta$, $\sqrt{9 - t^2} = 3\cos\theta$,
+	and $t^3 = 27\sin^3\theta$:
+	\[
+		\int{\frac{27\sin^3\theta}{3\cos\theta} \cdot 3\cos\theta}[\theta]
+		   = 27\int{(1 - \cos^2\theta)\sin\theta}[\theta].
+	\]
+	Taking $u = \cos\theta = \sqrt{9 - t^2}/3$,
+	\[
+		27\int{(u^2 - 1)}[u]
+		   = 9\cos^3\theta - 27\cos\theta + C
+		   = \boxed{-\tfrac13\sqrt{9 - t^2}\,(t^2 + 18) + C}.
+	\]
+\end{solution}
+
+\begin{exercise}
+	Evaluate $\ds \int[0][1]{x^5\sqrt{1 - x^2}}$.
+\end{exercise}
+\begin{solution}[2.75in]
+	Let $x = \sin\theta$, $dx = \cos\theta\dtheta$, $\sqrt{1 - x^2} = \cos\theta$,
+	with $x = 0 \to \theta = 0$ and $x = 1 \to \theta = \tfrac{\pi}{2}$:
+	\[
+		\int[0][1]{x^5\sqrt{1 - x^2}}
+		   = \int[0][\pi/2]{\sin^5\theta\cos^2\theta}[\theta]
+		   = \int[0][\pi/2]{(1 - \cos^2\theta)^2\cos^2\theta\sin\theta}[\theta].
+	\]
+	Substituting $u = \cos\theta$ (so $u : 1 \to 0$),
+	\[
+		\int[0][1]{(1 - u^2)^2 u^2}[u]
+		   = \int[0][1]{(u^2 - 2u^4 + u^6)}[u]
+		   = \tfrac13 - \tfrac25 + \tfrac17
+		   = \boxed{\tfrac{8}{105}}.
+	\]
+\end{solution}
+
+\begin{remark}[It rarely travels alone]
+	The substitution rarely finishes the job on its own. Here it left us with
+	$4\int{\sin^2\theta}[\theta]$, a trig integral of the kind from the last
+	section: trig substitution clears the radical, and the methods of \S 7.2
+	finish the integral in $\theta$.
+\end{remark}
+
+% -- Challenge -----------------------------------------------------------------
+\begin{challenge}
+	Find the area enclosed by the ellipse $\dfrac{x^2}{a^2} + \dfrac{y^2}{b^2} = 1$
+	by evaluating $\ds 4\int[0][a]{\frac{b}{a}\sqrt{a^2 - x^2}}$
+	with the substitution $x = a\sin\theta$, and confirm the answer is
+	$\pi a b$.
+\end{challenge}
+\ifsolutions
+\smallskip\noindent\textit{Solution.}\quad
+Solving the ellipse equation for the upper-right quarter gives
+$y = \tfrac{b}{a}\sqrt{a^2 - x^2}$, and four congruent quarters make up the
+whole region, so $\text{Area} = 4\ds\int[0][a]{\tfrac{b}{a}\sqrt{a^2 - x^2}}$.
+Let $x = a\sin\theta$, so $dx = a\cos\theta\dtheta$ and
+$\sqrt{a^2 - x^2} = a\cos\theta$; the limits change from $x: 0 \to a$ to
+$\theta: 0 \to \tfrac{\pi}{2}$. Then
+\[
+	4\int[0][a]{\tfrac{b}{a}\sqrt{a^2 - x^2}}
+	  = 4\cdot\frac{b}{a}\int[0][\pi/2]{a\cos\theta\cdot a\cos\theta}[\theta]
+	  = 4ab\int[0][\pi/2]{\cos^2\theta}[\theta].
+\]
+Power-reduce with $\cos^2\theta = \tfrac12(1 + \cos 2\theta)$:
+\[
+	4ab\int[0][\pi/2]{\tfrac12(1 + \cos 2\theta)}[\theta]
+	  = 2ab\eval{\theta + \tfrac{\sin 2\theta}{2}}{0}{\pi/2}
+	  = 2ab\cdot\frac{\pi}{2}
+	  = \boxed{\pi a b},
+\]
+since $\sin\pi = \sin 0 = 0$. The area of the ellipse is $\pi a b$.
+\fi

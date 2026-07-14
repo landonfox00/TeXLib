@@ -1,0 +1,40 @@
+% course-preamble.tex — shared preamble for every Math 182 (Summer 2026) document.
+%
+% Auto-loaded at \AtEndPreamble by course-metadata.sty because coursemeta.tex in
+% this directory sets  preamble-file = course-preamble. Put course-wide macros
+% and settings here ONCE instead of repeating them in each document's preamble.
+%
+% The differential-calculus helpers below are deliberately course-local:
+% texlib-mathutils.sty dropped \dd/\deriv/\inte on 2026-06-24 precisely so each
+% course can shape its own integral notation. Math 182 uses a compact integral
+% with optional bounds and an optional differential variable.
+
+% --- Notation shortcuts -----------------------------------------------------
+\newcommand{\ds}{\displaystyle}
+
+% Differentials: a thin space then the italic "d" of the variable.
+\newcommand{\dx}{\,dx}
+\newcommand{\dtheta}{\,d\theta}
+
+% \eval{expr}{lower}{upper} — an evaluation bar  [expr]_{lower}^{upper}.
+\newcommand{\eval}[3]{\left.#1\right|_{#2}^{#3}}
+
+% Compact integral:  \int[<lower>][<upper>]{<integrand>}[<var>]
+%   - both bounds optional (omit for an indefinite integral),
+%   - integrand mandatory,
+%   - differential variable optional (defaults to x).
+% Examples:
+%   \int{f(x)}              -> \int f(x)\,dx
+%   \int{g(\theta)}[\theta] -> \int g(\theta)\,d\theta
+%   \int[0][2]{h(x)}        -> \int_{0}^{2} h(x)\,dx
+\let\txlibintop\int
+\RenewDocumentCommand{\int}{o o m o}{%
+	\txlibintop
+		\IfValueT{#1}{_{#1}}%
+		\IfValueT{#2}{^{#2}}%
+	#3\,d\IfValueTF{#4}{#4}{x}%
+}
+
+% The §7.3 reference-triangle figures use Stealth arrow tips; basic-utilities
+% loads tikz but not the arrows.meta library, so pull it in course-wide.
+\usetikzlibrary{arrows.meta}
