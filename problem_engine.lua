@@ -438,9 +438,10 @@ function store_picks(name, picked)
 	for i, v in ipairs(picked) do vars[name .. "_" .. i] = v end
 end
 
-function pick_from_list(name, n, str)
-	if fixed[name] then return end
-	local pool = split_csv(str)
+-- Sample n items from pool WITHOUT replacement (n capped at #pool), then
+-- store. Shared by pick_from_list / pick_from_range; the _r variants sample
+-- WITH replacement and stay separate.
+local function sample_no_replace(name, pool, n)
 	n = math.min(n, #pool)
 	local picked = {}
 	for i = 1, n do
@@ -449,6 +450,11 @@ function pick_from_list(name, n, str)
 		table.remove(pool, idx)
 	end
 	store_picks(name, picked)
+end
+
+function pick_from_list(name, n, str)
+	if fixed[name] then return end
+	sample_no_replace(name, split_csv(str), n)
 end
 
 function pick_from_list_r(name, n, str)
@@ -463,14 +469,7 @@ function pick_from_range(name, n, lo, hi)
 	if fixed[name] then return end
 	local pool = {}
 	for i = lo, hi do table.insert(pool, i) end
-	n = math.min(n, #pool)
-	local picked = {}
-	for i = 1, n do
-		local idx = math.random(1, #pool)
-		table.insert(picked, pool[idx])
-		table.remove(pool, idx)
-	end
-	store_picks(name, picked)
+	sample_no_replace(name, pool, n)
 end
 
 function pick_from_range_r(name, n, lo, hi)
