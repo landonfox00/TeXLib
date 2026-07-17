@@ -6,8 +6,8 @@ starred ``\\begin{problems}*`` / ``\\begin{mcproblems}*`` section (star = no
 "Part N" heading), with ``\\def\\ShowSolutions{}`` so the worked solution shows.
 
 Mirrors the build tooling's engine invocation (Sublime/texlib/texlib_build.py):
-lualatex through the comma-free ``C:\\_texlibjunc`` junction
-(``TEXINPUTS=.;C:/_texlibjunc//;``) with aux routed to ``%TEMP%``, cwd = the
+lualatex through the comma-free ``C:\\_texlibjunc`` junction (an explicit,
+non-recursive TEXINPUTS: repo root + module dirs) with aux routed to ``%TEMP%``, cwd = the
 bank's own directory so ``\\loadbank`` resolves.  The PDF is tight-cropped
 (pdfcrop) and converted to SVG (dvisvgm, else pdftocairo).  Results are cached
 by (id, bank mtime, solution flag); a background pre-warm renders the whole bank.
@@ -26,7 +26,16 @@ import tempfile
 import threading
 
 JUNCTION = r"C:\_texlibjunc"
-TEXINPUTS_JUNCTION = ".;C:/_texlibjunc//;"
+_JUNC_FS = "C:/_texlibjunc"    # forward-slash form for TEXINPUTS entries
+# Explicit, non-recursive TEXINPUTS: repo root + the 9 module dirs, the only
+# places .sty/.cls/.lua live. NOT recursive "C:/_texlibjunc//" -- that walked
+# ~1200 dirs (incl. .git + .claude/worktrees copies), cost ~1-3.5s/pass (worse
+# cold), and let a stale examples/*.aux shadow the render. Mirrors the build
+# tooling's path (Sublime/texlib/texlib_build.py).
+_MODULE_DIRS = ("Exams", "Quizzes", "Notes", "Problem Sets", "Report Cards",
+                "Schedule", "Syllabi", "Bingo", "Bank")
+TEXINPUTS_JUNCTION = ";".join((".", _JUNC_FS)
+                              + tuple(_JUNC_FS + "/" + m for m in _MODULE_DIRS)) + ";"
 _NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 _CACHE_ROOT = os.path.join(tempfile.gettempdir(), "texlib-bankstudio")
 _RERUN_RE = re.compile(r"Rerun to get .* right\.|Label\(s\) may have changed")

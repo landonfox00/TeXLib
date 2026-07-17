@@ -112,6 +112,9 @@ GRADEBOOK_SHEETS = ("Report View", "Report Cards")
 # conditionals that every TeXLib class branches on.
 MODE_MACROS = {
     "default":   "",
+    "full":      "",   # same as default (full 2-pass); a stable token the host
+                       # never remaps, so "Build — Full" forces a settling build
+                       # even when default_build_mode is "quick".
     "key":       r"\def\ShowKey{}",
     "solutions": r"\def\ShowSolutions{}",
     "student":   r"\def\StudentMode{}",

@@ -50,9 +50,21 @@
 % --- Graphics + TikZ ---
 \RequirePackage{graphicx}
 \RequirePackage{tikz}
-\RequirePackage{pgfplots}
-\pgfplotsset{compat=1.18}
 \usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+
+% pgfplots is the single most expensive package in this bundle (~1s to load) and
+% only documents that actually draw \begin{axis} plots need it. It still loads by
+% default (backward compatible: existing documents are unaffected). A plot-free
+% document can OPT OUT -- reclaiming that ~1s on every engine pass -- by putting
+%     \def\TeXLibNoPlots{}
+% BEFORE \documentclass. If such a document later does need a plot, call
+% \TeXLibLoadPlots in its preamble to pull pgfplots in on demand.
+\newcommand{\TeXLibLoadPlots}{%
+  \RequirePackage{pgfplots}%
+  \pgfplotsset{compat=1.18}%
+  \global\let\TeXLibLoadPlots\relax    % idempotent: a second call is a no-op
+}
+\@ifundefined{TeXLibNoPlots}{\TeXLibLoadPlots}{}
 
 % --- Hyperref + canonical setup ---
 % Five of the existing TeXLib classes ship the exact same hypersetup call.

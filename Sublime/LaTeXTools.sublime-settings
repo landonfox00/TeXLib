@@ -18,10 +18,14 @@
 		"windows" : {
 			// kpathsea CANNOT resolve a TEXINPUTS entry that contains a comma.
 			// The real OneDrive folder name has one ("...Nevada, Reno..."), so
-			// we route via the comma-free junction. Trailing // means "and all
-			// subdirs".
+			// we route via the comma-free junction. The value is an EXPLICIT,
+			// non-recursive list (repo root + the 9 module dirs). NOT recursive
+				// "C:/_texlibjunc//": that walked ~1200 dirs incl. .git and the
+				// .claude/worktrees copies (~1-3.5s/pass, worse cold) and let a stale
+				// examples/*.aux shadow a same-named build. Add a segment only when
+				// you add a new top-level module dir.
 			"env" : {
-				"TEXINPUTS" : ".;C:\\_texlibjunc//;",
+				"TEXINPUTS" : ".;C:/_texlibjunc;C:/_texlibjunc/Exams;C:/_texlibjunc/Quizzes;C:/_texlibjunc/Notes;C:/_texlibjunc/Problem Sets;C:/_texlibjunc/Report Cards;C:/_texlibjunc/Schedule;C:/_texlibjunc/Syllabi;C:/_texlibjunc/Bingo;C:/_texlibjunc/Bank;",
 			}
 		},
 
