@@ -68,6 +68,17 @@
 % the publish sidecar in course-metadata.sty.
 \TeXLibDeclarePublishable{syllabus}{Syllabus}{Syllabus}
 
+% PDF document title. \maketitle renders the title VISUALLY from course metadata
+% but never sets \title, so hyperref's pdfusetitle had nothing to use and the PDF
+% shipped with no title at all (neither DocInfo /Title nor XMP dc:title). That is
+% a hard PDF/UA failure -- the standard requires a title, and the tagged build
+% also sets ViewerPreferences/DisplayDocTitle, which tells a viewer to show a
+% title that did not exist -- and it left a blank viewer/browser tab in normal
+% builds too. Set it from the same metadata, matching the published-copy naming
+% ("<course> <term> Syllabus"). Deferred to \AtBeginDocument so coursemeta.tex
+% has been read and the values resolved.
+\AtBeginDocument{\hypersetup{pdftitle={\GetCourse\space\GetTerm\space Syllabus}}}
+
 
 % ==============================================================================
 % 3. LIST DEFAULTS

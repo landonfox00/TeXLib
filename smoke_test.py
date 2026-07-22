@@ -376,6 +376,58 @@ def _compare_pages(ref_png: str, test_png: str) -> int | None:
     return 10**9 if r.returncode != 0 else 0
 
 
+def check_pdfua_structure(pdf_path: str) -> tuple[list[str], bool]:
+    """
+    Dependency-free PDF/UA structural assertions on an accessible build.
+
+    veraPDF gives full rule-level conformance but needs a JRE; this check needs
+    only pypdf (already an optional dep for PDF merge/split) and so runs
+    ~everywhere, including CI. It verifies the markers a tagged PDF/UA document
+    must carry -- catching the "builds fine but isn't really tagged" regression
+    that a build-only run would miss. Returns (problems, skipped); skipped when
+    pypdf is unavailable.
+
+    Note on the title: PDF 2.0 / PDF-A-4 deprecate the DocInfo dictionary in
+    favour of XMP, so a conforming file may legitimately carry ONLY XMP
+    dc:title. Accept either.
+    """
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return [], True  # soft skip: pypdf not installed
+    problems: list[str] = []
+    try:
+        reader = PdfReader(pdf_path)
+        cat = reader.trailer["/Root"]
+        mark_info = cat.get("/MarkInfo")
+        if not (mark_info and mark_info.get("/Marked")):
+            problems.append("not marked as tagged (/MarkInfo /Marked)")
+        if "/StructTreeRoot" not in cat:
+            problems.append("no /StructTreeRoot (no structure tree)")
+        if not cat.get("/Lang"):
+            problems.append("no document /Lang")
+        view_prefs = cat.get("/ViewerPreferences")
+        if not (view_prefs and view_prefs.get("/DisplayDocTitle")):
+            problems.append("ViewerPreferences/DisplayDocTitle not true")
+        # Title: XMP dc:title (authoritative for PDF 2.0) or legacy DocInfo.
+        xmp_text = ""
+        try:
+            xmp = reader.xmp_metadata
+            if xmp is not None:
+                xmp_text = xmp.stream.get_data().decode("utf-8", "replace")
+        except Exception:  # noqa: BLE001 - malformed XMP is itself reported below
+            xmp_text = ""
+        has_title = bool(re.search(r"<dc:title>.*?</dc:title>", xmp_text, re.S)) or bool(
+            (reader.metadata or {}).get("/Title"))
+        if not has_title:
+            problems.append("no document title (XMP dc:title / DocInfo /Title)")
+        if not re.search(r"pdfuaid:part", xmp_text):
+            problems.append("XMP does not declare pdfuaid:part (not identified as PDF/UA)")
+    except Exception as exc:  # noqa: BLE001 - never crash the suite on a reader quirk
+        return [f"PDF/UA structure check failed to read PDF: {exc}"], False
+    return problems, False
+
+
 def check_verapdf(pdf_path: str) -> tuple[list[str], bool]:
     """
     Validate PDF/UA-2 conformance of an accessible build with veraPDF.
@@ -687,6 +739,9 @@ def build_one(
             skipped = False
             problems: list[str] = []
             if accessible:
+                sp, struct_skipped = check_pdfua_structure(pdf)
+                problems += sp
+                skipped = skipped or struct_skipped
                 vp, vera_skipped = check_verapdf(pdf)
                 problems += vp
                 skipped = skipped or vera_skipped
@@ -1096,9 +1151,15 @@ def main() -> int:
             + (f" [{', '.join(miss)} MISSING -> skipped]" if miss else "")
         )
     if args.accessible:
+        try:
+            import pypdf  # noqa: F401
+            have_pypdf = True
+        except ImportError:
+            have_pypdf = False
+        a11y_miss = [n for n, ok in (("pypdf", have_pypdf), ("veraPDF", VERAPDF)) if not ok]
         check_bits.append(
             "accessible/PDF-UA"
-            + ("" if VERAPDF else " [veraPDF MISSING -> validation skipped]")
+            + (f" [{', '.join(a11y_miss)} MISSING -> those checks skipped]" if a11y_miss else "")
         )
 
     print(f"TeXLib smoke test")
