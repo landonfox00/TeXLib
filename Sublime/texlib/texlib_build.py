@@ -117,7 +117,27 @@ MODE_MACROS = {
     "student":   r"\def\StudentMode{}",
     "rubric":    r"\def\ShowRubric{}",
     "draft":     r"\def\ShowDraft{}",
+    "accessible": None,  # special-cased: see ACCESSIBLE_* and _build_accessible.
 }
+
+# --- Accessible (tagged PDF/UA) mode ----------------------------------------
+# Produces a tagged, screen-reader-friendly PDF ALONGSIDE the normal one, as
+# <base>_accessible.pdf, so the primary build is never touched. The tagging
+# engine can only be switched on by \DocumentMetadata issued BEFORE
+# \documentclass, so the builder injects it on the command line ahead of
+# \input{<doc>} (the same prefix trick used for \def\ShowKey{}). Requires
+# lualatex regardless of the class's normal engine. Config mirrors UNR's
+# Hurtado v0.5 template (tag structure + MathML math + tagged table headers;
+# ua-2 for accessibility, a-4f for archival). \TeXLibAccessibleMode lets the
+# TeXLib classes/packages adapt (texlib-build.sty -> \ifTeXLibAccessible).
+ACCESSIBLE_MODE   = "accessible"
+ACCESSIBLE_SUFFIX = "_accessible"
+ACCESSIBLE_DOCMETA = (
+    r"\DocumentMetadata{lang=en,tagging=on,"
+    r"tagging-setup={math/setup={mathml-SE},table/header-rows=1},"
+    r"pdfstandard={ua-2,a-4f}}"
+)
+ACCESSIBLE_MACRO = ACCESSIBLE_DOCMETA + r"\def\TeXLibAccessibleMode{}"
 
 # A pseudo-mode: a single engine pass with no biber and no rerun loop, for fast
 # preview while writing. Cross-references / citations may be stale; a normal
@@ -218,6 +238,16 @@ class TexlibBuildCore:
 
         engine = self._select_engine(src)
 
+        # The accessible (tagged PDF/UA) build always needs lualatex -- MathML
+        # math tagging is a Unicode-engine feature -- even for the pdflatex
+        # classes (syllabus, notes, pset).
+        if mode == ACCESSIBLE_MODE and engine != "lualatex":
+            self.display(
+                "TeXLib: accessible build requires lualatex "
+                f"-- overriding {engine}.\n"
+            )
+            engine = "lualatex"
+
         # Report cards: turn the one gradebook.xlsx (source of truth) into the
         # report-view CSV the class reads. Done in-process before the engine
         # runs so the build always sees fresh grades.
@@ -241,6 +271,8 @@ class TexlibBuildCore:
 
         if mode == MODE_QUICK:
             yield from self._count_passes(self._build_quick(base, engine))
+        elif mode == ACCESSIBLE_MODE:
+            yield from self._count_passes(self._build_accessible(base, engine))
         else:
             yield from self._count_passes(self._build_once(base, engine, mode))
 
@@ -522,6 +554,25 @@ class TexlibBuildCore:
         """
         cmd = base + [self.tex_name]
         yield (cmd, f"{engine} [quick] single pass (refs may be stale)...")
+
+    def _build_accessible(self, base, engine):
+        """Build the tagged PDF/UA variant to <base>_accessible.pdf.
+
+        A jobname suffix keeps the tagged PDF next to -- not on top of -- the
+        primary <base>.pdf (the source of truth for printing / the LMS). The
+        DocumentMetadata prefix goes AHEAD of \\input{<doc>} so it precedes the
+        document's own \\documentclass, the only position from which tagging can
+        be enabled. Two fixed passes settle cross-references and the "page X of
+        Y" footer, matching the CLI convention; no biber loop here yet, so a
+        bibliography-bearing class (notes/pset) may need one added when the
+        rollout reaches it. _copy_back_from_aux globs <base>*.pdf, so the
+        suffixed output is carried back beside the source with no extra work.
+        """
+        jobname = self.base_name + ACCESSIBLE_SUFFIX
+        arg = ACCESSIBLE_MACRO + f"\\input{{{self.tex_name}}}"
+        cmd = base + [f"--jobname={jobname}", arg]
+        yield (cmd, f"{engine} [accessible] run 1...")
+        yield (cmd, f"{engine} [accessible] run 2 (settle)...")
 
     def _tex_dir(self):
         """The directory containing the root .tex file."""

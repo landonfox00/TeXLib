@@ -45,6 +45,13 @@
 \RequirePackage{graphicx}
 \RequirePackage{fancyhdr, lastpage, enumitem, makecell, qrcode}
 \RequirePackage{xcolor}
+% Link colours must be DEFINED before hyperref consumes them below. A normal
+% build tolerates defining them later (hyperref resolves link colours at
+% shipout), but \DocumentMetadata{tagging=on} (accessible build) initialises
+% hyperref early enough that an undefined darkblue/darkred here is a hard error.
+\definecolor{darkblue}{rgb}{0,0,.6}
+\definecolor{darkred}{rgb}{.7,0,0}
+\definecolor{darkgreen}{rgb}{0,.6,0}
 \RequirePackage[colorlinks,pdfusetitle,
 				urlcolor=darkblue, citecolor=darkblue, linkcolor=darkred,
 				bookmarksnumbered, plainpages=false]{hyperref}
@@ -63,12 +70,9 @@
 
 
 % ==============================================================================
-% 3. COLORS & LIST DEFAULTS
+% 3. LIST DEFAULTS
 % ==============================================================================
-\definecolor{darkblue}{rgb}{0,0,.6}
-\definecolor{darkred}{rgb}{.7,0,0}
-\definecolor{darkgreen}{rgb}{0,.6,0}
-
+% (Link colours darkblue/darkred/darkgreen are defined above, before hyperref.)
 \setlist{noitemsep, topsep=2pt, parsep=0pt, partopsep=0pt}
 
 % ==============================================================================

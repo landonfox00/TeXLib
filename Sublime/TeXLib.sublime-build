@@ -61,6 +61,15 @@
 			"name": "Quick (single pass, refs may be stale)",
 			"builder": "texlib",
 			"options": ["--texlib-mode=quick"]
+		},
+		{
+			// Tagged, screen-reader-friendly PDF/UA copy written ALONGSIDE the
+			// normal PDF as <base>_accessible.pdf (the primary is untouched).
+			// Forced to lualatex; injects \DocumentMetadata{tagging=on,...}
+			// ahead of \documentclass.
+			"name": "Accessible (tagged PDF/UA, alongside)",
+			"builder": "texlib",
+			"options": ["--texlib-mode=accessible"]
 		}
 	]
 }
