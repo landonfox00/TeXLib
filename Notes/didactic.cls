@@ -269,29 +269,45 @@
 % remark, question, recall intentionally excluded -- they keep \emph labels.
 
 % ==============================================================================
-% 7. SOLUTION ENVIRONMENT  (minimal style: matches the colored-rule aesthetic)
+% 7. SOLUTION / ANSWER REGION ENVIRONMENTS  (label + gate + write-space)
 % ==============================================================================
-% Behaviour:
-%   - \ifsolutions (set by 'solutions = true' or 'instructor = true'):
-%       thin green left rule + 2% tint + bold "Solution." header
-%   - otherwise (default, 'solutions = false', or 'student = true'):
-%       dashed thin grey left rule around a blank answer box of height [#1]
+% Design paradigm (why an ENVIRONMENT, not a command):
+%   A region that must be SHOWN or HIDDEN, and that reserves student write-space
+%   equal to its own body, has to know where its content ends -- so it is a
+%   delimited environment (\begin..\end), never a bare lead-in command. The
+%   always-visible inline lead-ins (\solution \answer \pf, section 7b) are the
+%   command half of the pair: one-shot typographic labels with no gated region.
+%
+% Behaviour of the box:
+%   - shown  (instructor build, or gating disabled, or starred \begin{solution}*):
+%       thin green left rule + 2% tint + bold "\@sol@label" header, real body.
+%   - gated  (default student build):
+%       real body is captured and DISCARDED (never ships), replaced by a dashed
+%       thin grey left rule around a blank write-box of height [#1].
 % Both boxes are breakable, so a tall box splits to fill a page bottom and
 % continues on the next page rather than jumping whole and leaving a gap. The
 % blank box gets its height from breakable filler lines (\@sol@blankfill), not
-% a fixed tcolorbox height, precisely so it CAN split; the student build
-% discards the real solution body rather than hiding it, so no answer ships.
-% Shares the canonical TeXLib geometry (texlibbase: same rule width via
-% \texlibrulewidth, same margin bleed/position as the theorem boxes). The
-% green solved-rule and the dashed blank-answer rule are the same width and
-% sit in the same place as every other TeXLib rule.
+% a fixed tcolorbox height, precisely so it CAN split. Shares the canonical
+% TeXLib geometry (texlibbase: same rule width via \texlibrulewidth, same
+% margin bleed/position as the theorem boxes).
+%
+% Customisation knobs (document-level, letter-only so they are usable in .tex):
+%   \gatesolutionfalse  -- make {solution}/{answer} ALWAYS show the real body
+%                          (ungated), regardless of build mode. \gatesolutiontrue
+%                          restores the default (blank space for students).
+%   \begin{solution}* / \begin{answer}*  -- force-show this one instance.
+% The header text is swapped per role via \@sol@label ({answer} sets "Answer.").
+\newif\ifgatesolution  \gatesolutiontrue   % gated (blank for students) by default
+\newif\if@sol@show                         % scratch: does THIS instance show its body?
+\newcommand{\@sol@label}{Solution.}        % header text; {answer} overrides to "Answer."
+
 % Two inner boxes: the shown (green) solution and the blank (dashed) answer
 % space. Both inherit texlibbase, so both are breakable.
 \NewTColorBox{@sol@shown}{}{
 	texlibbase,
 	colback=green!3!white,
 	borderline west={\texlibrulewidth}{0pt}{green!50!black},
-	before upper={\textbf{Solution.}\par\smallskip},
+	before upper={\textbf{\@sol@label}\par\smallskip},
 }
 \NewTColorBox{@sol@blank}{}{
 	texlibbase,
@@ -316,52 +332,113 @@
 	}%
 	\rule{\z@}{\@tempdima}\par
 }
-% \ifsolutions: show the solution in the green box. Otherwise: capture and
-% DISCARD the real body (so a student build never ships the answer, even
-% invisibly) and emit a dashed breakable blank box of height #1 to write in.
-\NewDocumentEnvironment{solution}{ O{3cm} }
+% Show the real body when ANY of: this instance is starred (#1), gating is
+% disabled (\ifgatesolution false), or this is an instructor build
+% (\ifsolutions). Otherwise capture and DISCARD the real body (so a student
+% build never ships the answer, even invisibly) and emit a dashed breakable
+% blank box of height #2 to write in.
+\NewDocumentEnvironment{solution}{ s O{3cm} }
 {%
-	\ifsolutions
+	\IfBooleanTF{#1}{\@sol@showtrue}{%
+		\ifgatesolution
+			\ifsolutions \@sol@showtrue \else \@sol@showfalse \fi
+		\else
+			\@sol@showtrue
+		\fi}%
+	\if@sol@show
 		\begin{@sol@shown}%
 	\else
 		\setbox\z@\vbox\bgroup
 	\fi
 }{%
-	\ifsolutions
+	\if@sol@show
 		\end{@sol@shown}%
 	\else
 		\egroup
-		\begin{@sol@blank}\@sol@blankfill{#1}\end{@sol@blank}%
+		\begin{@sol@blank}\@sol@blankfill{#2}\end{@sol@blank}%
 	\fi
 }
 
-% \answer  --  inline answer prefix for use inside the question env (always visible)
-% Ends the current paragraph, inserts a blank line of vertical space (\bigskip,
-% roughly one baseline), prints "Answer." in italics, and yields a space so
-% the answer text continues inline. Usage:
-%   \begin{question}
-%       What is X?
-%       \answer X is ...
-%   \end{question}
-\newcommand{\answer}{\par\bigskip\noindent\textit{Answer.}\space}
+% ==============================================================================
+% 7.5. REGION ALIASES  ({soln}, {answer}, {ans})
+% ==============================================================================
+% Thin wrappers over {solution}: each forwards the star and the optional
+% [<height>]. {answer}/{ans} relabel the header to "Answer." (a shorter default
+% height, since a short-answer key needs less write-space than a full solution)
+% and are otherwise identical -- they gate and reserve space exactly like
+% {solution}. The relabel is scoped by the environment group, so it reverts at
+% \end. Naming: the region-answer form is the ENVIRONMENT \begin{answer}; the
+% always-visible inline label is the COMMAND \answer (section 7b). The two never
+% collide because \answer-the-command only exists (via \let) inside a worked
+% environment, where it locally shadows the environment name; in open text
+% \begin{answer} is the box. (No `*'-twin theorem semantics here -- the `s' is
+% the force-show star, matching {solution}*.)
+\NewDocumentEnvironment{soln}{ s O{3cm} }
+  {\IfBooleanTF{#1}{\begin{solution}*[#2]}{\begin{solution}[#2]}}
+  {\end{solution}}
+\NewDocumentEnvironment{answer}{ s O{1.5cm} }
+  {\renewcommand{\@sol@label}{Answer.}%
+   \IfBooleanTF{#1}{\begin{solution}*[#2]}{\begin{solution}[#2]}}
+  {\end{solution}}
+\NewDocumentEnvironment{ans}{ s O{1.5cm} }
+  {\IfBooleanTF{#1}{\begin{answer}*[#2]}{\begin{answer}[#2]}}
+  {\end{answer}}
 
 % ==============================================================================
-% 7.5. ENVIRONMENT ALIASES
+% 7b. INLINE WORKED LEAD-INS  (\solution \answer \ans \pf)  + challenge gating
 % ==============================================================================
-% The four-letter theorem synonyms (defn, conv, ques, exer, exam, notn, chal
-% and their `*` twins) are generated by \TeXLibTheorems[aliases=true] in
-% section 6 -- each a thin \NewDocumentEnvironment wrapping \begin{<real>} so
-% the tcolorbox hooks (keyed by env name) still fire. Only the solution-box
-% synonym is class-local, so it lives here.
+% The COMMAND half of the pair. texlib-thmenv.sty binds these four lead-ins
+% (\let to always-visible italic "Solution." / "Answer." / "Proof." labels)
+% inside every worked-shaped env -- example, exercise, question, challenge --
+% via \AtBeginEnvironment{<env>}{\texlib@bind@worked}. A worked solution is
+% exposition, so the DEFAULT is always-visible.
 %
-% \solution is built with \NewTColorBox (not \tcolorboxenvironment), so the
-% box machinery lives directly inside the \solution / \endsolution macros and
-% a \let-alias would in principle work.  We use the same wrapper pattern for
-% consistency and to pass the optional [<height>] argument through cleanly.
-% (No \soln*: the solution box has no unnumbered variant.)
-\NewDocumentEnvironment{soln}{O{3cm}}
-  {\begin{solution}[#1]}
-  {\end{solution}}
+% didactic then makes the two ASSESSMENT-shaped members gate. In `challenge'
+% and `exercise' a lead-in is a spoiler: it should reach the instructor build
+% but not the student handout. So here we re-bind the four lead-ins in just
+% those two envs to a gated form -- shown under \ifsolutions, otherwise opening
+% a \vbox that swallows the rest of the environment body (the \AtEndEnvironment
+% hook closes it), so no worked text ships. `example' and `question' are left
+% at the always-visible binding (a worked example is exposition; a question's
+% short \answer is a visible prompt).
+%
+% These \AtBeginEnvironment hooks are registered AFTER \TeXLibAllTheorems (sec.
+% 6) has registered \texlib@bind@worked, so at \begin they fire second and win.
+%
+% Knob: \gateworkedfalse turns the gating off (lead-ins stay always-visible in
+% challenge/exercise too); \gateworkedtrue (default) restores it.
+\newif\ifgateworked  \gateworkedtrue
+\newif\if@wrk@gateopen
+
+% A gated lead-in. #1 is the visible label macro (from texlib-thmenv.sty). In an
+% instructor build it prints the label inline; otherwise it opens ONE discard
+% vbox (guarded by the flag so a second lead-in in the same env does not nest a
+% second box) that captures everything up to \end.
+\newcommand{\texlib@wrk@lead}[1]{%
+	\ifsolutions
+		#1%
+	\else
+		\if@wrk@gateopen\else \@wrk@gateopentrue \setbox\z@\vbox\bgroup \fi
+	\fi}
+% Closes the discard vbox if a gated lead-in opened one. Runs as the last tokens
+% of the environment body, i.e. still inside that vbox, so \egroup balances it.
+\newcommand{\texlib@wrk@close}{\if@wrk@gateopen \egroup \@wrk@gateopenfalse \fi}
+% Re-bind the four lead-ins to their gated form (only when gating is enabled).
+\newcommand{\texlib@wrk@gatebind}{%
+	\ifgateworked
+		\def\solution{\texlib@wrk@lead{\texlib@inline@solution}}%
+		\def\answer  {\texlib@wrk@lead{\texlib@inline@answer}}%
+		\def\ans     {\texlib@wrk@lead{\texlib@inline@answer}}%
+		\def\pf      {\texlib@wrk@lead{\texlib@inline@proof}}%
+	\fi}
+\AtBeginEnvironment{challenge} {\texlib@wrk@gatebind}
+\AtBeginEnvironment{challenge*}{\texlib@wrk@gatebind}
+\AtBeginEnvironment{exercise}  {\texlib@wrk@gatebind}
+\AtBeginEnvironment{exercise*} {\texlib@wrk@gatebind}
+\AtEndEnvironment{challenge}   {\texlib@wrk@close}
+\AtEndEnvironment{challenge*}  {\texlib@wrk@close}
+\AtEndEnvironment{exercise}    {\texlib@wrk@close}
+\AtEndEnvironment{exercise*}   {\texlib@wrk@close}
 
 % ==============================================================================
 % 8. MATH UTILITIES

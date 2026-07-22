@@ -43,11 +43,16 @@ This is a sample of the boxed environments and the magic
 
 % Two ways to attach a worked solution:
 %
-%   (1) The gated \begin{solution} box (below the exercise) — a green box in the
-%       instructor build, a blank "show your work" box in the student build.
+%   (1) The gated \begin{solution} box (below the exercise; \begin{answer} is the
+%       same box relabelled "Answer.") — a green box in the instructor build, a
+%       blank "show your work" box in the student build. Force-show one instance
+%       with the star, \begin{solution}*; make ALL of them always-visible with
+%       \gatesolutionfalse.
 %   (2) The inline lead-ins \solution / \answer (alias \ans) / \pf — written
-%       INSIDE example/exercise/question/challenge. These are exposition: they
-%       are ALWAYS visible, in every build mode.
+%       INSIDE example/exercise/question/challenge. In example and question they
+%       are exposition: ALWAYS visible. In challenge and exercise they are gated
+%       like the box — shown in the instructor build, discarded from the student
+%       handout (so no solution ships). Turn that gating off with \gateworkedfalse.
 \begin{exercise}
 	Show that the equation $x^3 - x - 1 = 0$ has a solution in
 	$(1, 2)$.

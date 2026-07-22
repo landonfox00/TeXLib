@@ -161,27 +161,50 @@ Behavior:
 | Instructor (default)        | Body visible, blue tint                    |
 | Student                     | Blank box of `<height>`, "Space for Notes" |
 
-#### `\solution` inside an `example`
+#### Inline lead-ins `\solution` / `\answer` / `\ans` / `\pf`
 
-Within an `example` (also `example*` and the `exam` alias) you can mark a
-worked solution inline with `\solution`:
+Inside any worked-shaped environment — `example`, `question`, `exercise`,
+`challenge` (and their `*` twins / aliases) — you can mark a worked solution,
+answer, or proof inline with a one-word lead-in:
 
 ```latex
 \begin{example}
 	Evaluate $\lim_{x \to 3}(2x + 1)$.
 	\solution Direct substitution gives $7$.
 \end{example}
+
+\begin{challenge}
+	Show $\sqrt{2}$ is irrational.
+	\solution Suppose $\sqrt{2} = p/q$ in lowest terms; then …
+\end{challenge}
 ```
 
-Everything after `\solution` renders with an italic **"Solution."** lead-in
-(matching the `\answer` command) and is **always visible** in every build mode —
-a worked example's solution is part of the exposition, not a gated answer key
-(the key difference from the standalone
-`solution` box, which blanks out for students). The hook is shared — it lives in
-`texlib-thmenv.sty`, so every class with an `example` environment gets it — and
-is scoped to the example environment, so the standalone `\begin{solution}` box
-keeps `\solution` everywhere else; just don't nest a `\begin{solution}` box
-*inside* an example.
+Each renders an italic **"Solution."** / **"Answer."** / **"Proof."** lead-in,
+then the text continues inline. **Visibility depends on the environment:**
+
+| Environment            | Inline lead-in visibility                              |
+|------------------------|--------------------------------------------------------|
+| `example`, `question`  | **Always visible** — it is exposition / a shown prompt |
+| `challenge`, `exercise`| **Gated** — shown in the instructor build, discarded from the student handout (no solution ships) |
+
+So a worked `example` reads the same for everyone, while a `challenge`
+statement stays a bare prompt for students but carries its worked solution in
+your instructor build. Turn the gating off globally with `\gateworkedfalse`
+(then all four envs are always-visible).
+
+The always-visible half of the hook is shared (it lives in `texlib-thmenv.sty`,
+so every class with these environments gets it); the challenge/exercise gating
+is added by `didactic.cls`. Each lead-in is scoped to its environment, so the
+standalone `\begin{solution}` box keeps `\solution` everywhere else — just don't
+nest a `\begin{solution}` box *inside* one of these environments.
+
+#### `{answer}` — the solution box, relabelled
+
+`\begin{answer}` is the same gated box as `\begin{solution}` with an "Answer."
+header and a shorter default height — use it for a short-answer key that still
+wants student write-space. `{ans}` and `{soln}` are aliases. All accept the
+force-show star (`\begin{answer}*`) and obey `\gatesolutionfalse` (make every
+box always-visible).
 
 ### Math utilities
 
