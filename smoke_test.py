@@ -441,11 +441,14 @@ def check_verapdf(pdf_path: str) -> tuple[list[str], bool]:
     """
     if not VERAPDF:
         return [], True  # soft skip: veraPDF not installed
-    cmd = [VERAPDF, "--flavour", "ua2", "--format", "text", pdf_path]
+    # XML rather than text: the text report is only a PASS/FAIL line, whereas the
+    # XML carries the ISO clause of each failed rule -- the difference between
+    # "non-compliant" and an actionable "clause 8.11.1 (dc:title missing)".
+    cmd = [VERAPDF, "--flavour", "ua2", "--format", "xml", pdf_path]
     try:
         r = subprocess.run(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, encoding="utf-8", errors="replace", timeout=120,
+            text=True, encoding="utf-8", errors="replace", timeout=180,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return [f"veraPDF invocation failed: {exc}"], False
@@ -454,12 +457,14 @@ def check_verapdf(pdf_path: str) -> tuple[list[str], bool]:
         return [], False  # compliant
     if r.returncode > 1:
         return [f"veraPDF tool error (exit {r.returncode}): {out.strip()[:200]}"], False
-    # Non-compliant (exit 1). Surface a failed-rule count when the text report
-    # exposes one (format varies across veraPDF versions); fall back to a plain
-    # non-compliant note otherwise.
-    m = re.search(r"(\d+)\s+fail", out, re.I) or re.search(r"failedRules?\D+(\d+)", out, re.I)
-    detail = f" ({m.group(1)} failed rule(s))" if m else ""
-    return [f"PDF/UA-2 non-compliant{detail}"], False
+    # Non-compliant (exit 1): name the failed ISO clauses (deduped, first few).
+    clauses = []
+    for c in re.findall(r'clause="([^"]+)"', out):
+        if c not in clauses:
+            clauses.append(c)
+    detail = f" -- failed clause(s): {', '.join(clauses[:6])}" if clauses else ""
+    more = f" (+{len(clauses) - 6} more)" if len(clauses) > 6 else ""
+    return [f"PDF/UA-2 non-compliant{detail}{more}"], False
 
 
 def check_visual(module: str, tmp: str, pdf_path: str, update: bool) -> tuple[list[str], bool]:
