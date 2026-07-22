@@ -69,10 +69,24 @@ TEXLIB_ROOT = SCRIPT_DIR  # script lives at TeXLib root
 # failing, so a bare `lualatex`/`pdflatex` install can still run build-only.
 #   pdftotext / pdftoppm  -> poppler-utils
 #   magick (or compare)   -> ImageMagick
+#   verapdf               -> veraPDF PDF/UA conformance checker (--accessible)
 PDFTOTEXT = shutil.which("pdftotext")
 PDFTOPPM = shutil.which("pdftoppm")
 MAGICK = shutil.which("magick")
 COMPARE = shutil.which("compare")  # ImageMagick 6 standalone
+VERAPDF = shutil.which("verapdf") or shutil.which("verapdf.bat")
+
+# Accessible (tagged PDF/UA) build. Must stay in lock-step with the Sublime
+# builder's ACCESSIBLE_MACRO (Sublime/texlib/texlib_build.py): the same
+# \DocumentMetadata prefix is injected ahead of \input so tagging is switched on
+# before \documentclass. --accessible forces lualatex, builds the tagged
+# variant, and (when veraPDF is present) validates PDF/UA-2 conformance.
+ACCESSIBLE_DOCMETA = (
+    r"\DocumentMetadata{lang=en,tagging=on,"
+    r"tagging-setup={math/setup={mathml-SE},table/header-rows=1},"
+    r"pdfstandard={ua-2,a-4f}}"
+)
+ACCESSIBLE_MACRO = ACCESSIBLE_DOCMETA + r"\def\TeXLibAccessibleMode{}"
 
 # Committed reference images for visual regression (--visual). Generated with
 # --update-refs; environment-specific (font rendering differs across TeX Live
@@ -362,6 +376,40 @@ def _compare_pages(ref_png: str, test_png: str) -> int | None:
     return 10**9 if r.returncode != 0 else 0
 
 
+def check_verapdf(pdf_path: str) -> tuple[list[str], bool]:
+    """
+    Validate PDF/UA-2 conformance of an accessible build with veraPDF.
+
+    Returns (problems, skipped). `skipped` is True (a soft skip, not a failure)
+    when the veraPDF CLI is not on PATH, mirroring the pdftotext/ImageMagick
+    convention — a green run without veraPDF has NOT verified conformance.
+    veraPDF exits 0 when the file passes every rule of the chosen flavour, 1
+    when some rule fails, and >1 on a tool error; the failed-rule count is
+    parsed from the text report for a useful one-line summary.
+    """
+    if not VERAPDF:
+        return [], True  # soft skip: veraPDF not installed
+    cmd = [VERAPDF, "--flavour", "ua2", "--format", "text", pdf_path]
+    try:
+        r = subprocess.run(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace", timeout=120,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return [f"veraPDF invocation failed: {exc}"], False
+    out = r.stdout or ""
+    if r.returncode == 0:
+        return [], False  # compliant
+    if r.returncode > 1:
+        return [f"veraPDF tool error (exit {r.returncode}): {out.strip()[:200]}"], False
+    # Non-compliant (exit 1). Surface a failed-rule count when the text report
+    # exposes one (format varies across veraPDF versions); fall back to a plain
+    # non-compliant note otherwise.
+    m = re.search(r"(\d+)\s+fail", out, re.I) or re.search(r"failedRules?\D+(\d+)", out, re.I)
+    detail = f" ({m.group(1)} failed rule(s))" if m else ""
+    return [f"PDF/UA-2 non-compliant{detail}"], False
+
+
 def check_visual(module: str, tmp: str, pdf_path: str, update: bool) -> tuple[list[str], bool]:
     """
     Render every PDF page to PNG and compare against committed references.
@@ -526,23 +574,29 @@ def build_one(
     content: bool = True,
     visual: str | None = None,
     dump_text: bool = False,
+    accessible: bool = False,
 ) -> tuple[bool, float, str, str, bool]:
     """
     Build a single template.tex in an isolated temp directory.
 
     `content`: run text/artifact content checks after a successful build.
     `visual`:  None (off), "check" (compare to refs), or "update" (write refs).
+    `accessible`: build the tagged PDF/UA variant (force lualatex, inject the
+        \\DocumentMetadata prefix) and validate it with veraPDF.
 
     Returns (ok, elapsed_seconds, error_excerpt, log_path_on_failure, skipped),
-    where `skipped` is True if a requested content/visual check was soft-skipped
-    because its external tool (poppler / ImageMagick) was unavailable.
+    where `skipped` is True if a requested content/visual/veraPDF check was
+    soft-skipped because its external tool (poppler / ImageMagick / veraPDF) was
+    unavailable.
     """
     module_dir = os.path.join(TEXLIB_ROOT, module)
     tex_src = os.path.join(module_dir, template)
     if not os.path.exists(tex_src):
         return False, 0.0, f"missing template: {tex_src}", "", False
 
-    engine = detect_engine(tex_src)
+    # Tagging (MathML math) is a Unicode-engine feature -> force lualatex for the
+    # accessible variant even for the pdflatex classes, exactly as the builder does.
+    engine = "lualatex" if accessible else detect_engine(tex_src)
 
     # Build in a temp dir so we don't pollute the real module folder with
     # .aux/.log/.synctex.gz etc. Copy the module's local files (.cls/.lua/.tex
@@ -597,16 +651,23 @@ def build_one(
         #   trailing path separator = "...and the default texmf trees too".
         env["TEXINPUTS"] = f".{sep}{TEXLIB_ROOT}//{sep}{existing}"
 
+        jobname = os.path.splitext(template)[0]
         cmd = [engine, "-interaction=nonstopmode", "-halt-on-error"]
         if engine == "lualatex":
             cmd.append("-shell-escape")
-        if mode_macro:
-            # Compile-time flag injection: \def\StudentMode{}\input{template.tex}
-            cmd.append(f"{mode_macro}\\input{{{template}}}")
+        # Compile-time prefix injection: [\DocumentMetadata...]\def\Flag{}\input{t}.
+        # The accessible \DocumentMetadata must come FIRST so it precedes the
+        # document's \documentclass. \DocumentMetadata opens a support file before
+        # the \input runs, so the jobname must be pinned explicitly -- otherwise
+        # LuaTeX names the output after that support file, not the template.
+        prefix = (ACCESSIBLE_MACRO if accessible else "") + (mode_macro or "")
+        if accessible:
+            cmd.append(f"--jobname={jobname}")
+        if prefix:
+            cmd.append(f"{prefix}\\input{{{template}}}")
         else:
             cmd.append(template)
 
-        jobname = os.path.splitext(template)[0]
         pdf = os.path.join(tmp, jobname + ".pdf")
         t0 = time.time()
         try:
@@ -625,6 +686,10 @@ def build_one(
         if ok:
             skipped = False
             problems: list[str] = []
+            if accessible:
+                vp, vera_skipped = check_verapdf(pdf)
+                problems += vp
+                skipped = skipped or vera_skipped
             if content:
                 cp, text_skipped = check_content(module, tmp, pdf)
                 problems += cp
@@ -938,6 +1003,12 @@ def main() -> int:
     p.add_argument("--solutions", action="store_true", help=r"Also build with \ShowSolutions")
     p.add_argument("--rubric", action="store_true", help=r"Also build with \ShowRubric")
     p.add_argument(
+        "--accessible", action="store_true",
+        help="Also build the tagged PDF/UA variant (forces lualatex) and validate "
+             "it with veraPDF. Soft-skips validation if veraPDF is absent. Note: "
+             "only rolled-out classes (syllabus, didactic) are expected to pass.",
+    )
+    p.add_argument(
         "--modes",
         choices=["default", "all"],
         default="default",
@@ -999,6 +1070,11 @@ def main() -> int:
     for flag in ("student", "key", "solutions", "rubric"):
         if enable_all or getattr(args, flag):
             modes.append((flag, MODES[flag]))
+    # Accessible is opt-in only (never folded into --modes all): it is expensive
+    # (lualatex + tagging) and, until the rollout finishes, fails for classes
+    # whose package stack is not yet tagging-clean.
+    if args.accessible:
+        modes.append(("accessible", None))
 
     # --dump-text: build each target once (default mode) and print its text.
     if args.dump_text:
@@ -1018,6 +1094,11 @@ def main() -> int:
         check_bits.append(
             ("visual:update" if visual_mode == "update" else "visual")
             + (f" [{', '.join(miss)} MISSING -> skipped]" if miss else "")
+        )
+    if args.accessible:
+        check_bits.append(
+            "accessible/PDF-UA"
+            + ("" if VERAPDF else " [veraPDF MISSING -> validation skipped]")
         )
 
     print(f"TeXLib smoke test")
@@ -1042,7 +1123,8 @@ def main() -> int:
             (module, mode_name,
              pool.submit(build_one, module, template, mode_macro,
                          args.timeout, args.verbose,
-                         content=content_enabled, visual=visual_mode))
+                         content=content_enabled, visual=visual_mode,
+                         accessible=(mode_name == "accessible")))
             for (module, template, mode_name, mode_macro) in jobs
         ]
         for module, mode_name, fut in futures:

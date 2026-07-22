@@ -37,6 +37,47 @@
                            % but mathrsfs was never loaded, so \mscr errored
                            % the moment it was used in a document body.
 
+% --- Accessible math alt-text (MathML intent) -------------------------------
+% \TeXLibMathIntent{intent}{math}: attach a MathML "intent" so a screen reader
+% reads <math> as the given alt-text during an ACCESSIBLE build (the tagged
+% PDF/UA variant, texlib-build.sty -> \ifTeXLibAccessible); a no-op in every
+% normal build, so documents behave identically when not tagging. Built on
+% \MathMLintent (LaTeX tagging project), mirroring UNR Hurtado's approach.
+%
+% IMPORTANT -- single node only. luamml can attach an intent only to a SINGLE
+% math node (one symbol, or one \sin^{-1}-style super/subscript). A multi-node
+% or delimited expression (anything with \left..\right, plain \lvert x\rvert,
+% f(x), ...) makes luamml warn "Multiple math nodes" and DROP the intent -- the
+% build still succeeds, the alt-text is just ignored. So use it on ambiguous
+% single glyphs / scripted operators, e.g. inverse trig (the notation reads as
+% "sine to the negative one power" by default):
+%
+%     \newcommand{\sininv}{\TeXLibMathIntent{inverse-sine}{\sin^{-1}}}
+%     \newcommand{\Jac}{\TeXLibMathIntent{Jacobian-matrix}{\mathbf{J}}}
+%
+% The auto-sizing delimiters below are deliberately NOT wrapped: they are
+% multi-node, so an intent would be silently discarded.
+%
+% Both branches are defined at load time and \TeXLibMathIntent is \let to one of
+% them; \AtBeginDocument (after texlib-build has run and any source-level
+% \accessible / compile-time flag is settled) swaps to the active branch when
+% both the accessible flag and \MathMLintent are present. Defining the two-arg
+% branches up front -- rather than \renewcommand-ing inside the hook -- avoids
+% the # parameter-doubling that a parametered \def built inside \AtBeginDocument
+% would suffer.
+\newcommand{\texlib@mathintent@off}[2]{#2}
+\newcommand{\texlib@mathintent@on}[2]{\MathMLintent{#1}{#2}}
+\newcommand{\TeXLibMathIntent}{\texlib@mathintent@off}
+\AtBeginDocument{%
+  \ifdefined\ifTeXLibAccessible
+    \ifTeXLibAccessible
+      \ifdefined\MathMLintent
+        \let\TeXLibMathIntent\texlib@mathintent@on
+      \fi
+    \fi
+  \fi
+}
+
 % --- Math-font shortcuts ----------------------------------------------------
 \providecommand{\mbb}[1]{\mathbb{#1}}
 \providecommand{\mrm}[1]{\mathrm{#1}}
