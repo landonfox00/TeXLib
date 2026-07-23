@@ -42,6 +42,9 @@
 
 \RequirePackage{course-metadata}
 
+% PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty.
+\TeXLibDeclareDocTitle{\GetCourse\space\GetTerm\space Bingo}
+
 % Shared document-instructions mechanism (inline / file / default, file > inline
 % > default). \TeXLibDeclareInstructions{bingo} below mints \GetBingoInstructions,
 % \IfBingoInstructions{File,Inline}, and \bingo@input@userinstructions.

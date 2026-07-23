@@ -46,6 +46,9 @@
 \RequirePackage{tocloft}
 \RequirePackage{course-metadata}
 
+% PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty.
+\TeXLibDeclareDocTitle{\GetCourse\space\GetTerm\space Report Cards}
+
 % ==============================================================================
 % 2. BUILD FLAGS — UNIFIED TeXLib CLI
 % ==============================================================================
