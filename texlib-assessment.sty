@@ -21,36 +21,46 @@
 \renewcommand{\partlabel}{\textbf{\thequestion\thepartno.}}
 
 % ==============================================================================
-% Accessible build: restore subproblem point values
+% Accessible build: restore question/part point values (PDF tagging)
 % ==============================================================================
-% exam.cls attaches a \part's "(N points)" to the LIST machinery of {parts}. The
-% LaTeX tagging code replaces that machinery, so under \DocumentMetadata the
-% points vanish SILENTLY -- reproducible in a bare exam.cls document with no
-% TeXLib code at all:
+% exam.cls delivers an item's "(N points)" by appending \point@block to
+% \everypar. The LaTeX tagging code takes over \everypar for paragraph tagging,
+% so under \DocumentMetadata the points vanish SILENTLY at every level --
+% reproducible in a bare exam.cls document with no TeXLib code:
 %
 %   normal:  (a) (4 points) Find all real solutions.
 %   tagged:  (a) Find all real solutions.
 %
-% That is an upstream exam.cls x tagging incompatibility the classes cannot dodge,
-% and dropping per-part point values from the copy handed to a student is a real
-% regression. So in an accessible build ONLY, wrap \part and typeset the points
-% ourselves at the head of the body, where ordinary tagged text carries them.
-% Singular "point" for 1, matching exam.cls's wording; a \part with no optional
-% argument passes straight through.
-% NOT YET FIXED -- documented here so the next attempt does not restart cold.
+% Dropping point values from a graded copy handed to a student is a real
+% regression, so in an accessible build we re-emit them ourselves, inline at the
+% body start, exactly where exam.cls would (and where tagged text carries them).
 %
-% Two workarounds were tried and BOTH failed to emit anything:
-%   1. \let + \RenewDocumentCommand{\part}{o} at package level. exam.cls defines
-%      \part INSIDE the parts environment, so the outer definition is replaced
-%      when the environment opens. Confirmed: an UNTAGGED build with the wrapper
-%      still printed only ONE "(4 points)" -- exam.cls's own, never the wrapper's.
-%   2. The same wrap moved into \AtBeginEnvironment{parts}. Also produced nothing,
-%      so \part is established later than that hook, or the points text is
-%      swallowed by the item machinery rather than starting the item body.
+% \@readpoints[N] is the ONLY path exam.cls takes for an item that HAS points, so
+% it is the reliable per-item signal -- \if@placepoints is a global whose value
+% leaks to a following point-less item. Flag on there; after exam.cls's own
+% (now-dropped) placement runs, re-assert \@placepointstrue so \thepoints prints,
+% emit "(N points)" -- exam.cls has already set \@pointname to the singular
+% "point" for N=1 -- then clear the flag and normalise to a single following
+% space. Runs for questions, parts, subparts and subsubparts alike, since all
+% route through these two macros. Guarded so a normal build is untouched (there
+% the everypar delivery works and this would double the points).
 %
-% Next thing to try: patch exam.cls's internal part renderer (\@part / the
-% \partlabel-adjacent points code) rather than the user-facing \part, or emit the
-% points from \partlabel itself, which TeXLib already \renewcommands above and
-% which IS honoured under tagging.
+% \newif is declared OUTSIDE the \ifTeXLibAccessible guard on purpose: were it
+% inside, a normal build skipping the false branch would not yet recognise
+% \iftexlib@pts as a conditional, so its inner \fi would close \ifTeXLibAccessible
+% early and the next } would raise "Too many }'s".
+\newif\iftexlib@pts
+\ifTeXLibAccessible
+	\let\texlib@orig@readpoints\@readpoints
+	\def\@readpoints[#1]{\global\texlib@ptstrue\texlib@orig@readpoints[#1]}
+	\let\texlib@orig@itempoints\item@points@pageinfo
+	\def\item@points@pageinfo{%
+		\texlib@orig@itempoints
+		\iftexlib@pts
+			\global\@placepointstrue(\thepoints)%
+			\global\texlib@ptsfalse\space\ignorespaces
+		\fi
+	}
+\fi
 
 \endinput
