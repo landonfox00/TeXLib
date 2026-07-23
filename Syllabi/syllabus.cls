@@ -385,6 +385,41 @@
 	\end{tabular}%
 }
 
+% \gradebound{<left of x>}{<right of x>} -- a grade-range cell aligned ON the x.
+%
+% A plain centred cell centres each range as a whole string, so "$90 \leq x$" and
+% "$80 \leq x < 90$" put their x's in different places and the column reads
+% ragged. This pads both sides to the SAME fixed width, so every entry has
+% identical total width and the x lands on a common axis -- the column centres,
+% and the x's line up down it:
+%
+%     A & \gradebound{90 \leq}{}        \\ \hline
+%     B & \gradebound{80 \leq}{< 90}    \\ \hline
+%
+% Both arguments are set in math mode; either may be empty. Widen
+% \gradeboundwidth if a course uses longer bounds than the two-digit defaults.
+%
+% KNOWN LIMITATION: a row with an EMPTY LOWER bound (the open-ended F row,
+% \gradebound{}{< 60}) sits 1.8pt -- one \, -- left of the rest. Rows with both
+% bounds, and rows with an empty UPPER bound (the A row), align exactly. Measured
+% by extracting the x glyph origins from the built PDF, so it is real and not a
+% rendering artifact; the cause is not yet identified. Cosmetic and confined to
+% that one row.
+\newlength{\gradeboundwidth}
+\setlength{\gradeboundwidth}{3.6em}
+% An empty argument must NOT become "$$" -- that opens display math and shifts
+% the cell (the F row, which has no lower bound, drifted ~2pt before this guard).
+% \if\relax\detokenize{..}\relax is the same empty test basic-utilities uses.
+\newcommand{\texlib@gb@side}[1]{\if\relax\detokenize{#1}\relax\else$#1$\fi}
+% The x lives INSIDE the right-aligned box, so it is anchored to that box's right
+% edge rather than to whatever precedes it. Both boxes are a fixed width, so the
+% cell's total width -- and therefore its centring -- is identical on every row,
+% and the x lands on the same axis even when a bound is empty (the F row).
+\newcommand{\gradebound}[2]{%
+	\makebox[\gradeboundwidth][r]{\texlib@gb@side{#1}\,$x$}%
+	\makebox[\gradeboundwidth][l]{\,\texlib@gb@side{#2}}%
+}
+
 \newcommand{\gradescale}[1]{%
 	\begin{tabular}{|c|c|}
 		\hline
