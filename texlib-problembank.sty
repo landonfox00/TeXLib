@@ -76,7 +76,8 @@
 			local path = kpse.find_file(name, "lua")
 			if path and lfs.attributes(path) then dofile(path) return end
 			local sty_path = kpse.find_file("texlib-problembank.sty")
-			local base_dir = sty_path and sty_path:match("(.*[/\\])") or ""
+			local sep = string.char(92)
+			local base_dir = sty_path and sty_path:match("(.*[/" .. sep .. "])") or ""
 			path = base_dir .. name
 			if lfs.attributes(path) then dofile(path) return end
 			dofile(name)

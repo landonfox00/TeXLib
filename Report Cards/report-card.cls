@@ -67,7 +67,8 @@
 			local path = kpse.find_file(name, "lua")
 			if path and lfs.attributes(path) then dofile(path) return end
 			local cls = kpse.find_file("report-card.cls")
-			local dir = cls and cls:match("(.*[/\\])") or ""
+			local sep = string.char(92)
+			local dir = cls and cls:match("(.*[/" .. sep .. "])") or ""
 			path = dir .. name
 			if lfs.attributes(path) then dofile(path) return end
 			dofile(name)
