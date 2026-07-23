@@ -68,12 +68,22 @@
 \newcommand{\texlib@mathintent@off}[2]{#2}
 \newcommand{\texlib@mathintent@on}[2]{\MathMLintent{#1}{#2}}
 \newcommand{\TeXLibMathIntent}{\texlib@mathintent@off}
+% \ifTeXLibAccessible belongs to texlib-build.sty, which the CLASSES load -- but
+% this package is pulled in earlier (via texlib-corepkg) and may be used without
+% it. Guarantee the conditional exists rather than testing for it inline:
+% wrapping a POSSIBLY-UNDEFINED conditional in a guard is what produced the
+% "Extra \fi" at \begin{document}. When TeX skips a false branch it counts nested
+% conditionals BY MEANING; an undefined \ifTeXLibAccessible is not counted, yet
+% the source still carries a matching \fi, so the skipper closes the outer
+% conditional one \fi early and the last \fi is orphaned. With the flag always
+% defined, the conditional below is symmetric under both execution and skipping.
+% (texlib-build.sty re-runs \newif later, which resets and then sets it from
+% \TeXLibAccessibleMode -- it loads after this package, so that ordering is fine.)
+\ifcsname ifTeXLibAccessible\endcsname\else \newif\ifTeXLibAccessible \fi
 \AtBeginDocument{%
-  \ifdefined\ifTeXLibAccessible
-    \ifTeXLibAccessible
-      \ifdefined\MathMLintent
-        \let\TeXLibMathIntent\texlib@mathintent@on
-      \fi
+  \ifTeXLibAccessible
+    \ifcsname MathMLintent\endcsname
+      \let\TeXLibMathIntent\texlib@mathintent@on
     \fi
   \fi
 }

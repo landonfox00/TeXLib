@@ -269,6 +269,7 @@ class TexlibBuildCore:
             engine, self._aux_target, tex_dir, engine_options
         )
 
+        self._accessible_build = (mode == ACCESSIBLE_MODE)
         if mode == MODE_QUICK:
             yield from self._count_passes(self._build_quick(base, engine))
         elif mode == ACCESSIBLE_MODE:
@@ -556,23 +557,58 @@ class TexlibBuildCore:
         yield (cmd, f"{engine} [quick] single pass (refs may be stale)...")
 
     def _build_accessible(self, base, engine):
-        """Build the tagged PDF/UA variant to <base>_accessible.pdf.
+        """Build the tagged PDF/UA variant, kept beside the primary PDF.
 
-        A jobname suffix keeps the tagged PDF next to -- not on top of -- the
-        primary <base>.pdf (the source of truth for printing / the LMS). The
-        DocumentMetadata prefix goes AHEAD of \\input{<doc>} so it precedes the
-        document's own \\documentclass, the only position from which tagging can
-        be enabled. Two fixed passes settle cross-references and the "page X of
-        Y" footer, matching the CLI convention; no biber loop here yet, so a
-        bibliography-bearing class (notes/pset) may need one added when the
-        rollout reaches it. _copy_back_from_aux globs <base>*.pdf, so the
-        suffixed output is carried back beside the source with no extra work.
+        The jobname MUST stay the document's real base name. A suffixed jobname
+        looked like the tidy way to avoid clobbering <base>.pdf, but several
+        TeXLib engines key off \\jobname: autoexam reads the document body from
+        <jobname>.tex and simply aborts ("AutoExam: Cannot read document body")
+        when it does not exist, which silently truncated the tagged exam from 6
+        pages to 2. So instead of renaming the job, the build is redirected to an
+        `a11y` subdirectory of the aux dir; _postprocess copies the result out as
+        <base>_accessible.pdf. \\jobname is unchanged, every jobname-keyed engine
+        behaves exactly as in a normal build, and the primary PDF is untouched
+        because nothing is written next to the source until the copy.
+
+        The DocumentMetadata prefix goes AHEAD of \\input{<doc>} so it precedes
+        the document's \\documentclass, the only position from which tagging can
+        be enabled -- and pinning --jobname also stops LuaTeX naming the output
+        after the support file DocumentMetadata opens before the \\input.
+
+        Two fixed passes settle cross-references and the "page X of Y" footer;
+        no biber loop yet, so a bibliography-bearing class may need one when the
+        rollout reaches it.
         """
-        jobname = self.base_name + ACCESSIBLE_SUFFIX
-        arg = ACCESSIBLE_MACRO + f"\\input{{{self.tex_name}}}"
-        cmd = base + [f"--jobname={jobname}", arg]
+        out_dir = self._accessible_out_dir()
+        cmd = [c for c in base if not str(c).startswith("-output-directory=")]
+        cmd += [f"-output-directory={out_dir}", f"--jobname={self.base_name}",
+                ACCESSIBLE_MACRO + f"\\input{{{self.tex_name}}}"]
         yield (cmd, f"{engine} [accessible] run 1...")
         yield (cmd, f"{engine} [accessible] run 2 (settle)...")
+
+    def _accessible_out_dir(self):
+        """Aux subdirectory the accessible build writes into (created on demand)."""
+        parent = getattr(self, "_aux_target", None) or self._tex_dir()
+        out_dir = os.path.join(parent, "a11y")
+        try:
+            os.makedirs(out_dir, exist_ok=True)
+        except OSError:
+            return parent
+        return out_dir
+
+    def _copy_back_accessible(self, tex_dir):
+        """Copy the tagged build out as <base>_accessible.pdf beside the source."""
+        out_dir = self._accessible_out_dir()
+        src = os.path.join(out_dir, self.base_name + ".pdf")
+        if not os.path.exists(src):
+            return
+        dest = os.path.join(tex_dir, self.base_name + ACCESSIBLE_SUFFIX + ".pdf")
+        try:
+            shutil.copy2(src, dest)
+            self.display(
+                f"TeXLib: accessible copy -> {os.path.basename(dest)}\n")
+        except OSError as exc:
+            self.display(f"TeXLib: could not write {dest}: {exc}\n")
 
     def _tex_dir(self):
         """The directory containing the root .tex file."""
@@ -918,6 +954,12 @@ class TexlibBuildCore:
         # Aux files (.aux/.log/.out/.toc/.bcf/.bbl/.fls/.fdb_latexmk/...) stay
         # in the aux dir for cross-reference resolution across builds.
         self._copy_back_from_aux(tex_dir)
+
+        # An accessible build wrote into the aux dir's a11y/ subdirectory under
+        # the document's REAL jobname (see _build_accessible); bring it out under
+        # the _accessible name so it lands beside, not on top of, the primary PDF.
+        if getattr(self, "_accessible_build", False):
+            self._copy_back_accessible(tex_dir)
 
         self._split_pdf_if_signaled(base_path)
 

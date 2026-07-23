@@ -291,8 +291,22 @@ def main():
           and aarg.index(r"\DocumentMetadata") < aarg.index(r"\input"), aarg)
     check("accessible -> \\def\\TeXLibAccessibleMode injected",
           r"\def\TeXLibAccessibleMode{}" in aarg, aarg)
-    check("accessible -> --jobname=doc_accessible (alongside primary)",
-          bool(cmds) and "--jobname=doc_accessible" in cmds[0][0], cmds[0][0] if cmds else "")
+    # The jobname must stay the REAL base name: autoexam reads its document body
+    # from <jobname>.tex, so a suffixed jobname truncated the tagged exam. The
+    # output is separated by directory (aux/a11y) instead, and _postprocess
+    # copies it out as <base>_accessible.pdf.
+    check("accessible -> --jobname stays the real base name",
+          bool(cmds) and "--jobname=doc" in cmds[0][0]
+          and "--jobname=doc_accessible" not in cmds[0][0],
+          cmds[0][0] if cmds else "")
+    check("accessible -> redirected to an a11y output dir",
+          bool(cmds) and any(str(c).startswith("-output-directory=")
+                             and str(c).endswith("a11y") for c in cmds[0][0]),
+          cmds[0][0] if cmds else "")
+    check("accessible -> exactly one -output-directory (base one replaced)",
+          bool(cmds) and sum(1 for c in cmds[0][0]
+                             if str(c).startswith("-output-directory=")) == 1,
+          cmds[0][0] if cmds else "")
     check("accessible -> two settle passes", len(cmds) == 2, f"{len(cmds)} builds")
     check("accessible -> --texlib-mode token NOT passed to engine",
           not any("--texlib-mode" in str(x) for x in cmds[0][0]), cmds[0][0] if cmds else "")
