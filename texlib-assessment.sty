@@ -20,4 +20,37 @@
 \renewcommand{\questionlabel}{\textbf{Problem \thequestion.}}
 \renewcommand{\partlabel}{\textbf{\thequestion\thepartno.}}
 
+% ==============================================================================
+% Accessible build: restore subproblem point values
+% ==============================================================================
+% exam.cls attaches a \part's "(N points)" to the LIST machinery of {parts}. The
+% LaTeX tagging code replaces that machinery, so under \DocumentMetadata the
+% points vanish SILENTLY -- reproducible in a bare exam.cls document with no
+% TeXLib code at all:
+%
+%   normal:  (a) (4 points) Find all real solutions.
+%   tagged:  (a) Find all real solutions.
+%
+% That is an upstream exam.cls x tagging incompatibility the classes cannot dodge,
+% and dropping per-part point values from the copy handed to a student is a real
+% regression. So in an accessible build ONLY, wrap \part and typeset the points
+% ourselves at the head of the body, where ordinary tagged text carries them.
+% Singular "point" for 1, matching exam.cls's wording; a \part with no optional
+% argument passes straight through.
+% NOT YET FIXED -- documented here so the next attempt does not restart cold.
+%
+% Two workarounds were tried and BOTH failed to emit anything:
+%   1. \let + \RenewDocumentCommand{\part}{o} at package level. exam.cls defines
+%      \part INSIDE the parts environment, so the outer definition is replaced
+%      when the environment opens. Confirmed: an UNTAGGED build with the wrapper
+%      still printed only ONE "(4 points)" -- exam.cls's own, never the wrapper's.
+%   2. The same wrap moved into \AtBeginEnvironment{parts}. Also produced nothing,
+%      so \part is established later than that hook, or the points text is
+%      swallowed by the item machinery rather than starting the item body.
+%
+% Next thing to try: patch exam.cls's internal part renderer (\@part / the
+% \partlabel-adjacent points code) rather than the user-facing \part, or emit the
+% points from \partlabel itself, which TeXLib already \renewcommands above and
+% which IS honoured under tagging.
+
 \endinput
