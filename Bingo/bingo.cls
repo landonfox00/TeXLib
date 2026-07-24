@@ -42,6 +42,16 @@
 
 \RequirePackage{course-metadata}
 
+% hyperref (hidelinks: no coloured boxes, this is a print-first class) so the PDF
+% carries a document title. Without it the central \TeXLibDeclareDocTitle hook in
+% course-metadata.sty has no \hypersetup to feed, so the title never reaches the
+% PDF -- a blank viewer tab normally, and a hard PDF/UA failure (clause 8.11.1)
+% in an accessible build, which was the ONLY clause keeping bingo from conforming.
+\RequirePackage[hidelinks]{hyperref}
+
+% PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty.
+\TeXLibDeclareDocTitle{\GetCourse\space\GetTerm\space Bingo}
+
 % Shared document-instructions mechanism (inline / file / default, file > inline
 % > default). \TeXLibDeclareInstructions{bingo} below mints \GetBingoInstructions,
 % \IfBingoInstructions{File,Inline}, and \bingo@input@userinstructions.

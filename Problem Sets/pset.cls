@@ -61,6 +61,9 @@
 \RequirePackage{xstring}            % for \IfInteger in problem's optional arg
 \RequirePackage{course-metadata}
 
+% PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty.
+\TeXLibDeclareDocTitle{\GetCourse\space\GetTerm\space Problem Set}
+
 % Shared document-instructions mechanism (inline / file / default, file > inline
 % > default). \TeXLibDeclareInstructions{pset} below mints \GetPsetInstructions,
 % \IfPsetInstructions{File,Inline}, and \pset@input@userinstructions.

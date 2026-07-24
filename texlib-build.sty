@@ -11,6 +11,18 @@
 %
 % Conditionals exposed to class authors and downstream documents:
 %   \ifsolutions  \ifkey  \ifrubric  \ifdraft  \ifstudent  \ifinstructor
+%   \ifTeXLibAccessible
+%
+% Accessibility note: \ifTeXLibAccessible is TRUE during an "accessible" build
+% (Sublime "Build — Accessible" / --texlib-mode=accessible). The builder issues
+% \DocumentMetadata{tagging=on,...} BEFORE \documentclass -- which is the ONLY
+% place tagging can be switched on -- and additionally defines
+% \TeXLibAccessibleMode so classes/packages can adapt their output (drop
+% tagging-hostile constructs, add alt text / MathML intents). Because
+% \DocumentMetadata precedes \documentclass, this flag can only be SET from the
+% command line, never from a class option; the source-level \accessible below is
+% a preamble convenience that toggles the in-document behaviour only (it cannot
+% retroactively enable tagging).
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesPackage{texlib-build}[2026/05/08 v1.0 TeXLib unified build flags]
 
@@ -21,14 +33,16 @@
 \newif\ifdraft
 \newif\ifstudent
 \newif\ifinstructor
+\newif\ifTeXLibAccessible
 
 % Compile-time toggles
-\ifdefined\ShowSolutions   \solutionstrue   \fi
-\ifdefined\ShowKey         \keytrue         \fi
-\ifdefined\ShowRubric      \rubrictrue      \fi
-\ifdefined\ShowDraft       \drafttrue       \fi
-\ifdefined\StudentMode     \studenttrue     \fi
-\ifdefined\InstructorMode  \instructortrue  \fi
+\ifdefined\ShowSolutions      \solutionstrue        \fi
+\ifdefined\ShowKey            \keytrue              \fi
+\ifdefined\ShowRubric         \rubrictrue           \fi
+\ifdefined\ShowDraft          \drafttrue            \fi
+\ifdefined\StudentMode        \studenttrue          \fi
+\ifdefined\InstructorMode     \instructortrue       \fi
+\ifdefined\TeXLibAccessibleMode \TeXLibAccessibletrue \fi
 
 % Source-level toggles
 \newcommand{\solutions}{\solutionstrue}
@@ -37,6 +51,7 @@
 \newcommand{\drafts}{\drafttrue}
 \newcommand{\studentmode}{\studenttrue\instructorfalse}
 \newcommand{\instructormode}{\instructortrue\studentfalse}
+\newcommand{\accessible}{\TeXLibAccessibletrue}
 
 % Header build-mode badge ------------------------------------------------------
 % The centered header indicator that marks an answers/instructor build. The

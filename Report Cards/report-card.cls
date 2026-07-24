@@ -46,6 +46,9 @@
 \RequirePackage{tocloft}
 \RequirePackage{course-metadata}
 
+% PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty.
+\TeXLibDeclareDocTitle{\GetCourse\space\GetTerm\space Report Cards}
+
 % ==============================================================================
 % 2. BUILD FLAGS — UNIFIED TeXLib CLI
 % ==============================================================================
@@ -64,7 +67,8 @@
 			local path = kpse.find_file(name, "lua")
 			if path and lfs.attributes(path) then dofile(path) return end
 			local cls = kpse.find_file("report-card.cls")
-			local dir = cls and cls:match("(.*[/\\])") or ""
+			local sep = string.char(92)
+			local dir = cls and cls:match("(.*[/" .. sep .. "])") or ""
 			path = dir .. name
 			if lfs.attributes(path) then dofile(path) return end
 			dofile(name)

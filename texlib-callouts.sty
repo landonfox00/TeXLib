@@ -10,15 +10,19 @@
 \RequirePackage{texlib-theorems}   % texlibbase + \texlibrulewidth + tcolorbox (\NewTColorBox)
 \RequirePackage{enumitem}          % keyval itemize for {readings}
 
-% {hint} -- a light yellow left-rule box, always visible, lighter than a
-% {solution}. Shares the canonical TeXLib rule width/position via texlibbase, so
-% its left rule lines up with every other TeXLib rule.
-\NewTColorBox{hint}{ }{
-	texlibbase,
-	colback=yellow!4!white,
-	borderline west={\texlibrulewidth}{0pt}{yellow!55!black},
-	before upper={\textbf{Hint.}\par\smallskip},
-}
+% \hint -- a run-in "Hint." lead-in, always visible (no \ifsolutions guard).
+%
+% Replaces the former {hint} tcolorbox. A COMMAND matches how \solution, \answer
+% and \pf are already used inside the problem-shaped environments -- you write
+% the hint as ordinary following prose instead of wrapping it in \begin/\end --
+% and it drops a tcolorbox, which is a bonus for the tagged PDF/UA build (the
+% tcolorbox inner list is what breaks under tagging=on).
+%
+%     \hint Differentiate both sides with respect to $t$.
+%
+% BREAKING: \begin{hint}...\end{hint} no longer exists. Convert call sites to the
+% command form.
+\newcommand{\hint}{\par\medskip\noindent\textbf{Hint.}\space}
 
 % {readings} -- a bold "Readings." header + indented en-dash list, no box. Use to
 % list assigned readings under a section/day. Lightweight: tight vertical spacing.

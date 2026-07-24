@@ -20,4 +20,47 @@
 \renewcommand{\questionlabel}{\textbf{Problem \thequestion.}}
 \renewcommand{\partlabel}{\textbf{\thequestion\thepartno.}}
 
+% ==============================================================================
+% Accessible build: restore question/part point values (PDF tagging)
+% ==============================================================================
+% exam.cls delivers an item's "(N points)" by appending \point@block to
+% \everypar. The LaTeX tagging code takes over \everypar for paragraph tagging,
+% so under \DocumentMetadata the points vanish SILENTLY at every level --
+% reproducible in a bare exam.cls document with no TeXLib code:
+%
+%   normal:  (a) (4 points) Find all real solutions.
+%   tagged:  (a) Find all real solutions.
+%
+% Dropping point values from a graded copy handed to a student is a real
+% regression, so in an accessible build we re-emit them ourselves, inline at the
+% body start, exactly where exam.cls would (and where tagged text carries them).
+%
+% \@readpoints[N] is the ONLY path exam.cls takes for an item that HAS points, so
+% it is the reliable per-item signal -- \if@placepoints is a global whose value
+% leaks to a following point-less item. Flag on there; after exam.cls's own
+% (now-dropped) placement runs, re-assert \@placepointstrue so \thepoints prints,
+% emit "(N points)" -- exam.cls has already set \@pointname to the singular
+% "point" for N=1 -- then clear the flag and normalise to a single following
+% space. Runs for questions, parts, subparts and subsubparts alike, since all
+% route through these two macros. Guarded so a normal build is untouched (there
+% the everypar delivery works and this would double the points).
+%
+% \newif is declared OUTSIDE the \ifTeXLibAccessible guard on purpose: were it
+% inside, a normal build skipping the false branch would not yet recognise
+% \iftexlib@pts as a conditional, so its inner \fi would close \ifTeXLibAccessible
+% early and the next } would raise "Too many }'s".
+\newif\iftexlib@pts
+\ifTeXLibAccessible
+	\let\texlib@orig@readpoints\@readpoints
+	\def\@readpoints[#1]{\global\texlib@ptstrue\texlib@orig@readpoints[#1]}
+	\let\texlib@orig@itempoints\item@points@pageinfo
+	\def\item@points@pageinfo{%
+		\texlib@orig@itempoints
+		\iftexlib@pts
+			\global\@placepointstrue(\thepoints)%
+			\global\texlib@ptsfalse\space\ignorespaces
+		\fi
+	}
+\fi
+
 \endinput

@@ -68,17 +68,40 @@
 % Full-width double-fbox with a bold "Instructions:" header. Unlike
 % \TeXLibInstructionsBox (centered, footnotesize, fixed width — kept for bingo),
 % this fills the text block and titles it, matching the exam cover page.
+%
+% Accessible build: the exam/quiz cover renders this box inside a `center`
+% environment. Under PDF tagging the `center` becomes a centered structure block
+% whose alignment leaks into the instruction bullets -- so every item comes out
+% horizontally CENTERED instead of left-aligned, and no TeX-level skip reset
+% (\raggedright, \rightskip=0, \@parboxrestore, list keys) overrides it because
+% the centering is applied below those, at the tag-block level. A `flushleft`
+% environment DOES override it: it introduces its own left-aligned block. So in
+% an accessible build wrap the content in flushleft; a normal build keeps the
+% justified layout untouched. (flushleft is ragged-right, which is fine -- even
+% mildly preferable -- for accessibility.)
 \NewDocumentCommand \TeXLibInstructionsTitledBox { +m } {
 	\fbox { \fbox { \parbox { \dimexpr \linewidth - 4\fboxsep - 4\fboxrule \relax } {
-		% ~ is an explicit space: literal spaces are ignored under \ExplSyntaxOn,
-		% and inline (paragraph) instructions must not run into the header.
-		\noindent {\large\bf Instructions:}~#1
+		\bool_if:NTF \g__texlibinstr_accessible_bool
+			{ \begin{flushleft}
+				% ~ is an explicit space: literal spaces are ignored under
+				% \ExplSyntaxOn, and inline instructions must not run into the header.
+				\noindent {\large\bf Instructions:}~#1
+			  \end{flushleft} }
+			{ \noindent {\large\bf Instructions:}~#1 }
 	} } }
 }
 
 % Auto-boxing is on by default; a document that needs full layout control over
 % its own instructions file can switch it off in its preamble with
 % \TeXLibInstructionsUnboxed (the file/inline/default then renders bare).
+% True during an accessible (tagged) build -- see \TeXLibInstructionsTitledBox
+% for why the instructions need a flushleft wrap then. Keyed on the compile-time
+% marker \TeXLibAccessibleMode (the builder \def's it before \documentclass), so
+% this is reliable regardless of whether texlib-build.sty has loaded yet.
+\bool_new:N \g__texlibinstr_accessible_bool
+\cs_if_exist:NT \TeXLibAccessibleMode
+	{ \bool_gset_true:N \g__texlibinstr_accessible_bool }
+
 \bool_new:N \g__texlibinstr_boxed_bool
 \bool_gset_true:N \g__texlibinstr_boxed_bool
 \NewDocumentCommand \TeXLibInstructionsBoxed   { } { \bool_gset_true:N  \g__texlibinstr_boxed_bool }
