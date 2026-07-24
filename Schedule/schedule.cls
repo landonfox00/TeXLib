@@ -59,6 +59,14 @@
 
 \RequirePackage{course-metadata}
 
+% hyperref (hidelinks: no coloured boxes, this is a print-first class) so the PDF
+% carries a document title. Without it the central \TeXLibDeclareDocTitle hook in
+% course-metadata.sty has no \hypersetup to feed -- a blank viewer tab normally,
+% and PDF/UA clause 8.11.1 in an accessible build. (Schedule still fails other
+% clauses from its calendar structure, so this does not make it conform on its
+% own, but it removes 8.11.1 and titles the normal PDF.)
+\RequirePackage[hidelinks]{hyperref}
+
 % PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty.
 \TeXLibDeclareDocTitle{\GetCourse\space\GetTerm\space Tentative Schedule}
 
