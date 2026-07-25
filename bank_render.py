@@ -161,7 +161,7 @@ def render_svg(problem, show_solution=True, use_cache=True):
             _quiet_remove(harness_path)
             _quiet_remove(os.path.join(bank_dir, base + ".synctex.gz"))
 
-    if use_cache:
+    if use_cache and _is_complete_svg(svg):
         with open(cache, "w", encoding="utf-8") as fh:
             fh.write(svg)
     return svg
@@ -174,13 +174,24 @@ def _pdf_to_svg(pdf, aux, base):
     if _which("pdftocairo"):
         proc = _run(["pdftocairo", "-svg", "-f", "1", "-l", "1", pdf, out], aux)
         if proc.returncode == 0 and os.path.isfile(out):
-            return _read(out)
+            svg = _read(out)
+            if _is_complete_svg(svg):
+                return svg
     if _which("dvisvgm"):
         proc = _run(["dvisvgm", "--pdf", "--page=1", "--no-fonts",
                      "--output=" + out, pdf], aux)
         if proc.returncode == 0 and os.path.isfile(out):
-            return _read(out)
+            svg = _read(out)
+            if _is_complete_svg(svg):
+                return svg
     raise RenderError("PDF->SVG conversion failed (need pdftocairo or dvisvgm)")
+
+
+def _is_complete_svg(svg):
+    """A converter can exit 0 having written an empty or half-flushed file
+    (seen once on a cold first render). Require a real, closed SVG so a blank is
+    retried on demand rather than cached and served as an empty preview."""
+    return bool(svg) and "<svg" in svg and "</svg>" in svg
 
 
 def _read(path):
@@ -210,8 +221,10 @@ def prewarm(problems, show_solution=True, on_done=None):
         for p in problems:
             try:
                 render_svg(p, show_solution=show_solution)
-            except (RenderUnavailable, RenderError, OSError):
-                pass
+            except Exception:
+                pass    # best-effort warmup: a preview that won't build (compile
+                        # error, timeout, ...) must never crash the background
+                        # thread; the UI renders that problem on demand instead.
             if on_done:
                 on_done(p.id)
     t = threading.Thread(target=worker, daemon=True)

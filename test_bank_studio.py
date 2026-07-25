@@ -13,6 +13,7 @@ import tempfile
 import unittest
 
 import bank_parser
+import bank_render
 import bank_studio
 import exam_writer
 import usage_scan
@@ -283,6 +284,126 @@ class ServerHelperTests(unittest.TestCase):
         st = bank_studio.exam_state()
         self.assertTrue(st["exists"])
         self.assertEqual(len(st["entries"]), 2)
+
+
+class CoursemetaResolutionTests(unittest.TestCase):
+    """The exam names no bank inline; the bank is wired through coursemeta
+    `bank-path` -> a thin master bank.tex -> per-chapter files (the real
+    teaching-course layout). discover must walk the whole chain."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="bankstudio-cm-")
+        self._mk("coursemeta.tex",
+                 "\\metasetup{\n  course-number = 182,\n"
+                 "  bank-path = Bank/bank.tex,\n}\n")
+        # master bank is a thin loader using the \GetCourseMetaDir prefix
+        self._mk("Bank/bank.tex",
+                 "\\loadbank{\\GetCourseMetaDir Bank/ch5.tex}\n"
+                 "\\loadbank{\\GetCourseMetaDir Bank/ch6.tex}\n")
+        self._mk("Bank/ch5.tex",
+                 "\\begin{problem}{ch5_a}[topic=sub]\nStem A.\n\\end{problem}\n")
+        self._mk("Bank/ch6.tex",
+                 "\\begin{problem}{ch6_b}[topic=parts]\nStem B.\n"
+                 "\\begin{choices}\\cchoice x\\choice y\\end{choices}\n"
+                 "\\end{problem}\n")
+        # exam lives two dirs below coursemeta and names no bank inline
+        self._mk("Exams/Exam 1/exam1.tex",
+                 "\\documentclass[exam-number=1]{autoexam}\n\\begin{document}\n"
+                 "\\begin{problems}\\problem{ch5_a}\\end{problems}\n"
+                 "\\begin{mcproblems}\\problem{ch6_b}\\end{mcproblems}\n"
+                 "\\end{document}\n")
+        self.exam = os.path.join(self.root, "Exams", "Exam 1", "exam1.tex")
+
+    def _mk(self, rel, text):
+        path = os.path.join(self.root, *rel.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        return path
+
+    def test_find_coursemeta_walks_up(self):
+        start = os.path.join(self.root, "Exams", "Exam 1")
+        self.assertEqual(bank_parser.find_coursemeta(start),
+                         os.path.join(self.root, "coursemeta.tex"))
+
+    def test_bank_path_resolves(self):
+        cm = os.path.join(self.root, "coursemeta.tex")
+        self.assertEqual(bank_parser.coursemeta_bank_path(cm),
+                         os.path.join(self.root, "Bank", "bank.tex"))
+
+    def test_discover_finds_chapter_problems(self):
+        sources, probs = bank_parser.discover(self.exam)
+        # reached via bank-path -> master bank.tex -> per-chapter files
+        self.assertEqual({p.id for p in probs}, {"ch5_a", "ch6_b"})
+        # the chapter files themselves (not just the master) are sources
+        self.assertTrue(any(s.endswith("ch5.tex") for s in sources))
+        self.assertTrue(any(s.endswith("ch6.tex") for s in sources))
+        # MC detection survived the resolution chain
+        self.assertTrue(next(p for p in probs if p.id == "ch6_b").is_mc)
+
+    def test_expand_metadir(self):
+        self.assertEqual(
+            bank_parser._expand_metadir("\\GetCourseMetaDir Bank/ch5.tex",
+                                        "C:/course/Summer 26"),
+            "C:/course/Summer 26/Bank/ch5.tex")
+        # no coursemeta -> the macro drops out, path stays relative
+        self.assertEqual(
+            bank_parser._expand_metadir("\\GetCourseMetaDir Bank/ch5.tex", None),
+            "Bank/ch5.tex")
+
+    def test_meta_command_spelling(self):
+        alt = self._mk("alt/coursemeta.tex", "\\meta{bank-path}{Bank/bank.tex}\n")
+        self._mk("alt/Bank/bank.tex",
+                 "\\begin{problem}{alt_a}[topic=x]s\\end{problem}\n")
+        self.assertEqual(bank_parser.coursemeta_bank_path(alt),
+                         os.path.join(self.root, "alt", "Bank", "bank.tex"))
+
+    def test_no_bank_path_key_is_none(self):
+        cm = self._mk("nobank/coursemeta.tex",
+                      "\\metasetup{ course-number = 1 }\n")
+        self.assertIsNone(bank_parser.coursemeta_bank_path(cm))
+
+
+class StartupTests(unittest.TestCase):
+    """main() turns launch-time failures into a clean message + exit instead of
+    an uncaught traceback (mistyped path, bad --port, port already in use)."""
+
+    def _exam(self):
+        fd, path = tempfile.mkstemp(suffix=".tex")
+        os.close(fd)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(EXAM_BARE)
+        self.addCleanup(lambda: os.path.isfile(path) and os.remove(path))
+        return path
+
+    def test_missing_file_exits_cleanly(self):
+        d = tempfile.mkdtemp(prefix="bankstudio-missing-")
+        missing = os.path.join(d, "nope.tex")
+        with self.assertRaises(SystemExit):
+            bank_studio.main(["bank_studio.py", missing])
+
+    def test_bad_port_arg_exits_cleanly(self):
+        exam = self._exam()
+        with self.assertRaises(SystemExit):
+            bank_studio.main(["bank_studio.py", exam, "--no-open",
+                              "--port", "notaport"])
+
+    def test_port_in_use_exits_cleanly(self):
+        exam = self._exam()
+        orig_avail = bank_render.available
+        orig_server = bank_studio.ThreadingHTTPServer
+        bank_render.available = lambda: False        # keep the renderer out of it
+        bank_studio.ThreadingHTTPServer = _bind_fails
+        try:
+            with self.assertRaises(SystemExit):
+                bank_studio.main(["bank_studio.py", exam, "--no-open"])
+        finally:
+            bank_render.available = orig_avail
+            bank_studio.ThreadingHTTPServer = orig_server
+
+
+def _bind_fails(*_a, **_k):
+    raise OSError("address already in use (simulated)")
 
 
 if __name__ == "__main__":
