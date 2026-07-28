@@ -20,6 +20,7 @@
 %   texlibexample      black   — Example / Exercise (no tint; rule only)
 %   texlibquestion     orange  — Question / Challenge
 %   texlibnote         gray    — Note / Notation / Recall
+%   texlibwarning      red     — Warning
 %
 % GEOMETRY (consolidated 2026/05/30). Every rule is the SAME width
 % (\texlibrulewidth) and the SAME horizontal position. The box bleeds
@@ -100,6 +101,7 @@
 \texlib@thm@param{example}    {black}  {0}{60}   % "quiet" family: never tinted
 \texlib@thm@param{question}   {orange} {3}{60}
 \texlib@thm@param{note}       {gray}   {4}{50}
+\texlib@thm@param{warning}    {red}    {4}{60}
 
 % Rebuild one family's tcolorbox style from its current parameters + the global
 % toggles, reducing colback/border colour to literals before \tcbset sees them.
@@ -122,7 +124,7 @@
 \newcommand{\texlibtheoremrebuild}{%
 	\texlib@thm@build{theorem}\texlib@thm@build{proposition}%
 	\texlib@thm@build{definition}\texlib@thm@build{procedure}%
-	\texlib@thm@build{example}\texlib@thm@build{question}\texlib@thm@build{note}%
+	\texlib@thm@build{example}\texlib@thm@build{question}\texlib@thm@build{note}\texlib@thm@build{warning}%
 }
 \texlibtheoremrebuild
 
@@ -137,6 +139,7 @@
 	example-color/.code     ={\@namedef{texlib@thm@hue@example}{#1}},
 	question-color/.code    ={\@namedef{texlib@thm@hue@question}{#1}},
 	note-color/.code        ={\@namedef{texlib@thm@hue@note}{#1}},
+	warning-color/.code     ={\@namedef{texlib@thm@hue@warning}{#1}},
 }
 % \texlibtheoremsetup{key=value, ...} — update the theorem look. Keys:
 %   rule = true|false          left rule on/off (all families)
