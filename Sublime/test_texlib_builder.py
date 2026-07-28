@@ -43,7 +43,9 @@ if "sublime" in sys.modules:  # only true inside Sublime's plugin host
 
 from _testkit import install_native_builder  # noqa: E402
 TexlibBuilder = install_native_builder()
-from texlib_build import GRADEBOOK_SHEETS, TexlibBuildCore  # noqa: E402  (native core)
+from texlib_build import (  # noqa: E402  (native core)
+    GRADEBOOK_SHEETS, MAX_RERUNS, STATE_ONLY_RERUNS, TexlibBuildCore,
+)
 
 
 # --- 2. Harness ------------------------------------------------------------
@@ -523,19 +525,53 @@ def main():
     check("seq: plain + clean -> 1 pass, no biber",
           heads(cmds) == ["pdflatex"], heads(cmds))
 
-    # Cross-ref churn: rerun signal once, then clean -> two passes.
-    cmds, _, _ = drive_builder(ART, steps=[{"out": RERUN}, {"out": ""}])
+    # Cross-ref churn: rerun signal once, then clean -> two passes. The pass
+    # must also MOVE the aux state, which is what really makes LaTeX print that
+    # warning -- a rerun request over byte-stable state is vetoed (below).
+    cmds, _, _ = drive_builder(ART, steps=[{"out": RERUN,
+                                            "write": {"doc.aux": "v1"}},
+                                           {"out": ""}])
     check("seq: rerun signal then clean -> 2 passes",
           heads(cmds) == ["pdflatex", "pdflatex"], heads(cmds))
 
-    # Persistent rerun signal -> capped at MAX_RERUNS (3) passes, never looping.
+    # Persistent rerun signal over genuinely churning state -> capped at
+    # MAX_RERUNS passes, never looping, and the cap is reported.
+    cmds, disp, _ = drive_builder(
+        ART, steps=[{"out": RERUN, "write": {"doc.aux": f"v{n}"}}
+                    for n in range(MAX_RERUNS + 2)])
+    check(f"seq: persistent rerun -> capped at {MAX_RERUNS} passes",
+          heads(cmds) == ["pdflatex"] * MAX_RERUNS, f"{len(cmds)} passes")
+    check("seq: hitting the pass ceiling is reported",
+          "unsettled after" in disp, disp)
+
+    # The veto: the log keeps asking but the state never moved. Another pass
+    # would consume identical input and produce identical output, so it is
+    # skipped -- this is where the rerun loop stops costing passes for nothing.
     cmds, _, _ = drive_builder(ART, steps=[{"out": RERUN}] * 6)
-    check("seq: persistent rerun -> capped at 3 passes",
-          heads(cmds) == ["pdflatex"] * 3, f"{len(cmds)} passes")
+    check("seq: stable state vetoes a log-requested rerun -> 1 pass",
+          heads(cmds) == ["pdflatex"], heads(cmds))
+
+    # The log's blind spot: no warning at all, but the aux state moved (an
+    # autoexam footer label shifting pages -- the class defines \@testdef away,
+    # so nothing is printed). Earns a settling pass on the state alone.
+    cmds, _, _ = drive_builder(
+        ART, steps=[{"out": "", "write": {"doc.aux": r"\newlabel{@lastqpage}{{}{4}}"}},
+                    {"out": ""}])
+    check("seq: silent log + moved state -> settling pass",
+          heads(cmds) == ["pdflatex", "pdflatex"], heads(cmds))
+
+    # ...but a document that never converges with a silent log (problem_engine
+    # re-randomizes an unversioned bank doc every pass) is bounded well short of
+    # MAX_RERUNS.
+    cmds, _, _ = drive_builder(
+        ART, steps=[{"out": "", "write": {"doc.aux": f"r{n}"}} for n in range(6)])
+    check("seq: silent-log churn stops at STATE_ONLY_RERUNS",
+          heads(cmds) == ["pdflatex"] * (1 + STATE_ONLY_RERUNS), f"{len(cmds)} passes")
 
     # biblatex 'Please rerun LaTeX' is honored (the bug that shipped ?? refs).
     cmds, _, _ = drive_builder(
-        ART, steps=[{"out": "Package biblatex Warning: Please rerun LaTeX."},
+        ART, steps=[{"out": "Package biblatex Warning: Please rerun LaTeX.",
+                     "write": {"doc.aux": "v1"}},
                     {"out": ""}])
     check("seq: 'Please rerun LaTeX' triggers another pass",
           heads(cmds) == ["pdflatex", "pdflatex"], heads(cmds))
@@ -548,7 +584,8 @@ def main():
         steps=[
             {"write": {"doc.bcf": BCF}},                 # pass 1 wrote the .bcf
             {"write": {"doc.bbl": "bbl-v1"}},            # biber wrote the .bbl
-            {"out": "Package biblatex Warning: Please rerun LaTeX."},
+            {"out": "Package biblatex Warning: Please rerun LaTeX.",
+             "write": {"doc.aux": "cites-resolved"}},    # post-biber pass
             {"out": ""},
         ])
     check("seq: fresh bib -> run, biber, run, run",

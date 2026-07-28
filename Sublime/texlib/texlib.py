@@ -402,11 +402,12 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             tex_root=root, engine=engine,
             options=["--texlib-mode=%s" % mode], display=emit,
         )
-        # Publish toggles: the native host has no LaTeXTools builder_settings, so
+        # Build toggles: the native host has no LaTeXTools builder_settings, so
         # feed the sublime settings in (the brain's _setting_on reads them first,
-        # else falls back to the TEXLIB_PUBLISH* env vars).
+        # else falls back to the matching TEXLIB_* env vars).
         toggles = {}
-        for _k in ("publish_shareable_copies", "copy_published_path_to_clipboard"):
+        for _k in ("publish_shareable_copies", "copy_published_path_to_clipboard",
+                   "detect_reruns_by_state"):
             _v = settings.get(_k)
             if _v is not None:
                 toggles[_k] = _v

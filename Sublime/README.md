@@ -71,8 +71,16 @@ command line, exactly the way `smoke_test.py` does.
   `\documentclass{autoexam|quiz|schedule}`, which require it — so a document
   that forgot the magic comment still builds correctly. Plain `pdflatex`
   documents are untouched.
-- **Cross-reference reruns.** Re-runs the engine (up to 3×) while the log still
-  says "Rerun to get cross-references right."
+- **Rerun convergence.** How many passes a document needs is detected, not
+  guessed: after each pass the cross-pass state it writes (`.aux`, `.toc`,
+  `.out`, `.bbl`, …) is fingerprinted and compared with the state that pass
+  started from, and the engine re-runs (up to 5×) while that keeps changing or
+  the log asks. The fingerprint outranks the log both ways — it catches reruns
+  the log never mentions (`autoexam` defines `\@testdef` away, so a shifted
+  "page X of Y" footer warns about nothing) and skips a log-requested pass whose
+  state is already byte-stable, which is provably a no-op. Non-convergent
+  documents stop at the cycle, or at the ceiling with a message, rather than
+  silently truncating. Turn it off with `"detect_reruns_by_state": false`.
 - **biber change-detection.** For biblatex documents, biber (and its forced
   re-pass) only runs when the `.bcf` changed since the `.bbl` was last built —
   the hash is cached in the aux dir. Editing prose no longer pays for a biber
@@ -99,7 +107,7 @@ The builder has three layers of automated tests (none deployed to Sublime):
 
 | Script | Needs TeX? | Covers |
 |--------|-----------|--------|
-| `test_texlib_builder.py` | No | Decision logic + **full multi-pass orchestration** (biber-skip cache, rerun detection, `MAX_RERUNS` cap, per-version biber, aux routing, hidden-file recovery, schedmap rewrite, per-version/solutions `.vmap` PDF slicing). Drives `commands()` with a scripted side-effect timeline so the biber/rerun branches actually execute. |
+| `test_texlib_builder.py` | No | Decision logic + **full multi-pass orchestration** (biber-skip cache, rerun detection, the state-fingerprint veto / silent-log settling pass / oscillation + `MAX_RERUNS` stops, per-version biber, aux routing, hidden-file recovery, schedmap rewrite, per-version/solutions `.vmap` PDF slicing). Drives `commands()` with a scripted side-effect timeline — per-pass output *and* the aux files each pass writes — so the biber/rerun branches actually execute. |
 | `test_biber_integration.py` | Yes (`pdflatex`/`lualatex` + `biber`) | Real end-to-end: drives the actual builder coroutine against the real toolchain on a biblatex fixture. Proves a fresh build settles with no undefined refs, an unchanged rebuild **skips biber** in one pass, and editing the `.bib` re-runs biber. Soft-skips if the tools are absent. |
 | `test_synctex_integration.py` | Yes (`lualatex` + poppler's `pdftotext` + `synctex`) | Real end-to-end **inverse search**: drives the real builder against a real build, then uses TeX Live's own `synctex edit -o page:x:y:pdf` CLI to simulate a Sumatra double-click and check where it actually lands — the fabricated-data unit tests above can't catch a real engine/table-package quirk (e.g. xltabular deferring shipout) that only shows up against genuine output. Soft-skips if the tools (or a poppler-flavored `pdftotext` specifically — an xpdf build earlier on `PATH` silently lacks `-bbox`) are absent. |
 | `smoke_test.py` (repo root) | Yes (`lualatex`) | Builds every module template; content/visual regression for shared `.sty`/`.cls` refactors. |

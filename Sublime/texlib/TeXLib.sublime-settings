@@ -66,6 +66,18 @@
     //
     // "build_on_save": false
 
+    // detect_reruns_by_state: decide how many engine passes a document needs by
+    // fingerprinting the cross-pass state it writes (.aux/.toc/.out/.bbl/...)
+    // instead of trusting the log alone. Default: true, and worth keeping.
+    //   * It sees reruns the log never mentions -- autoexam defines \@testdef
+    //     away to silence the multi-version label oscillation, so an exam whose
+    //     "page X of Y" footer just moved to another page says nothing at all.
+    //   * It skips passes the log asks for pointlessly: when a pass consumed and
+    //     produced byte-identical state, the next one is provably a no-op.
+    // Set false (or env TEXLIB_STATE_RERUN=0) to fall back to log-only reruns.
+    //
+    // "detect_reruns_by_state": true
+
     // class_source: absolute path to your TeXLib repo checkout. Used to locate
     // package_for_lms.py and course-metadata.sty (for coursemeta key
     // completions). Leave unset to auto-detect the repo root above the plugin;

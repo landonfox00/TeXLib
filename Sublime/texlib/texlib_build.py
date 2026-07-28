@@ -30,8 +30,14 @@
 #     the <base>.vmap sidecar autoexam.cls writes per copy. No extra clicks
 #     or separate recompiles needed.
 #
-#   * Cross-reference reruns -- re-runs the engine (up to MAX_RERUNS) while the
-#     log still says "Rerun to get cross-references right."
+#   * Rerun convergence -- after every pass the cross-pass state files in the
+#     aux dir (.aux/.toc/.out/.bbl/...) are fingerprinted and compared with the
+#     state that pass started from; the engine re-runs (up to MAX_RERUNS) while
+#     that state keeps changing, or while the log asks. The fingerprint beats
+#     the log in both directions: it sees reruns the log never mentions (a
+#     shifted "page X of Y" footer under autoexam, which defines \@testdef away)
+#     and it vetoes a log-requested pass once the state is byte-stable, which is
+#     provably a fixed point. See _needs_another_run.
 #
 #   * biber change-detection -- biber (and its forced re-pass) only runs when
 #     the .bcf changed since the .bbl was last built. Editing prose in a
@@ -127,8 +133,44 @@ MODE_MACROS = {
 # build settles them.
 MODE_QUICK = "quick"
 
-# How many times to re-run the engine chasing stable cross-references.
-MAX_RERUNS = 3
+# Ceiling on engine passes per build. The state fingerprint ends the loop the
+# moment the aux state settles, so this is only a backstop for a document that
+# genuinely refuses to converge -- which is why it can afford headroom (a
+# three-deep toc/pageref chain settles on pass 4) where the old log-only loop
+# had to stay tight at 3 to bound the "Label(s) may have changed" oscillation.
+MAX_RERUNS = 5
+
+# How many passes may be justified by a state change ALONE (no rerun request in
+# the log). Bounds a document that cannot converge: problem_engine.lua seeds the
+# unversioned case from os.time(), so a bank-driven quiz draws fresh values on
+# every pass -- invisible here while the draw moves no page break, but once one
+# moves, the .aux never repeats. Two keeps the classic label -> page -> label
+# chain reachable without letting such a document run to MAX_RERUNS every build.
+STATE_ONLY_RERUNS = 2
+
+# Files one pass writes and the next pass reads back -- the state whose
+# stability decides whether another pass is needed. Deliberately just the
+# genuine cross-pass state: the Lua engine's per-pass scratch (.sco, .srcmap,
+# *_autoexam_body_*.tex) is regenerated wholesale every pass and is not what a
+# rerun resolves, and whatever it derives from page numbers reaches us through
+# the .aux anyway.
+STATE_EXTS = frozenset({
+    ".aux",                          # labels, refs, counters, exam point totals
+    ".toc", ".lof", ".lot", ".lol",  # contents lists
+    ".out",                          # hyperref bookmarks
+    ".bbl",                          # biber output
+    ".idx", ".ind", ".glo", ".gls",  # index / glossary
+    ".nav", ".snm", ".vrb", ".brf",  # beamer / backref
+})
+
+# .aux lines that are biblatex asking ITSELF for a rerun -- \abx@aux@read@bblrerun
+# and the .bbl checksum beside it. They are not document state: they flip on the
+# pass after biblatex settles even in a document with no bibliography, which
+# would buy a pointless third pass on every cold build of a class that merely
+# loads biblatex (didactic does). Nothing is lost by ignoring them -- that
+# request reaches us through the log (BIBER_RERUN_RE) and the .bcf/.bbl hash
+# cache, and a real .bbl change still shows up because .bbl is itself state.
+STATE_NOISE_RE = re.compile(r"^\\abx@aux@read@bbl")
 
 # --- Publish step -----------------------------------------------------------
 # A class that calls \TeXLibDeclarePublishable (syllabus, schedule) drops a
@@ -196,6 +238,13 @@ class TexlibBuildCore:
         self._pass_count = 0
         self._biber_count = 0
 
+        # Convergence state (see _record_state_baseline / _needs_another_run):
+        # the aux fingerprint the current pass started from, and every
+        # fingerprint seen this build, for cycle detection.
+        self._state_digest = None
+        self._state_history = set()
+        self._state_warned = False
+
         mode, engine_options = self._extract_mode(self.options or [])
 
         # Problem-bank fragments (bank.tex, chN.tex, ...) have no root document
@@ -251,9 +300,16 @@ class TexlibBuildCore:
 
     def _count_passes(self, inner):
         """Pass-through generator that tallies engine passes and biber runs for
-        the build summary, without altering the (command, message) stream it
-        forwards. Wrapping every build sub-coroutine here keeps the tally in one
-        place instead of threading a counter through each of them.
+        the build summary, and snapshots the aux state each pass is about to
+        consume -- without altering the (command, message) stream it forwards.
+        Wrapping every build sub-coroutine here keeps both the tally and the
+        convergence baseline in one place instead of threading them through
+        each of them.
+
+        The snapshot lands on the engine branch only. Taking it before a biber
+        run too would make the baseline for the forced post-biber pass predate
+        the .bbl biber just wrote, so that pass would always look like it
+        changed something and win a free rerun.
         """
         try:
             item = next(inner)
@@ -263,6 +319,7 @@ class TexlibBuildCore:
                     self._biber_count += 1
                 elif head:
                     self._pass_count += 1
+                    self._record_state_baseline()
                 item = inner.send((yield item))
         except StopIteration:
             return
@@ -492,6 +549,7 @@ class TexlibBuildCore:
         while run < MAX_RERUNS and self._needs_another_run():
             run += 1
             yield (cmd, f"{label} rerun {run}...")
+        self._warn_if_unsettled(run)
 
     def _build_bank_catalog(self, base, engine):
         """Build a problem-bank fragment directly: synthesize a minimal
@@ -515,6 +573,7 @@ class TexlibBuildCore:
         while run < MAX_RERUNS and self._needs_another_run():
             run += 1
             yield (cmd, f"{engine} [bank catalog] rerun {run}...")
+        self._warn_if_unsettled(run)
 
     def _build_quick(self, base, engine):
         """One engine pass, no biber, no rerun loop -- fast preview while writing.
@@ -831,10 +890,150 @@ class TexlibBuildCore:
         except OSError:
             pass
 
+    def _aux_state_digest(self):
+        """Fingerprint of the cross-pass state files in the aux dir.
+
+        One digest over (name, content hash) for every STATE_EXTS file at the
+        top level of the aux dir, sorted so it does not depend on listing order.
+        None only when the directory cannot be listed -- the caller then falls
+        back to the log. An EMPTY directory still hashes to a real value rather
+        than None: a cold aux dir differing from the populated one pass 1 leaves
+        behind is exactly the "a first build needs a settling pass" signal.
+
+        Top level only. With aux routing the dir is this document's own temp dir
+        (keyed by a hash of the tex root), but with routing disabled it is the
+        source dir, which must not be walked recursively -- a module dir can sit
+        above the whole examples tree. Sibling documents' aux files landing in
+        the digest is harmless: they do not change while our pass runs.
+        """
+        search_dir = getattr(self, "_aux_target", None) or self._tex_dir()
+        if not search_dir:
+            return None
+        try:
+            names = sorted(os.listdir(search_dir))
+        except OSError:
+            return None
+        digest = hashlib.md5()
+        for name in names:
+            ext = os.path.splitext(name)[1].lower()
+            if ext not in STATE_EXTS:
+                continue
+            path = os.path.join(search_dir, name)
+            content = (self._hash_aux_file(path) if ext == ".aux"
+                       else self._hash_file(path))
+            if content is None:  # vanished mid-build; nothing to compare
+                continue
+            digest.update(name.encode("utf-8", "replace"))
+            digest.update(content.encode("ascii"))
+        return digest.hexdigest()
+
+    @staticmethod
+    def _hash_aux_file(path):
+        """Hash of an .aux with the STATE_NOISE_RE bookkeeping lines dropped,
+        or None if it can't be read."""
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                lines = fh.read().splitlines()
+        except OSError:
+            return None
+        keep = [ln for ln in lines if not STATE_NOISE_RE.match(ln)]
+        return hashlib.md5("\n".join(keep).encode("utf-8")).hexdigest()
+
+    def _record_state_baseline(self):
+        """Snapshot the aux state the pass about to run will consume."""
+        self._state_digest = self._aux_state_digest()
+        if self._state_digest is None:
+            return
+        if getattr(self, "_state_history", None) is None:
+            self._state_history = set()
+        self._state_history.add(self._state_digest)
+
     def _needs_another_run(self):
-        """Check for a standard cross-ref rerun OR a biblatex rerun signal."""
+        """Decide whether another engine pass would change anything.
+
+        Two sources of evidence, because neither is sufficient alone:
+
+          * the log -- "Rerun to get ... right", "Label(s) may have changed",
+            biblatex's "Please rerun LaTeX";
+          * the aux-state fingerprint this pass started from (recorded by
+            _count_passes) against the state on disk now.
+
+        The fingerprint outranks the log wherever the two disagree, in both
+        directions:
+
+          * More complete. autoexam defines \\@testdef as a no-op to silence the
+            multi-version label oscillation (autoexam.cls), so an exam whose
+            "page X of Y" footer -- \\pageref{@lastqpage@<ver>} -- just moved to
+            another page says nothing at all in the log. The .aux changing is
+            the only evidence there is.
+          * More honest. When a pass consumed and produced byte-identical
+            state, the next pass gets identical input and so produces identical
+            output: a log line still asking for one is asking for nothing. That
+            veto is what lets MAX_RERUNS carry headroom for free.
+
+        Pure -- callers may invoke it more than once per pass (the cap warning
+        does). The baseline and history it reads advance once per pass, in
+        _count_passes.
+        """
         out = self._last_output()
-        return bool(RERUN_RE.search(out)) or bool(BIBER_RERUN_RE.search(out))
+        asked = bool(RERUN_RE.search(out)) or bool(BIBER_RERUN_RE.search(out))
+
+        baseline = getattr(self, "_state_digest", None)
+        if baseline is None or not self._setting_on(
+            "detect_reruns_by_state", "TEXLIB_STATE_RERUN", True
+        ):
+            return asked
+        current = self._aux_state_digest()
+        if current is None:
+            return asked
+
+        if current == baseline:
+            return False  # fixed point: identical in, identical out
+        if current in getattr(self, "_state_history", ()):
+            # A -> B -> A. The document has no fixed point, so further passes
+            # only pick which of the two states the PDF ends on. Stop at the
+            # cycle instead of spending the rest of MAX_RERUNS discovering that.
+            self._warn_once(
+                "TeXLib: aux state is oscillating between passes; stopping. "
+                "Cross-references may be unstable.\n"
+            )
+            return False
+        if asked:
+            return True
+        # State moved but the log never asked: the case the log cannot see.
+        # Worth a settling pass, but capped (see STATE_ONLY_RERUNS) so a
+        # document that re-randomizes every pass cannot make every build pay
+        # the full rerun budget.
+        #
+        # On a COLD aux dir this branch always fires once, because the baseline
+        # is the absence of state and pass 1 necessarily writes some. That costs
+        # a pass on a first build whose first pass was already complete
+        # (report-card-template is one: its .aux is a fixed point from pass 1).
+        # Keep it anyway -- it is the same transition that catches the exam
+        # footer, where the log is silent BY CONSTRUCTION: autoexam guards
+        # \pageref{@lastqpage@<ver>} with \@ifundefined and falls back to
+        # \numpages, so a cold pass 1 reports no undefined reference, and the
+        # gutted \@testdef means pass 2 reports no changed label either. Nothing
+        # would ask for the pass that fixes the footer. The cost is one pass per
+        # document per aux-dir lifetime; warm builds are unaffected.
+        return getattr(self, "_pass_count", 0) < 1 + STATE_ONLY_RERUNS
+
+    def _warn_if_unsettled(self, run):
+        """Report giving up at the ceiling rather than stopping silently."""
+        if run < MAX_RERUNS or not self._needs_another_run():
+            return
+        self._warn_once(
+            f"TeXLib: document still unsettled after {run} passes "
+            f"(MAX_RERUNS); cross-references or the page-count footer may be "
+            f"stale.\n"
+        )
+
+    def _warn_once(self, message):
+        """Emit a convergence warning at most once per build."""
+        if getattr(self, "_state_warned", False):
+            return
+        self._state_warned = True
+        self.display(message)
 
     def _last_output(self):
         """The most recent command's combined output, or '' if unavailable."""
