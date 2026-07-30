@@ -144,6 +144,26 @@
 % \get{name}  — retrieve and typeset a stored value
 \newcommand{\get}[1]{\pbank@lua{get_var('#1')}}
 
+% \ifvar{lua-expr}{then}{else}  — branch on the CURRENT random draw.
+%   The expression is evaluated by the same sandbox \calcvar uses (the `math'
+%   library plus every stored variable as a global), so it sees the values
+%   \setrng / \picklist / \calcvar have drawn for THIS problem in THIS version:
+%     \setrng{a}{-3}{3}
+%     \ifvar{a < 0}{The parabola opens downward.}{The parabola opens upward.}
+%   A non-false, non-nil result takes the `then' branch — note Lua truthiness,
+%   where 0 is TRUE, so compare explicitly (`a ~= 0', not `a').
+%
+%   Evaluation is at TYPESET time (the branch is chosen where the macro sits in
+%   the problem body, after that body's \setrng has run), which is what makes it
+%   safe to use in a stem, a part, or a {solution}.  Both branches are \long, so
+%   either may contain paragraphs.  \pbank@cond is set by the engine's printed
+%   \@pbank@condtrue / \@pbank@condfalse before the \if below is reached.
+\newif\if@pbank@cond
+\NewDocumentCommand{\ifvar}{m +m +m}{%
+	\pbank@lua{eval_cond('#1')}%
+	\if@pbank@cond #2\else #3\fi
+}
+
 % \picklist{name}{n}{a, b, c, ...}  — pick n items WITHOUT replacement
 % NOTE: list items must not contain commas themselves.
 \NewDocumentCommand{\picklist}{m m m}{%
@@ -395,28 +415,37 @@
 	\pbank@lua{pbank_clear_bankfile()}%
 }
 
+% \pbank@iffilelocal{path}{then}{else} — existence test that consults ONLY the
+% CWD/absolute path via lfs, never TEXINPUTS. \IfFileExists searches the whole
+% TEXINPUTS, so with a recursive entry (e.g. the C:/_texlibjunc// junction) a
+% bare "Bank/bank.tex" silently matches the library's stray sample bank instead
+% of the course bank — the bug this guards against.
+\newcommand{\pbank@iffilelocal}[3]{%
+	\edef\pbank@exists@{\directlua{%
+		if lfs.attributes([==[#1]==], 'mode') == 'file'
+			then tex.print('T') else tex.print('F') end
+	}}%
+	\if T\pbank@exists@ #2\else #3\fi
+}
 % \pbank@load@coursebank — auto-load a course-level bank, called by each class
 % from its own \AtBeginDocument (not registered here, so non-assessment
-% consumers like didactic are unaffected). Tries the coursemeta bank-path
-% (literal first for legacy document-relative values, then coursemeta-relative),
-% then a sibling bank.tex. The CWD probe uses lfs rather than \IfFileExists so a
-% recursive TEXINPUTS entry can't silently match a stray library sample bank.
+% consumers like didactic are unaffected). Resolves the coursemeta bank-path
+% coursemeta-relative FIRST (the canonical form), then falls back to the literal
+% value for legacy document-relative banks, then a sibling bank.tex. Every probe
+% uses lfs (see \pbank@iffilelocal) rather than \IfFileExists so a recursive
+% TEXINPUTS entry can't silently match a stray library sample bank.
 \newcommand{\pbank@load@coursebank}{%
 	\@ifundefined{GetBankPath}{}{%
 		\edef\@tmpbankpath{\GetBankPath}%
 		\ifx\@tmpbankpath\empty\else
-			\IfFileExists{\@tmpbankpath}{%
-				\loadbank{\@tmpbankpath}%
+			\@ifundefined{GetCourseMetaDir}{%
+				\pbank@iffilelocal{\@tmpbankpath}{\loadbank{\@tmpbankpath}}{}%
 			}{%
-				\@ifundefined{GetCourseMetaDir}{%
-					\loadbank{\@tmpbankpath}%
+				\edef\@tmpbankresolved{\GetCourseMetaDir\@tmpbankpath}%
+				\pbank@iffilelocal{\@tmpbankresolved}{%
+					\loadbank{\@tmpbankresolved}%
 				}{%
-					\edef\@tmpbankresolved{\GetCourseMetaDir\@tmpbankpath}%
-					\IfFileExists{\@tmpbankresolved}{%
-						\loadbank{\@tmpbankresolved}%
-					}{%
-						\loadbank{\@tmpbankpath}%
-					}%
+					\pbank@iffilelocal{\@tmpbankpath}{\loadbank{\@tmpbankpath}}{}%
 				}%
 			}%
 		\fi
@@ -618,10 +647,25 @@
 % captured source and emits exam-class \choice / \CorrectChoice at typeset time,
 % so these are executed only if a choices block is used directly (outside the
 % bank flow).  Defined here for that safety and for documentation.
-%   \cchoice      the correct option (exactly one expected)
-%   \fchoice[i]   a forced (always-present) option; optional i pins its 1-based
-%                 slot (negative = from the end, Python-style)
+%   \cchoice        a correct option.  Repeatable: mark every option that is
+%                   right (equivalent forms, "select all that apply") and the
+%                   key reports them all, e.g. "Answer: B, D".
+%   \cchoiceif{c}   an option correct only when the Lua expression c is true at
+%                   typeset time -- so which option is right can follow the
+%                   problem's own random draw:
+%                     \setrng{a}{-3}{3}
+%                     \begin{choices}
+%                       \cchoiceif{a > 0} increasing
+%                       \cchoiceif{a < 0} decreasing
+%                       \choice           constant
+%                     \end{choices}
+%                   The expression sees the same sandbox as \calcvar / \ifvar
+%                   (math + every stored var).  Conditional options are always
+%                   presented, so a \shuffle can never drop the live answer.
+%   \fchoice[i]     a forced (always-present) option; optional i pins its 1-based
+%                   slot (negative = from the end, Python-style)
 \ProvideDocumentCommand{\cchoice}{}{\CorrectChoice}
+\ProvideDocumentCommand{\cchoiceif}{m}{\ifvar{#1}{\CorrectChoice}{\choice}}
 \ProvideDocumentCommand{\fchoice}{o}{\choice}
 
 % ---- Multiple-choice layout frame -----------------------------------------

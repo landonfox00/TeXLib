@@ -64,7 +64,42 @@
 % The non-colliding members (\solution, \answer, \ans, \pf) cover the same need,
 % and {soln} / {proof} stay fully usable (as a sibling after the statement, or
 % nested -- neither token is rebound).
-\newcommand{\texlib@inline@solution}{\par\bigskip\noindent\textit{Solution.}\space}
+% Worked-solution numbering ---------------------------------------------------
+% A worked environment may carry more than one \solution; when it does they are
+% labelled "Solution 1." / "Solution 2." / ..., but a lone \solution stays a bare
+% "Solution.". Whether to number can only be known from the TOTAL, so it is
+% resolved across runs via the .aux (the builders compile twice): each worked-env
+% instance gets a stable id (globally stepped, in document order), each \solution
+% steps a per-instance counter, and the total is written to the aux at \end and
+% read back at the next \begin. A single-pass build shows every solution
+% unnumbered until the second pass settles the count. (Assumes worked envs are
+% not nested inside one another -- not a pattern the library uses.) Both the def
+% and the lookup go through \csname, so the @-named control sequence works even
+% though the aux is read back with @ at its ordinary (non-letter) catcode.
+\newcount\texlib@worked@id
+\newcount\texlib@soln@ct
+\newcommand{\texlib@soln@total}{0}   % \solutions in this instance (previous run)
+
+\newcommand{\texlib@worked@begin}{%
+	\global\advance\texlib@worked@id\@ne
+	\global\texlib@soln@ct\z@
+	\ifcsname texlib@solntot@\the\texlib@worked@id\endcsname
+		\edef\texlib@soln@total{\csname texlib@solntot@\the\texlib@worked@id\endcsname}%
+	\else
+		\def\texlib@soln@total{0}%
+	\fi
+}
+\newcommand{\texlib@worked@end}{%
+	\ifnum\texlib@soln@ct>\z@
+		\protected@write\@auxout{}{%
+			\string\csgdef{texlib@solntot@\the\texlib@worked@id}{\the\texlib@soln@ct}}%
+	\fi
+}
+
+\newcommand{\texlib@inline@solution}{%
+	\par\bigskip\noindent
+	\global\advance\texlib@soln@ct\@ne
+	\textit{Solution\ifnum\texlib@soln@total>\@ne\space\the\texlib@soln@ct\fi.}\space}
 \newcommand{\texlib@inline@answer}  {\par\bigskip\noindent\textit{Answer.}\space}
 \newcommand{\texlib@inline@proof}   {\par\bigskip\noindent\textit{Proof.}\space}
 
@@ -72,6 +107,7 @@
 % scoped to that environment's group and revert at \end (the class's standalone
 % {solution} box, the global \answer, and amsthm's \proof are untouched outside).
 \newcommand{\texlib@bind@worked}{%
+	\texlib@worked@begin
 	\let\solution\texlib@inline@solution
 	\let\answer\texlib@inline@answer
 	\let\ans\texlib@inline@answer
@@ -115,6 +151,7 @@
 \__texlib_thm_entry:nnnnn {remark}      {Remark}      {remark}     {none}              {rmk}
 \__texlib_thm_entry:nnnnn {recall}      {Recall}      {remark}     {texlibnote}        {rcl}
 \__texlib_thm_entry:nnnnn {note}        {Note}        {remark}     {texlibnote}        {nte}
+\__texlib_thm_entry:nnnnn {warning}     {Warning}     {definition} {texlibwarning}     {warn}
 
 % ------------------------------------------------------------------------------
 % Options
@@ -192,6 +229,8 @@
 		\clist_if_in:nnT { example , exercise , question , challenge } {#1} {
 			\AtBeginEnvironment{#1}{\texlib@bind@worked}
 			\AtBeginEnvironment{#1*}{\texlib@bind@worked}
+			\AtEndEnvironment{#1}{\texlib@worked@end}
+			\AtEndEnvironment{#1*}{\texlib@worked@end}
 		}
 	}{
 		\msg_error:nnn { texlib-thmenv } { unknown-env } {#1}
@@ -245,7 +284,7 @@
 	\TeXLibTheorems[#1]{%
 		theorem, corollary, lemma, conjecture, proposition,
 		definition, convention, procedure, challenge, exercise,
-		example, notation, question, remark, recall, note}%
+		example, notation, question, remark, recall, note, warning}%
 }
 
 % ------------------------------------------------------------------------------
@@ -283,6 +322,10 @@
 	\AtBeginEnvironment{ex*}{\texlib@bind@worked}%
 	\AtBeginEnvironment{ques*}{\texlib@bind@worked}%
 	\AtBeginEnvironment{prob*}{\texlib@bind@worked}%
+	\AtEndEnvironment{exam*}{\texlib@worked@end}%
+	\AtEndEnvironment{ex*}{\texlib@worked@end}%
+	\AtEndEnvironment{ques*}{\texlib@worked@end}%
+	\AtEndEnvironment{prob*}{\texlib@worked@end}%
 	% Restore the default style so later class code starts clean.
 	\theoremstyle{plain}%
 }

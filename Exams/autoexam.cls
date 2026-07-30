@@ -202,11 +202,19 @@
 % defaults.
 \RequirePackage{texlib-solutions}
 
-% Float the blank MC "Answer" rule to the bottom of its page group with a
-% stretch-1 gap after the last option (the MC analogue of a free-response
-% \workbox).  Only the student build's blank answer line honors this; key /
-% solution builds keep the answer beside/below the choices.
+% Float the MC "Answer" line to the bottom of its page group with a stretch-1 gap
+% after the last option (the MC analogue of a free-response \workbox), so the
+% problems spread evenly down the page.  Two macros because the two builds need
+% different glue to reach the same place: the blank copy's rule floats on
+% \@mc@answergap, while a key must use \@mc@keyanswergap -- texlib-solutions.sty
+% collapses \stretch itself to 0pt under \ifsolutions (so a bank problem's bare
+% \vspace{\stretch{n}} answer space can't shove the solution to the page bottom),
+% which would make any \stretch-based gap a silent no-op in exactly the build it
+% is meant for.  \vfill is the same "fill" glue order, reached without the
+% neutered macro.  Set either to \relax to pack that build's problems at the top
+% of the page instead.
 \renewcommand{\@mc@answergap}{\vspace{\stretch{1}}}
+\renewcommand{\@mc@keyanswergap}{\vfill}
 
 % \begin{problems} / \begin{mcproblems} ... (repeatable Part sections)
 %   The environments are defined once in texlib-problembank.sty (shared with
@@ -274,7 +282,7 @@
 		% plain \def make here) has already closed.
 		\gdef\@lhead{\bfseries\GetExamTitle}%
 		\gdef\@chead{}%
-		\gdef\@rhead{\GetTermSection}%
+		\gdef\@rhead{\rightmark}%
 		\global\@headruletrue%
 		% Per-copy "X of N": freeze THIS copy's id into the footer denominator.
 		\stepcounter{autoexamcopyno}%
@@ -296,6 +304,26 @@
 \renewcommand{\problems@end@hook}{%
 	\label{@lastqpage@\theautoexamcopyno}%
 	\if@texlib@cursectionmc\global\@texlib@prevmctrue\else\global\@texlib@prevmcfalse\fi
+}
+
+% The part label appears BOTH in the body (the shared core's "Part N -- Label"
+% \section*, unchanged) and in the right header, so a reader who opens to any
+% page still knows which part they are in.  The heading is what the shared core
+% would emit on its own; the \markboth is what the header slots read back through
+% \rightmark (see \runningheader / \problems@begin@hook).
+%
+% A mark rather than a plain \gdef because the two are NOT equivalent on one
+% page: \problems@begin@hook skips its \clearpage after an {mcproblems} (see
+% \if@texlib@prevmc), so Part I can end and Part II begin on the SAME page.  A
+% global macro is expanded at shipout and would head that shared page with
+% Part II; \rightmark expands \firstmark -- the mark in force at the TOP of the
+% page -- so the page is headed by the part it opens in.  Pages with no mark of
+% their own inherit the previous page's, which is what carries the label across
+% a multi-page part.  The mark is placed BEFORE the heading so a part that starts
+% a page marks that page, not the previous one.
+\renewcommand{\texlib@partheading}[1]{%
+	\markboth{#1}{#1}%
+	\section*{\hspace*{-\@totalleftmargin}#1}%
 }
 
 % \loadbank is provided by texlib-problembank.sty.  Multi-version mode is
@@ -662,7 +690,8 @@
 % "X of N" footer) before starting the scratch leaf.
 \newcommand{\blankpage}{%
 	\clearpage
-	\def\run@chead{Scratch Work}%   % center header on scratch leaves
+	\gdef\run@chead{}%              % label goes right, not center
+	\markboth{Scratch Work}{Scratch Work}%   % right header on scratch leaves
 	\def\run@cfoot{}%               % no page number on scratch leaves
 	\null
 }
@@ -773,7 +802,10 @@
 \firstpagefooter{\GetCourse}{%
 	\thepage\ of\ \@ifundefined{r@@lastqpage}{\numpages}{\pageref*{@lastqpage}}%
 }{\GetInstitution}
-\runningheader{\bfseries\GetExamTitle}{}{\GetTermSection}
+% Header R is the current part ("Part I --- Multiple Choice") via the mark set in
+% \texlib@partheading, or "Scratch Work" on a \blankpage leaf.  The term and
+% section it used to carry now live on the title page (see \maketitle).
+\runningheader{\bfseries\GetExamTitle}{}{\rightmark}
 \runningfooter{\GetCourse}{%
 	\thepage\ of\ \@ifundefined{r@@lastqpage}{\numpages}{\pageref*{@lastqpage}}%
 }{\GetInstitution}
@@ -805,14 +837,23 @@
 	% pre-problem pages such as a series-reference sheet (Exam 3 / the Final).
 	\def\@cfoot{}%
 	\gdef\run@cfoot{}%
-	\gdef\run@chead{}%   % also drop a "Scratch Work" running header leaked from a
-	                     % previous copy's trailing \blankpage (e.g. onto a series sheet)
+	\gdef\run@chead{}%
+	% Clear the part / "Scratch Work" mark so a previous copy's trailing
+	% \blankpage can't head this copy's pre-problem pages (e.g. a series
+	% reference sheet) through \rightmark's carry-over.
+	\markboth{}{}%
 	\thispagestyle{headandfoot}%
 	% ---- title block ---------------------------------------------------------
 	\begin{center}
 		\huge Exam \GetExamNumber \\
 		\LARGE Math \theCourseNumber\ \theCourseTitle \\
 		\vspace{0.1em}
+		% Term + section, relocated here from the running header (which now
+		% carries the part label).  Emitted only when non-empty: \GetTermSection
+		% collapses to nothing when neither `term' nor `course-section' is set,
+		% and an unconditional line would leave a blank \large strut on the cover.
+		\sbox\z@{\GetTermSection}%
+		\ifdim\wd\z@>\z@ \large\GetTermSection \\ \vspace{0.1em} \fi
 		\large \GetExamDate
 		% Build-mode label: shown in red when solutions and/or rubrics are on.
 		% "Answer Key" for an \ifkey build, else "Solutions" (see \@autoexam@solword).
@@ -842,12 +883,19 @@
 		\TeXLibInstructionsTitled{exam}%
 		\vfill
 
-		Name: \underline{\hspace{4in}}
-		\vfill
+		% Blank-copy furniture: the name rule and the postscript both address the
+		% student sitting the exam, so an instructor key / solutions copy carries
+		% neither.  \ifsolutions (not \ifkey) is the gate, so \ShowSolutions and
+		% \justsolutions builds drop them too -- every copy that shows answers is
+		% an instructor copy.
+		\ifsolutions\else
+			Name: \underline{\hspace{4in}}
+			\vfill
 
-		\ifthenelse{\equal{}{\GetExamPostscript}}%
-			{}%
-			{\textit{\GetExamPostscript}}%
+			\ifthenelse{\equal{}{\GetExamPostscript}}%
+				{}%
+				{\textit{\GetExamPostscript}}%
+		\fi
 	\end{center}
 	% Title page is complete.  The user adds \blankpage after \maketitle to produce
 	% a pre-problem scratch leaf.  \blankpage ships this page via \clearpage, sets

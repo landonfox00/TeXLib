@@ -1,8 +1,10 @@
 #!/usr/bin/env python
-r"""Coverage for Doctor render (N2) and the shadow-install warning (N3).
+r"""Coverage for Doctor render (N2), the shadow-install warning (N3), and
+TEXINPUTS normalization.
 
-Stubs sublime/sublime_plugin, then exercises texlib_doctor.render_doctor (pure)
-and texlib._shadow_warning_line (the one-time build-time nudge).
+Stubs sublime/sublime_plugin, then exercises texlib_doctor.render_doctor (pure),
+texlib._shadow_warning_line (the one-time build-time nudge), and
+texlib._resolve_texinputs (the empty-segment guarantee).
 
 Run:  python Sublime/test_texlib_doctor.py
 """
@@ -69,5 +71,20 @@ texlib_texmf.shadows_checkout = lambda: False
 texlib._shadow_warned[0] = False
 ok &= check(texlib._shadow_warning_line(_Settings({"texinputs": "x"})) is None,
             "N3: no shadow -> no warning")
+
+# --- TEXINPUTS normalization -------------------------------------------------
+# Without an empty segment kpathsea REPLACES its default path (texmf-dist drops
+# out and luaotfload fatals at startup), so _resolve_texinputs must always leave
+# one; a blank setting stays blank (inherit the process env).
+sep = os.pathsep
+ok &= check(texlib._resolve_texinputs([".", "C:/j"]) == "." + sep + "C:/j" + sep,
+            "texinputs: list w/o empty segment gains a trailing separator")
+ok &= check(texlib._resolve_texinputs([".", "C:/j", ""]) == "." + sep + "C:/j" + sep,
+            "texinputs: explicit trailing empty segment not doubled")
+ok &= check(texlib._resolve_texinputs("." + sep + sep + "C:/j")
+            == "." + sep + sep + "C:/j",
+            "texinputs: string with a doubled separator left untouched")
+ok &= check(texlib._resolve_texinputs("") == "",
+            "texinputs: blank stays blank (inherit process env)")
 
 report(ok)

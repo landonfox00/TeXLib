@@ -8,6 +8,7 @@
     { "caption": "TeXLib: Build — Rubric", "command": "texlib_build", "args": { "mode": "rubric" } },
     { "caption": "TeXLib: Build — Draft", "command": "texlib_build", "args": { "mode": "draft" } },
     { "caption": "TeXLib: Build — Quick (single pass)", "command": "texlib_build", "args": { "mode": "quick" } },
+    { "caption": "TeXLib: Build — Full (2-pass)", "command": "texlib_build", "args": { "mode": "full" } },
     { "caption": "TeXLib: Cancel Build", "command": "texlib_cancel_build" },
     { "caption": "TeXLib: Cancel All Builds", "command": "texlib_cancel_all_builds" },
     { "caption": "TeXLib: Build Status (running builds)", "command": "texlib_build_status" },

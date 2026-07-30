@@ -7,15 +7,28 @@
     // texinputs: value for the child engine's TEXINPUTS env var -- this is how
     // the plugin's builds resolve the TeXLib classes and shared texlib-*.sty.
     // Point it at your comma-free repo checkout (kpathsea cannot search a path
-    // segment containing a comma, so use the junction, NOT the OneDrive path). A
-    // trailing "//" means "and all subdirectories"; the empty first segment keeps
-    // the default search path. May be a string or a list of segments. Because the
+    // segment containing a comma, so use the junction, NOT the OneDrive path). Use
+    // an EXPLICIT, non-recursive list -- the repo root + the 9 module dirs, the
+    // only places .sty/.cls/.lua live -- NOT the recursive "C:/_texlibjunc//":
+    // that walked ~1200 dirs (incl. .git and .claude/worktrees copies), cost
+    // ~1-3.5s/pass (worse cold), and let a stale examples/*.aux shadow a
+    // same-named build. End the list with an empty segment ("") -- kpathsea
+    // APPENDS its default path at an empty segment; without one TEXINPUTS
+    // REPLACES the default, texmf-dist drops out, and every build fatals at
+    // startup (luaotfload can't find its Unicode data). The plugin appends one
+    // if missing. May be a string or a list of segments. Because the
     // classes load from your checkout, NO TEXMF install is needed (and none
     // should shadow it -- see "Uninstall Classes from TEXMF" / Doctor).
     //
     // Leave unset (the default) to inherit the process environment.
     //
-    // "texinputs": ".;C:/_texlibjunc//;"
+    // "texinputs": [
+    //     ".", "C:/_texlibjunc",
+    //     "C:/_texlibjunc/Exams", "C:/_texlibjunc/Quizzes", "C:/_texlibjunc/Notes",
+    //     "C:/_texlibjunc/Problem Sets", "C:/_texlibjunc/Report Cards",
+    //     "C:/_texlibjunc/Schedule", "C:/_texlibjunc/Syllabi",
+    //     "C:/_texlibjunc/Bingo", "C:/_texlibjunc/Bank", ""
+    // ]
 
     // open_pdf_on_build: after a successful build, delegate to LaTeXTools'
     // jumpto_pdf to open/refresh the PDF and forward-sync (it honors your
@@ -35,10 +48,35 @@
     //
     // "show_panel_on_build": "errors"
 
+    // default_build_mode: what the plain build (Ctrl+B / "Build") does.
+    //   "default"/"full" (default) -- the settling 2-pass build (biber + rerun
+    //                                  loop) so cross-refs and the "page X of Y"
+    //                                  footer are correct.
+    //   "quick"                     -- ONE fast pass, no biber, no reruns, for a
+    //                                  tight edit-preview loop; cross-references
+    //                                  and page totals may be stale. Run
+    //                                  "Build — Full" (or Build — Pick Mode) for a
+    //                                  settling build before you hand a PDF out.
+    // Explicit modes (Answer Key, Solutions, Quick, Full, ...) are never affected.
+    //
+    // "default_build_mode": "quick"
+
     // build_on_save: rebuild a LaTeX document (default mode) every time it is
     // saved. Off by default; toggle from Tools > TeXLib > Toggle Build on Save.
     //
     // "build_on_save": false
+
+    // detect_reruns_by_state: decide how many engine passes a document needs by
+    // fingerprinting the cross-pass state it writes (.aux/.toc/.out/.bbl/...)
+    // instead of trusting the log alone. Default: true, and worth keeping.
+    //   * It sees reruns the log never mentions -- autoexam defines \@testdef
+    //     away to silence the multi-version label oscillation, so an exam whose
+    //     "page X of Y" footer just moved to another page says nothing at all.
+    //   * It skips passes the log asks for pointlessly: when a pass consumed and
+    //     produced byte-identical state, the next one is provably a no-op.
+    // Set false (or env TEXLIB_STATE_RERUN=0) to fall back to log-only reruns.
+    //
+    // "detect_reruns_by_state": true
 
     // class_source: absolute path to your TeXLib repo checkout. Used to locate
     // package_for_lms.py and course-metadata.sty (for coursemeta key

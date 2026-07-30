@@ -165,11 +165,34 @@ tracks load order for diagnostics.
 Define a problem. The body is region-delimited: an optional
 `\begin{choices}...\end{choices}` (its presence marks the problem multiple
 choice) and an optional `\begin{solution}...\end{solution}`; everything else is
-the stem. In a choices block, `\cchoice` marks the correct option, `\fchoice[i]`
+the stem. In a choices block, `\cchoice` marks a correct option, `\fchoice[i]`
 forces an always-present option into slot `i` (negative = from the end), and
 `[choose=m]` presents only `m` of the options (per version). May sit in the bank
 file, the preamble, or the body. Inverse search (double-click in the PDF) jumps
 back to the `\begin{problem}` block in its source file.
+
+`\cchoice` is repeatable — mark every option that is right (equivalent forms,
+"select all that apply") and the key reports them together as `Answer: B, D`.
+`\cchoiceif{lua-expr}` makes an option correct only when the expression holds at
+typeset time, so the answer can follow the problem's own random draw:
+
+```latex
+\begin{problem}{slope-sign}
+    \setrng{a}{-6}{6}
+    Let $f(x) = \get{a}x + 1$. On $(-\infty,\infty)$, $f$ is:
+    \begin{choices}
+        \cchoiceif{a > 0} increasing
+        \cchoiceif{a < 0} decreasing
+        \cchoiceif{a == 0} constant
+    \end{choices}
+\end{problem}
+```
+
+Conditional options are always presented, so `\shuffle` can never drop the live
+answer. The expression sees the same sandbox as `\calcvar` (the `math` library
+plus every stored variable); note Lua truthiness, where `0` is true, so compare
+explicitly. `\ifvar{lua-expr}{then}{else}` branches ordinary prose on the same
+values and works anywhere in a stem, a part, or a `{solution}`.
 
 `\getproblem{query}` (aliases: `\useproblem`, `\reqproblem`)
 Retrieve a problem. `query` is either an id (`linear_eq`) or a
@@ -190,6 +213,7 @@ version-specific content.
 | `\setrng{name}{min}{max}`                | Random integer in [min, max]                  |
 | `\calcvar{name}{lua-expr}`               | Compute from stored vars                      |
 | `\get{name}`                             | Typeset a stored value                        |
+| `\ifvar{lua-expr}{then}{else}`           | Branch on the current draw                    |
 | `\picklist{name}{n}{a, b, c, ...}`       | Pick `n` items without replacement            |
 | `\picklistr{name}{n}{a, b, c, ...}`      | Pick `n` items with replacement               |
 | `\pickrange{name}{n}{min}{max}`          | Pick `n` distinct integers from [min, max]    |
