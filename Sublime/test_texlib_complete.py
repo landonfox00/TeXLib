@@ -34,4 +34,17 @@ ok &= check(ctx("plain words her", "r") is None, "ordinary prose -> None")
 ok &= check(ctx("\\setvar{x}{y}", "}") is None,
             "a non-id macro is not treated as ids")
 
+# The macro popup fires AFTER a backslash is already typed, so any snippet that
+# itself starts with a backslash would double it (\\begin{...}). Guard it.
+for trig, snip, _ann in tc.MACROS:
+    ok &= check(not snip.startswith("\\"),
+                "macro %r snippet has no leading backslash" % trig)
+
+# The environment snippets folded in from Sublime/texlib/snippets/ must stay in
+# the popup after auto_complete_include_snippets=false hides the .sublime-snippet
+# files from it.
+_macro_trigs = {t for (t, _s, _a) in tc.MACROS}
+for env in ("problem", "parts", "questions", "solution", "versions"):
+    ok &= check(env in _macro_trigs, "%r folded into MACROS" % env)
+
 report(ok)
