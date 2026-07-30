@@ -331,11 +331,16 @@ def check_content(module: str, tmp: str, pdf_path: str,
     return problems, text_skipped
 
 
+class CompareFailed(RuntimeError):
+    """ImageMagick ran but its output could not be read as an AE pixel count."""
+
+
 def _compare_pages(ref_png: str, test_png: str) -> int | None:
     """
     Return the number of differing pixels (ImageMagick AE metric, small fuzz)
-    between two PNGs, or None if no comparison tool is available. A huge value
-    is returned when dimensions differ (ImageMagick reports that as an error).
+    between two PNGs, or None if no comparison tool is available. Raises
+    CompareFailed if the tool ran but emitted no usable metric -- a dimension
+    mismatch, for instance, which ImageMagick reports as a plain error.
     """
     if MAGICK:
         cmd = [MAGICK, "compare", "-metric", "AE", "-fuzz", "3%", ref_png, test_png, "null:"]
@@ -350,16 +355,21 @@ def _compare_pages(ref_png: str, test_png: str) -> int | None:
         )
     except (OSError, subprocess.SubprocessError):
         return None
-    # AE count is printed to stderr (merged into stdout here) as the LAST line,
-    # e.g. "1234" or "1234 (0.00188)". Scan from the end for a line that is
-    # purely the metric, so a leading ImageMagick warning line that happens to
-    # contain a number isn't mistaken for the count. Dimension mismatch ->
-    # non-zero exit + no metric line.
+    # AE count is printed to stderr (merged into stdout here) as the LAST line.
+    # The spelling varies by build: "1234", "1234 (0.00188)", and since
+    # ImageMagick 7.1.2 a real-valued form such as "1234.0000" / "1.234e+06".
+    # Accept all of them -- an integer-only pattern silently rejects the 7.1.2
+    # output, and since `compare` also exits non-zero whenever the images differ
+    # at all, every sub-budget nudge would then masquerade as an unbounded diff.
+    # Scan from the end so a leading warning line that happens to contain a
+    # number isn't mistaken for the count.
     for ln in reversed((r.stdout or "").splitlines()):
-        m = re.match(r"^\s*(\d+)(?:\s*\([\d.eE+-]+\))?\s*$", ln)
+        m = re.match(r"^\s*(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)(?:\s*\([^)]*\))?\s*$", ln)
         if m:
-            return int(m.group(1))
-    return 10**9 if r.returncode != 0 else 0
+            return round(float(m.group(1)))
+    if r.returncode != 0:
+        raise CompareFailed((r.stdout or "").strip() or f"exit status {r.returncode}")
+    return 0
 
 
 def check_visual(module: str, tmp: str, pdf_path: str, update: bool) -> tuple[list[str], bool]:
@@ -399,13 +409,31 @@ def check_visual(module: str, tmp: str, pdf_path: str, update: bool) -> tuple[li
 
     problems: list[str] = []
     for i, (pg, rf) in enumerate(zip(pages, refs), 1):
-        diff = _compare_pages(rf, pg)
+        try:
+            diff = _compare_pages(rf, pg)
+        except CompareFailed as exc:
+            # Surface the tool's own words: a broken compare is a different
+            # failure from a page that legitimately drifted, and reporting it
+            # as a pixel count sends you hunting a layout regression instead.
+            problems.append(f"page {i}: image compare failed ({exc})")
+            continue
         if diff is None:
             return [], True
         # Budget scales with page area so a fixed fraction means the same thing
         # for portrait notes and landscape schedules.
         w, h = _png_size(rf)
         budget = int(w * h * VISUAL_MAX_DIFF_FRAC)
+        # AE counts differing pixels, so it cannot exceed the page's pixel count.
+        # A larger figure means the metric itself is untrustworthy rather than
+        # the page having drifted -- ImageMagick 7.1.2-27 (Beta), which Alpine
+        # ships, returns a nonsense magnitude here (and a "normalized" value
+        # identical to the raw one) for images that differ by a few dozen pixels.
+        # Say so instead of blaming the layout.
+        if diff > w * h:
+            problems.append(
+                f"page {i}: implausible diff ({diff} px on a {w}x{h} page) -- "
+                "the ImageMagick build's AE metric is unreliable, not the layout")
+            continue
         if diff > budget:
             problems.append(f"page {i} differs ({diff} px > {budget} budget)")
     return problems, False

@@ -4,6 +4,10 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Fixed
+
+- **The visual gate no longer turns an ImageMagick defect into a phantom layout regression.** Alpine began shipping **ImageMagick 7.1.2-27 (Beta)** mid-week, which is why the *same* `main` commit went green on 2026-07-28 and red on 07-29 with nothing committed in between. Two independent faults stacked. (1) `_compare_pages` read the `-metric AE` count with an integer-only pattern (`1234`, optionally `1234 (0.00188)`); the Beta emits scientific notation, that pattern rejected it, and because `compare` also exits non-zero whenever the images differ *at all*, the "no metric line" fallback returned a fabricated `10**9` — which reads exactly like a page-dimension mismatch and sends you hunting the wrong thing. The parser now accepts the integer, real and scientific spellings, and a genuinely unreadable result raises `CompareFailed` so the tool reports itself in its own words. (2) The Beta's AE value is itself wrong: for a pair that 7.1.1 measures at 30 differing pixels it reports `1.59597e+06 (1.59597e+06)` — a count larger than the 935 000-pixel page, with a "normalized" figure identical to the raw one. Since AE counts differing pixels it cannot exceed the page's pixel count, so a figure that does is now reported as an unreliable metric rather than as drift. Byte-identical pages still compare as `0` and pass, so the gate keeps working; what it loses on this build is the 0.2 % fuzz tolerance, which makes references effectively exact-match until the Beta is superseded. Consider pinning `imagemagick` in `.github/workflows/visual.yml` if Alpine stays on a Beta. The `quiz__solutions` reference — a genuine 30 px drift, well under budget, but no longer forgiven by the broken metric — is regenerated here.
+
 ## [0.4.0] — 2026-07-13
 
 ### Changed
