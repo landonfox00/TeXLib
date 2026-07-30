@@ -4,6 +4,8 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-07-30
+
 ### Added
 
 - **Multiple-choice problems may have more than one correct option.** `\cchoice` is now repeatable — mark every right answer (equivalent antiderivative forms, "select all that apply") and the key reports them in presented order as `Answer: B, D`. All correct options are always-present, so `\shuffle`'s subset selection can never drop one and strand the key. A single `\cchoice` still renders the bare letter, so existing keys are byte-identical; the old "only the first counts as correct" warning is gone.
@@ -283,7 +285,8 @@ Initial public-on-GitHub release. Snapshot of TeXLib after the documentation pas
 - `course-metadata_old.sty` (v7) was archived on the `archive/old-metadata` branch before deletion. Recoverable from there if ever needed.
 - A handful of pre-class-consolidation prototypes (`Bingo/bingo.tex`, `Bingo/bingo_og.tex`, `Bingo/Math 181 Su25 *.tex`) and dev-test files (`Notes/test_aliases.*`, `Notes/test_conv_fix.*`, `Notes/test_labeledsection.*`) were deleted from disk before the first commit, so they have no history in this repo.
 
-[Unreleased]: https://github.com/landonfox00/TeXLib/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/landonfox00/TeXLib/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/landonfox00/TeXLib/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/landonfox00/TeXLib/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/landonfox00/TeXLib/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/landonfox00/TeXLib/compare/v0.1.1...v0.2.0
