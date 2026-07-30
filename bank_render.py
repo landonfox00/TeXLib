@@ -28,7 +28,7 @@ import threading
 JUNCTION = r"C:\_texlibjunc"
 TEXINPUTS_JUNCTION = ".;C:/_texlibjunc//;"
 _NO_WINDOW = 0x08000000 if os.name == "nt" else 0
-_CACHE_ROOT = os.path.join(tempfile.gettempdir(), "texlib-bankstudio")
+_CACHE_ROOT = os.path.join(tempfile.gettempdir(), "texlib-texam")
 _RERUN_RE = re.compile(r"Rerun to get .* right\.|Label\(s\) may have changed")
 
 _lock = threading.Lock()      # serialize compiles (one engine at a time)
@@ -129,7 +129,7 @@ def render_svg(problem, show_solution=True, use_cache=True):
     bank_dir = os.path.dirname(os.path.abspath(bank_file))
     bank_name = os.path.basename(bank_file)
     safe = re.sub(r"[^A-Za-z0-9._-]", "_", problem.id)
-    harness_name = f"_bankstudio_{safe}.tex"
+    harness_name = f"_texam_{safe}.tex"
     harness_path = os.path.join(bank_dir, harness_name)
     base = os.path.splitext(harness_name)[0]
 

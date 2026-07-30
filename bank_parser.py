@@ -1,4 +1,4 @@
-"""bank_parser.py -- parse a TeXLib problem bank for Bank Studio.
+"""bank_parser.py -- parse a TeXLib problem bank for TeXam.
 
 Standalone, stdlib-only, no TeX toolchain required.  Discovers which bank
 files back an exam document and parses every ``\\begin{problem}`` block into a
@@ -33,7 +33,7 @@ LOADBANK_RE = re.compile(r"\\loadbank\{([^}]+)\}")
 IMPORT_RE = re.compile(r"\\importproblem\{([^}]+)\}")
 ROOT_RE = re.compile(r"%\s*!\s*T[eE]X\s+root\s*=\s*(.+)")
 
-# --- added for Bank Studio -------------------------------------------------
+# --- added for TeXam -------------------------------------------------
 PROBLEM_END_RE = re.compile(r"\\end\{problem\}")
 CHOICE_RE = re.compile(r"\\(cchoice|choice|fchoice)\b(\s*\[[^\]]*\])?")
 PART_PTS_RE = re.compile(r"\\part\s*\[\s*(\d+)\s*\]")
@@ -94,7 +94,7 @@ def find_coursemeta(start_dir):
     """coursemeta.tex at start_dir or up to five parents above it, else None.
 
     Mirrors course-metadata.sty's upward walk (and texlib_locate.find_coursemeta)
-    so Bank Studio resolves the same governing file the build does -- the nearest
+    so TeXam resolves the same governing file the build does -- the nearest
     ancestor wins."""
     d = os.path.abspath(start_dir)
     for _ in range(6):

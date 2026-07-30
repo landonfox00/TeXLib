@@ -1,7 +1,7 @@
 """usage_scan.py -- where has each bank problem been used before?
 
 Scans the sibling assessment files in a course directory for references to each
-problem, so Bank Studio can flag what a student may have already seen (or what
+problem, so TeXam can flag what a student may have already seen (or what
 you're intentionally recycling).  A reference is either by **id**
 (``\\problem{lim-poly-factor}``, ``\\getproblem{lim-poly-factor}``, ...) or by
 **topic filter** (``\\problem{topic=limit}``) matching the problem's own topic.

@@ -1,11 +1,11 @@
-"""test_bank_studio.py -- dependency-free tests for Bank Studio.
+"""test_texam.py -- dependency-free tests for TeXam.
 
 Covers the bank parser (region split, MC detection, meta, points, comment
 handling) and the exam writer (add / remove / reorder, environment creation).
 No TeX toolchain required.  Server routing and the real-engine renderer are
 tested in later, tool-gated additions.
 
-    python test_bank_studio.py
+    python test_texam.py
 """
 
 import os
@@ -14,7 +14,7 @@ import unittest
 
 import bank_parser
 import bank_render
-import bank_studio
+import texam
 import exam_writer
 import usage_scan
 
@@ -121,7 +121,7 @@ class ScanFileTests(unittest.TestCase):
     def test_scan_and_discover_via_tmp(self):
         import os
         import tempfile
-        d = tempfile.mkdtemp(prefix="bankstudio-test-")
+        d = tempfile.mkdtemp(prefix="texam-test-")
         bank = os.path.join(d, "bank.tex")
         exam = os.path.join(d, "exam.tex")
         with open(bank, "w", encoding="utf-8") as fh:
@@ -212,7 +212,7 @@ class ExamWriterTests(unittest.TestCase):
 
 class UsageScanTests(unittest.TestCase):
     def setUp(self):
-        self.d = tempfile.mkdtemp(prefix="bankstudio-usage-")
+        self.d = tempfile.mkdtemp(prefix="texam-usage-")
         self._w("bank.tex", BANK)
         # frac-lim (topic=limit), deriv-mc (topic=derivative)
         self._w("exam-01.tex", r"\begin{problems}\problem{topic=limit}\end{problems}")
@@ -257,31 +257,31 @@ class ServerHelperTests(unittest.TestCase):
 
     def test_newline_preserved_lf(self):
         p = self._tmp(b"a\nb\nc\n")
-        text, nl = bank_studio.read_exam(p)
+        text, nl = texam.read_exam(p)
         self.assertEqual(nl, "\n")
-        bank_studio.write_exam(p, text + "d\n", nl)
+        texam.write_exam(p, text + "d\n", nl)
         with open(p, "rb") as fh:
             self.assertEqual(fh.read(), b"a\nb\nc\nd\n")
 
     def test_newline_preserved_crlf(self):
         p = self._tmp(b"a\r\nb\r\n")
-        text, nl = bank_studio.read_exam(p)
+        text, nl = texam.read_exam(p)
         self.assertEqual(nl, "\r\n")
         self.assertEqual(text, "a\nb\n")           # normalized in memory
-        bank_studio.write_exam(p, text + "c\n", nl)
+        texam.write_exam(p, text + "c\n", nl)
         with open(p, "rb") as fh:
             self.assertEqual(fh.read(), b"a\r\nb\r\nc\r\n")  # CRLF restored
 
     def test_arg_for_modes(self):
         prob = bank_parser.Problem("pid", "topic=alg", "b.tex", 0, "", "stem")
-        self.assertEqual(bank_studio._arg_for(prob, "id"), "pid")
-        self.assertEqual(bank_studio._arg_for(prob, "filter"), "topic=alg")
+        self.assertEqual(texam._arg_for(prob, "id"), "pid")
+        self.assertEqual(texam._arg_for(prob, "filter"), "topic=alg")
         notopic = bank_parser.Problem("q", "", "b.tex", 0, "", "stem")
-        self.assertEqual(bank_studio._arg_for(notopic, "filter"), "q")  # falls back
+        self.assertEqual(texam._arg_for(notopic, "filter"), "q")  # falls back
 
     def test_exam_state(self):
-        bank_studio.CTX["exam"] = self._tmp(EXAM.encode())
-        st = bank_studio.exam_state()
+        texam.CTX["exam"] = self._tmp(EXAM.encode())
+        st = texam.exam_state()
         self.assertTrue(st["exists"])
         self.assertEqual(len(st["entries"]), 2)
 
@@ -292,7 +292,7 @@ class CoursemetaResolutionTests(unittest.TestCase):
     teaching-course layout). discover must walk the whole chain."""
 
     def setUp(self):
-        self.root = tempfile.mkdtemp(prefix="bankstudio-cm-")
+        self.root = tempfile.mkdtemp(prefix="texam-cm-")
         self._mk("coursemeta.tex",
                  "\\metasetup{\n  course-number = 182,\n"
                  "  bank-path = Bank/bank.tex,\n}\n")
@@ -377,29 +377,29 @@ class StartupTests(unittest.TestCase):
         return path
 
     def test_missing_file_exits_cleanly(self):
-        d = tempfile.mkdtemp(prefix="bankstudio-missing-")
+        d = tempfile.mkdtemp(prefix="texam-missing-")
         missing = os.path.join(d, "nope.tex")
         with self.assertRaises(SystemExit):
-            bank_studio.main(["bank_studio.py", missing])
+            texam.main(["texam.py", missing])
 
     def test_bad_port_arg_exits_cleanly(self):
         exam = self._exam()
         with self.assertRaises(SystemExit):
-            bank_studio.main(["bank_studio.py", exam, "--no-open",
+            texam.main(["texam.py", exam, "--no-open",
                               "--port", "notaport"])
 
     def test_port_in_use_exits_cleanly(self):
         exam = self._exam()
         orig_avail = bank_render.available
-        orig_server = bank_studio.ThreadingHTTPServer
+        orig_server = texam.ThreadingHTTPServer
         bank_render.available = lambda: False        # keep the renderer out of it
-        bank_studio.ThreadingHTTPServer = _bind_fails
+        texam.ThreadingHTTPServer = _bind_fails
         try:
             with self.assertRaises(SystemExit):
-                bank_studio.main(["bank_studio.py", exam, "--no-open"])
+                texam.main(["texam.py", exam, "--no-open"])
         finally:
             bank_render.available = orig_avail
-            bank_studio.ThreadingHTTPServer = orig_server
+            texam.ThreadingHTTPServer = orig_server
 
 
 def _bind_fails(*_a, **_k):
