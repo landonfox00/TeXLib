@@ -19,6 +19,14 @@
 	//     "Cech" or "Holder", add the accented form ("Čech", "Hölder")
 	//     instead of the bare suffix.
 
+	// Keep the autocomplete popup free of snippet entries. LaTeXTools bundles
+	// ~200 tab-trigger snippets (bf, frame, bca, Rar_upr, ...) that otherwise
+	// flood the popup; TeXLib serves its own macros/environments via
+	// texlib/texlib_complete.py instead. This ONLY hides snippets from the
+	// popup list -- every snippet still expands on its tab-trigger. Pairs with
+	// the completion suppressors in LaTeXTools.sublime-settings.
+	"auto_complete_include_snippets": false,
+
 	"added_words":
 	[
 		// === Mathematicians (alphabetical) ===

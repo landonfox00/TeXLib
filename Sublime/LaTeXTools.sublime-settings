@@ -35,6 +35,29 @@
 		// "copy_published_path_to_clipboard" : false,
 	},
 
+	// --- Completions: TeXLib serves its own popup (texlib/texlib_complete.py).
+	// Suppress the CWL command list (the big \-triggered one), the
+	// fill/glossary/env/directive auto-triggers, and the auto-label helper, so
+	// the \-popup shows ONLY TeXLib macros plus the document's own problem IDs /
+	// coursemeta keys. (The ~200 bundled LaTeXTools SNIPPETS are a core-Sublime
+	// concern, suppressed via auto_complete_include_snippets in
+	// LaTeX.sublime-settings, not here.)
+	//
+	// EXCEPTION -- \cite{ and \ref{ autofill stay ON: those complete from the
+	// document's own .bib entries / \label{}s (not the CWL command list), so
+	// they don't clutter the macro popup and are worth keeping.
+	"command_completion" : "never",
+	"cwl_autoload" : false,
+	"cwl_list" : [],
+	"cite_auto_trigger" : true,
+	"ref_auto_trigger" : true,
+	"fill_auto_trigger" : false,
+	"glossary_auto_trigger" : false,
+	"env_auto_trigger" : false,
+	"tex_directive_auto_trigger" : false,
+	"auto_label_auto_trigger" : false,
+	"smart_bracket_auto_trigger" : false,
+
 	"viewer" : "sumatra",
 	"open_pdf_on_build" : true,
 	"forward_sync" : false,

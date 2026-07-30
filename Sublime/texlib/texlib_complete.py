@@ -3,7 +3,10 @@
 # TeXLib -- completions LaTeXTools can't provide (it doesn't know our macros).
 #
 #   * After a backslash, offer the TeXLib bank/variable macros (\getproblem,
-#     \setvar, \picklist, \loadbank, ...) as snippet completions.
+#     \setvar, \picklist, \loadbank, ...) plus the exam environments
+#     (problem/parts/questions/solution/versions) as snippet completions --
+#     the popup's only content once LaTeXTools' completions + snippets are
+#     suppressed (see LaTeXTools/LaTeX .sublime-settings).
 #   * Inside \getproblem{...} / \useproblem{...} / \reqproblem{...}, offer the
 #     actual problem IDS available to the document, reusing the bank scanner.
 #
@@ -23,7 +26,10 @@ except ImportError:
 
 # TeXLib macros: (trigger, snippet-without-leading-backslash, annotation). The
 # backslash is already typed, so the completion inserts only the rest -- no
-# double backslash.
+# double backslash (guarded by test_texlib_complete.py). The trailing block
+# mirrors the environment snippets in Sublime/texlib/snippets/: those still
+# tab-expand, but auto_complete_include_snippets=false hides them (and all of
+# LaTeXTools') from the popup, so we re-offer them here as plugin completions.
 MACROS = [
     ("getproblem", "getproblem{$1}", "retrieve a bank problem by id/filter"),
     ("useproblem", "useproblem{$1}", "alias of \\getproblem"),
@@ -36,6 +42,20 @@ MACROS = [
     ("picklist", "picklist{$1}", "pick from a list"),
     ("pickrange", "pickrange{$1}{$2}", "pick from a range"),
     ("setexamseed", "setexamseed{$1}", "seed the version RNG"),
+    ("problem",
+     "begin{problem}{${1:id}}[${2:topic=}]\n\t${0:problem statement}\n\\end{problem}",
+     "problem environment"),
+    ("parts",
+     "begin{parts}\n\t\\part[${1:pts}] ${2:first part}\n"
+     "\t\\part[${3:pts}] ${0:second part}\n\\end{parts}",
+     "parts environment"),
+    ("questions",
+     "begin{questions}\n\t\\question ${0:question text}\n\\end{questions}",
+     "questions environment"),
+    ("solution",
+     "begin{solution}\n\t${0:answer}\n\\end{solution}",
+     "solution environment"),
+    ("versions", "versions{${1:A, B, C}}", "declare exam versions"),
 ]
 
 # Cursor sits inside the braces of a by-id retrieval command.
@@ -138,11 +158,14 @@ class TexlibCompletions(sublime_plugin.EventListener):
         if ctx == "ids":
             return self._problem_ids(view)
         if ctx == "macros":
-            return [
+            # INHIBIT_WORD_COMPLETIONS keeps Sublime's buffer-word guesses out of
+            # the \-popup; ranking within our list stays Sublime's default fuzzy
+            # score (no INHIBIT_REORDER).
+            return ([
                 sublime.CompletionItem.snippet_completion(
                     trig, snip, annotation="TeXLib · " + ann)
                 for (trig, snip, ann) in MACROS
-            ]
+            ], sublime.INHIBIT_WORD_COMPLETIONS)
         return None
 
     def _problem_ids(self, view):
