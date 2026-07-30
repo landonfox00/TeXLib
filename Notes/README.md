@@ -183,6 +183,34 @@ is scoped to the example environment, so the standalone `\begin{solution}` box
 keeps `\solution` everywhere else; just don't nest a `\begin{solution}` box
 *inside* an example.
 
+The same lead-ins (`\solution`, `\answer`, `\ans`, `\pf`) work in `exercise`,
+`question`, and `challenge`.
+
+#### `challenge` hides its worked response by default
+
+`challenge` is the one exception to "always visible": a challenge is posed to be
+attempted, so **everything after a `\solution` / `\answer` / `\ans` / `\pf` is
+hidden unless the build shows solutions** (`\ShowSolutions`, `\ShowKey`,
+`\solutions`, …). The challenge *statement* always renders; only the worked
+response is gated.
+
+```latex
+\begin{challenge}
+	Prove that $\sum 1/n$ diverges without the integral test.
+	\solution Group the terms in blocks of length $2^k$ …   % student build: hidden
+\end{challenge}
+```
+
+To opt out and have challenges behave like the other worked environments, put
+`\TeXLibShowChallengeSolutions` in the preamble (`\TeXLibHideChallengeSolutions`
+restores the default).
+
+One caveat: hiding works by collecting the response into a discarded box, so it
+is still *typeset* into that dead box. Counters stepped inside it still advance
+and `\label`s still fire — keep numbered equations and nested numbered
+environments out of a challenge's response, or the student build's numbering
+will skip.
+
 ### Math utilities
 
 The class predefines: `\mbb`, `\mrm`, `\mcal`, `\msf`, `\mf`, `\mscr`,
