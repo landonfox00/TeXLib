@@ -38,6 +38,9 @@
 % aux packages, unified problem/part labels) -- identical to quiz/autoexam.
 \RequirePackage{texlib-assessment}
 
+% PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty.
+\TeXLibDeclareDocTitle{\GetCourse\space\GetTerm\space Problem Bank}
+
 % The problem-bank engine + LaTeX glue: \loadbank, \begin{problem}, \getproblem,
 % \printbankcatalog, ... (loads problem_engine.lua via \directlua).
 \RequirePackage{texlib-problembank}

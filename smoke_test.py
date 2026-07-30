@@ -69,10 +69,24 @@ TEXLIB_ROOT = SCRIPT_DIR  # script lives at TeXLib root
 # failing, so a bare `lualatex`/`pdflatex` install can still run build-only.
 #   pdftotext / pdftoppm  -> poppler-utils
 #   magick (or compare)   -> ImageMagick
+#   verapdf               -> veraPDF PDF/UA conformance checker (--accessible)
 PDFTOTEXT = shutil.which("pdftotext")
 PDFTOPPM = shutil.which("pdftoppm")
 MAGICK = shutil.which("magick")
 COMPARE = shutil.which("compare")  # ImageMagick 6 standalone
+VERAPDF = shutil.which("verapdf") or shutil.which("verapdf.bat")
+
+# Accessible (tagged PDF/UA) build. Must stay in lock-step with the Sublime
+# builder's ACCESSIBLE_MACRO (Sublime/texlib/texlib_build.py): the same
+# \DocumentMetadata prefix is injected ahead of \input so tagging is switched on
+# before \documentclass. --accessible forces lualatex, builds the tagged
+# variant, and (when veraPDF is present) validates PDF/UA-2 conformance.
+ACCESSIBLE_DOCMETA = (
+    r"\DocumentMetadata{lang=en,tagging=on,"
+    r"tagging-setup={math/setup={mathml-SE},table/header-rows=1},"
+    r"pdfstandard={ua-2,a-4f}}"
+)
+ACCESSIBLE_MACRO = ACCESSIBLE_DOCMETA + r"\def\TeXLibAccessibleMode{}"
 
 # Committed reference images for visual regression (--visual). Generated with
 # --update-refs; environment-specific (font rendering differs across TeX Live
@@ -331,11 +345,16 @@ def check_content(module: str, tmp: str, pdf_path: str,
     return problems, text_skipped
 
 
+class CompareFailed(RuntimeError):
+    """ImageMagick ran but its output could not be read as an AE pixel count."""
+
+
 def _compare_pages(ref_png: str, test_png: str) -> int | None:
     """
     Return the number of differing pixels (ImageMagick AE metric, small fuzz)
-    between two PNGs, or None if no comparison tool is available. A huge value
-    is returned when dimensions differ (ImageMagick reports that as an error).
+    between two PNGs, or None if no comparison tool is available. Raises
+    CompareFailed if the tool ran but emitted no usable metric -- a dimension
+    mismatch, for instance, which ImageMagick reports as a plain error.
     """
     if MAGICK:
         cmd = [MAGICK, "compare", "-metric", "AE", "-fuzz", "3%", ref_png, test_png, "null:"]
@@ -350,16 +369,112 @@ def _compare_pages(ref_png: str, test_png: str) -> int | None:
         )
     except (OSError, subprocess.SubprocessError):
         return None
-    # AE count is printed to stderr (merged into stdout here) as the LAST line,
-    # e.g. "1234" or "1234 (0.00188)". Scan from the end for a line that is
-    # purely the metric, so a leading ImageMagick warning line that happens to
-    # contain a number isn't mistaken for the count. Dimension mismatch ->
-    # non-zero exit + no metric line.
+    # AE count is printed to stderr (merged into stdout here) as the LAST line.
+    # The spelling varies by build: "1234", "1234 (0.00188)", and since
+    # ImageMagick 7.1.2 a real-valued form such as "1234.0000" / "1.234e+06".
+    # Accept all of them -- an integer-only pattern silently rejects the 7.1.2
+    # output, and since `compare` also exits non-zero whenever the images differ
+    # at all, every sub-budget nudge would then masquerade as an unbounded diff.
+    # Scan from the end so a leading warning line that happens to contain a
+    # number isn't mistaken for the count.
     for ln in reversed((r.stdout or "").splitlines()):
-        m = re.match(r"^\s*(\d+)(?:\s*\([\d.eE+-]+\))?\s*$", ln)
+        m = re.match(r"^\s*(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)(?:\s*\([^)]*\))?\s*$", ln)
         if m:
-            return int(m.group(1))
-    return 10**9 if r.returncode != 0 else 0
+            return round(float(m.group(1)))
+    if r.returncode != 0:
+        raise CompareFailed((r.stdout or "").strip() or f"exit status {r.returncode}")
+    return 0
+
+
+def check_pdfua_structure(pdf_path: str) -> tuple[list[str], bool]:
+    """
+    Dependency-free PDF/UA structural assertions on an accessible build.
+
+    veraPDF gives full rule-level conformance but needs a JRE; this check needs
+    only pypdf (already an optional dep for PDF merge/split) and so runs
+    ~everywhere, including CI. It verifies the markers a tagged PDF/UA document
+    must carry -- catching the "builds fine but isn't really tagged" regression
+    that a build-only run would miss. Returns (problems, skipped); skipped when
+    pypdf is unavailable.
+
+    Note on the title: PDF 2.0 / PDF-A-4 deprecate the DocInfo dictionary in
+    favour of XMP, so a conforming file may legitimately carry ONLY XMP
+    dc:title. Accept either.
+    """
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return [], True  # soft skip: pypdf not installed
+    problems: list[str] = []
+    try:
+        reader = PdfReader(pdf_path)
+        cat = reader.trailer["/Root"]
+        mark_info = cat.get("/MarkInfo")
+        if not (mark_info and mark_info.get("/Marked")):
+            problems.append("not marked as tagged (/MarkInfo /Marked)")
+        if "/StructTreeRoot" not in cat:
+            problems.append("no /StructTreeRoot (no structure tree)")
+        if not cat.get("/Lang"):
+            problems.append("no document /Lang")
+        view_prefs = cat.get("/ViewerPreferences")
+        if not (view_prefs and view_prefs.get("/DisplayDocTitle")):
+            problems.append("ViewerPreferences/DisplayDocTitle not true")
+        # Title: XMP dc:title (authoritative for PDF 2.0) or legacy DocInfo.
+        xmp_text = ""
+        try:
+            xmp = reader.xmp_metadata
+            if xmp is not None:
+                xmp_text = xmp.stream.get_data().decode("utf-8", "replace")
+        except Exception:  # noqa: BLE001 - malformed XMP is itself reported below
+            xmp_text = ""
+        has_title = bool(re.search(r"<dc:title>.*?</dc:title>", xmp_text, re.S)) or bool(
+            (reader.metadata or {}).get("/Title"))
+        if not has_title:
+            problems.append("no document title (XMP dc:title / DocInfo /Title)")
+        if not re.search(r"pdfuaid:part", xmp_text):
+            problems.append("XMP does not declare pdfuaid:part (not identified as PDF/UA)")
+    except Exception as exc:  # noqa: BLE001 - never crash the suite on a reader quirk
+        return [f"PDF/UA structure check failed to read PDF: {exc}"], False
+    return problems, False
+
+
+def check_verapdf(pdf_path: str) -> tuple[list[str], bool]:
+    """
+    Validate PDF/UA-2 conformance of an accessible build with veraPDF.
+
+    Returns (problems, skipped). `skipped` is True (a soft skip, not a failure)
+    when the veraPDF CLI is not on PATH, mirroring the pdftotext/ImageMagick
+    convention — a green run without veraPDF has NOT verified conformance.
+    veraPDF exits 0 when the file passes every rule of the chosen flavour, 1
+    when some rule fails, and >1 on a tool error; the failed-rule count is
+    parsed from the text report for a useful one-line summary.
+    """
+    if not VERAPDF:
+        return [], True  # soft skip: veraPDF not installed
+    # XML rather than text: the text report is only a PASS/FAIL line, whereas the
+    # XML carries the ISO clause of each failed rule -- the difference between
+    # "non-compliant" and an actionable "clause 8.11.1 (dc:title missing)".
+    cmd = [VERAPDF, "--flavour", "ua2", "--format", "xml", pdf_path]
+    try:
+        r = subprocess.run(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace", timeout=180,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return [f"veraPDF invocation failed: {exc}"], False
+    out = r.stdout or ""
+    if r.returncode == 0:
+        return [], False  # compliant
+    if r.returncode > 1:
+        return [f"veraPDF tool error (exit {r.returncode}): {out.strip()[:200]}"], False
+    # Non-compliant (exit 1): name the failed ISO clauses (deduped, first few).
+    clauses = []
+    for c in re.findall(r'clause="([^"]+)"', out):
+        if c not in clauses:
+            clauses.append(c)
+    detail = f" -- failed clause(s): {', '.join(clauses[:6])}" if clauses else ""
+    more = f" (+{len(clauses) - 6} more)" if len(clauses) > 6 else ""
+    return [f"PDF/UA-2 non-compliant{detail}{more}"], False
 
 
 def check_visual(module: str, tmp: str, pdf_path: str, update: bool) -> tuple[list[str], bool]:
@@ -399,13 +514,31 @@ def check_visual(module: str, tmp: str, pdf_path: str, update: bool) -> tuple[li
 
     problems: list[str] = []
     for i, (pg, rf) in enumerate(zip(pages, refs), 1):
-        diff = _compare_pages(rf, pg)
+        try:
+            diff = _compare_pages(rf, pg)
+        except CompareFailed as exc:
+            # Surface the tool's own words: a broken compare is a different
+            # failure from a page that legitimately drifted, and reporting it
+            # as a pixel count sends you hunting a layout regression instead.
+            problems.append(f"page {i}: image compare failed ({exc})")
+            continue
         if diff is None:
             return [], True
         # Budget scales with page area so a fixed fraction means the same thing
         # for portrait notes and landscape schedules.
         w, h = _png_size(rf)
         budget = int(w * h * VISUAL_MAX_DIFF_FRAC)
+        # AE counts differing pixels, so it cannot exceed the page's pixel count.
+        # A larger figure means the metric itself is untrustworthy rather than
+        # the page having drifted -- ImageMagick 7.1.2-27 (Beta), which Alpine
+        # ships, returns a nonsense magnitude here (and a "normalized" value
+        # identical to the raw one) for images that differ by a few dozen pixels.
+        # Say so instead of blaming the layout.
+        if diff > w * h:
+            problems.append(
+                f"page {i}: implausible diff ({diff} px on a {w}x{h} page) -- "
+                "the ImageMagick build's AE metric is unreliable, not the layout")
+            continue
         if diff > budget:
             problems.append(f"page {i} differs ({diff} px > {budget} budget)")
     return problems, False
@@ -526,23 +659,29 @@ def build_one(
     content: bool = True,
     visual: str | None = None,
     dump_text: bool = False,
+    accessible: bool = False,
 ) -> tuple[bool, float, str, str, bool]:
     """
     Build a single template.tex in an isolated temp directory.
 
     `content`: run text/artifact content checks after a successful build.
     `visual`:  None (off), "check" (compare to refs), or "update" (write refs).
+    `accessible`: build the tagged PDF/UA variant (force lualatex, inject the
+        \\DocumentMetadata prefix) and validate it with veraPDF.
 
     Returns (ok, elapsed_seconds, error_excerpt, log_path_on_failure, skipped),
-    where `skipped` is True if a requested content/visual check was soft-skipped
-    because its external tool (poppler / ImageMagick) was unavailable.
+    where `skipped` is True if a requested content/visual/veraPDF check was
+    soft-skipped because its external tool (poppler / ImageMagick / veraPDF) was
+    unavailable.
     """
     module_dir = os.path.join(TEXLIB_ROOT, module)
     tex_src = os.path.join(module_dir, template)
     if not os.path.exists(tex_src):
         return False, 0.0, f"missing template: {tex_src}", "", False
 
-    engine = detect_engine(tex_src)
+    # Tagging (MathML math) is a Unicode-engine feature -> force lualatex for the
+    # accessible variant even for the pdflatex classes, exactly as the builder does.
+    engine = "lualatex" if accessible else detect_engine(tex_src)
 
     # Build in a temp dir so we don't pollute the real module folder with
     # .aux/.log/.synctex.gz etc. Copy the module's local files (.cls/.lua/.tex
@@ -597,16 +736,23 @@ def build_one(
         #   trailing path separator = "...and the default texmf trees too".
         env["TEXINPUTS"] = f".{sep}{TEXLIB_ROOT}//{sep}{existing}"
 
+        jobname = os.path.splitext(template)[0]
         cmd = [engine, "-interaction=nonstopmode", "-halt-on-error"]
         if engine == "lualatex":
             cmd.append("-shell-escape")
-        if mode_macro:
-            # Compile-time flag injection: \def\StudentMode{}\input{template.tex}
-            cmd.append(f"{mode_macro}\\input{{{template}}}")
+        # Compile-time prefix injection: [\DocumentMetadata...]\def\Flag{}\input{t}.
+        # The accessible \DocumentMetadata must come FIRST so it precedes the
+        # document's \documentclass. \DocumentMetadata opens a support file before
+        # the \input runs, so the jobname must be pinned explicitly -- otherwise
+        # LuaTeX names the output after that support file, not the template.
+        prefix = (ACCESSIBLE_MACRO if accessible else "") + (mode_macro or "")
+        if accessible:
+            cmd.append(f"--jobname={jobname}")
+        if prefix:
+            cmd.append(f"{prefix}\\input{{{template}}}")
         else:
             cmd.append(template)
 
-        jobname = os.path.splitext(template)[0]
         pdf = os.path.join(tmp, jobname + ".pdf")
         t0 = time.time()
         try:
@@ -625,6 +771,13 @@ def build_one(
         if ok:
             skipped = False
             problems: list[str] = []
+            if accessible:
+                sp, struct_skipped = check_pdfua_structure(pdf)
+                problems += sp
+                skipped = skipped or struct_skipped
+                vp, vera_skipped = check_verapdf(pdf)
+                problems += vp
+                skipped = skipped or vera_skipped
             if content:
                 cp, text_skipped = check_content(module, tmp, pdf)
                 problems += cp
@@ -938,6 +1091,12 @@ def main() -> int:
     p.add_argument("--solutions", action="store_true", help=r"Also build with \ShowSolutions")
     p.add_argument("--rubric", action="store_true", help=r"Also build with \ShowRubric")
     p.add_argument(
+        "--accessible", action="store_true",
+        help="Also build the tagged PDF/UA variant (forces lualatex) and validate "
+             "it with veraPDF. Soft-skips validation if veraPDF is absent. Note: "
+             "only rolled-out classes (syllabus, didactic) are expected to pass.",
+    )
+    p.add_argument(
         "--modes",
         choices=["default", "all"],
         default="default",
@@ -999,6 +1158,11 @@ def main() -> int:
     for flag in ("student", "key", "solutions", "rubric"):
         if enable_all or getattr(args, flag):
             modes.append((flag, MODES[flag]))
+    # Accessible is opt-in only (never folded into --modes all): it is expensive
+    # (lualatex + tagging) and, until the rollout finishes, fails for classes
+    # whose package stack is not yet tagging-clean.
+    if args.accessible:
+        modes.append(("accessible", None))
 
     # --dump-text: build each target once (default mode) and print its text.
     if args.dump_text:
@@ -1018,6 +1182,17 @@ def main() -> int:
         check_bits.append(
             ("visual:update" if visual_mode == "update" else "visual")
             + (f" [{', '.join(miss)} MISSING -> skipped]" if miss else "")
+        )
+    if args.accessible:
+        try:
+            import pypdf  # noqa: F401
+            have_pypdf = True
+        except ImportError:
+            have_pypdf = False
+        a11y_miss = [n for n, ok in (("pypdf", have_pypdf), ("veraPDF", VERAPDF)) if not ok]
+        check_bits.append(
+            "accessible/PDF-UA"
+            + (f" [{', '.join(a11y_miss)} MISSING -> those checks skipped]" if a11y_miss else "")
         )
 
     print(f"TeXLib smoke test")
@@ -1042,7 +1217,8 @@ def main() -> int:
             (module, mode_name,
              pool.submit(build_one, module, template, mode_macro,
                          args.timeout, args.verbose,
-                         content=content_enabled, visual=visual_mode))
+                         content=content_enabled, visual=visual_mode,
+                         accessible=(mode_name == "accessible")))
             for (module, template, mode_name, mode_macro) in jobs
         ]
         for module, mode_name, fut in futures:
