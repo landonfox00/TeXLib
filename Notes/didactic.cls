@@ -391,12 +391,14 @@
 % 7b. INLINE WORKED LEAD-INS  (\solution \answer \ans \pf)  + challenge gating
 % ==============================================================================
 % The COMMAND half of the pair. texlib-thmenv.sty binds these four lead-ins
-% (\let to always-visible italic "Solution." / "Answer." / "Proof." labels)
-% inside every worked-shaped env -- example, exercise, question, challenge --
-% via \AtBeginEnvironment{<env>}{\texlib@bind@worked}. A worked solution is
-% exposition, so the DEFAULT is always-visible.
+% (\let to italic "Solution." / "Answer." / "Proof." labels) inside every
+% worked-shaped env -- example, exercise, question, challenge -- via
+% \AtBeginEnvironment{<env>}{\texlib@bind@worked}. A worked solution is
+% exposition, so the DEFAULT is always-visible; thmenv makes `challenge' alone
+% the exception, on its own \@texlib@gatechallenge flag.
 %
-% didactic then makes the two ASSESSMENT-shaped members gate. In `challenge'
+% didactic then makes the two ASSESSMENT-shaped members gate -- `exercise' as
+% well as `challenge', which thmenv does not cover. In `challenge'
 % and `exercise' a lead-in is a spoiler: it should reach the instructor build
 % but not the student handout. So here we re-bind the four lead-ins in just
 % those two envs to a gated form -- shown under \ifsolutions, otherwise opening
@@ -412,6 +414,16 @@
 % challenge/exercise too); \gateworkedtrue (default) restores it.
 \newif\ifgateworked  \gateworkedtrue
 \newif\if@wrk@gateopen
+
+% thmenv exposes \TeXLibShowChallengeSolutions for the gating it does itself,
+% but didactic's hooks are registered later and win, so that name would silently
+% no-op in a didactic document -- a knob that does nothing is worse than no
+% knob. Point it at BOTH flags so one public name behaves the same in every
+% class (here it also covers `exercise', which thmenv never gates).
+\renewcommand{\TeXLibShowChallengeSolutions}{%
+	\gateworkedfalse \@texlib@gatechallengefalse}
+\renewcommand{\TeXLibHideChallengeSolutions}{%
+	\gateworkedtrue \@texlib@gatechallengetrue}
 
 % A gated lead-in. #1 is the visible label macro (from texlib-thmenv.sty). In an
 % instructor build it prints the label inline; otherwise it opens ONE discard
