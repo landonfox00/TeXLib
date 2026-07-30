@@ -163,13 +163,16 @@
 						\rule[-\dimexpr\ht\@sol@box+\dp\@sol@box+6pt\relax]%
 							{\dimexpr\textwidth\relax}%
 							{\dimexpr\ht\strutbox+\ht\@sol@box+\dp\@sol@box+12pt\relax}}}}%
-					% Left accent, oriented DOWNWARD from the "Solution." baseline
-					% (height = just the header line, depth = the rest) and \smash'd so
-					% it adds nothing to the box's own height/depth.
+					% Left accent, drawn flush with the green fill above: its top/bottom
+					% match the fill's own edges (\ht\strutbox+6pt up, box+6pt down --
+					% the same 6pt pad the \rule uses) so it reads as a full-height left
+					% border like pset/didactic's tcolorbox borderline west, not a short
+					% header-line tick.  \smash'd so it adds nothing to the box's own
+					% height/depth.
 					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsolrulecolor}{%
 						\vrule width 1.5pt
-							height \dimexpr\ht\strutbox+3pt\relax
-							depth \dimexpr\ht\@sol@box+\dp\@sol@box+\dp\strutbox\relax}}}%
+							height \dimexpr\ht\strutbox+6pt\relax
+							depth \dimexpr\ht\@sol@box+\dp\@sol@box+6pt\relax}}}%
 				\noindent\texlibsolheader%
 				\ifrubric
 					\ifx\@sol@rubric\@empty\else
