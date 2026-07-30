@@ -49,6 +49,9 @@
 \RequirePackage[capitalise,nameinlink]{cleveref}
 \RequirePackage{course-metadata}
 
+% PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty.
+\TeXLibDeclareDocTitle{\GetCourse\space\GetTerm\space Lecture Notes}
+
 % Bibliography: biblatex with the biber backend. Loaded last so it can hook
 % into hyperref/cleveref/amsmath. The \printreferences command below is a
 % \maketitle-style wrapper that prints the cited references with a clean

@@ -273,6 +273,44 @@ def main():
     check("quick -> single-pass message shown",
           bool(cmds) and "quick" in cmds[0][1], cmds[0][1] if cmds else "")
 
+    # (k) accessible mode: syllabus (a pdflatex class) -> forced lualatex, the
+    # DocumentMetadata prefix is injected AHEAD of \input, a jobname suffix
+    # keeps the tagged PDF beside the primary, and two passes settle refs.
+    cmds, disp = run_builder(
+        r"\documentclass{syllabus}\begin{document}x\end{document}",
+        options=["--texlib-mode=accessible"])
+    check("accessible -> forced lualatex",
+          bool(cmds) and cmds[0][0][0] == "lualatex", cmds)
+    check("accessible -> 'requires lualatex' message shown",
+          "requires lualatex" in disp, repr(disp))
+    aarg = cmds[0][0][-1] if cmds else ""
+    check("accessible -> \\DocumentMetadata injected", r"\DocumentMetadata" in aarg, aarg)
+    check("accessible -> tagging=on requested", "tagging=on" in aarg, aarg)
+    check("accessible -> DocumentMetadata precedes \\input",
+          r"\DocumentMetadata" in aarg
+          and aarg.index(r"\DocumentMetadata") < aarg.index(r"\input"), aarg)
+    check("accessible -> \\def\\TeXLibAccessibleMode injected",
+          r"\def\TeXLibAccessibleMode{}" in aarg, aarg)
+    # The jobname must stay the REAL base name: autoexam reads its document body
+    # from <jobname>.tex, so a suffixed jobname truncated the tagged exam. The
+    # output is separated by directory (aux/a11y) instead, and _postprocess
+    # copies it out as <base>_accessible.pdf.
+    check("accessible -> --jobname stays the real base name",
+          bool(cmds) and "--jobname=doc" in cmds[0][0]
+          and "--jobname=doc_accessible" not in cmds[0][0],
+          cmds[0][0] if cmds else "")
+    check("accessible -> redirected to an a11y output dir",
+          bool(cmds) and any(str(c).startswith("-output-directory=")
+                             and str(c).endswith("a11y") for c in cmds[0][0]),
+          cmds[0][0] if cmds else "")
+    check("accessible -> exactly one -output-directory (base one replaced)",
+          bool(cmds) and sum(1 for c in cmds[0][0]
+                             if str(c).startswith("-output-directory=")) == 1,
+          cmds[0][0] if cmds else "")
+    check("accessible -> two settle passes", len(cmds) == 2, f"{len(cmds)} builds")
+    check("accessible -> --texlib-mode token NOT passed to engine",
+          not any("--texlib-mode" in str(x) for x in cmds[0][0]), cmds[0][0] if cmds else "")
+
     # (j3) biber change-detection
     BCF = "<bcf>cite-keys</bcf>"
     BCF_HASH = _fp(BCF)   # full fingerprint (bcf md5 + biber version if present)

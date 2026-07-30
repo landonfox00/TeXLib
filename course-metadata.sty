@@ -384,3 +384,37 @@
 \AtEndPreamble{%
 	\IfMetaSet{preamble-file}{\input{\GetCourseMetaDir\GetPreambleFile}}{}%
 }
+
+% ==============================================================================
+% PDF document title  (PDF/UA clause 8.11.1)
+% ==============================================================================
+% PDF/UA REQUIRES the document to carry a title, and a tagged build additionally
+% sets ViewerPreferences/DisplayDocTitle -- i.e. it tells a viewer to display a
+% title that, without this, did not exist. veraPDF flagged clause 8.11.1 ("the
+% Metadata stream shall contain a dc:title") on essentially every TeXLib class:
+% the classes render their title VISUALLY from metadata but never set \title, so
+% hyperref's pdfusetitle had nothing to work with and the PDF shipped untitled.
+% This also left a blank viewer/browser tab in ordinary (untagged) builds.
+%
+% Default is "<course> <term>"; a class refines it with its document noun via
+% \TeXLibDeclareDocTitle -- e.g. syllabus.cls declares "<course> <term>
+% Syllabus", matching the published-copy naming. Deferred to \AtBeginDocument so
+% coursemeta.tex has been read, the values are resolved, and hyperref is
+% certainly loaded (course-metadata loads before hyperref in some classes). An
+% accessible build stores this as XMP dc:title -- PDF 2.0 / PDF-A-4 deprecate the
+% DocInfo dictionary -- while a normal build stores DocInfo /Title.
+% KNOWN GAP: this reaches only the classes that load hyperref (8 of 9).
+% schedule.cls deliberately does not load it, so Schedule still ships untitled
+% and veraPDF still reports clause 8.11.1 for it -- the ONLY clause it fails, so
+% closing this makes Schedule fully conformant. A \pdfmanagement_add:nnn{Info}
+% {Title} fallback was tried and did NOT populate the XMP dc:title that PDF/UA-2
+% requires, so it was removed rather than left in as untested complexity; the fix
+% is likely to give schedule.cls hyperref (or set dc:title through l3pdfmeta's
+% XMP interface directly).
+\newcommand{\texlib@doctitle}{\GetCourse\space\GetTerm}
+\newcommand{\TeXLibDeclareDocTitle}[1]{\renewcommand{\texlib@doctitle}{#1}}
+\AtBeginDocument{%
+	\ifdefined\hypersetup
+		\hypersetup{pdftitle={\texlib@doctitle}}%
+	\fi
+}

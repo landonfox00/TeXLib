@@ -139,11 +139,21 @@
 % ------------------------------------------------------------------------------
 % Per-environment declaration
 % ------------------------------------------------------------------------------
+% Accessible (tagged PDF/UA) build: SKIP the tcolorbox wrap. tcolorbox's inner
+% list breaks under tagging=on ("Something's wrong--perhaps a missing \item"),
+% so theorems fall back to their plain amsthm rendering, which tags cleanly. The
+% colour/box is lost in the tagged variant only (the normal PDF keeps it), and a
+% screen reader never conveyed the colour anyway. Keyed on \TeXLibAccessibleMode
+% (the builder \def's it before \documentclass), so it is reliably visible here
+% at package-load time regardless of when texlib-build.sty runs.
+\bool_new:N \g__texlib_thm_accessible_bool
+\ifdefined\TeXLibAccessibleMode \bool_gset_true:N \g__texlib_thm_accessible_bool \fi
+
 % Declares one environment from the catalog: amsthm \newtheorem (master counter
 % the first time, sharing it thereafter), its unnumbered `<name>*` twin, and the
-% tcolorbox wrap on both (unless box=none). Label/style/box are x-expanded into
-% the calls so amsthm/tcolorbox receive literal values — the lookup scratch tls
-% are overwritten on the next iteration.
+% tcolorbox wrap on both (unless box=none, or an accessible build). Label/style/
+% box are x-expanded into the calls so amsthm/tcolorbox receive literal values —
+% the lookup scratch tls are overwritten on the next iteration.
 \cs_new_protected:Npn \__texlib_thm_declare:n #1 {
 	\prop_get:NnNTF \g__texlib_thm_label_prop {#1} \l__texlib_thm_label_tl {
 		\prop_get:NnN \g__texlib_thm_style_prop {#1} \l__texlib_thm_style_tl
@@ -166,11 +176,13 @@
 		% Unnumbered twin (same style; no \theoremstyle change in between).
 		\use:x { \exp_not:N \newtheorem * { \exp_not:n {#1} * }
 			{ \l__texlib_thm_label_tl } }
-		\str_if_eq:VnF \l__texlib_thm_box_tl { none } {
-			\use:x { \exp_not:N \tcolorboxenvironment { \exp_not:n {#1} }
-				{ \l__texlib_thm_box_tl } }
-			\use:x { \exp_not:N \tcolorboxenvironment { \exp_not:n {#1} * }
-				{ \l__texlib_thm_box_tl } }
+		\bool_if:NF \g__texlib_thm_accessible_bool {
+			\str_if_eq:VnF \l__texlib_thm_box_tl { none } {
+				\use:x { \exp_not:N \tcolorboxenvironment { \exp_not:n {#1} }
+					{ \l__texlib_thm_box_tl } }
+				\use:x { \exp_not:N \tcolorboxenvironment { \exp_not:n {#1} * }
+					{ \l__texlib_thm_box_tl } }
+			}
 		}
 		% Problem-shaped envs bind the always-visible inline lead-ins
 		% (\solution \answer \ans \pf -- see \texlib@bind@worked). Scoped via
