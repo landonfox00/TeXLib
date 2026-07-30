@@ -1,4 +1,4 @@
-/* Bank Studio client -- three views (Library Desk, Composer, Card Wall) over one
+/* TeXam client -- three views (Library Desk, Composer, Card Wall) over one
    shared exam state and one renderer.  Talks to the stdlib server: browse the
    parsed bank, render problems with the real engine (SVG), and add/remove/
    reorder problems, which the server writes into the exam .tex. */

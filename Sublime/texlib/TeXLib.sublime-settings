@@ -85,10 +85,10 @@
     //
     // "class_source": "C:/_texlibjunc"
 
-    // bank_studio_path: absolute path to bank_studio.py (or its folder) for the
-    // "Open Bank Studio" command. Leave unset to resolve it from class_source /
-    // the repo root (bank_studio.py lives at the repo root); set it only for an
+    // texam_path: absolute path to texam.py (or its folder) for the
+    // "Open TeXam" command. Leave unset to resolve it from class_source /
+    // the repo root (texam.py lives at the repo root); set it only for an
     // unusual layout where the command can't find it.
     //
-    // "bank_studio_path": "C:/_texlibjunc/bank_studio.py"
+    // "texam_path": "C:/_texlibjunc/texam.py"
 }

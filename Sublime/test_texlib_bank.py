@@ -61,4 +61,31 @@ with tempfile.TemporaryDirectory() as tmp:
     ok &= check(byid["ivt-root"]["line"] == 2,
                 "scan: 0-based line number correct (2nd problem in bank.tex)")
 
+with tempfile.TemporaryDirectory() as tmp2:
+    # Coursemeta chain: the exam names no bank; coursemeta bank-path -> a thin
+    # master bank.tex -> per-chapter files (\GetCourseMetaDir prefix). The scan
+    # must walk the whole chain (the real teaching-course layout).
+    os.makedirs(os.path.join(tmp2, "Bank"))
+    os.makedirs(os.path.join(tmp2, "Exams", "Exam 1"))
+    with open(os.path.join(tmp2, "coursemeta.tex"), "w", encoding="utf-8") as fh:
+        fh.write("\\metasetup{ course-number = 182, bank-path = Bank/bank.tex, }\n")
+    with open(os.path.join(tmp2, "Bank", "bank.tex"), "w", encoding="utf-8") as fh:
+        fh.write("\\loadbank{\\GetCourseMetaDir Bank/ch5.tex}\n")
+    with open(os.path.join(tmp2, "Bank", "ch5.tex"), "w", encoding="utf-8") as fh:
+        fh.write("\\begin{problem}{ch5-a}[topic=sub]\n s \\end{problem}\n")
+    exam2 = os.path.join(tmp2, "Exams", "Exam 1", "exam1.tex")
+    exam2_text = "\\documentclass{autoexam}\n\\begin{document}\\end{document}\n"
+    with open(exam2, "w", encoding="utf-8") as fh:
+        fh.write(exam2_text)
+
+    srcs = texlib_bank.problem_sources(exam2, exam2_text)
+    names = [os.path.basename(p) for p in srcs]
+    ok &= check("bank.tex" in names, "coursemeta: bank-path master resolved")
+    ok &= check("ch5.tex" in names, "coursemeta: \\GetCourseMetaDir chapter recursed")
+    ids2 = [p["id"] for p in texlib_bank.scan_problems(srcs)]
+    ok &= check("ch5-a" in ids2, "coursemeta: chapter problem found via bank-path chain")
+    ok &= check(texlib_bank.find_coursemeta(os.path.dirname(exam2))
+                == os.path.join(tmp2, "coursemeta.tex"),
+                "coursemeta: find_coursemeta walks up to the governing file")
+
 report(ok)

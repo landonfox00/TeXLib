@@ -1,6 +1,6 @@
-"""bank_studio.py -- local web app to browse a TeXLib bank and compose an exam.
+"""texam.py -- local web app to browse a TeXLib bank and compose an exam.
 
-    python bank_studio.py path/to/exam.tex        # opens the browser
+    python texam.py path/to/exam.tex        # opens the browser
 
 Resolves the bank behind the exam, serves a small single-page app, and writes
 ``\\problem{...}`` lines back into the exam file as you add problems.  Stdlib
@@ -9,7 +9,7 @@ cached + pre-warmed).  Launched from the shell or, later, a Sublime command.
 
 Endpoints (JSON unless noted):
   GET  /                     the app
-  GET  /<asset>              static files from bank_studio_web/
+  GET  /<asset>              static files from texam_web/
   GET  /api/bank             {problems: [...], render_available: bool, sources}
   GET  /api/exam             {name, path, entries: [...], exists}
   POST /api/exam/add         {id, mode: 'id'|'filter'} -> updated exam
@@ -31,7 +31,7 @@ import bank_render
 import exam_writer
 import usage_scan
 
-WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bank_studio_web")
+WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "texam_web")
 _MIME = {
     ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml; charset=utf-8",
@@ -86,7 +86,7 @@ def _arg_for(problem, mode):
 
 # --------------------------------------------------------------------------
 class Handler(BaseHTTPRequestHandler):
-    server_version = "BankStudio"
+    server_version = "TeXam"
 
     def log_message(self, *a):
         pass  # quiet
@@ -220,23 +220,40 @@ class Handler(BaseHTTPRequestHandler):
 
 def main(argv):
     if len(argv) < 2:
-        sys.exit("usage: python bank_studio.py <exam.tex> [--port N] [--no-open]")
-    CTX["exam"] = os.path.abspath(argv[1])
+        sys.exit("usage: python texam.py <exam.tex> [--port N] [--no-open]")
+    exam = os.path.abspath(argv[1])
+    if not os.path.isfile(exam):
+        sys.exit(f"texam: no such exam file: {exam}")
+    CTX["exam"] = exam
     port = 8765
     do_open = "--no-open" not in argv
     if "--port" in argv:
-        port = int(argv[argv.index("--port") + 1])
+        try:
+            port = int(argv[argv.index("--port") + 1])
+        except (IndexError, ValueError):
+            sys.exit("texam: --port needs a number, e.g. --port 8790")
 
-    problems = refresh_bank()
-    print(f"Bank Studio -- exam: {CTX['exam']}")
+    try:
+        problems = refresh_bank()
+    except Exception as exc:            # a parse error must not crash the launcher
+        sys.exit(f"texam: could not read the exam or its bank: {exc}")
+    print(f"TeXam -- exam: {CTX['exam']}")
     print(f"  bank sources: {len(CTX['sources'])}, problems: {len(problems)}")
+    if not problems:
+        print("  note: no bank problems found -- check the coursemeta bank-path "
+              "or the \\loadbank targets.")
     if bank_render.available():
         print("  renderer: lualatex ready; pre-warming previews in background...")
         bank_render.prewarm(problems)
     else:
         print("  renderer: unavailable (source view only)")
 
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    try:
+        httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    except OSError as exc:
+        sys.exit(f"texam: cannot serve on port {port} ({exc}).\n"
+                 "  TeXam may already be running -- close its window, or "
+                 "pass --port <n> to use a different port.")
     url = f"http://127.0.0.1:{httpd.server_address[1]}/"
     print(f"  serving {url}  (Ctrl+C to stop)")
     if do_open:
@@ -245,6 +262,8 @@ def main(argv):
         httpd.serve_forever()
     except KeyboardInterrupt:
         print("\nstopped.")
+    finally:
+        httpd.server_close()
 
 
 if __name__ == "__main__":

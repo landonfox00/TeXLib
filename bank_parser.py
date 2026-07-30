@@ -1,4 +1,4 @@
-"""bank_parser.py -- parse a TeXLib problem bank for Bank Studio.
+"""bank_parser.py -- parse a TeXLib problem bank for TeXam.
 
 Standalone, stdlib-only, no TeX toolchain required.  Discovers which bank
 files back an exam document and parses every ``\\begin{problem}`` block into a
@@ -33,10 +33,18 @@ LOADBANK_RE = re.compile(r"\\loadbank\{([^}]+)\}")
 IMPORT_RE = re.compile(r"\\importproblem\{([^}]+)\}")
 ROOT_RE = re.compile(r"%\s*!\s*T[eE]X\s+root\s*=\s*(.+)")
 
-# --- added for Bank Studio -------------------------------------------------
+# --- added for TeXam -------------------------------------------------
 PROBLEM_END_RE = re.compile(r"\\end\{problem\}")
 CHOICE_RE = re.compile(r"\\(cchoice|choice|fchoice)\b(\s*\[[^\]]*\])?")
 PART_PTS_RE = re.compile(r"\\part\s*\[\s*(\d+)\s*\]")
+
+# coursemeta wiring: the \GetCourseMetaDir prefix macro (swallows its trailing
+# space at build time) and the bank-path key in either spelling used across
+# coursemeta.tex files.
+GETMETADIR_RE = re.compile(r"\\GetCourseMetaDir\s*")
+BANKPATH_RE = re.compile(
+    r"\\meta\s*\{\s*bank-path\s*\}\s*\{([^}]*)\}"      # \meta{bank-path}{...}
+    r"|bank-path\s*=\s*(\{[^}]*\}|[^,%\n\r]+)")        # metasetup: bank-path = ...
 
 
 def _read(path):
@@ -82,29 +90,110 @@ def resolve_root(doc_path, doc_text):
     return root, text
 
 
-def problem_sources(doc_path, doc_text):
-    """Ordered, de-duplicated bank files: the doc, its \\loadbank /
-    \\importproblem targets, then a sibling bank.tex.  Single level (no
-    recursion into loaded banks) -- matches the plugin scanner."""
-    files = [doc_path]
-    base = os.path.dirname(doc_path)
+def find_coursemeta(start_dir):
+    """coursemeta.tex at start_dir or up to five parents above it, else None.
 
-    def add(rel):
-        for cand in (rel, rel + ".tex"):
+    Mirrors course-metadata.sty's upward walk (and texlib_locate.find_coursemeta)
+    so TeXam resolves the same governing file the build does -- the nearest
+    ancestor wins."""
+    d = os.path.abspath(start_dir)
+    for _ in range(6):
+        cand = os.path.join(d, "coursemeta.tex")
+        if os.path.isfile(cand):
+            return cand
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    return None
+
+
+def _expand_metadir(target, coursemeta_dir):
+    """Expand a ``\\GetCourseMetaDir`` prefix to the coursemeta directory.
+
+    The engine's macro swallows the space that follows it, so
+    ``\\GetCourseMetaDir Bank/ch5.tex`` resolves as ``<coursemeta>/Bank/ch5.tex``.
+    With no coursemeta in scope the macro drops to empty (the path stays
+    relative).  A function replacement is used so a Windows ``coursemeta_dir``
+    with backslashes is not mis-read as a regex backreference."""
+    prefix = ""
+    if coursemeta_dir:
+        prefix = coursemeta_dir.replace("\\", "/").rstrip("/") + "/"
+    return GETMETADIR_RE.sub(lambda _m: prefix, target)
+
+
+def coursemeta_bank_path(coursemeta_path):
+    """The coursemeta ``bank-path`` resolved to an absolute file, or None.
+
+    The value is coursemeta-relative (autoexam/quiz prepend \\GetCourseMetaDir),
+    so it resolves against the coursemeta directory.  Accepts both the metasetup
+    ``bank-path = ...`` and the ``\\meta{bank-path}{...}`` spellings; a value may be
+    brace-wrapped and may carry a redundant leading \\GetCourseMetaDir."""
+    text = _read(coursemeta_path)
+    if text is None:
+        return None
+    m = BANKPATH_RE.search(strip_comments(text))
+    if not m:
+        return None
+    val = (m.group(1) or m.group(2) or "").strip()
+    if val.startswith("{") and val.endswith("}"):
+        val = val[1:-1].strip()
+    base = os.path.dirname(coursemeta_path)
+    val = _expand_metadir(val, base)      # normalize a stray leading macro
+    if not val:
+        return None
+    path = val if os.path.isabs(val) else os.path.normpath(os.path.join(base, val))
+    return path if os.path.isfile(path) else None
+
+
+def problem_sources(doc_path, doc_text, coursemeta_dir=None, extra_roots=()):
+    """Ordered, de-duplicated bank files reachable from an exam/bank document.
+
+    Starts at ``doc_path`` (plus any ``extra_roots`` -- e.g. the coursemeta
+    ``bank-path`` bank autoloaded by the classes) and follows ``\\loadbank`` /
+    ``\\importproblem`` targets *transitively*: a master ``bank.tex`` that only
+    ``\\loadbank``s per-chapter files is walked through to the chapters that
+    actually define problems.  A sibling ``bank.tex`` beside any visited file is
+    included too.  ``\\GetCourseMetaDir`` in a target is expanded to
+    ``coursemeta_dir``.  The doc is scanned first so its own definitions win an id
+    collision."""
+    files = []
+    seen = set()
+    queue = []
+
+    def visit(path, text=None):
+        key = os.path.normcase(os.path.abspath(path))
+        if key in seen or not os.path.isfile(path):
+            return
+        seen.add(key)
+        files.append(path)
+        queue.append((path, text))
+
+    def resolve(target, base):
+        target = _expand_metadir(target.strip(), coursemeta_dir)
+        for cand in (target, target + ".tex"):
             path = cand if os.path.isabs(cand) else os.path.normpath(
                 os.path.join(base, cand))
-            if os.path.isfile(path) and path not in files:
-                files.append(path)
-                return
+            if os.path.isfile(path):
+                return path
+        return None
 
-    for m in LOADBANK_RE.finditer(doc_text):
-        add(m.group(1).strip())
-    for m in IMPORT_RE.finditer(doc_text):
-        add(m.group(1).strip())
+    visit(doc_path, doc_text)
+    for root in extra_roots:
+        visit(root)
 
-    sibling = os.path.normpath(os.path.join(base, "bank.tex"))
-    if os.path.isfile(sibling) and sibling not in files:
-        files.append(sibling)
+    while queue:
+        cur_path, cur_text = queue.pop(0)
+        if cur_text is None:
+            cur_text = _read(cur_path) or ""
+        base = os.path.dirname(cur_path)
+        for rx in (LOADBANK_RE, IMPORT_RE):
+            for m in rx.finditer(cur_text):
+                hit = resolve(m.group(1), base)
+                if hit:
+                    visit(hit)
+        visit(os.path.normpath(os.path.join(base, "bank.tex")))
+
     return files
 
 
@@ -290,13 +379,28 @@ def scan_problems(files):
 
 
 def discover(exam_path):
-    """Convenience for the server/CLI: resolve the bank behind an exam file and
-    return (sources, [Problem, ...])."""
+    """Resolve the bank behind an exam file and return (sources, [Problem, ...]).
+
+    Follows inline \\loadbank/\\importproblem *and* the coursemeta ``bank-path``
+    the classes autoload -- expanding \\GetCourseMetaDir and recursing through a
+    master bank into its per-chapter files -- so the studio sees the same problem
+    set the real build does, at any directory depth below coursemeta.tex."""
     text = _read(exam_path)
     if text is None:
         raise FileNotFoundError(exam_path)
     root, root_text = resolve_root(os.path.abspath(exam_path), text)
-    sources = problem_sources(root, root_text)
+
+    coursemeta_dir = None
+    extra_roots = []
+    cm = find_coursemeta(os.path.dirname(root))
+    if cm:
+        coursemeta_dir = os.path.dirname(cm)
+        bank = coursemeta_bank_path(cm)
+        if bank:
+            extra_roots.append(bank)
+
+    sources = problem_sources(root, root_text, coursemeta_dir=coursemeta_dir,
+                              extra_roots=extra_roots)
     return sources, scan_problems(sources)
 
 
