@@ -31,6 +31,9 @@
 % common aux packages, and the unified problem/part labels). Shared with autoexam.
 \RequirePackage{texlib-assessment}
 
+% PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty.
+\TeXLibDeclareDocTitle{\GetCourse\space\GetTerm\space Quiz}
+
 % Shared document-instructions mechanism (inline / file / default, file > inline
 % > default). \TeXLibDeclareInstructions{quiz} below mints \GetQuizInstructions,
 % \IfQuizInstructions{File,Inline}, and \quiz@input@userinstructions.

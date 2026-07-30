@@ -59,6 +59,17 @@
 
 \RequirePackage{course-metadata}
 
+% hyperref (hidelinks: no coloured boxes, this is a print-first class) so the PDF
+% carries a document title. Without it the central \TeXLibDeclareDocTitle hook in
+% course-metadata.sty has no \hypersetup to feed -- a blank viewer tab normally,
+% and PDF/UA clause 8.11.1 in an accessible build. (Schedule still fails other
+% clauses from its calendar structure, so this does not make it conform on its
+% own, but it removes 8.11.1 and titles the normal PDF.)
+\RequirePackage[hidelinks]{hyperref}
+
+% PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty.
+\TeXLibDeclareDocTitle{\GetCourse\space\GetTerm\space Tentative Schedule}
+
 % ==============================================================================
 % 2. BUILD FLAGS — UNIFIED TeXLib CLI
 % ==============================================================================
@@ -85,7 +96,8 @@
 \directlua{
 	local function load_safe(name)
 		local cls_path = kpse.find_file("schedule.cls")
-		local base_dir = cls_path and cls_path:match("(.*[/\\])") or ""
+		local sep = string.char(92)
+		local base_dir = cls_path and cls_path:match("(.*[/" .. sep .. "])") or ""
 		local path = kpse.find_file(name, "lua")
 		if not path then
 			path = base_dir .. name
