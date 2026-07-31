@@ -403,6 +403,16 @@ async function removeByPid(id) {
 }
 function post(obj) { return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(obj) }; }
 
+/* inverse search: open a problem's \begin{problem} definition in Sublime */
+async function revealInSublime(id) {
+  const p = S.byId[id];
+  if (!p) { toast("no bank source for a topic filter", true); return; }
+  try {
+    const r = await api("/api/reveal", post({ id }));
+    toast("Opened in Sublime: " + (r.file ? r.file.split(/[\\/]/).pop() : id) + ":" + r.line);
+  } catch (e) { toast(e.message, true); }
+}
+
 function switchTab(tab) {
   S.tab = tab;
   $$(".tab").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
@@ -491,4 +501,52 @@ $("#theme-btn").addEventListener("click", () => {
   root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
 });
 
+/* double-click a row / card / preview -> reveal the definition in Sublime */
+document.addEventListener("dblclick", (ev) => {
+  const row = ev.target.closest("[data-pid]");
+  const card = ev.target.closest("[data-card]");
+  let id = null;
+  if (row && row.dataset.act == null) id = row.dataset.pid;
+  else if (card) id = card.dataset.card;
+  else if (ev.target.closest("#preview, #render-slot")) id = S.selected;
+  if (id) { ev.preventDefault(); revealInSublime(id); }
+});
+
+/* resizable + collapsible desk panels (widths + collapsed state persisted) */
+function initPanels() {
+  const desk = $("#view-desk"), LS = window.localStorage;
+  const rw = LS.getItem("texam.railW"), tw = LS.getItem("texam.trayW");
+  if (rw) desk.style.setProperty("--rail-w", rw);
+  if (tw) desk.style.setProperty("--tray-w", tw);
+  const setCollapsed = (side, on) => {
+    desk.classList.toggle(side + "-collapsed", on);
+    LS.setItem("texam." + side + "Hidden", on ? "1" : "0");
+    const btn = $("#toggle-" + side); if (btn) btn.setAttribute("aria-pressed", on);
+  };
+  setCollapsed("rail", LS.getItem("texam.railHidden") === "1");
+  setCollapsed("tray", LS.getItem("texam.trayHidden") === "1");
+  $("#toggle-rail").addEventListener("click", () => setCollapsed("rail", !desk.classList.contains("rail-collapsed")));
+  $("#toggle-tray").addEventListener("click", () => setCollapsed("tray", !desk.classList.contains("tray-collapsed")));
+  $$(".splitter").forEach((h) => h.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    const side = h.dataset.split, rect = desk.getBoundingClientRect();
+    const move = (mv) => {
+      const w = side === "rail" ? Math.max(180, Math.min(560, mv.clientX - rect.left))
+                                : Math.max(220, Math.min(620, rect.right - mv.clientX));
+      desk.style.setProperty("--" + side + "-w", w + "px");
+    };
+    const up = () => {
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", up);
+      document.body.style.userSelect = "";
+      LS.setItem("texam." + side + "W",
+                 getComputedStyle(desk).getPropertyValue("--" + side + "-w").trim());
+    };
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", up);
+  }));
+}
+
+initPanels();
 boot();

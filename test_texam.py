@@ -443,5 +443,31 @@ class ParallelPrewarmTests(unittest.TestCase):
         self.assertEqual(bank_render.prewarm([]), [])
 
 
+class RevealTests(unittest.TestCase):
+    """reveal_in_editor turns a 0-based bank line into subl's 1-based
+    file:line target and launches it."""
+
+    def test_builds_target_and_launches(self):
+        calls = []
+        orig_find, orig_popen = texam._find_subl, texam.subprocess.Popen
+        texam._find_subl = lambda: "subl"
+        texam.subprocess.Popen = lambda argv, **k: calls.append(argv)
+        try:
+            target = texam.reveal_in_editor("C:/x/Bank/ch5.tex", 456)
+        finally:
+            texam._find_subl, texam.subprocess.Popen = orig_find, orig_popen
+        self.assertEqual(target, "C:/x/Bank/ch5.tex:457")     # 0-based -> 1-based
+        self.assertEqual(calls, [["subl", "C:/x/Bank/ch5.tex:457"]])
+
+    def test_without_subl_raises(self):
+        orig = texam._find_subl
+        texam._find_subl = lambda: None
+        try:
+            with self.assertRaises(RuntimeError):
+                texam.reveal_in_editor("x.tex", 0)
+        finally:
+            texam._find_subl = orig
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

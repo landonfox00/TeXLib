@@ -78,10 +78,23 @@ button{font:inherit}
 .render-badge.off{color:var(--warn); background:var(--mc-weak)}
 
 /* ---------- desk ---------- */
-.desk{flex:1; min-height:0; display:grid; grid-template-columns:300px minmax(0,1fr) 330px}
+.desk{--rail-w:300px; --tray-w:330px; flex:1; min-height:0; display:grid;
+  grid-template-columns:var(--rail-w) minmax(0,1fr) var(--tray-w)}
 .desk>section{min-width:0; display:flex; flex-direction:column; min-height:0}
-.rail{border-right:1px solid var(--line); background:var(--panel-2)}
-.tray{border-left:1px solid var(--line); background:var(--panel-2)}
+.rail{border-right:1px solid var(--line); background:var(--panel-2); position:relative}
+.tray{border-left:1px solid var(--line); background:var(--panel-2); position:relative}
+
+/* drag-to-resize handles on the panel edges + collapse (widths persisted in JS) */
+.splitter{position:absolute; top:0; bottom:0; width:8px; z-index:6; cursor:col-resize}
+.splitter[data-split="rail"]{right:-4px}
+.splitter[data-split="tray"]{left:-4px}
+.splitter:hover, .splitter:active{background:var(--accent-weak)}
+.desk.rail-collapsed{--rail-w:0px}
+.desk.tray-collapsed{--tray-w:0px}
+.desk.rail-collapsed .rail, .desk.tray-collapsed .tray{overflow:hidden; border:0}
+.desk.rail-collapsed .splitter[data-split="rail"],
+.desk.tray-collapsed .splitter[data-split="tray"]{display:none}
+.icon-btn[aria-pressed="true"]{background:var(--accent-weak); color:var(--accent-ink); border-color:transparent}
 
 .rail-head{padding:12px 14px; border-bottom:1px solid var(--line)}
 .search{width:100%; font:inherit; font-size:13px; padding:9px 11px 9px 32px; border-radius:8px;
@@ -319,6 +332,9 @@ button{font:inherit}
 
 @media (max-width:1000px){
   .desk{grid-template-columns:260px minmax(0,1fr)}
+  .desk.rail-collapsed{grid-template-columns:minmax(0,1fr)}
   .tray{grid-column:1 / -1; border-left:0; border-top:1px solid var(--line); max-height:38vh}
+  .splitter{display:none}
+  .desk.rail-collapsed .rail, .desk.tray-collapsed .tray{display:none}
 }
 @media (max-width:720px){ .tabs .lbl{display:none} }
