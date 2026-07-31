@@ -222,11 +222,23 @@
 %      shorthand, so we MUST use \renewenvironment -- \newenvironment would
 %      raise "Command \parts already defined" and silently leave the
 %      upstream definition in place.
-\renewenvironment{parts}
-	{\begin{enumerate}[label=\textbf{(\alph*)}, leftmargin=*,
-						topsep=2pt, parsep=2pt]%
-		\let\part\item}
-	{\end{enumerate}}
+% Accessible build: the LaTeX tagging "block" code rejects several enumitem keys
+% (leftmargin=*, parsep, ref) when passed INLINE to enumerate -- "Some keys
+% specified on the enumerate environment are unknown", fatal under -halt-on-error.
+% Pass only the block-supported subset (label, topsep) in a tagged build; the
+% slightly different left indent is confined to the accessible copy.
+\ifdefined\TeXLibAccessibleMode
+	\renewenvironment{parts}
+		{\begin{enumerate}[label=\textbf{(\alph*)}, topsep=2pt]%
+			\let\part\item}
+		{\end{enumerate}}
+\else
+	\renewenvironment{parts}
+		{\begin{enumerate}[label=\textbf{(\alph*)}, leftmargin=*,
+							topsep=2pt, parsep=2pt]%
+			\let\part\item}
+		{\end{enumerate}}
+\fi
 
 % Top-level enumerate: bold lowercase-roman labels (i., ii., iii., ...).
 % The `parts` environment above sets its own inline label, so it is
