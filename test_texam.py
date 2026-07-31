@@ -406,5 +406,68 @@ def _bind_fails(*_a, **_k):
     raise OSError("address already in use (simulated)")
 
 
+class ParallelPrewarmTests(unittest.TestCase):
+    """prewarm renders the whole bank across a pool of threads, not one at a
+    time; every problem is rendered once and on_done fires for each."""
+
+    def test_pool_renders_all_across_threads(self):
+        import threading
+        import time
+        probs = [bank_parser.Problem("p%d" % i, "", "b.tex", 0, "", "stem")
+                 for i in range(6)]
+        lock = threading.Lock()
+        rendered, threads_seen = [], set()
+
+        def stub(p, show_solution=True, use_cache=True):
+            time.sleep(0.05)                 # hold the slot so workers overlap
+            with lock:
+                rendered.append(p.id)
+                threads_seen.add(threading.current_thread().name)
+            return "<svg></svg>"
+
+        done = []
+        orig = bank_render.render_svg
+        bank_render.render_svg = stub
+        try:
+            ts = bank_render.prewarm(probs, on_done=done.append, workers=3)
+            for t in ts:
+                t.join(timeout=5)
+        finally:
+            bank_render.render_svg = orig
+
+        self.assertEqual(sorted(rendered), sorted(p.id for p in probs))
+        self.assertEqual(sorted(done), sorted(p.id for p in probs))
+        self.assertGreaterEqual(len(threads_seen), 2)   # genuinely parallel
+
+    def test_empty_bank_is_noop(self):
+        self.assertEqual(bank_render.prewarm([]), [])
+
+
+class RevealTests(unittest.TestCase):
+    """reveal_in_editor turns a 0-based bank line into subl's 1-based
+    file:line target and launches it."""
+
+    def test_builds_target_and_launches(self):
+        calls = []
+        orig_find, orig_popen = texam._find_subl, texam.subprocess.Popen
+        texam._find_subl = lambda: "subl"
+        texam.subprocess.Popen = lambda argv, **k: calls.append(argv)
+        try:
+            target = texam.reveal_in_editor("C:/x/Bank/ch5.tex", 456)
+        finally:
+            texam._find_subl, texam.subprocess.Popen = orig_find, orig_popen
+        self.assertEqual(target, "C:/x/Bank/ch5.tex:457")     # 0-based -> 1-based
+        self.assertEqual(calls, [["subl", "C:/x/Bank/ch5.tex:457"]])
+
+    def test_without_subl_raises(self):
+        orig = texam._find_subl
+        texam._find_subl = lambda: None
+        try:
+            with self.assertRaises(RuntimeError):
+                texam.reveal_in_editor("x.tex", 0)
+        finally:
+            texam._find_subl = orig
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1,0 +1,58 @@
+% limits.tex — limit problems for the TeXam demo bank.
+
+% --- Free response ----------------------------------------------------------
+\begin{problem}{lim-factor}[topic=limit, section=2.3, style=fr, diff=easy]
+	Evaluate $\displaystyle \lim_{x \to 3} \frac{x^2 - 9}{x - 3}$.
+	\begin{solution}
+	Factor the numerator: $\frac{(x-3)(x+3)}{x-3} = x + 3 \to 6$.
+	\end{solution}
+\end{problem}
+
+\begin{problem}{lim-rationalize}[topic=limit, section=2.3, style=fr, diff=med]
+	Evaluate $\displaystyle \lim_{x \to 0} \frac{\sqrt{x+4}-2}{x}$.
+	\begin{solution}
+	Multiply by the conjugate: $\frac{x}{x(\sqrt{x+4}+2)} \to \frac{1}{4}$.
+	\end{solution}
+\end{problem}
+
+\begin{problem}{lim-squeeze}[topic=limit, section=2.3, style=fr, diff=hard]
+	Use the Squeeze Theorem to evaluate
+	$\displaystyle \lim_{x \to 0} x^2 \sin\!\left(\frac{1}{x}\right)$.
+	\begin{solution}
+	Since $-x^2 \le x^2 \sin(1/x) \le x^2$ and $x^2 \to 0$, the limit is $0$.
+	\end{solution}
+\end{problem}
+
+% --- Multiple choice --------------------------------------------------------
+\begin{problem}{lim-ratio-mc}[topic=limit, section=2.6, style=mc, diff=easy]
+	Evaluate $\displaystyle \lim_{x \to \infty} \frac{3x^2 + 2}{x^2 - 5}$.
+	\begin{choices}
+		\cchoice $3$
+		\choice $0$
+		\choice $\infty$
+		\choice $\tfrac{2}{5}$
+	\end{choices}
+	\begin{solution} Divide through by $x^2$; the leading terms give $3$. \end{solution}
+\end{problem}
+
+\begin{problem}{lim-trig-mc}[topic=limit, section=2.4, style=mc, diff=med]
+	Evaluate $\displaystyle \lim_{x \to 0} \frac{\sin 5x}{x}$.
+	\begin{choices}
+		\cchoice $5$
+		\choice $1$
+		\choice $0$
+		\choice $\tfrac{1}{5}$
+	\end{choices}
+	\begin{solution} $\frac{\sin 5x}{x} = 5\cdot\frac{\sin 5x}{5x} \to 5$. \end{solution}
+\end{problem}
+
+\begin{problem}{lim-oneside-mc}[topic=limit, section=2.3, style=mc, diff=med]
+	For $f(x) = \dfrac{|x|}{x}$, evaluate $\displaystyle \lim_{x \to 0^-} f(x)$.
+	\begin{choices}
+		\cchoice $-1$
+		\choice $1$
+		\choice $0$
+		\choice the limit does not exist
+	\end{choices}
+	\begin{solution} For $x < 0$, $|x|/x = -1$. \end{solution}
+\end{problem}

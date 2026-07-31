@@ -1,0 +1,51 @@
+% derivatives.tex — derivative problems for the TeXam demo bank.
+
+% --- Free response ----------------------------------------------------------
+\begin{problem}{der-power}[topic=derivative, section=3.1, style=fr, diff=easy]
+	Differentiate $f(x) = x^4 - 3x^2 + 7$.
+	\begin{solution} $f'(x) = 4x^3 - 6x$. \end{solution}
+\end{problem}
+
+\begin{problem}{der-chain}[topic=derivative, section=3.4, style=fr, diff=med]
+	Differentiate $g(x) = \sin(3x^2)$.
+	\begin{solution} $g'(x) = 6x\cos(3x^2)$ by the chain rule. \end{solution}
+\end{problem}
+
+\begin{problem}{der-implicit}[topic=derivative, section=3.5, style=fr, diff=hard]
+	Given $x^2 + y^2 = 25$, find $\dfrac{dy}{dx}$ by implicit differentiation.
+	\begin{solution} $2x + 2y\,y' = 0 \Rightarrow y' = -\dfrac{x}{y}$. \end{solution}
+\end{problem}
+
+% --- Multiple choice --------------------------------------------------------
+\begin{problem}{der-product-mc}[topic=derivative, section=3.3, style=mc, diff=med]
+	Differentiate $h(x) = x^2 e^x$.
+	\begin{choices}
+		\cchoice $(2x + x^2)e^x$
+		\choice $2x e^x$
+		\choice $x^2 e^x$
+		\choice $2x e^{x-1}$
+	\end{choices}
+	\begin{solution} Product rule: $2x e^x + x^2 e^x = (2x + x^2)e^x$. \end{solution}
+\end{problem}
+
+\begin{problem}{der-quotient-mc}[topic=derivative, section=3.3, style=mc, diff=med]
+	Differentiate $\displaystyle \frac{x}{x+1}$.
+	\begin{choices}
+		\cchoice $\dfrac{1}{(x+1)^2}$
+		\choice $1$
+		\choice $\dfrac{-1}{(x+1)^2}$
+		\choice $\dfrac{2x+1}{(x+1)^2}$
+	\end{choices}
+	\begin{solution} $\dfrac{(x+1) - x}{(x+1)^2} = \dfrac{1}{(x+1)^2}$. \end{solution}
+\end{problem}
+
+\begin{problem}{der-tangent-mc}[topic=derivative, section=3.1, style=mc, diff=easy]
+	What is the slope of the tangent line to $y = x^2$ at $x = 2$?
+	\begin{choices}
+		\cchoice $4$
+		\choice $2$
+		\choice $8$
+		\choice $1$
+	\end{choices}
+	\begin{solution} $y' = 2x$; at $x = 2$ the slope is $4$. \end{solution}
+\end{problem}

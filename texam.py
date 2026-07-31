@@ -15,11 +15,14 @@ Endpoints (JSON unless noted):
   POST /api/exam/add         {id, mode: 'id'|'filter'} -> updated exam
   POST /api/exam/remove      {index}                   -> updated exam
   POST /api/exam/reorder     {index, dir: -1|1}        -> updated exam
+  POST /api/reveal           {id}  -> open the problem's source in Sublime
   GET  /api/render/<id>?sol= image/svg+xml (503 if the toolchain is missing)
 """
 
 import json
 import os
+import shutil
+import subprocess
 import sys
 import threading
 import webbrowser
@@ -84,6 +87,33 @@ def _arg_for(problem, mode):
     return problem.id
 
 
+_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
+# Common Windows install spots when `subl` is not on PATH (macOS/Linux ship the
+# `subl` symlink, so which() covers them).
+_SUBL_FALLBACKS = (
+    r"C:\Program Files\Sublime Text\subl.exe",
+    r"C:\Program Files\Sublime Text 3\subl.exe",
+    r"C:\Program Files (x86)\Sublime Text 3\subl.exe",
+)
+
+
+def _find_subl():
+    return (shutil.which("subl") or shutil.which("subl.exe")
+            or next((c for c in _SUBL_FALLBACKS if os.path.isfile(c)), None))
+
+
+def reveal_in_editor(source_file, line):
+    """Open ``source_file`` at ``line`` (0-based) in Sublime via the ``subl``
+    CLI -- inverse search from a preview to the bank definition. Returns the
+    launched ``file:line`` target; raises RuntimeError if ``subl`` is missing."""
+    subl = _find_subl()
+    if not subl:
+        raise RuntimeError("Sublime 'subl' CLI not found on PATH")
+    target = "%s:%d" % (source_file, (line or 0) + 1)
+    subprocess.Popen([subl, target], creationflags=_NO_WINDOW)
+    return target
+
+
 # --------------------------------------------------------------------------
 class Handler(BaseHTTPRequestHandler):
     server_version = "TeXam"
@@ -142,6 +172,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._api_mutate("remove", self._body_json())
             if u.path == "/api/exam/reorder":
                 return self._api_mutate("reorder", self._body_json())
+            if u.path == "/api/reveal":
+                return self._api_reveal(self._body_json())
             return self._json({"error": "not found"}, 404)
         except Exception as exc:                       # noqa: BLE001
             self._json({"error": str(exc)}, 500)
@@ -204,6 +236,20 @@ class Handler(BaseHTTPRequestHandler):
                                            problem.is_mc, after_index=after)
             write_exam(CTX["exam"], text, nl)
         self._json(exam_state())
+
+    def _api_reveal(self, body):
+        pid = (body or {}).get("id", "")
+        problem = CTX["by_id"].get(pid) or {p.id: p for p in refresh_bank()}.get(pid)
+        if not problem:
+            return self._json({"error": "unknown problem: " + pid}, 404)
+        try:
+            reveal_in_editor(problem.source_file, problem.line)
+        except RuntimeError as exc:                     # subl not found
+            return self._json({"error": str(exc)}, 503)
+        except OSError as exc:
+            return self._json({"error": str(exc)}, 500)
+        self._json({"ok": True, "file": problem.source_file,
+                    "line": (problem.line or 0) + 1})
 
     def _api_mutate(self, op, body):
         idx = int((body or {}).get("index", -1))

@@ -29,6 +29,8 @@
         <button data-mode="filter" aria-pressed="false">{topic=&hellip;}</button>
       </div>
     </div>
+    <button class="icon-btn" id="toggle-rail" title="Show / hide the filter panel" aria-label="Toggle left panel" aria-pressed="false">&#9703;</button>
+    <button class="icon-btn" id="toggle-tray" title="Show / hide the exam panel" aria-label="Toggle right panel" aria-pressed="false">&#9704;</button>
     <button class="icon-btn" id="theme-btn" title="Toggle light / dark" aria-label="Toggle theme">&#9680;</button>
   </header>
 
@@ -42,9 +44,11 @@
         </div>
         <div class="count" id="count"></div>
         <div class="rowlist" id="rows"></div>
+        <div class="splitter" data-split="rail" title="Drag to resize"></div>
       </section>
       <section class="preview" id="preview"><div class="empty">Loading bank&hellip;</div></section>
       <section class="tray">
+        <div class="splitter" data-split="tray" title="Drag to resize"></div>
         <div class="tray-head"><h2>Exam in progress</h2><span class="n" id="tray-n"></span></div>
         <div class="examlist" id="examlist"></div>
         <div class="tray-foot">
