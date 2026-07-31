@@ -1,0 +1,22 @@
+% coursemeta.tex — metadata for the TeXam demo course (a sandbox for TeXam).
+%
+% This demo mirrors a real teaching course: the exam names no \loadbank; the
+% bank is wired here via bank-path, and Bank/bank.tex is a thin master that
+% \loadbank's per-topic chapter files. TeXam (and the build) resolve the whole
+% chain, so opening exam-01.tex in TeXam shows every problem below.
+
+\metasetup{
+	institution     = {Demo University},
+	instructor      = {TeXam Demo},
+	season          = Fall,
+	year            = 2026,
+	course-subject  = Math,
+	course-number   = 100,
+	course-title    = {Calculus Sampler},
+	course-section  = 1,
+	exam1-date      = {Oct 1, 2026},
+	% Problem bank — resolved relative to THIS file's directory. autoexam/quiz
+	% auto-load it (\GetCourseMetaDir prepended), so exam-01.tex needs no
+	% per-exam \loadbank.
+	bank-path       = Bank/bank.tex,
+}
