@@ -18,6 +18,7 @@ RenderUnavailable so the server can degrade to the source view.
 
 import hashlib
 import os
+import queue
 import re
 import shutil
 import subprocess
@@ -40,7 +41,22 @@ _NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 _CACHE_ROOT = os.path.join(tempfile.gettempdir(), "texlib-texam")
 _RERUN_RE = re.compile(r"Rerun to get .* right\.|Label\(s\) may have changed")
 
-_lock = threading.Lock()      # serialize compiles (one engine at a time)
+# Background prewarm pool size (capped again to cpu-1 at call time).
+_PREWARM_WORKERS = 4
+
+# Per-problem render locks: different problems compile in parallel, but the same
+# (bank, id, solution) is serialized so two concurrent renders don't clobber the
+# shared harness / aux / cache. Keyed by the cache path (unique per that triple).
+_locks = {}
+_locks_guard = threading.Lock()
+
+
+def _render_lock(key):
+    with _locks_guard:
+        lk = _locks.get(key)
+        if lk is None:
+            lk = _locks[key] = threading.Lock()
+        return lk
 
 
 class RenderUnavailable(Exception):
@@ -150,7 +166,12 @@ def render_svg(problem, show_solution=True, use_cache=True):
     env["TEXINPUTS"] = _texinputs(bank_dir)
     env["TEXLIB_AUX_DIR"] = aux
 
-    with _lock:
+    with _render_lock(cache):
+        # Re-check under the lock: a concurrent render of the same problem may
+        # have populated the cache while we waited on the lock.
+        if use_cache and os.path.isfile(cache) and os.path.getsize(cache) > 0:
+            with open(cache, "r", encoding="utf-8") as fh:
+                return fh.read()
         try:
             with open(harness_path, "w", encoding="utf-8") as fh:
                 fh.write(_harness(bank_name, problem.id, problem.is_mc))
@@ -223,22 +244,44 @@ def _quiet_remove(path):
         pass
 
 
-def prewarm(problems, show_solution=True, on_done=None):
-    """Render every problem in a background thread, populating the cache so the
-    UI is instant after warm-up.  Silent on per-problem failure."""
+def prewarm(problems, show_solution=True, on_done=None, workers=None):
+    """Render every problem into the cache using a small pool of background
+    threads, so a big bank's previews warm up in parallel instead of one engine
+    at a time.  Best-effort: a per-problem failure (compile error, timeout, ...)
+    is swallowed so it never crashes a worker; the UI renders that one on demand.
+    Returns the worker threads (daemon)."""
+    problems = list(problems)
+    if not problems:
+        return []
+    if workers is None:
+        workers = max(1, min(_PREWARM_WORKERS, (os.cpu_count() or 2) - 1))
+    workers = min(workers, len(problems))
+
+    q = queue.Queue()
+    for p in problems:
+        q.put(p)
+
     def worker():
-        for p in problems:
+        while True:
+            try:
+                p = q.get_nowait()
+            except queue.Empty:
+                return
             try:
                 render_svg(p, show_solution=show_solution)
             except Exception:
-                pass    # best-effort warmup: a preview that won't build (compile
-                        # error, timeout, ...) must never crash the background
-                        # thread; the UI renders that problem on demand instead.
-            if on_done:
-                on_done(p.id)
-    t = threading.Thread(target=worker, daemon=True)
-    t.start()
-    return t
+                pass
+            finally:
+                if on_done:
+                    on_done(p.id)
+                q.task_done()
+
+    threads = []
+    for _ in range(workers):
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+        threads.append(t)
+    return threads
 
 
 if __name__ == "__main__":

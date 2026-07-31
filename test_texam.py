@@ -406,5 +406,42 @@ def _bind_fails(*_a, **_k):
     raise OSError("address already in use (simulated)")
 
 
+class ParallelPrewarmTests(unittest.TestCase):
+    """prewarm renders the whole bank across a pool of threads, not one at a
+    time; every problem is rendered once and on_done fires for each."""
+
+    def test_pool_renders_all_across_threads(self):
+        import threading
+        import time
+        probs = [bank_parser.Problem("p%d" % i, "", "b.tex", 0, "", "stem")
+                 for i in range(6)]
+        lock = threading.Lock()
+        rendered, threads_seen = [], set()
+
+        def stub(p, show_solution=True, use_cache=True):
+            time.sleep(0.05)                 # hold the slot so workers overlap
+            with lock:
+                rendered.append(p.id)
+                threads_seen.add(threading.current_thread().name)
+            return "<svg></svg>"
+
+        done = []
+        orig = bank_render.render_svg
+        bank_render.render_svg = stub
+        try:
+            ts = bank_render.prewarm(probs, on_done=done.append, workers=3)
+            for t in ts:
+                t.join(timeout=5)
+        finally:
+            bank_render.render_svg = orig
+
+        self.assertEqual(sorted(rendered), sorted(p.id for p in probs))
+        self.assertEqual(sorted(done), sorted(p.id for p in probs))
+        self.assertGreaterEqual(len(threads_seen), 2)   # genuinely parallel
+
+    def test_empty_bank_is_noop(self):
+        self.assertEqual(bank_render.prewarm([]), [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
