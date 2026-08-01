@@ -44,7 +44,8 @@ PART_PTS_RE = re.compile(r"\\part\s*\[\s*(\d+)\s*\]")
 GETMETADIR_RE = re.compile(r"\\GetCourseMetaDir\s*")
 BANKPATH_RE = re.compile(
     r"\\meta\s*\{\s*bank-path\s*\}\s*\{([^}]*)\}"      # \meta{bank-path}{...}
-    r"|bank-path\s*=\s*(\{[^}]*\}|[^,%\n\r]+)")        # metasetup: bank-path = ...
+    r"|bank-path\s*=\s*(\{[^}]*\}|[^,%}\n\r]+)")       # metasetup: bank-path = ...
+    #                                    ^ stop at a closing } too (last key before \metasetup's })
 
 
 def _read(path):

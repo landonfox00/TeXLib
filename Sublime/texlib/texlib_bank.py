@@ -29,7 +29,7 @@ ROOT_RE = re.compile(r"(?im)^%\s*!\s*T[Ee]X\s+root\s*=\s*(.+?)\s*$")
 GETMETADIR_RE = re.compile(r"\\GetCourseMetaDir\s*")
 BANKPATH_RE = re.compile(
     r"\\meta\s*\{\s*bank-path\s*\}\s*\{([^}]*)\}"      # \meta{bank-path}{...}
-    r"|bank-path\s*=\s*(\{[^}]*\}|[^,%\n\r]+)")        # metasetup: bank-path = ...
+    r"|bank-path\s*=\s*(\{[^}]*\}|[^,%}\n\r]+)")       # metasetup: bank-path = ...
 
 
 def _is_tex(view):
