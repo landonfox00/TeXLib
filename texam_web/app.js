@@ -13,6 +13,7 @@ const S = {
   // composer
   compMode: "rendered", caret: "end", flashArg: null,
   recentlyDeleted: [], recentOpen: false,
+  compCursor: -1, clip: null,
   // wall
   wallF: { q: "", topic: "all", type: "all" }, modalId: null,
   // palette
@@ -266,6 +267,57 @@ function renderComposer() {
     injectSVG($(`#cb-${e.index} .render-box`), p.id, true);
   });
   renderRecent();
+  applyCursor();
+}
+
+/* ---- Composer keyboard cursor (arrows) + cut/copy/paste ---- */
+function compStopEls() {
+  const b = $("#comp-body");
+  return b ? [...b.querySelectorAll(".caret-gap, .qblock")] : [];   // gaps + problems, in doc order
+}
+function applyCursor() {
+  const els = compStopEls();
+  els.forEach((e) => e.classList.remove("cursor"));
+  if (S.compCursor < 0 || !els.length) return;
+  if (S.compCursor >= els.length) S.compCursor = els.length - 1;
+  const el = els[S.compCursor]; if (!el) return;
+  el.classList.add("cursor");
+  if (el.classList.contains("caret-gap")) S.caret = el.dataset.caret;   // a gap is the insert point
+  el.scrollIntoView({ block: "nearest" });
+}
+function moveCursor(delta) {
+  const els = compStopEls(); if (!els.length) return;
+  S.compCursor = S.compCursor < 0 ? (delta > 0 ? 0 : els.length - 1)
+                                  : Math.max(0, Math.min(els.length - 1, S.compCursor + delta));
+  applyCursor();
+}
+function cursorEntry() {
+  const el = compStopEls()[S.compCursor];
+  if (!el || !el.classList.contains("qblock")) return null;
+  return S.exam.entries.find((x) => x.index === +el.id.slice(3)) || null;
+}
+function copyCursor() { const e = cursorEntry(); if (e) { S.clip = e.arg; toast("Copied " + e.arg); } }
+async function cutCursor() {
+  const e = cursorEntry(); if (!e) return;
+  S.clip = e.arg;
+  await removeIdx(e.index);
+  toast("Cut " + e.arg);
+}
+async function pasteCursor() {
+  if (!S.clip) return;
+  const el = compStopEls()[S.compCursor];
+  let after;
+  if (el && el.classList.contains("caret-gap")) after = el.dataset.caret === "end" ? null : Number(el.dataset.caret);
+  else if (el && el.classList.contains("qblock")) after = Number(el.id.slice(3));   // after this problem
+  else after = S.caret === "end" ? null : Number(S.caret);
+  const m = /^topic=(.+)$/.exec(S.clip);
+  let id, mode;
+  if (m) { const rep = S.problems.find((p) => p.topic === m[1].trim()); if (!rep) { toast("no problem for " + S.clip, true); return; } id = rep.id; mode = "filter"; }
+  else if (S.byId[S.clip]) { id = S.clip; mode = "id"; }
+  else { toast("cannot paste " + S.clip, true); return; }
+  const body = after != null ? { id, mode, after } : { id, mode };
+  try { refreshExam(await api("/api/exam/add", post(body))); toast("Pasted " + S.clip); }
+  catch (e) { toast(e.message, true); }
 }
 function qblock(e) {
   const flash = S.flashArg === e.arg ? " flash" : "";
@@ -541,6 +593,18 @@ document.addEventListener("keydown", (ev) => {
     const k = ev.key.toLowerCase();
     if (k === "z" && !ev.shiftKey) { ev.preventDefault(); undo(); return; }
     if ((k === "z" && ev.shiftKey) || k === "y") { ev.preventDefault(); redo(); return; }
+  }
+  // Composer: arrow keys walk problems + gaps; Ctrl/Cmd+C/X/V on a problem/gap
+  if (S.tab === "composer" && !typing) {
+    if (ev.key === "ArrowDown") { moveCursor(1); ev.preventDefault(); return; }
+    if (ev.key === "ArrowUp") { moveCursor(-1); ev.preventDefault(); return; }
+    if (ev.metaKey || ev.ctrlKey) {
+      const k = ev.key.toLowerCase();
+      const noSel = !(window.getSelection && String(window.getSelection()));
+      if (k === "c" && noSel && cursorEntry()) { copyCursor(); ev.preventDefault(); return; }
+      if (k === "x" && noSel && cursorEntry()) { cutCursor(); ev.preventDefault(); return; }
+      if (k === "v" && S.clip) { pasteCursor(); ev.preventDefault(); return; }
+    }
   }
   if ((ev.metaKey || ev.ctrlKey) && (ev.key === "k" || ev.key === "K")) { ev.preventDefault(); if (S.tab !== "composer") switchTab("composer"); openPalette(); return; }
   if ((ev.key === "Enter" || ev.key === " ")) {
