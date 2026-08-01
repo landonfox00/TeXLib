@@ -116,7 +116,7 @@ def reveal_in_editor(source_file, line):
 
 # --------------------------------------------------------------------------
 class Handler(BaseHTTPRequestHandler):
-    server_version = "TeXam"
+    server_version = "TeXaM"
 
     def log_message(self, *a):
         pass  # quiet
@@ -283,7 +283,7 @@ def main(argv):
         problems = refresh_bank()
     except Exception as exc:            # a parse error must not crash the launcher
         sys.exit(f"texam: could not read the exam or its bank: {exc}")
-    print(f"TeXam -- exam: {CTX['exam']}")
+    print(f"TeXaM -- exam: {CTX['exam']}")
     print(f"  bank sources: {len(CTX['sources'])}, problems: {len(problems)}")
     if not problems:
         print("  note: no bank problems found -- check the coursemeta bank-path "
@@ -298,7 +298,7 @@ def main(argv):
         httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     except OSError as exc:
         sys.exit(f"texam: cannot serve on port {port} ({exc}).\n"
-                 "  TeXam may already be running -- close its window, or "
+                 "  TeXaM may already be running -- close its window, or "
                  "pass --port <n> to use a different port.")
     url = f"http://127.0.0.1:{httpd.server_address[1]}/"
     print(f"  serving {url}  (Ctrl+C to stop)")

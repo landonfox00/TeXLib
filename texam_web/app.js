@@ -13,7 +13,7 @@ const S = {
   // composer
   compMode: "rendered", caret: "end", flashArg: null,
   // wall
-  wallF: { q: "", topic: "all", type: "all" },
+  wallF: { q: "", topic: "all", type: "all" }, modalId: null,
   // palette
   pal: { q: "", sel: 0, list: [] },
   renderCache: {},
@@ -50,13 +50,25 @@ function fetchSVG(id, sol) {
       return svg;
     });
 }
+/* pdftocairo reuses internal ids (glyph0-1, clip1, ...) across separately
+   rendered files, so inlining several SVGs on one page (Composer / Library)
+   makes every <use href="#glyph..."> resolve to the FIRST match -> scrambled
+   math. Namespace each injected SVG's ids + references so they stay isolated. */
+let _svgSeq = 0;
+function uniquifySVG(svg) {
+  const n = ++_svgSeq;
+  return svg
+    .replace(/\bid="([^"]+)"/g, (m, x) => `id="${x}__${n}"`)
+    .replace(/\b(xlink:href|href)="#([^"]+)"/g, (m, a, x) => `${a}="#${x}__${n}"`)
+    .replace(/url\(#([^)]+)\)/g, (m, x) => `url(#${x}__${n})`);
+}
 function injectSVG(el, id, sol) {
   if (!el) return;
   if (!S.renderAvailable) { el.className = "render-box center"; el.textContent = "No engine on PATH."; return; }
   const cached = S.renderCache[`${id}|${sol ? 1 : 0}`];
-  if (cached) { el.className = "render-box"; el.innerHTML = cached; return; }
+  if (cached) { el.className = "render-box"; el.innerHTML = uniquifySVG(cached); return; }
   el.className = "render-box center"; el.innerHTML = `<span class="spinner"></span>rendering&hellip;`;
-  fetchSVG(id, sol).then((svg) => { el.className = "render-box"; el.innerHTML = svg; })
+  fetchSVG(id, sol).then((svg) => { el.className = "render-box"; el.innerHTML = uniquifySVG(svg); })
     .catch((e) => { el.className = "render-box center"; el.textContent = "render failed: " + e.message; });
 }
 function typeChip(p) { return p.type === "mc" ? `<span class="chip mc">MC</span>` : `<span class="chip fr">FR</span>`; }
@@ -364,9 +376,10 @@ function openModal(id) {
         : `<button class="btn primary" data-act="modal-add" data-pid="${esc(p.id)}"><span>&#43;</span> Add to exam</button>`}
       <button class="btn ghost" data-act="copy-line-id" data-pid="${esc(p.id)}">Copy <code>\\problem{${esc(argFor(p))}}</code></button></div>`;
   injectSVG($("#modal-render"), p.id, true);
+  S.modalId = id;
   $("#modal-overlay").classList.add("open");
 }
-function closeModal() { $("#modal-overlay").classList.remove("open"); }
+function closeModal() { S.modalId = null; $("#modal-overlay").classList.remove("open"); }
 
 /* =======================================================================
    exam mutations + tabs + misc
@@ -415,6 +428,7 @@ async function revealInSublime(id) {
 
 function switchTab(tab) {
   S.tab = tab;
+  closeModal(); closePalette();          // don't strand an open overlay on the old view
   $$(".tab").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
   $$(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + tab));
   if (tab === "composer") renderComposer();
@@ -450,7 +464,7 @@ document.addEventListener("click", (ev) => {
   else if (d.compView != null) { S.compMode = d.compView; $$('[data-comp-view]').forEach((b) => b.setAttribute("aria-pressed", b.dataset.compView === S.compMode)); renderComposer(); }
   else if (d.caret != null) { S.caret = d.caret; renderComposer(); }
   else if (d.pal != null) { S.pal.sel = +d.pal; paletteInsert(); }
-  else if (d.wadd != null) { ev.stopPropagation(); addToExam(d.wadd, null); }
+  else if (d.wadd != null) { ev.stopPropagation(); if (inExam(d.wadd)) removeByPid(d.wadd); else addToExam(d.wadd, null); }
   else if (d.card != null) { openModal(d.card); }
   else if (d.wtopic != null) { S.wallF.topic = d.wtopic; renderWall(); }
   else if (d.wtype != null) { S.wallF.type = S.wallF.type === d.wtype ? "all" : d.wtype; renderWall(); }
@@ -501,14 +515,17 @@ $("#theme-btn").addEventListener("click", () => {
   root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
 });
 
-/* double-click a row / card / preview -> reveal the definition in Sublime */
+/* double-click the RENDERED problem -> reveal its definition in Sublime.
+   Scoped to .render-box so buttons (show solution / add / copy) never trigger it. */
 document.addEventListener("dblclick", (ev) => {
-  const row = ev.target.closest("[data-pid]");
-  const card = ev.target.closest("[data-card]");
+  if (!ev.target.closest(".render-box")) return;
   let id = null;
-  if (row && row.dataset.act == null) id = row.dataset.pid;
-  else if (card) id = card.dataset.card;
-  else if (ev.target.closest("#preview, #render-slot")) id = S.selected;
+  const card = ev.target.closest("[data-card]");
+  const cb = ev.target.closest(".qblock[id^='cb-']");
+  if (card) id = card.dataset.card;                                  // Library card
+  else if (cb) { const e = S.exam.entries.find((x) => x.index === +cb.id.slice(3)); if (e && !e.is_filter) id = e.arg; }  // Composer block
+  else if (ev.target.closest("#modal-render")) id = S.modalId;       // Library modal
+  else if (ev.target.closest("#render-slot")) id = S.selected;       // Desk preview
   if (id) { ev.preventDefault(); revealInSublime(id); }
 });
 
@@ -548,5 +565,23 @@ function initPanels() {
   }));
 }
 
+/* show/hide the filter-tag rows (Desk + Library), persisted */
+function initTagToggles() {
+  const bind = (btnId, boxId, key) => {
+    const btn = $("#" + btnId), box = $("#" + boxId);
+    if (!btn || !box) return;
+    const set = (hidden) => {
+      box.classList.toggle("tags-hidden", hidden);
+      btn.setAttribute("aria-pressed", !hidden);
+      window.localStorage.setItem(key, hidden ? "1" : "0");
+    };
+    set(window.localStorage.getItem(key) === "1");
+    btn.addEventListener("click", () => set(!box.classList.contains("tags-hidden")));
+  };
+  bind("filters-toggle", "filters", "texam.deskTagsHidden");
+  bind("wall-filters-toggle", "wall-filters", "texam.wallTagsHidden");
+}
+
 initPanels();
+initTagToggles();
 boot();

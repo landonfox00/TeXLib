@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TeXam</title>
+  <title>TeXaM</title>
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -11,14 +11,14 @@
     <div class="brand">
       <div class="brand-mark">&Sigma;</div>
       <div>
-        <div class="brand-title">TeXam</div>
+        <div class="brand-title">TeXaM</div>
         <div class="brand-sub" id="exam-name">&mdash;</div>
       </div>
     </div>
     <nav class="tabs" role="tablist" aria-label="Views">
-      <button class="tab" role="tab" data-tab="desk" aria-selected="true">Library Desk</button>
+      <button class="tab" role="tab" data-tab="desk" aria-selected="true">Desk</button>
       <button class="tab" role="tab" data-tab="composer" aria-selected="false">Composer</button>
-      <button class="tab" role="tab" data-tab="wall" aria-selected="false">Card Wall</button>
+      <button class="tab" role="tab" data-tab="wall" aria-selected="false">Library</button>
     </nav>
     <span id="render-badge" class="render-badge off">rendering&hellip;</span>
     <div class="spacer"></div>
@@ -40,6 +40,7 @@
       <section class="rail">
         <div class="rail-head">
           <input class="search" id="search" type="search" placeholder="Search stems, ids, topics&hellip;" aria-label="Search problems">
+          <button class="tagtoggle" id="filters-toggle" aria-pressed="true" title="Show / hide filter tags"><span>Filters</span><span class="chev">&#9662;</span></button>
           <div class="filters" id="filters"></div>
         </div>
         <div class="count" id="count"></div>
@@ -76,7 +77,8 @@
     <!-- ========== CARD WALL ========== -->
     <section id="view-wall" class="view wall" role="tabpanel">
       <div class="wall-top">
-        <input class="search" id="wall-search" type="search" placeholder="Search the wall&hellip;" aria-label="Search problems">
+        <input class="search" id="wall-search" type="search" placeholder="Search the library&hellip;" aria-label="Search problems">
+        <button class="tagtoggle" id="wall-filters-toggle" aria-pressed="true" title="Show / hide filter tags"><span>Filters</span><span class="chev">&#9662;</span></button>
         <div class="filters" id="wall-filters"></div>
         <span class="wall-tag" id="wall-tag"></span>
       </div>
