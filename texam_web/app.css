@@ -296,6 +296,11 @@ button{font:inherit}
 .caret-gap.here::after{content:"caret \00b7 \2318K to insert"; position:absolute; left:8px; top:-8px;
   font-size:10px; font-family:var(--mono); color:var(--accent); background:var(--panel); padding:0 5px}
 @keyframes blink{50%{opacity:.3}}
+/* keyboard cursor (arrow-key navigation): a highlighted problem or gap */
+.qblock.cursor{outline:2px solid var(--accent); outline-offset:3px}
+.caret-gap.cursor{background:var(--accent-weak)}
+.caret-gap.cursor::before{content:""; position:absolute; left:6px; right:6px; top:6px; height:3px;
+  background:var(--accent); border-radius:2px}
 .comp-source pre{max-width:760px; margin:0 auto; padding:18px 20px; background:var(--inset);
   border:1px solid var(--line); border-radius:12px; font-family:var(--mono); font-size:13px;
   line-height:1.7; overflow-x:auto; tab-size:2}
