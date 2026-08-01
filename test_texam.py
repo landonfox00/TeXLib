@@ -469,5 +469,46 @@ class RevealTests(unittest.TestCase):
             texam._find_subl = orig
 
 
+class UndoRedoTests(unittest.TestCase):
+    """Whole-file snapshot undo/redo restores the exam exactly and reports the
+    action label."""
+
+    def setUp(self):
+        texam._undo.clear(); texam._redo.clear()
+        fd, self.path = tempfile.mkstemp(suffix=".tex"); os.close(fd)
+        with open(self.path, "w", encoding="utf-8") as fh:
+            fh.write(EXAM)                       # 2 FR entries
+        texam.CTX["exam"] = self.path
+        self.addCleanup(lambda: os.path.isfile(self.path) and os.remove(self.path))
+
+    def _args(self):
+        return [e["arg"] for e in exam_writer.public_entries(
+            texam.read_exam(self.path)[0])]
+
+    def test_roundtrip(self):
+        before = self._args()
+        text, nl = texam.read_exam(self.path)     # mimic _api_add's record+mutate
+        texam._record(text, nl, "add frac-lim")
+        texam.write_exam(self.path, exam_writer.add_problem(text, "frac-lim", False), nl)
+        self.assertEqual(len(self._args()), 3)
+
+        self.assertEqual(texam.history_step(redo=False), "add frac-lim")
+        self.assertEqual(self._args(), before)    # exact restore
+        self.assertEqual(texam.history_step(redo=True), "add frac-lim")
+        self.assertEqual(len(self._args()), 3)
+        self.assertIsNone(texam.history_step(redo=True))   # nothing left to redo
+
+    def test_empty_stack_returns_none(self):
+        self.assertIsNone(texam.history_step(redo=False))
+
+    def test_new_edit_voids_redo(self):
+        text, nl = texam.read_exam(self.path)
+        texam._record(text, nl, "add a")
+        texam.history_step(redo=False)            # now redo has one entry
+        self.assertEqual(len(texam._redo), 1)
+        texam._record(*texam.read_exam(self.path), "add b")   # a fresh edit
+        self.assertEqual(len(texam._redo), 0)     # redo voided
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

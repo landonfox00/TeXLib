@@ -12,6 +12,7 @@ const S = {
   filters: { q: "", topic: "all", type: "all", fresh: false },
   // composer
   compMode: "rendered", caret: "end", flashArg: null,
+  recentlyDeleted: [], recentOpen: false,
   // wall
   wallF: { q: "", topic: "all", type: "all" }, modalId: null,
   // palette
@@ -264,6 +265,7 @@ function renderComposer() {
     const p = S.byId[e.arg]; if (!p) return;
     injectSVG($(`#cb-${e.index} .render-box`), p.id, true);
   });
+  renderRecent();
 }
 function qblock(e) {
   const flash = S.flashArg === e.arg ? " flash" : "";
@@ -407,8 +409,47 @@ async function addToExam(id, after) {
   try { refreshExam(await api("/api/exam/add", post(bodyObj))); toast(`Added ${id}`); }
   catch (e) { toast(e.message, true); }
 }
-async function removeIdx(idx) { try { refreshExam(await api("/api/exam/remove", post({ index: idx }))); } catch (e) { toast(e.message, true); } }
+async function removeIdx(idx) {
+  const e = S.exam.entries.find((x) => x.index === idx);   // capture before it's gone
+  try { refreshExam(await api("/api/exam/remove", post({ index: idx }))); if (e) noteDeleted(e); }
+  catch (err) { toast(err.message, true); }
+}
 async function moveIdx(idx, dir) { try { refreshExam(await api("/api/exam/reorder", post({ index: idx, dir }))); } catch (e) { toast(e.message, true); } }
+async function undo() { try { const d = await api("/api/exam/undo", post({})); refreshExam(d); toast(d.undone ? "Undid: " + d.undone : "Nothing to undo", !d.undone); } catch (e) { toast(e.message, true); } }
+async function redo() { try { const d = await api("/api/exam/redo", post({})); refreshExam(d); toast(d.redone ? "Redid: " + d.redone : "Nothing to redo", !d.redone); } catch (e) { toast(e.message, true); } }
+/* recently-deleted stack (client-side), newest first, deduped */
+function noteDeleted(entry) {
+  S.recentlyDeleted = S.recentlyDeleted.filter((r) => r.arg !== entry.arg);
+  S.recentlyDeleted.unshift({ arg: entry.arg, is_filter: entry.is_filter });
+  S.recentlyDeleted = S.recentlyDeleted.slice(0, 12);
+  renderRecent();
+}
+function renderRecent() {
+  const list = $("#recent-list"), panel = $("#recent-panel"), btn = $("#recent-toggle");
+  if (!list) return;
+  panel.hidden = !S.recentOpen;
+  if (btn) { btn.setAttribute("aria-pressed", S.recentOpen); btn.innerHTML = "&#9851; Recently deleted" + (S.recentlyDeleted.length ? ` (${S.recentlyDeleted.length})` : ""); }
+  list.innerHTML = S.recentlyDeleted.length
+    ? S.recentlyDeleted.map((r) => `<div class="recent-item">
+        <span class="earg" title="${esc(r.arg)}">\\problem{${esc(r.arg)}}</span>
+        <button class="re-add" data-readd="${esc(r.arg)}">Add</button></div>`).join("")
+    : `<div class="recent-empty">Nothing removed yet. Remove a problem and it lands here to re-add.</div>`;
+}
+async function addArg(id, mode) {
+  try { refreshExam(await api("/api/exam/add", post({ id, mode }))); toast(`Re-added ${id}`); }
+  catch (e) { toast(e.message, true); }
+}
+function reAdd(arg) {
+  const m = /^topic=(.+)$/.exec(arg);
+  if (m) {
+    const rep = S.problems.find((p) => p.topic === m[1].trim());
+    if (!rep) { toast("no problem with topic " + m[1].trim(), true); return; }
+    addArg(rep.id, "filter");
+  } else if (S.byId[arg]) { addArg(arg, "id"); }
+  else { toast("cannot re-add " + arg + " (not in bank)", true); return; }
+  S.recentlyDeleted = S.recentlyDeleted.filter((r) => r.arg !== arg);
+  renderRecent();
+}
 async function removeByPid(id) {
   const p = S.byId[id];
   const e = S.exam.entries.find((x) => x.arg === id || x.arg === "topic=" + p.topic);
@@ -451,7 +492,7 @@ function copyText(txt, msg) {
 
 /* ---------- events ---------- */
 document.addEventListener("click", (ev) => {
-  const el = ev.target.closest("[data-tab],[data-pid],[data-topic],[data-type],[data-fresh],[data-pv],[data-mode],[data-comp-view],[data-caret],[data-pal],[data-card],[data-wadd],[data-wtopic],[data-wtype],[data-act]");
+  const el = ev.target.closest("[data-tab],[data-pid],[data-topic],[data-type],[data-fresh],[data-pv],[data-mode],[data-comp-view],[data-caret],[data-pal],[data-card],[data-wadd],[data-wtopic],[data-wtype],[data-readd],[data-act]");
   if (!el) return;
   const d = el.dataset;
   if (d.tab) switchTab(d.tab);
@@ -468,6 +509,7 @@ document.addEventListener("click", (ev) => {
   else if (d.card != null) { openModal(d.card); }
   else if (d.wtopic != null) { S.wallF.topic = d.wtopic; renderWall(); }
   else if (d.wtype != null) { S.wallF.type = S.wallF.type === d.wtype ? "all" : d.wtype; renderWall(); }
+  else if (d.readd != null) reAdd(d.readd);
   else if (d.act) handleAct(d.act, d);
 });
 function handleAct(a, d) {
@@ -494,6 +536,12 @@ document.addEventListener("keydown", (ev) => {
     return;
   }
   if ($("#modal-overlay").classList.contains("open") && ev.key === "Escape") { closeModal(); return; }
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName) || ev.target.isContentEditable;
+  if ((ev.metaKey || ev.ctrlKey) && !typing) {
+    const k = ev.key.toLowerCase();
+    if (k === "z" && !ev.shiftKey) { ev.preventDefault(); undo(); return; }
+    if ((k === "z" && ev.shiftKey) || k === "y") { ev.preventDefault(); redo(); return; }
+  }
   if ((ev.metaKey || ev.ctrlKey) && (ev.key === "k" || ev.key === "K")) { ev.preventDefault(); if (S.tab !== "composer") switchTab("composer"); openPalette(); return; }
   if ((ev.key === "Enter" || ev.key === " ")) {
     const row = ev.target.closest?.("[data-pid]"); if (row && row.dataset.act == null) { S.selected = row.dataset.pid; renderRows(); renderPreview(); ev.preventDefault(); return; }
@@ -506,6 +554,8 @@ $("#pal-input").addEventListener("input", (e) => { S.pal.q = e.target.value; S.p
 $("#copy-btn").addEventListener("click", () => copyText(generateTeX(), "Copied exam body"));
 $("#wall-copy").addEventListener("click", () => copyText(generateTeX(), "Copied exam body"));
 $("#comp-copy").addEventListener("click", () => copyText(composerSource(), "Copied document"));
+$("#recent-toggle").addEventListener("click", () => { S.recentOpen = !S.recentOpen; renderRecent(); });
+$("#recent-close").addEventListener("click", () => { S.recentOpen = false; renderRecent(); });
 $("#palette-open").addEventListener("click", openPalette);
 $("#palette-overlay").addEventListener("click", (e) => { if (e.target.id === "palette-overlay") closePalette(); });
 $("#modal-overlay").addEventListener("click", (e) => { if (e.target.id === "modal-overlay") closeModal(); });
