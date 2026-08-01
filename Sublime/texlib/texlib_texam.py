@@ -33,7 +33,20 @@ except ImportError:
 
 # CREATE_NEW_CONSOLE: the server gets its own window showing "serving http://...
 # (Ctrl+C to stop)", so it is visible and killable rather than an invisible orphan.
+# The window starts MINIMIZED (STARTUPINFO SW_MINIMIZE) so it does not pop up over
+# the editor or steal focus -- it just sits in the taskbar, still there to close.
 _NEW_CONSOLE = 0x00000010 if os.name == "nt" else 0
+_SW_MINIMIZE = 6
+
+
+def _minimized_console():
+    """STARTUPINFO that opens the new console minimized (Windows), else None."""
+    if os.name != "nt":
+        return None
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = _SW_MINIMIZE
+    return si
 
 
 def resolve_script(settings):
@@ -79,7 +92,8 @@ class TexlibOpenTexamCommand(sublime_plugin.WindowCommand):
             return
         try:
             subprocess.Popen([py, script, exam], cwd=os.path.dirname(script),
-                             creationflags=_NEW_CONSOLE)
+                             creationflags=_NEW_CONSOLE,
+                             startupinfo=_minimized_console())
         except OSError as exc:
             sublime.error_message("TeXLib: could not launch TeXam: %s" % exc)
             return
