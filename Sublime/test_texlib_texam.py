@@ -52,5 +52,16 @@ for s in (None, {}):
     ok &= check(os.path.basename(got) == "texam.py",
                 "fallback resolves to a texam.py path (settings=%r)" % (s,))
 
+# The launcher opens the server console minimized (Windows) / no STARTUPINFO else.
+si = texlib_texam._minimized_console()
+if os.name == "nt":
+    import subprocess
+    ok &= check(si is not None
+                and bool(si.dwFlags & subprocess.STARTF_USESHOWWINDOW)
+                and si.wShowWindow == texlib_texam._SW_MINIMIZE,
+                "minimized console: STARTUPINFO requests SW_MINIMIZE")
+else:
+    ok &= check(si is None, "minimized console: None off Windows")
+
 print("\nALL PASS" if ok else "\nFAILURES ABOVE")
 sys.exit(0 if ok else 1)
