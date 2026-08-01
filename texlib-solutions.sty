@@ -35,6 +35,25 @@
 \newif\if@in@partsolution  \@in@partsolutionfalse
 \newif\if@in@solution      \@in@solutionfalse
 
+% ACCESSIBLE: when solutions are HIDDEN (non-key build) the {solution} /
+% {partsolution} environments still typeset their body into a DISCARDED \vbox
+% (\setbox\z@) so counters/labels inside a solution stay consistent.  The box is
+% dropped, so no glyphs ship -- but under PDF tagging tagpdf still records the
+% solution body's structure (its inline math becomes empty <Formula>s) and,
+% because the discarded box opens while the surrounding question paragraph is
+% still active, that structure nests INSIDE the stem's <text>: a "P contains P /
+% P contains Part" PDF/UA Table-5 violation with no visible cause.  Suspend
+% tagging around the discarded box so it emits no structure at all.  Uses the
+% kernel expl3 hooks via \csname (no ExplSyntaxOn needed, so the @-names stay
+% intact); no-ops in a normal build where the tagging layer is absent.
+\ifdefined\TeXLibAccessibleMode
+	\newcommand\texlib@acc@tagsuspend{\csname tag_suspend:n\endcsname{texlibhiddensol}}
+	\newcommand\texlib@acc@tagresume{\csname tag_resume:n\endcsname{texlibhiddensol}}
+\else
+	\newcommand\texlib@acc@tagsuspend{}
+	\newcommand\texlib@acc@tagresume{}
+\fi
+
 \newbox\@partsol@box
 \newbox\@sol@box
 \gdef\@partsol@rubric{}
@@ -130,7 +149,7 @@
 		\setbox\@sol@box\vbox\bgroup
 			\hsize\dimexpr\textwidth-12pt\relax
 	\else
-		\setbox\z@\vbox\bgroup
+		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }{%
 	\ifsolutions
@@ -184,7 +203,7 @@
 			}%
 		\vspace{\@sol@outervsep}%
 	\else
-		\egroup
+		\egroup\texlib@acc@tagresume
 	\fi
 }
 
@@ -203,7 +222,7 @@
 			% full-bleed {solution} box above (verified: no right-margin overhang).
 			\hsize\textwidth
 	\else
-		\setbox\z@\vbox\bgroup
+		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }{%
 	\ifsolutions
@@ -219,7 +238,7 @@
 		{\color{green!40!black}\unvbox\@partsol@box}%
 		\normalcolor\par\smallskip
 	\else
-		\egroup
+		\egroup\texlib@acc@tagresume
 	\fi
 }
 

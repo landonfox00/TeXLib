@@ -57,7 +57,19 @@
 	\def\item@points@pageinfo{%
 		\texlib@orig@itempoints
 		\iftexlib@pts
-			\global\@placepointstrue(\thepoints)%
+			% Print "(N points)" ourselves (exam.cls's \everypar delivery is
+			% dead under tagging).  Keep \@placepointstrue LOCAL to a group so
+			% \thepoints expands, then force it globally FALSE before the body
+			% paragraph begins: exam.cls has appended \padded@point@block
+			% (\begingroup\@placepointstrue\point@block\endgroup) to \everypar,
+			% and if @placepoints is still globally true when the body's
+			% paragraph fires \everypar, that group opens on the body paragraph
+			% and tags as a nested <text-unit> inside the body <text> -- a
+			% PDF/UA "P contains P / P contains Part" structure violation.
+			% Neutralising @placepoints keeps the group empty so it emits no
+			% structure, leaving a flat body paragraph.
+			\begingroup\@placepointstrue(\thepoints)\endgroup
+			\global\@placepointsfalse
 			\global\texlib@ptsfalse\space\ignorespaces
 		\fi
 	}
