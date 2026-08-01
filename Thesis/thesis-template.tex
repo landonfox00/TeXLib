@@ -1,0 +1,76 @@
+% UNR accessible thesis / dissertation — TeXLib template.
+% Compile with lualatex. \DocumentMetadata MUST be the first line (it is what
+% switches on PDF tagging, and it can only do so before \documentclass).
+\DocumentMetadata{
+	lang          = en,
+	tagging       = on,
+	tagging-setup = { math/setup={mathml-SE}, table/header-rows=1 },
+	pdfstandard   = { ua-2, a-4f },
+}
+\documentclass{thesis}
+
+% --- Degree / committee metadata ---------------------------------------------
+\title{An Accessible Approach to Something Important}
+\author{Ada N. Student}
+\doctype{thesis}                 % thesis (M.S.) or dissertation (Ph.D.)
+\gradprogram{Mathematics}
+\gradadvisor{Pat D. Advisor, Ph.D.}
+\graddate{May, 2027}
+\committeemember{Pat D. Advisor, Ph.D.}{Advisor}
+\committeemember{Sam K. Reader, Ph.D.}{Committee Member}
+\committeemember{Lee Q. Faculty, Ph.D.}{Graduate School Representative}
+
+\addbibresource{thesis-refs.bib}
+
+\begin{document}
+
+% --- Front matter ------------------------------------------------------------
+\makeUNRtitlepage
+\makecopyrightpage
+\committeeapprovalpage
+
+\frontmatter
+
+\begin{frontmatterpage}{Abstract}
+This thesis develops an accessible approach to a problem of genuine importance,
+and demonstrates that the resulting document is both mathematically rigorous and
+readable by assistive technology. We show that the operator $T$ satisfies
+$T(x) = \ThesisMathIntent{inverse-sine}{\sin^{-1}}(x)$ for all admissible $x$.
+\end{frontmatterpage}
+
+\begin{frontmatterpage}{Acknowledgements}
+I thank my advisor, my committee, and the veraPDF validator.
+\end{frontmatterpage}
+
+\tableofcontents
+\listoffigures
+
+\mainmatter
+
+% --- Body --------------------------------------------------------------------
+\chapter{Introduction}
+This is the introduction. Cross-references work: see \cref{thm:main} below.
+
+\begin{definition}[Admissible]
+A point $x$ is \emph{admissible} if $x > 0$ and $x \neq 1$.
+\end{definition}
+
+\begin{theorem}[Main result]\label{thm:main}
+For every admissible $x$, the identity $\int_0^x t \, dt = \tfrac{1}{2}x^2$ holds.
+\end{theorem}
+
+\begin{proof}
+Integrate directly.
+\end{proof}
+
+\chapter{Methods}
+The methods chapter continues the argument. \Cref{thm:main} is the key tool,
+following the classic treatment~\autocite{rudin1976}.
+
+\begin{example}
+Take $x = 2$: then $\int_0^2 t\,dt = 2$, and indeed $\tfrac{1}{2}(2)^2 = 2$.
+\end{example}
+
+\makereferences
+
+\end{document}

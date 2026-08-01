@@ -4,6 +4,10 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- **`Thesis/thesis.cls` — an accessible UNR thesis / dissertation class.** A report-based class for University of Nevada, Reno M.S. theses and Ph.D. dissertations that produces a **tagged, PDF/UA-conformant** document by default, following the Graduate School filing guidelines and building on Paul Hurtado's accessible thesis template (v0.5). It provides the UNR front matter — `\makeUNRtitlepage`, `\committeeapprovalpage` (the double blue frame + N logo + per-member signature rules), `\makecopyrightpage`, and a `frontmatterpage` environment for the abstract/acknowledgements — plus `\frontmatter`/`\mainmatter` pagination, degree/committee metadata commands (`\doctype`, `\gradprogram`, `\gradadvisor`, `\graddate`, `\committeemember`), biblatex (`\makereferences`), and accessible theorem environments that render as plain headed paragraphs (not amsthm's `\trivlist`, which tags as a list and violates PDF/UA), with correct `\cref` naming and a `\ThesisMathIntent` MathML-alt-text helper. Tagging is intrinsic: the document begins with `\DocumentMetadata{...ua-2,a-4f...}` before `\documentclass`; compile with LuaLaTeX + Biber. The example (`Thesis/thesis-template.tex`) builds with 0 errors and passes veraPDF for PDF/UA-2 and PDF/A-4f. Prototype — committee-page spacing/wording, optional `<Title>`/`<H1>` tagging, list-of-tables, and CI wiring are noted as follow-ups in `Thesis/README.md`.
+
 ## [0.5.0] — 2026-07-30
 
 ### Added
