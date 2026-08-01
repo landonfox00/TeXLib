@@ -15,6 +15,8 @@ Endpoints (JSON unless noted):
   POST /api/exam/add         {id, mode: 'id'|'filter'} -> updated exam
   POST /api/exam/remove      {index}                   -> updated exam
   POST /api/exam/reorder     {index, dir: -1|1}        -> updated exam
+  POST /api/exam/undo        -> restore prior exam state (+ {undone: label})
+  POST /api/exam/redo        -> reapply undone state   (+ {redone: label})
   POST /api/reveal           {id}  -> open the problem's source in Sublime
   GET  /api/render/<id>?sol= image/svg+xml (503 if the toolchain is missing)
 """
@@ -43,6 +45,36 @@ _MIME = {
 
 CTX = {"exam": None, "by_id": {}, "sources": []}
 _write_lock = threading.Lock()
+
+# Undo/redo: snapshots of the whole exam-file text taken before each edit, so a
+# restore is exact regardless of index churn. Each entry is (text, nl, label).
+_undo = []
+_redo = []
+_HISTORY_MAX = 100
+
+
+def _record(pre_text, pre_nl, label):
+    """Push the pre-edit exam state onto the undo stack; a fresh edit voids redo."""
+    _undo.append((pre_text, pre_nl, label))
+    del _undo[:-_HISTORY_MAX]
+    _redo.clear()
+
+
+def history_step(redo):
+    """Swap the current exam text with the top of the undo (or redo) stack,
+    pushing the current state onto the other stack. Returns the action label, or
+    None if the stack is empty. The file rewrite is the whole exam text, so it is
+    exact regardless of index churn."""
+    src, dst = (_redo, _undo) if redo else (_undo, _redo)
+    with _write_lock:
+        if not src:
+            return None
+        cur, curnl = read_exam(CTX["exam"])
+        text, nl, label = src.pop()
+        dst.append((cur, curnl, label))
+        del dst[:-_HISTORY_MAX]
+        write_exam(CTX["exam"], text, nl)
+    return label
 
 
 # --------------------------------------------------------------------------
@@ -172,6 +204,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._api_mutate("remove", self._body_json())
             if u.path == "/api/exam/reorder":
                 return self._api_mutate("reorder", self._body_json())
+            if u.path == "/api/exam/undo":
+                return self._api_history(redo=False)
+            if u.path == "/api/exam/redo":
+                return self._api_history(redo=True)
             if u.path == "/api/reveal":
                 return self._api_reveal(self._body_json())
             return self._json({"error": "not found"}, 404)
@@ -232,6 +268,7 @@ class Handler(BaseHTTPRequestHandler):
         after = int(after) if after is not None else None
         with _write_lock:
             text, nl = read_exam(CTX["exam"])
+            _record(text, nl, "add " + _arg_for(problem, mode))
             text = exam_writer.add_problem(text, _arg_for(problem, mode),
                                            problem.is_mc, after_index=after)
             write_exam(CTX["exam"], text, nl)
@@ -256,12 +293,24 @@ class Handler(BaseHTTPRequestHandler):
         with _write_lock:
             text, nl = read_exam(CTX["exam"])
             if op == "remove":
+                ents = exam_writer.public_entries(text)
+                arg = ents[idx]["arg"] if 0 <= idx < len(ents) else ""
+                _record(text, nl, "remove " + arg)
                 text = exam_writer.remove_problem(text, idx)
             else:
+                _record(text, nl, "reorder")
                 text = exam_writer.move_problem(text, idx,
                                                 int((body or {}).get("dir", 0)))
             write_exam(CTX["exam"], text, nl)
         self._json(exam_state())
+
+    def _api_history(self, redo):
+        """Undo (redo=False) / redo (redo=True) the exam, returning the exam
+        state plus `undone`/`redone` = the action label (None if nothing)."""
+        label = history_step(redo)
+        st = exam_state()
+        st["redone" if redo else "undone"] = label
+        self._json(st)
 
 
 def main(argv):
