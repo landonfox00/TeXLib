@@ -667,6 +667,29 @@ class ParserEdgeTests(unittest.TestCase):
             bank_parser._expand_metadir("\\GetCourseMetaDir Bank/ch.tex", "C:\\c\\Su 26"),
             "C:/c/Su 26/Bank/ch.tex")
 
+    def test_importproblem_and_sibling_bank(self):
+        d = self._dir()
+        self._w(os.path.join(d, "extra.tex"), "\\begin{problem}{ext}[topic=z]s\\end{problem}\n")
+        self._w(os.path.join(d, "bank.tex"), "\\begin{problem}{sib}[topic=w]s\\end{problem}\n")
+        doc = os.path.join(d, "exam.tex")
+        text = "\\importproblem{extra.tex}{}\n"
+        self._w(doc, text)
+        names = [os.path.basename(s) for s in bank_parser.problem_sources(doc, text)]
+        self.assertIn("extra.tex", names)      # \importproblem target resolved
+        self.assertIn("bank.tex", names)       # sibling bank.tex auto-default
+
+    def test_scan_skips_missing_files(self):
+        self.assertEqual(bank_parser.scan_problems(["/no/such/file.tex"]), [])
+
+    def test_read_missing_returns_none(self):
+        self.assertIsNone(bank_parser._read("/no/such/file.tex"))
+
+    def test_strip_comments_respects_escaped_percent(self):
+        out = bank_parser.strip_comments("a \\% keep % drop\nb")
+        self.assertIn("\\% keep", out)
+        self.assertNotIn("drop", out)
+        self.assertEqual(out.count("\n"), 1)   # line count preserved
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
