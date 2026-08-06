@@ -226,6 +226,60 @@ class ServerTests(unittest.TestCase):
         st, _ct, _raw = self._req("GET", "/../texam.py")
         self.assertEqual(st, 404)
 
+    def test_static_css_content_type(self):
+        st, ct, _raw = self._req("GET", "/app.css")
+        self.assertEqual(st, 200)
+        self.assertIn("text/css", ct)
+
+    def test_add_appends_then_reorders(self):
+        self._json("POST", "/api/exam/add", {"id": "fr-two", "mode": "id"})
+        self.assertEqual(self._args(), ["fr-one", "fr-two"])       # append semantics
+        _st, d = self._json("GET", "/api/exam")
+        idx = [e["index"] for e in d["entries"] if e["arg"] == "fr-two"][0]
+        self._json("POST", "/api/exam/reorder", {"index": idx, "dir": -1})
+        self.assertEqual(self._args(), ["fr-two", "fr-one"])
+
+    def test_malformed_body_is_graceful(self):
+        # a non-JSON body decodes to {} -> add of "" -> unknown id -> 404, no 500
+        c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        c.request("POST", "/api/exam/add", b"not json at all",
+                  {"Content-Type": "application/json"})
+        r = c.getresponse(); r.read(); c.close()
+        self.assertEqual(r.status, 404)               # graceful, not a 500 crash
+
+    def test_crlf_exam_preserved_on_edit(self):
+        with open(self.exam, "wb") as fh:
+            fh.write(EXAM.replace("\n", "\r\n").encode())
+        self._json("POST", "/api/exam/add", {"id": "fr-two", "mode": "id"})
+        with open(self.exam, "rb") as fh:
+            raw = fh.read()
+        self.assertIn(b"\r\n", raw)
+        self.assertNotIn(b"\r\r", raw)                # not doubled
+
+    def test_render_error_is_500(self):
+        oa, orr = bank_render.available, bank_render.render_svg
+        def boom(p, show_solution=True):
+            raise bank_render.RenderError("compile failed")
+        bank_render.available = lambda: True
+        bank_render.render_svg = boom
+        try:
+            st, _d = self._json("GET", "/api/render/fr-one")
+        finally:
+            bank_render.available, bank_render.render_svg = oa, orr
+        self.assertEqual(st, 500)
+
+    def test_reveal_launch_oserror_is_500(self):
+        of, op = texam._find_subl, texam.subprocess.Popen
+        texam._find_subl = lambda: "subl"
+        def boom(*a, **k):
+            raise OSError("cannot exec")
+        texam.subprocess.Popen = boom
+        try:
+            st, _d = self._json("POST", "/api/reveal", {"id": "fr-one"})
+        finally:
+            texam._find_subl, texam.subprocess.Popen = of, op
+        self.assertEqual(st, 500)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

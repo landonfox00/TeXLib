@@ -137,3 +137,9 @@ jobs:
             python3 test_class_render.py
             # MC answer-key marks the correct choice + schedule grid content.
             python3 test_mc_schedule_render.py
+            # TeXaM real-render integration: lualatex + pdftocairo on the demo
+            # bank (the composer preview pipeline). LUAINPUTS points at the repo
+            # root so the class-local .lua engines resolve in the container
+            # (bank_render sets TEXINPUTS itself; there is no _texlibjunc here).
+            export LUAINPUTS=".:$(pwd)//:"
+            python3 test_texam_render.py
