@@ -28,6 +28,20 @@ jobs:
           python Sublime/test_texlib_bank.py
           python Sublime/test_texlib_domain.py
 
+  # TeXaM client-side pure logic (texam_web/logic.js) under Node's built-in test
+  # runner -- no npm dependencies. Covers the browser-only helpers with no server
+  # equivalent (HTML escaping, SVG id-namespacing, filter matching, points math,
+  # exam-body serialization). Node isn't needed to *use* TeXaM; only to run these.
+  js-logic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: TeXaM client pure-logic tests
+        run: node --test texam_web/test/
+
   # Pure-Lua unit tests for the class-local Lua engines. No TeX toolchain — a
   # stock lua 5.3 runs them (the engines are tex-independent; the tests stub the
   # tex.* globals) — so this stays in the fast, no-container lane.
