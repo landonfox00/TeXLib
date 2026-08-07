@@ -39,8 +39,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      # `node --test` from the dir globs *.test.js -- stable across node 20..24
+      # (the bare-directory-path form changed behavior in node 24) and auto-picks
+      # up new test files.
       - name: TeXaM client pure-logic tests
-        run: node --test texam_web/test/
+        working-directory: texam_web/test
+        run: node --test
 
   # Pure-Lua unit tests for the class-local Lua engines. No TeX toolchain — a
   # stock lua 5.3 runs them (the engines are tex-independent; the tests stub the
