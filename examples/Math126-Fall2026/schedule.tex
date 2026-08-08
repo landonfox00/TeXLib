@@ -1,0 +1,110 @@
+% =============================================================================
+% Math 126 (Precalculus I) — Fall 2026 tentative schedule
+% =============================================================================
+%
+% Section 1003: TuTh 10:30-11:45am, EJCH 103, 8/24/2026 - 12/8/2026.
+% Lecture days, term dates, and final-exam info come from coursemeta.tex.
+%
+% SECTION LIST mirrors the Math 126EE Fall 26 curriculum
+% (Teaching/Math 126EE/Future/Schedule/Schedule.tex) with its unit 1 — the
+% R.1-R.9 algebra refresher — removed. Its units 2-6 become units 1-5 here.
+%
+% PACING IS NOT MIRRORED, and cannot be: 126EE meets five days a week
+% ({MWF, TTh}) and spends 2-2.5 days on many sections, needing ~44 class days
+% for these units. This section meets TuTh only, which gives 30. So sections get
+% one day each, except three in unit 3 that reclaim 126EE's two-day pacing with
+% the slack Nevada Day creates (see that unit's note).
+%
+%   30 TuTh class days (Thanksgiving takes Thu 11/26)
+%    - 1  syllabus
+%    - 4  exam reviews
+%    - 1  final review
+%   ----
+%   = 24 topic days, for 24 sections + 3 doubled = 27 day-equivalents... which
+%     fits only because Nevada Day pushes Exam 3 a week later, lengthening
+%     unit 3. The term is now FULL: a cancelled class overflows the grid until
+%     something is cut. Rebuild and read the warnings before assuming otherwise.
+%
+% Exams do NOT consume a lecture day: they sit in Friday recitation.
+
+\documentclass[
+	landscape       = true,
+	lecture-caps    = {1.0, 1.0},
+	recitation-days = F,
+	quiz-days       = F,
+	exam-days       = F,
+]{schedule}
+% Quizzes AND exams are given in Friday recitation (sections 1301-1306, run by
+% Natasha Anderson); TuTh are lecture only. recitation-days draws the Friday
+% column, quiz-days layers the weekly quiz onto it, and exam-days makes \exam
+% jump to the next Friday rather than taking a lecture day.
+
+\begin{document}
+\maketitle
+\begin{schedule}
+
+	% --- Holidays / blackouts (adopted from the 126EE Fall 26 schedule) ------
+	\holiday{9-7}{Labor Day}
+	\holiday{10-30}{Nevada Day}
+	\holiday{11-11}{Veterans Day}
+	\holiday{11-26}{Thanksgiving}
+	\holiday{11-27}{Family Day}
+	\holiday{12-9}{Prep Day}
+
+	\noquiz{8-28}                 % no quiz the opening Friday
+
+	\syllabus
+
+	% --- Unit 1 (126EE unit 2) ------------------------------------------------
+	\section{2.1}
+	\section{2.2}
+	\section{3.1}
+	\section{2.5}
+	\examreview
+	\exam[noquiz]
+
+	% --- Unit 2 (126EE unit 3) ------------------------------------------------
+	\section{3.3}
+	\section{3.4}
+	\section{4.1}
+	\section{3.5/4.5}
+	\section{4.2}
+	\examreview
+	\exam
+
+	% --- Unit 3 (126EE unit 4) ------------------------------------------------
+	% Nevada Day (Fri 10-30) removes an exam Friday, pushing Exam 3 to 11-6 and
+	% opening three spare lecture days in this unit. Spent restoring 126EE's own
+	% two-day pacing on the three heaviest sections rather than leaving the term
+	% with an idle fortnight before the exam.
+	\section{R.10}
+	\section[2]{R.11}
+	\section[2]{R.12}
+	\section[2]{4.5}
+	\section{4.3}
+	\section{4.4}
+	\examreview
+	\exam[noquiz]
+
+	% --- Unit 4 (126EE unit 5) ------------------------------------------------
+	\section{5.1}
+	\section{5.2}
+	\section{5.3}
+	\section{5.4}
+	\section{5.5}
+	\section{5.6}
+	\examreview
+	\exam[noquiz]
+
+	% --- Unit 5 (126EE unit 6) ------------------------------------------------
+	\section{A.7}
+	\section{11.1}
+	\section{1.4}
+
+	% --- Final week -----------------------------------------------------------
+	\finalreview
+	\finalsweek[12-10][5]
+	\winterbreak
+
+\end{schedule}
+\end{document}

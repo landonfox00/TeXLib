@@ -50,7 +50,15 @@
 #     multi-copy exam's <base>.vmap is sliced into a PDF per version/solutions
 #     copy. Both need pypdf; Sublime's embedded Python has none, so the work is
 #     delegated to texlib_pdfpost.py, run under an external Python that does
-#     (see _run_pdfpost / _external_python).
+#     (see _run_pdfpost / _external_python). Every sliced copy also gets its own
+#     <name>.synctex, cut from the parent's by page span, so inverse search works
+#     inside it and not only in the combined PDF (_slice_synctex_for_copies).
+#
+#   * Which PDF the host opens -- a multi-copy build produces the combined
+#     <base>.pdf AND one file per copy, and preferred_pdf_path resolves the
+#     host's setting ("solutions" / "student" / a literal suffix) against what
+#     THIS build produced, falling back to <base>.pdf. Nothing about what gets
+#     built changes; this only names the copy to put in front of the user.
 #
 #   * aux_directory routing -- honors LaTeXTools' aux_directory setting
 #     (typically "<<temp>>"). On TeX Live there is no separate -aux-directory
@@ -121,10 +129,15 @@ MODE_MACROS = {
     "full":      "",   # same as default (full 2-pass); a stable token the host
                        # never remaps, so "Build — Full" forces a settling build
                        # even when default_build_mode is "quick".
+    # "key" is the student-facing, after-the-fact answer key, so it deliberately
+    # does NOT carry \ShowRubric -- point apportionments and common-error notes
+    # are grading-internal. "solutions" is the instructor build and carries both.
     "key":       r"\def\ShowKey{}",
-    "solutions": r"\def\ShowSolutions{}",
+    "solutions": r"\def\ShowSolutions{}\def\ShowRubric{}",
     "student":   r"\def\StudentMode{}",
-    "rubric":    r"\def\ShowRubric{}",
+    # No "rubric" mode. A rubric annotates a worked solution, so rubric-without-
+    # solutions is of no use to anyone; \ShowRubric now implies \ifsolutions
+    # (texlib-build.sty) and "solutions" above is how you ask for both.
     "draft":     r"\def\ShowDraft{}",
     "accessible": None,  # special-cased: see ACCESSIBLE_* and _build_accessible.
 }
@@ -146,6 +159,12 @@ ACCESSIBLE_DOCMETA = (
     r"tagging-setup={math/setup={mathml-SE},table/header-rows=1},"
     r"pdfstandard={ua-2,a-4f}}"
 )
+
+# --- Sliced copies ----------------------------------------------------------
+# How the version slicer names an instructor copy (texlib_pdfpost.slice_from_vmap
+# appends it, and the .spl split's <base>_Solutions.pdf matches case-insensitively).
+# preferred_pdf_path tells the two kinds of copy apart by this and nothing else.
+SOLUTION_COPY_SUFFIX = "_solutions.pdf"
 ACCESSIBLE_MACRO = ACCESSIBLE_DOCMETA + r"\def\TeXLibAccessibleMode{}"
 
 # A pseudo-mode: a single engine pass with no biber and no rerun loop, for fast
@@ -855,12 +874,22 @@ class TexlibBuildCore:
 
     @staticmethod
     def _set_hidden(path):
-        """Apply the Hidden attribute on Windows via the Win32 API.
+        """Hide the file and pin it against OneDrive dehydration (Windows).
 
         Uses SetFileAttributesW directly rather than `os.system('attrib +h')`,
         which would be a shell-quoting hazard for paths with special characters
         and spawns a console window (ironic in a builder that works to suppress
         console flashes). No-op off Windows.
+
+        PINNED is here for inverse search. SetFileAttributesW writes the whole
+        settable mask, so passing HIDDEN alone also CLEARED the file's PINNED
+        ("always keep on this device") bit. Under OneDrive -- the teaching
+        courses, not this repo -- that left <base>.synctex as the one build
+        artifact eligible for dehydration, while its own .pdf and .tex siblings
+        stayed pinned. A dehydrated SyncTeX map makes SumatraPDF's first
+        double-click pay a hydration round-trip, which is the likeliest cause of
+        inverse search needing a second click to land. Set both flags in the one
+        call; HIDDEN on its own un-pins the file again.
         """
         if os.name != "nt":
             return
@@ -868,8 +897,9 @@ class TexlibBuildCore:
             import ctypes
 
             FILE_ATTRIBUTE_HIDDEN = 0x2
+            FILE_ATTRIBUTE_PINNED = 0x00080000
             ctypes.windll.kernel32.SetFileAttributesW(
-                str(path), FILE_ATTRIBUTE_HIDDEN
+                str(path), FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_PINNED
             )
         except Exception:  # noqa: BLE001 - best-effort attribute set
             pass
@@ -1133,6 +1163,14 @@ class TexlibBuildCore:
         tex_dir = self._tex_dir()
         base_path = os.path.join(tex_dir, self.base_name)
 
+        # Reset per-build: the post-processing steps below append every extra
+        # PDF they cut out of the combined build (in typeset order) and the page
+        # span each was cut from. The host reads produced_pdfs to resolve its
+        # preferred_pdf setting (see preferred_pdf_path); _slice_synctex_for_copies
+        # reads the spans.
+        self.produced_pdfs = []
+        self._copy_ranges = {}
+
         # Record biber-input fingerprints now that the final engine pass has
         # settled each .bcf, so the next build's cache check compares against
         # the real on-disk .bcf. (See _record_biber_hash for why mid-build
@@ -1173,6 +1211,11 @@ class TexlibBuildCore:
         self._publish_shareable_copies(tex_dir, base_path)
 
         self._finalize_synctex(tex_dir)
+
+        # After finalize, because that is what leaves a plain <base>.synctex to
+        # cut from (before it, the map is still gzipped and possibly still in
+        # the aux dir).
+        self._slice_synctex_for_copies(tex_dir)
 
         self._display_build_summary(tex_dir, base_path)
     def _finalize_synctex(self, tex_dir):
@@ -1222,12 +1265,169 @@ class TexlibBuildCore:
             except Exception:
                 pass
 
+    def _slice_synctex_for_copies(self, tex_dir):
+        """Cut a matching <name>.synctex for every PDF the slicer produced.
+
+        A sliced copy (<base>_A_solutions.pdf, <base>_Solutions.pdf, ...) is
+        pages carved out of the combined PDF with pypdf, so it ships with no
+        SyncTeX map of its own -- and a PDF viewer looks for <its own
+        name>.synctex, never the parent's. Without this step, double-clicking
+        anywhere in a sliced copy does nothing: inverse search silently dies the
+        moment you look at anything but <base>.pdf. That matters now that the
+        preferred_pdf setting can make a slice the copy the viewer opens.
+
+        The cut is the same page selection the PDF got: keep the {n ... }n sheet
+        blocks in the copy's page span, renumber them to start at 1, and leave
+        every record inside untouched (a record carries a file tag and a source
+        LINE, never a page, so slicing cannot invalidate one). Every Input:
+        declaration is kept wherever it stood, including those for sheets that
+        were dropped: they define the tag -> file table the surviving records
+        index into, and an unused entry costs nothing.
+
+        No-op unless the build actually sliced something. Best-effort
+        throughout: a copy whose map cannot be written just has no inverse
+        search, exactly as before this existed.
+        """
+        ranges = getattr(self, "_copy_ranges", None)
+        if not ranges:
+            return
+        src = os.path.join(tex_dir, self.base_name + ".synctex")
+        try:
+            with open(src, "rb") as fh:
+                data = fh.read()
+        except OSError:
+            return  # no map to cut from (-synctex=0, or finalize found nothing)
+        for pdf_name in sorted(ranges):
+            first, last = ranges[pdf_name]
+            out = os.path.join(
+                tex_dir, os.path.splitext(pdf_name)[0] + ".synctex")
+            if os.path.normcase(out) == os.path.normcase(src):
+                # Never cut the parent's own map down: every other copy is cut
+                # FROM it, and <base>.pdf's inverse search is it. The slicer
+                # already refuses to emit a copy under the combined PDF's name,
+                # so this only fires if that guard is ever lost.
+                continue
+            try:
+                sliced = self._synctex_page_slice(data, first, last)
+            except Exception as exc:  # noqa: BLE001 - best-effort
+                self.display(
+                    f"TeXLib: could not cut a SyncTeX map for {pdf_name}: "
+                    f"{exc}\n")
+                continue
+            if sliced is None:
+                continue
+            # Clear the previous build's (hidden) copy first -- open('wb') over
+            # a hidden file is an Errno 13 on Windows, same as in _finalize_synctex.
+            self._force_remove(out)
+            try:
+                with open(out, "wb") as fh:
+                    fh.write(sliced)
+            except OSError as exc:
+                self.display(
+                    f"TeXLib: could not write {os.path.basename(out)}: {exc}\n")
+                continue
+            self._set_hidden(out)
+
+    @staticmethod
+    def _synctex_page_slice(data, first_page, last_page):
+        """Return `data` (a whole .synctex) reduced to pages first..last, or None.
+
+        Format, from the one this build just wrote:
+
+            SyncTeX Version:1        preamble: Input: table, Magnification, ...
+            Content:
+            !20315                   anchor, then one sheet per page
+            {1                         <- sheet 1 opens
+            ...records...
+            !11059
+            }1                         <- sheet 1 closes
+            Input:251:...            more Input: rows may appear between sheets
+            !422
+            {2
+            ...
+            Postamble:
+            Count:1029
+            Post scriptum:
+
+        The `!N` anchors are the only thing that makes this non-trivial: N is
+        the byte distance from the previous anchor's own offset (from the file
+        start, for the first), and SyncTeX seeks with them, so a rewrite that
+        left them alone would send a reader into the middle of a record. They
+        are dropped on the way in and recomputed on the way out, which also
+        means this round-trips a file it does not change byte-for-byte.
+
+        `Count:` is left as the parent's -- it sizes the parser's record table,
+        so an over-estimate is harmless where a wrong-but-plausible value is not.
+        Returns None if `data` is not a SyncTeX map or the span holds no page.
+        """
+        eol = b"\r\n" if data[:200].find(b"\r\n") != -1 else b"\n"
+        lines = data.split(eol)
+        if not lines or not lines[0].startswith(b"SyncTeX Version:"):
+            return None
+
+        out = []          # emitted lines, anchors excluded (added while writing)
+        anchored = set()  # indices in `out` that an anchor must precede
+        sheet = None      # page number of the sheet currently being buffered
+        buf = []
+        kept = 0
+
+        def emit(line, anchor=False):
+            if anchor:
+                anchored.add(len(out))
+            out.append(line)
+
+        for line in lines:
+            if line.startswith(b"!"):
+                continue  # recomputed below
+            if sheet is None:
+                if line[:1] == b"{" and line[1:].isdigit():
+                    sheet, buf = int(line[1:]), []
+                    continue
+                emit(line, anchor=line in (b"Postamble:", b"Post scriptum:"))
+                continue
+            # Inside a sheet: only its own closing brace ends it. Records use
+            # (, ), [, ], h, v, x, g, k, $ -- never a bare-number brace.
+            if line == b"}" + str(sheet).encode():
+                if first_page <= sheet <= last_page:
+                    kept += 1
+                    emit(b"{" + str(kept).encode(), anchor=True)
+                    for r in buf:
+                        emit(r)
+                    emit(b"}" + str(kept).encode(), anchor=True)
+                sheet, buf = None, []
+                continue
+            buf.append(line)
+
+        if not kept:
+            return None
+
+        # Write out, recomputing each anchor as the byte delta from the previous
+        # anchor's own offset (0 for the first).
+        blob, last_at = bytearray(), 0
+        for i, line in enumerate(out):
+            if i in anchored:
+                here = len(blob)
+                blob += b"!" + str(here - last_at).encode() + eol
+                last_at = here
+            blob += line + eol
+        # split() left a trailing empty element for the file's final newline;
+        # the loop turned it back into one, so strip the extra it also added.
+        return bytes(blob[:-len(eol)]) if out and out[-1] == b"" else bytes(blob)
+
     def _copy_back_from_aux(self, tex_dir):
         """If aux routing is active, copy viewer-facing artifacts back.
 
-        We copy <base>*.pdf, <base>*.synctex.gz, and <base>*.spl. The glob
-        catches per-version outputs too (e.g. template_A.pdf for autoexam).
-        Aux/log/etc. stay in the aux dir.
+        We copy <base>*.pdf, <base>*.synctex.gz, <base>*.spl and
+        <base>*.schedmeta. The glob catches per-version outputs too (e.g.
+        template_A.pdf for autoexam). Aux/log/etc. stay in the aux dir.
+
+        .schedmeta is here because its consumer is OUTSIDE the build (the
+        standalone TeXLib Sync program reads it from beside the source, like a
+        reader opens the PDF from beside the source). Without this it lands in
+        %TEMP%\\texlib-aux\\<hash> on every builder build and the sync tool either
+        reports "build the schedule first" for a schedule just built, or reads a
+        stale copy from an older in-place CLI build. Contrast .schedmap, whose
+        consumer *is* this builder -- it probes both directories itself.
         """
         aux_target = getattr(self, "_aux_target", None)
         if not aux_target or aux_target == tex_dir or not os.path.isdir(aux_target):
@@ -1236,6 +1436,7 @@ class TexlibBuildCore:
             f"{self.base_name}*.pdf",
             f"{self.base_name}*.synctex.gz",
             f"{self.base_name}*.spl",
+            f"{self.base_name}*.schedmeta",
         )
         for pat in patterns:
             for src in glob.glob(os.path.join(aux_target, pat)):
@@ -1858,7 +2059,9 @@ class TexlibBuildCore:
         has pypdf (Sublime's embedded one does not). Both paths call the SAME
         module functions, so there is one implementation. Returns
         (produced_names, messages); messages are user-facing. Never raises --
-        every failure becomes a message the caller can display.
+        every failure becomes a message the caller can display. The op's page
+        spans are absorbed on the way past (see _absorb_pdfpost) rather than
+        returned, so existing two-value callers are untouched.
         """
         base_name = os.path.splitext(os.path.basename(pdf_path))[0]
         pdfpost = os.path.join(
@@ -1872,7 +2075,7 @@ class TexlibBuildCore:
             result = texlib_pdfpost._OPS[op](
                 sidecar_path, pdf_path, out_dir, base_name
             )
-            return result["produced"], result["messages"]
+            return self._absorb_pdfpost(result)
         except ImportError:
             pass
         except Exception as exc:  # noqa: BLE001 - best-effort
@@ -1915,7 +2118,82 @@ class TexlibBuildCore:
             result = json.loads((proc.stdout or "").strip() or "{}")
         except ValueError:
             return [], ["TeXLib: PDF post-processing returned unreadable output."]
-        return result.get("produced", []), result.get("messages", [])
+        return self._absorb_pdfpost(result)
+
+    def _absorb_pdfpost(self, result):
+        """Record what a pypdf op produced, and return its (produced, messages).
+
+        produced_pdfs accumulates in call order across the ops of one build --
+        which for a version slice is typeset order (every student copy, then
+        every solutions copy), the order preferred_pdf_path resolves "solutions"
+        / "student" against. _copy_ranges carries each name's page span for
+        _slice_synctex_for_copies.
+        """
+        names = getattr(self, "produced_pdfs", None)
+        if names is None:
+            names = self.produced_pdfs = []
+        spans = getattr(self, "_copy_ranges", None)
+        if spans is None:
+            spans = self._copy_ranges = {}
+
+        produced = result.get("produced", []) or []
+        for name in produced:
+            if name not in names:
+                names.append(name)
+        for name, span in (result.get("ranges", {}) or {}).items():
+            try:
+                spans[name] = (int(span[0]), int(span[1]))
+            except (TypeError, ValueError, IndexError):
+                continue
+        return produced, result.get("messages", [])
+
+    # ------------------------------------------------------------------ #
+    # Which PDF the host should present
+    # ------------------------------------------------------------------ #
+    def preferred_pdf_path(self, preference):
+        """Resolve the host's `preferred_pdf` setting to a PDF to open.
+
+        A multi-copy exam build produces the combined <base>.pdf AND one sliced
+        copy per version/state, and which of those you actually want in front of
+        you while writing is a matter of habit, not of what the build produced:
+        an author checking worked solutions wants <base>_A_solutions.pdf every
+        time. This resolves that preference against what THIS build produced.
+
+          "combined" / unset  <base>.pdf, the whole build (the default -- and
+                              the only value that keeps forward sync, since
+                              LaTeXTools' jumpto_pdf can only aim at <root>.pdf)
+          "solutions"         the first solutions copy produced: _A_solutions
+                              for \\versions{A,B,C}, _Solutions for a .spl key
+                              build
+          "student"           likewise the first student copy (_A, _Exam)
+          anything else       a literal suffix -- "_B_solutions" resolves to
+                              <base>_B_solutions.pdf
+
+        Always falls back to <base>.pdf: a preference is a preference, and a
+        student-mode build, a single-version document, or a build whose slicing
+        was skipped for want of pypdf simply has no such copy to open.
+        """
+        tex_dir = self._tex_dir()
+        combined = os.path.join(tex_dir, self.base_name + ".pdf")
+        pref = (preference or "").strip()
+        if not pref or pref.lower() in ("combined", "default", "main"):
+            return combined
+
+        def _is_solution(name):
+            return name.lower().endswith(SOLUTION_COPY_SUFFIX)
+
+        produced = getattr(self, "produced_pdfs", []) or []
+        if pref.lower() == "solutions":
+            pick = next((n for n in produced if _is_solution(n)), None)
+        elif pref.lower() == "student":
+            pick = next((n for n in produced if not _is_solution(n)), None)
+        else:
+            pick = self.base_name + pref + ".pdf"
+        if pick:
+            candidate = os.path.join(tex_dir, pick)
+            if os.path.exists(candidate):
+                return candidate
+        return combined
 
 
 class TexlibBuild(TexlibBuildCore):

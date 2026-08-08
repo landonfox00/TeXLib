@@ -126,6 +126,7 @@
 \clist_new:N \g__sched_lecture_caps_clist
 \clist_new:N \g__sched_quiz_days_clist
 \clist_new:N \g__sched_recitation_days_clist
+\clist_new:N \g__sched_exam_days_clist
 \bool_new:N  \g__sched_landscape_bool
 \bool_new:N  \g__sched_monthpages_bool
 \bool_new:N  \g__sched_boxgrid_bool
@@ -134,6 +135,13 @@
 	lecture-caps     .clist_gset:N = \g__sched_lecture_caps_clist,
 	quiz-days        .clist_gset:N = \g__sched_quiz_days_clist,
 	recitation-days  .clist_gset:N = \g__sched_recitation_days_clist,
+
+	% exam-days = F  ->  \exam places on the next day in this set instead of the
+	% next lecture day. For a course whose exams sit in a recitation or lab
+	% section rather than in lecture: topics still flow across the lecture
+	% columns, but an exam jumps to the next matching day. Unset (the default)
+	% keeps the historic behaviour of placing exams on lecture days.
+	exam-days        .clist_gset:N = \g__sched_exam_days_clist,
 
 	% month-pages = true  ->  one table per calendar month, each on its own
 	% page, with month-boundary weeks repeated so every month shows full weeks.
@@ -179,6 +187,9 @@
 }
 \NewExpandableDocumentCommand{\GetRecitationDays}{}{
 	\clist_use:Nn \g__sched_recitation_days_clist {,}
+}
+\NewExpandableDocumentCommand{\GetExamDays}{}{
+	\clist_use:Nn \g__sched_exam_days_clist {,}
 }
 
 % Expands to the Lua literal `true`/`false` for the month-pages flag, so the
@@ -304,7 +315,8 @@
 			"\GetRecitationDays",
 			"\GetQuizDays",
 			"\GetLectureCaps",
-			"\GetYear"
+			"\GetYear",
+			"\GetExamDays"
 		)
 	}
 

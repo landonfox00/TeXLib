@@ -1,0 +1,26 @@
+# calendar-sync.toml -- what Math 126 (Fall 2026) overrides.
+#
+# Everything not stated here comes from defaults.toml beside the program:
+# calendar id, task list, reminders, and the whole task chain.
+# `sync_calendar.py --show-config .` prints the merged result.
+
+[tasks]
+ta = "Natasha"                        # Natasha Anderson runs the recitations
+# TODO: not on the UNR math department's public pages as of 2026-08-07 (Fall 26
+# staffing looks unpublished — the lecture instructor is still "To be
+# Announced"). Fill in and the address appears in the body of every {ta} task.
+ta_email = ""
+
+[events]
+recitation   = true                   # all-day Friday marker; she runs it
+office_hours = true
+
+# Sections 1301-1306 meet at six different hours (8am-4pm), so this is an
+# all-day marker rather than a meeting -- no `time` key on purpose. Suppressed
+# automatically on exam Fridays: the exam IS that session.
+[recitation]
+days = "F"
+
+[office_hours]
+days = "TR"
+time = "12:30--2:00pm"

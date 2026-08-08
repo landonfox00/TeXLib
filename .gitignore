@@ -5,7 +5,7 @@
 # Old / superseded files
 course-metadata_old.sty
 
-# Local Claude Code session guide (per-machine; not distributed to coworkers)
+# Local per-machine working notes; not distributed to coworkers
 /CLAUDE.md
 
 # Local feature-idea scratch log (cron-appended; not distributed to coworkers)
@@ -34,6 +34,11 @@ course-metadata_old.sty
 # Sublime builder).
 *.schedmap
 *_schedule_grid.tex
+# Resolved-entry sidecar (schedule.lua writes it every build; sync_calendar.py
+# consumes it) and that tool's per-course id map. The state file holds Google
+# event/task ids for a personal account -- never commit it to a public repo.
+*.schedmeta
+.calendar-sync-state.json
 
 # Publish sidecar (course-metadata.sty writes it for a publishable class; the
 # Sublime builder consumes it, but a CLI build that bypassed the builder leaves
