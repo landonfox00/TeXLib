@@ -57,20 +57,23 @@
 	\def\item@points@pageinfo{%
 		\texlib@orig@itempoints
 		\iftexlib@pts
-			% Print "(N points)" ourselves (exam.cls's \everypar delivery is
-			% dead under tagging).  Keep \@placepointstrue LOCAL to a group so
-			% \thepoints expands, then force it globally FALSE before the body
-			% paragraph begins: exam.cls has appended \padded@point@block
-			% (\begingroup\@placepointstrue\point@block\endgroup) to \everypar,
-			% and if @placepoints is still globally true when the body's
-			% paragraph fires \everypar, that group opens on the body paragraph
-			% and tags as a nested <text-unit> inside the body <text> -- a
-			% PDF/UA "P contains P / P contains Part" structure violation.
-			% Neutralising @placepoints keeps the group empty so it emits no
-			% structure, leaving a flat body paragraph.
-			\begingroup\@placepointstrue(\thepoints)\endgroup
+			% Print "(N points)" ourselves (exam.cls's \everypar delivery is dead
+			% under tagging).  DEFER it to the START of the body's first paragraph
+			% via the para/begin hook, so it renders INLINE with the stem exactly
+			% like the normal \everypar delivery -- emitting it here instead would
+			% open its own paragraph that the body's leading \par then drops onto a
+			% separate line ("(5 points)\n What is..."). @placepoints is forced true
+			% only inside the hook group so \thepoints prints; \@points/\@pointname
+			% still hold this item's values when the hook fires.
+			\AddToHookNext{para/begin}{%
+				\begingroup\@placepointstrue(\thepoints)\endgroup\space}%
+			% Clear @placepoints before the body paragraph so exam.cls's leftover
+			% \everypar \padded@point@block (\begingroup\@placepointstrue
+			% \point@block\endgroup) stays EMPTY -- otherwise that group opens on
+			% the body paragraph and tags as a <text-unit> nested inside the body
+			% <text>, a PDF/UA "P-P / P-Part" structure violation.
 			\global\@placepointsfalse
-			\global\texlib@ptsfalse\space\ignorespaces
+			\global\texlib@ptsfalse
 		\fi
 	}
 \fi

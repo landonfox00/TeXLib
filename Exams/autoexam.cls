@@ -847,6 +847,10 @@
 		% Instructions: file / inline / default alike are wrapped in the titled
 		% box. A doc can call \TeXLibInstructionsUnboxed to reclaim full layout
 		% control over its own instructions file (renders bare, no box).
+		% This cover renders the box inside the surrounding `center`; tell the
+		% instructions package so an accessible build de-centers the bullets (the
+		% quiz box is not centered and skips this). No-op in a normal build.
+		\TeXLibInstructionsDecenter
 		\TeXLibInstructionsTitled{exam}%
 		\vfill
 

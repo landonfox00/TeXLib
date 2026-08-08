@@ -533,15 +533,19 @@ def _build_html(items: list[dict], stats: dict) -> str:
   body {{ margin:0; background:var(--bg); color:var(--fg);
     font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }}
   header {{ position:sticky; top:0; z-index:5; background:var(--bg);
-    border-bottom:1px solid var(--border); padding:14px 20px; }}
-  header h1 {{ margin:0 0 4px; font-size:18px; }}
+    border-bottom:1px solid var(--border); padding:12px 20px; }}
+  .hrow {{ display:flex; justify-content:space-between; align-items:center; gap:20px; }}
+  header h1 {{ margin:0 0 3px; font-size:18px; }}
   .genline {{ color:var(--muted); font-size:13px; }}
-  .legend {{ color:var(--muted); font-size:12px; max-width:70ch; margin-top:6px; }}
-  .legend b {{ color:var(--fg); font-weight:600; }}
-  #q {{ width:100%; max-width:420px; margin-top:10px; padding:8px 12px; font-size:14px;
-    border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--fg); }}
+  #q {{ width:300px; flex:0 0 auto; padding:8px 12px; font-size:14px; border:1px solid var(--border);
+    border-radius:8px; background:var(--card); color:var(--fg); }}
+  details.legend {{ border-bottom:1px solid var(--border); background:var(--card);
+    padding:8px 20px; font-size:12px; color:var(--muted); }}
+  details.legend summary {{ cursor:pointer; color:var(--fg); font-weight:600; font-size:13px; }}
+  .legendbody {{ max-width:80ch; margin-top:8px; }}
+  details.legend b {{ color:var(--fg); font-weight:600; }}
   .layout {{ display:grid; grid-template-columns:240px 1fr; gap:0; align-items:start; }}
-  nav {{ position:sticky; top:96px; align-self:start; max-height:calc(100vh - 110px);
+  nav {{ position:sticky; top:72px; align-self:start; max-height:calc(100vh - 84px);
     overflow:auto; padding:16px; border-right:1px solid var(--border); }}
   nav h4 {{ margin:14px 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.04em;
     color:var(--muted); }}
@@ -597,11 +601,18 @@ def _build_html(items: list[dict], stats: dict) -> str:
 </style>
 </head><body>
 <header>
-  <h1>TeXLib — normal vs accessible feature gallery</h1>
-  <div class="genline">{html.escape(genline)}</div>
-  <div class="legend">{legend}</div>
-  <input id="q" type="search" placeholder="Filter features… (feature name, class, keyword)">
+  <div class="hrow">
+    <div class="htitle">
+      <h1>TeXLib — normal vs accessible feature gallery</h1>
+      <div class="genline">{html.escape(genline)}</div>
+    </div>
+    <input id="q" type="search" placeholder="Filter features…">
+  </div>
 </header>
+<details class="legend">
+  <summary>How to read this gallery</summary>
+  <div class="legendbody">{legend}</div>
+</details>
 <div class="layout">
   <nav>{"".join(toc)}</nav>
   <main>{sections}</main>
