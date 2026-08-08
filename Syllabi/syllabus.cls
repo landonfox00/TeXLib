@@ -287,7 +287,7 @@
 	\syllInfoIfPresent{%
 		\vspace{-0.98cm}
 		\begin{center}
-			\rule{6.5in}{0.4pt}
+			\rule{6.5in}{0.4pt}\\[5pt]
 			\begin{minipage}[t]{0.8\textwidth}
 			\renewcommand{\arraystretch}{1.0}%
 			\syllInfoTable
