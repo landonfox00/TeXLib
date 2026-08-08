@@ -23,7 +23,8 @@ const S = {
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+// esc, uniquifySVG, cssId, matchWith, argForMode, filterRep, sumPoints, examBody
+// live in logic.js (pure + unit-tested); loaded before this file.
 
 async function api(path, opts) {
   const res = await fetch(path, opts);
@@ -51,18 +52,6 @@ function fetchSVG(id, sol) {
       S.renderCache[key] = svg;
       return svg;
     });
-}
-/* pdftocairo reuses internal ids (glyph0-1, clip1, ...) across separately
-   rendered files, so inlining several SVGs on one page (Composer / Library)
-   makes every <use href="#glyph..."> resolve to the FIRST match -> scrambled
-   math. Namespace each injected SVG's ids + references so they stay isolated. */
-let _svgSeq = 0;
-function uniquifySVG(svg) {
-  const n = ++_svgSeq;
-  return svg
-    .replace(/\bid="([^"]+)"/g, (m, x) => `id="${x}__${n}"`)
-    .replace(/\b(xlink:href|href)="#([^"]+)"/g, (m, a, x) => `${a}="#${x}__${n}"`)
-    .replace(/url\(#([^)]+)\)/g, (m, x) => `url(#${x}__${n})`);
 }
 function injectSVG(el, id, sol) {
   if (!el) return;
@@ -105,16 +94,9 @@ async function boot() {
 
 /* ---------- filters shared ---------- */
 function topics() { const t = []; S.problems.forEach((p) => { if (p.topic && !t.includes(p.topic)) t.push(p.topic); }); return t; }
-function matchWith(p, f) {
-  if (f.topic !== "all" && p.topic !== f.topic) return false;
-  if (f.type !== "all" && p.type !== f.type) return false;
-  if (f.fresh && (p.used_in || []).length) return false;
-  if (f.q) { const hay = `${p.id} ${p.topic} ${p.section} ${p.preview}`.toLowerCase(); if (!hay.includes(f.q.toLowerCase())) return false; }
-  return true;
-}
 function usedFiles(p) { return [...new Set((p.used_in || []).map((u) => u.file))]; }
 function inExam(id) { const p = S.byId[id] || {}; return S.exam.entries.some((e) => e.arg === id || e.arg === "topic=" + p.topic); }
-function argFor(p) { return (S.insertMode === "filter" && p.topic) ? "topic=" + p.topic : p.id; }
+function argFor(p) { return argForMode(p, S.insertMode); }
 
 /* =======================================================================
    LIBRARY DESK
@@ -197,16 +179,8 @@ function renderTray() {
   $("#tray-total").innerHTML = `${entries.length} &middot; ${knownPoints()}`;
   renderCoverage();
 }
-function filterRep(arg) { const m = /topic=([^,]+)/.exec(arg); if (!m) return null; const t = m[1].trim(); return S.problems.find((p) => p.topic === t && p.points != null) || null; }
-function knownPoints() {
-  let n = 0;
-  S.exam.entries.forEach((e) => {
-    if (e.is_filter) { const c = filterRep(e.arg); if (c) n += c.points; }
-    else { const p = S.byId[e.arg]; if (p && p.points != null) n += p.points; }
-  });
-  return n;
-}
-function pointsApprox() { return S.exam.entries.some((e) => e.is_filter && filterRep(e.arg)); }
+function knownPoints() { return sumPoints(S.exam.entries, S.byId, S.problems); }
+function pointsApprox() { return S.exam.entries.some((e) => e.is_filter && filterRep(e.arg, S.problems)); }
 function usedText(p) {
   const u = p.used_in || [];
   if (!u.length) return `<span class="fresh-tag">&#10022; Fresh &mdash; not used in your other assessments</span>`;
@@ -404,7 +378,6 @@ function renderWall() {
   cards.forEach((p) => injectSVG($(`#wc-${cssId(p.id)}`), p.id, false));
   renderWallDock();
 }
-function cssId(id) { return id.replace(/[^A-Za-z0-9_-]/g, "_"); }
 function renderWallDock() {
   const film = $("#wall-film"); const entries = S.exam.entries;
   film.innerHTML = entries.length ? entries.map((e) => `
@@ -438,15 +411,7 @@ function closeModal() { S.modalId = null; $("#modal-overlay").classList.remove("
 /* =======================================================================
    exam mutations + tabs + misc
 ======================================================================= */
-function generateTeX() {
-  const fr = S.exam.entries.filter((e) => e.env === "fr");
-  const mc = S.exam.entries.filter((e) => e.env === "mc");
-  const blk = (name, arr) => `\\begin{${name}}\n${arr.map((e) => "\t\\problem{" + e.arg + "}").join("\n")}\n\\end{${name}}`;
-  const out = [];
-  if (fr.length) out.push(blk("problems", fr));
-  if (mc.length) out.push(blk("mcproblems", mc));
-  return out.join("\n\n") || "% add problems to build the exam body";
-}
+function generateTeX() { return examBody(S.exam.entries); }
 function refreshExam(data) {
   S.exam = data;
   renderTray(); renderRows();

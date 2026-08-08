@@ -77,6 +77,13 @@ class TexlibOpenTexamCommand(sublime_plugin.WindowCommand):
         if not exam:
             sublime.status_message("TeXLib: save the exam document first.")
             return
+        # Save first (like Ctrl+B) so TeXaM opens on the CURRENT text, not a stale
+        # on-disk copy: the active buffer, plus the resolved %!TeX root view if it
+        # is a different open file. A titled+dirty view saves silently; the second
+        # pass is a no-op once the first has cleared the dirty flag.
+        for v in (view, self.window.find_open_file(exam)):
+            if v is not None and v.file_name() and v.is_dirty():
+                v.run_command("save")
         settings = sublime.load_settings("TeXLib.sublime-settings")
         script = resolve_script(settings)
         if not os.path.isfile(script):
