@@ -141,13 +141,20 @@
 \setlength{\@sol@outervsep}{10pt}
 \let\solution\relax
 \let\endsolution\relax
+% Width of the solution box's content measure + parbox. Defaults to the full text
+% block (minus the 6pt fill pad each side); the side-by-side MC key redefines it
+% to the narrow solution column (\@mcframe@mid) so the box is MEASURED at the
+% width it is RENDERED at -- otherwise the body is measured at full width (one
+% line) but wraps to more lines in the narrow column, and the green fill/left rule,
+% sized from the mismeasured box, come up short of the content.
+\newcommand{\@sol@boxw}{\dimexpr\textwidth-12pt\relax}
 \newenvironment{solution}{%
 	\ifsolutions
 		\par
 		\gdef\@sol@rubric{}%
 		\@in@solutiontrue
 		\setbox\@sol@box\vbox\bgroup
-			\hsize\dimexpr\textwidth-12pt\relax
+			\hsize\@sol@boxw
 	\else
 		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
@@ -166,7 +173,7 @@
 		% In the MC-key minipage \@totalleftmargin is 0 (minipage zeroes it), so this
 		% is a no-op there and the box keeps its narrow column.
 		\noindent\hspace*{-\@totalleftmargin}%
-			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
+			\parbox[t]{\@sol@boxw}{%
 					% The green fill is a \smash\rlap'd rule drawn INSIDE the parbox's
 					% vertical list, BEHIND the content -- NOT a \colorbox.  \colorbox
 					% wraps its content in an \hbox whose inner nodes are orphaned for
@@ -180,7 +187,7 @@
 					% matching the old \colorbox{}'s \fboxsep=6pt.
 					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsoltint}{%
 						\rule[-\dimexpr\ht\@sol@box+\dp\@sol@box+6pt\relax]%
-							{\dimexpr\textwidth\relax}%
+							{\dimexpr\@sol@boxw+12pt\relax}%
 							{\dimexpr\ht\strutbox+\ht\@sol@box+\dp\@sol@box+12pt\relax}}}}%
 					% Left accent, drawn flush with the green fill above: its top/bottom
 					% match the fill's own edges (\ht\strutbox+6pt up, box+6pt down --
@@ -406,7 +413,11 @@
 			% Side-by-side: close the choices column, open the (narrow) solution
 			% column. Drop the box's outer padding so the "Solution." header
 			% top-aligns with choice A and the column doesn't outgrow the choices.
+			% Size the solution box to THIS column (\linewidth inside the minipage
+			% = \@mc@solw), so its fill/rule match the wrapped-in-column body rather
+			% than a mismeasured full-width one.
 			\end{minipage}\hfill\begin{minipage}[t]{\@mc@solw}%
+			\renewcommand{\@sol@boxw}{\dimexpr\linewidth-12pt\relax}%
 		\fi
 		\setlength{\@sol@outervsep}{0pt}%
 	\fi \fi
