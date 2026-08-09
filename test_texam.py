@@ -691,5 +691,31 @@ class ParserEdgeTests(unittest.TestCase):
         self.assertEqual(out.count("\n"), 1)   # line count preserved
 
 
+class ExportTests(unittest.TestCase):
+    """export_bank renders each problem once and writes <id>.svg (render stubbed)."""
+
+    def test_writes_one_svg_per_problem(self):
+        d = tempfile.mkdtemp(prefix="texam-export-")
+        exam = os.path.join(d, "exam.tex")
+        with open(exam, "w", encoding="utf-8") as fh:
+            fh.write(EXAM_BARE)
+        texam.CTX["exam"] = exam
+        probs = [bank_parser.Problem("p1", "", "b.tex", 0, "", "s"),
+                 bank_parser.Problem("p2", "", "b.tex", 0, "", "s")]
+        oa, orr, opw = bank_render.available, bank_render.render_svg, bank_render.prewarm
+        bank_render.available = lambda: True
+        bank_render.render_svg = lambda p, show_solution=False: "<svg>%s</svg>" % p.id
+        bank_render.prewarm = lambda problems, show_solution=False: []
+        out = os.path.join(d, "render")
+        try:
+            texam.export_bank(probs, out)
+        finally:
+            bank_render.available, bank_render.render_svg, bank_render.prewarm = oa, orr, opw
+        self.assertTrue(os.path.isfile(os.path.join(out, "p1.svg")))
+        self.assertTrue(os.path.isfile(os.path.join(out, "p2.svg")))
+        with open(os.path.join(out, "p1.svg"), encoding="utf-8") as fh:
+            self.assertIn("<svg>p1</svg>", fh.read())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
