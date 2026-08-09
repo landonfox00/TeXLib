@@ -32,11 +32,11 @@ try:
 except ImportError:
     import texlib_locate
 
-# CREATE_NO_WINDOW: the server runs with NO console at all -- no popup, no taskbar
-# window, no focus steal. It cleans itself up rather than orphaning: the page pings
-# to keep it alive and auto-quits ~5 min after the tab closes, plus a Quit button
-# in the UI stops it immediately. Output goes to a log so a startup error is still
-# recoverable.
+# No console at all: launch via pythonw.exe (windowless Python) when available,
+# with CREATE_NO_WINDOW as a backstop -- no popup, no taskbar window, no focus
+# steal. It cleans itself up rather than orphaning: the page pings to keep it
+# alive and auto-quits ~5 min after the tab closes, plus a Quit button stops it
+# immediately. Output goes to a log (python -u) so a startup error is recoverable.
 _CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 _LAUNCH_LOG = os.path.join(tempfile.gettempdir(), "texam-launch.log")
 
@@ -89,11 +89,18 @@ class TexlibOpenTexamCommand(sublime_plugin.WindowCommand):
         if not py:
             sublime.error_message("TeXLib: no python found on PATH to run it.")
             return
+        # Prefer pythonw.exe (the windowless Python) so there is genuinely NO
+        # console -- the definitive fix on Windows; CREATE_NO_WINDOW stays as a
+        # belt-and-suspenders. Fall back to python.exe if pythonw isn't beside it.
+        if os.name == "nt":
+            pyw = os.path.join(os.path.dirname(py), "pythonw.exe")
+            if os.path.isfile(pyw):
+                py = pyw
         try:
             log = open(_LAUNCH_LOG, "ab")            # child dups the fd; safe to close after
-            subprocess.Popen([py, script, exam], cwd=os.path.dirname(script),
+            subprocess.Popen([py, "-u", script, exam], cwd=os.path.dirname(script),
                              creationflags=_CREATE_NO_WINDOW,
-                             stdout=log, stderr=subprocess.STDOUT)
+                             stdout=log, stderr=subprocess.STDOUT)   # -u: live log
             log.close()
         except OSError as exc:
             sublime.error_message("TeXLib: could not launch TeXam: %s" % exc)
