@@ -226,6 +226,18 @@ class ServerTests(unittest.TestCase):
         st, _ct, _raw = self._req("GET", "/../texam.py")
         self.assertEqual(st, 404)
 
+    def test_ping_ok(self):
+        st, d = self._json("GET", "/api/ping")
+        self.assertEqual(st, 200)
+        self.assertTrue(d["ok"])
+
+    def test_quit_responds_ok(self):
+        # texam._httpd is None under test, so _shutdown() is a no-op -- the quit
+        # endpoint still acknowledges without killing this test's server.
+        st, d = self._json("POST", "/api/quit")
+        self.assertEqual(st, 200)
+        self.assertTrue(d["ok"])
+
     def test_static_css_content_type(self):
         st, ct, _raw = self._req("GET", "/app.css")
         self.assertEqual(st, 200)

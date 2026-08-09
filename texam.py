@@ -19,6 +19,11 @@ Endpoints (JSON unless noted):
   POST /api/exam/redo        -> reapply undone state   (+ {redone: label})
   POST /api/reveal           {id}  -> open the problem's source in Sublime
   GET  /api/render/<id>?sol= image/svg+xml (503 if the toolchain is missing)
+  GET  /api/ping             {ok}  -- keep-alive heartbeat (resets idle timer)
+  POST /api/quit             {ok}  -- stop the server
+
+CLI: `--export [dir]` renders every problem once and writes the SVGs to dir
+(default <exam-dir>/texam-render/), then exits without serving.
 """
 
 import json
@@ -27,6 +32,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote
@@ -45,6 +51,64 @@ _MIME = {
 
 CTX = {"exam": None, "by_id": {}, "sources": []}
 _write_lock = threading.Lock()
+
+# Server lifecycle: the running server, the last-request time, and the idle
+# window after which a hidden (console-less) server auto-quits so it can't
+# linger. The page pings every 30s while open, so this only fires once the tab
+# is really gone.
+_httpd = None
+_last_activity = 0.0
+_IDLE_TIMEOUT = 300.0
+
+
+def _touch():
+    global _last_activity
+    _last_activity = time.monotonic()
+
+
+def _shutdown():
+    """Stop serve_forever from a separate (non-handler) thread -- no deadlock."""
+    if _httpd is not None:
+        _httpd.shutdown()
+
+
+def _idle_watch():
+    """Auto-quit after _IDLE_TIMEOUT with no browser request, so a hidden
+    (console-less) server cleans itself up once the tab is closed."""
+    while True:
+        time.sleep(15)
+        if time.monotonic() - _last_activity > _IDLE_TIMEOUT:
+            _shutdown()
+            return
+
+
+def export_bank(problems, outdir=None, show_solution=False):
+    """Render every problem ONCE and save the SVGs to a persistent directory --
+    a portable, reusable image set for a bank, with no server and no
+    re-rendering later. Renders in parallel; prints a per-problem failure line."""
+    if not bank_render.available():
+        sys.exit("texam: renderer unavailable (need lualatex + pdftocairo/dvisvgm)")
+    if not outdir:
+        outdir = os.path.join(os.path.dirname(CTX["exam"]), "texam-render")
+    os.makedirs(outdir, exist_ok=True)
+    print(f"TeXaM export: rendering {len(problems)} problem(s) in parallel...")
+    for t in bank_render.prewarm(problems, show_solution=show_solution):
+        t.join()                                        # populate the cache in parallel
+    ok = fail = 0
+    for p in problems:
+        try:
+            svg = bank_render.render_svg(p, show_solution=show_solution)  # cache hit
+            if not bank_render._is_complete_svg(svg):
+                raise RuntimeError("empty render")
+            with open(os.path.join(outdir, p.id + ".svg"), "w", encoding="utf-8") as fh:
+                fh.write(svg)
+            ok += 1
+        except Exception as exc:
+            fail += 1
+            first = str(exc).splitlines()[0] if str(exc) else type(exc).__name__
+            print(f"  ! {p.id}: {first}")
+    print(f"TeXaM export: wrote {ok} SVG(s) to {outdir}"
+          + (f"  ({fail} failed)" if fail else ""))
 
 # Undo/redo: snapshots of the whole exam-file text taken before each edit, so a
 # restore is exact regardless of index churn. Each entry is (text, nl, label).
@@ -178,11 +242,14 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- routing -----------------------------------------------------------
     def do_GET(self):
+        _touch()
         try:
             u = urlparse(self.path)
             path, qs = u.path, parse_qs(u.query)
             if path == "/" or path == "/index.html":
                 return self._static("index.html")
+            if path == "/api/ping":                     # keep-alive heartbeat
+                return self._json({"ok": True})
             if path == "/api/bank":
                 return self._api_bank()
             if path == "/api/exam":
@@ -196,8 +263,13 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"error": str(exc)}, 500)
 
     def do_POST(self):
+        _touch()
         try:
             u = urlparse(self.path)
+            if u.path == "/api/quit":                   # stop the server (Quit button)
+                self._json({"ok": True})
+                threading.Thread(target=_shutdown, daemon=True).start()
+                return
             if u.path == "/api/exam/add":
                 return self._api_add(self._body_json())
             if u.path == "/api/exam/remove":
@@ -315,7 +387,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def main(argv):
     if len(argv) < 2:
-        sys.exit("usage: python texam.py <exam.tex> [--port N] [--no-open]")
+        sys.exit("usage: python texam.py <exam.tex> [--port N] [--no-open] "
+                 "[--export [dir]]")
     exam = os.path.abspath(argv[1])
     if not os.path.isfile(exam):
         sys.exit(f"texam: no such exam file: {exam}")
@@ -332,6 +405,12 @@ def main(argv):
         problems = refresh_bank()
     except Exception as exc:            # a parse error must not crash the launcher
         sys.exit(f"texam: could not read the exam or its bank: {exc}")
+
+    if "--export" in argv:             # render all + save SVGs, then exit (no server)
+        i = argv.index("--export")
+        outdir = argv[i + 1] if i + 1 < len(argv) and not argv[i + 1].startswith("-") else None
+        return export_bank(problems, outdir)
+
     print(f"TeXaM -- exam: {CTX['exam']}")
     print(f"  bank sources: {len(CTX['sources'])}, problems: {len(problems)}")
     if not problems:
@@ -349,6 +428,10 @@ def main(argv):
         sys.exit(f"texam: cannot serve on port {port} ({exc}).\n"
                  "  TeXaM may already be running -- close its window, or "
                  "pass --port <n> to use a different port.")
+    global _httpd
+    _httpd = httpd
+    _touch()
+    threading.Thread(target=_idle_watch, daemon=True).start()   # hidden-server cleanup
     url = f"http://127.0.0.1:{httpd.server_address[1]}/"
     print(f"  serving {url}  (Ctrl+C to stop)")
     if do_open:
