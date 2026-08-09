@@ -594,6 +594,18 @@ $("#theme-btn").addEventListener("click", () => {
   root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
 });
 
+/* keep the (console-less) server alive while this tab is open; it auto-quits a
+   few minutes after the last ping, so closing the tab cleans it up. */
+let _heartbeat = setInterval(() => fetch("/api/ping").catch(() => {}), 30000);
+$("#quit-btn").addEventListener("click", async () => {
+  if (!confirm("Quit TeXaM? This stops the local server. Your exam changes are already saved to disk.")) return;
+  clearInterval(_heartbeat);
+  try { await fetch("/api/quit", { method: "POST" }); } catch (e) {}
+  document.body.innerHTML =
+    '<div style="display:grid;place-items:center;height:100vh;font-family:system-ui;color:#888">' +
+    'TeXaM stopped &mdash; you can close this tab.</div>';
+});
+
 /* double-click the RENDERED problem -> reveal its definition in Sublime.
    Scoped to .render-box so buttons (show solution / add / copy) never trigger it. */
 document.addEventListener("dblclick", (ev) => {
