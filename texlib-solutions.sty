@@ -56,6 +56,7 @@
 
 \newbox\@partsol@box
 \newbox\@sol@box
+\newbox\@sol@vtop
 \gdef\@partsol@rubric{}
 \gdef\@sol@rubric{}
 
@@ -141,20 +142,13 @@
 \setlength{\@sol@outervsep}{10pt}
 \let\solution\relax
 \let\endsolution\relax
-% Width of the solution box's content measure + parbox. Defaults to the full text
-% block (minus the 6pt fill pad each side); the side-by-side MC key redefines it
-% to the narrow solution column (\@mcframe@mid) so the box is MEASURED at the
-% width it is RENDERED at -- otherwise the body is measured at full width (one
-% line) but wraps to more lines in the narrow column, and the green fill/left rule,
-% sized from the mismeasured box, come up short of the content.
-\newcommand{\@sol@boxw}{\dimexpr\textwidth-12pt\relax}
 \newenvironment{solution}{%
 	\ifsolutions
 		\par
 		\gdef\@sol@rubric{}%
 		\@in@solutiontrue
 		\setbox\@sol@box\vbox\bgroup
-			\hsize\@sol@boxw
+			\hsize\dimexpr\textwidth-12pt\relax
 	\else
 		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
@@ -164,6 +158,25 @@
 		\@in@solutionfalse
 		\par\vspace{\@sol@outervsep}%
 		\setlength{\fboxsep}{6pt}%
+		% Collect the "Solution." header (+ any \rubric overlay) and the pre-\box'd
+		% body into ONE \vtop, whose reference point is the header baseline. Then
+		% \dp\@sol@vtop is the EXACT distance from that baseline down to the body's
+		% bottom, so the green fill / left accent size to the real rendered content.
+		% The old formula reconstructed the header->body gap from \ht\strutbox + a
+		% fixed pad; that held for the full-width free-response box but came up short
+		% in the narrow side-by-side MC-key column (the body sat a full extra line
+		% below where the formula assumed), leaving the last line outside the fill.
+		\setbox\@sol@vtop\vtop{%
+			\hsize\dimexpr\textwidth-12pt\relax
+			\noindent\texlibsolheader%
+			\ifrubric
+				\ifx\@sol@rubric\@empty\else
+					\@emit@rubric@overlay{\@sol@rubric}%
+				\fi
+			\fi
+			\par\vskip2pt
+			\box\@sol@box
+		}%
 		% Full-bleed to the true text margins.  {solution} renders inside the
 		% exam-class {questions} list body, whose left indent (\@totalleftmargin)
 		% \noindent does NOT remove; without this the full-\textwidth box is shifted
@@ -173,40 +186,26 @@
 		% In the MC-key minipage \@totalleftmargin is 0 (minipage zeroes it), so this
 		% is a no-op there and the box keeps its narrow column.
 		\noindent\hspace*{-\@totalleftmargin}%
-			\parbox[t]{\@sol@boxw}{%
-					% The green fill is a \smash\rlap'd rule drawn INSIDE the parbox's
-					% vertical list, BEHIND the content -- NOT a \colorbox.  \colorbox
-					% wraps its content in an \hbox whose inner nodes are orphaned for
-					% SyncTeX reverse search, so `synctex edit` on the solution
-					% resolved to nothing (task_b7217810 / task_dbeb33f6) even though
-					% the solution's redirected bank-file records were present.  An
-					% \rlap at the OUTER horizontal level orphans it the same way; drawn
-					% inside the parbox (like the accent) the content stays reachable,
-					% so clicking the solution in the PDF now inverse-searches.  The
-					% fill spans the header line down past the box, +6pt pad each side,
-					% matching the old \colorbox{}'s \fboxsep=6pt.
+			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
+				\noindent
+					% Green fill + left accent \smash\rlap'd BEHIND the content on this
+					% one line (the \box\@sol@vtop below shares this baseline = the
+					% header baseline). NOT a \colorbox, which orphans the content for
+					% SyncTeX reverse search (task_b7217810 / task_dbeb33f6); the \rlap
+					% inside the parbox keeps the \box'd nodes reachable. +6pt pad each
+					% side, matching the old \colorbox{}'s \fboxsep=6pt.
 					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsoltint}{%
-						\rule[-\dimexpr\ht\@sol@box+\dp\@sol@box+6pt\relax]%
-							{\dimexpr\@sol@boxw+12pt\relax}%
-							{\dimexpr\ht\strutbox+\ht\@sol@box+\dp\@sol@box+12pt\relax}}}}%
-					% Left accent, drawn flush with the green fill above: its top/bottom
-					% match the fill's own edges (\ht\strutbox+6pt up, box+6pt down --
-					% the same 6pt pad the \rule uses) so it reads as a full-height left
-					% border like pset/didactic's tcolorbox borderline west, not a short
-					% header-line tick.  \smash'd so it adds nothing to the box's own
-					% height/depth.
+						\rule[-\dimexpr\dp\@sol@vtop+6pt\relax]%
+							{\dimexpr\textwidth\relax}%
+							{\dimexpr\ht\@sol@vtop+\dp\@sol@vtop+12pt\relax}}}}%
+					% Left accent, top/bottom flush with the green fill (the same 6pt
+					% pad), reading as a full-height left border like pset/didactic's
+					% tcolorbox borderline west. \smash'd so it adds no height/depth.
 					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsolrulecolor}{%
 						\vrule width 1.5pt
-							height \dimexpr\ht\strutbox+6pt\relax
-							depth \dimexpr\ht\@sol@box+\dp\@sol@box+6pt\relax}}}%
-				\noindent\texlibsolheader%
-				\ifrubric
-					\ifx\@sol@rubric\@empty\else
-						\@emit@rubric@overlay{\@sol@rubric}%
-					\fi
-				\fi
-				\par\vskip2pt
-				\box\@sol@box
+							height \dimexpr\ht\@sol@vtop+6pt\relax
+							depth \dimexpr\dp\@sol@vtop+6pt\relax}}}%
+				\box\@sol@vtop
 			}%
 		\vspace{\@sol@outervsep}%
 	\else
@@ -413,11 +412,7 @@
 			% Side-by-side: close the choices column, open the (narrow) solution
 			% column. Drop the box's outer padding so the "Solution." header
 			% top-aligns with choice A and the column doesn't outgrow the choices.
-			% Size the solution box to THIS column (\linewidth inside the minipage
-			% = \@mc@solw), so its fill/rule match the wrapped-in-column body rather
-			% than a mismeasured full-width one.
 			\end{minipage}\hfill\begin{minipage}[t]{\@mc@solw}%
-			\renewcommand{\@sol@boxw}{\dimexpr\linewidth-12pt\relax}%
 		\fi
 		\setlength{\@sol@outervsep}{0pt}%
 	\fi \fi
