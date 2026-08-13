@@ -588,11 +588,23 @@ $("#recent-close").addEventListener("click", () => { S.recentOpen = false; rende
 $("#palette-open").addEventListener("click", openPalette);
 $("#palette-overlay").addEventListener("click", (e) => { if (e.target.id === "palette-overlay") closePalette(); });
 $("#modal-overlay").addEventListener("click", (e) => { if (e.target.id === "modal-overlay") closeModal(); });
-$("#theme-btn").addEventListener("click", () => {
-  const root = document.documentElement;
-  const cur = root.getAttribute("data-theme") || (matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light");
-  root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
-});
+/* theme: Auto (default, follows the OS) / Light / Dark, persisted.
+   Auto is stored as the ABSENCE of the key -- see themeAttr in logic.js. The
+   pre-paint script in index.html applies the saved value; this only keeps the
+   buttons in sync and handles clicks. */
+function initTheme() {
+  const root = document.documentElement, LS = window.localStorage;
+  const buttons = $$("#theme-seg button[data-set-theme]");
+  const apply = (pref, remember) => {
+    const attr = themeAttr(pref);
+    if (attr) root.setAttribute("data-theme", attr); else root.removeAttribute("data-theme");
+    const norm = normalizeTheme(pref);
+    if (remember) { norm === "auto" ? LS.removeItem("texam.theme") : LS.setItem("texam.theme", norm); }
+    buttons.forEach((b) => b.setAttribute("aria-pressed", b.dataset.setTheme === norm));
+  };
+  buttons.forEach((b) => b.addEventListener("click", () => apply(b.dataset.setTheme, true)));
+  apply(LS.getItem("texam.theme"), false);
+}
 
 /* keep the (console-less) server alive while this tab is open; it auto-quits a
    few minutes after the last ping, so closing the tab cleans it up. */
@@ -675,4 +687,5 @@ function initTagToggles() {
 
 initPanels();
 initTagToggles();
+initTheme();
 boot();
