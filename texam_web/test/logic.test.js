@@ -77,6 +77,18 @@ test("sumPoints adds concrete ids and estimates filters", () => {
   assert.strictEqual(L.sumPoints([], byId, problems), 0);
 });
 
+test("theme preference normalizes to auto and maps auto to no attribute", () => {
+  assert.deepStrictEqual(L.THEMES, ["auto", "light", "dark"]);
+  assert.strictEqual(L.normalizeTheme("dark"), "dark");
+  assert.strictEqual(L.normalizeTheme("light"), "light");
+  assert.strictEqual(L.normalizeTheme("auto"), "auto");
+  assert.strictEqual(L.normalizeTheme("system"), "auto");   // unknown -> the default
+  assert.strictEqual(L.normalizeTheme(null), "auto");       // nothing stored -> the default
+  assert.strictEqual(L.themeAttr("auto"), null);            // auto == no data-theme
+  assert.strictEqual(L.themeAttr("junk"), null);
+  assert.strictEqual(L.themeAttr("dark"), "dark");
+});
+
 test("examBody emits FR + MC blocks (or a placeholder when empty)", () => {
   const body = L.examBody([
     { arg: "a", env: "fr" }, { arg: "topic=t", env: "fr" }, { arg: "m", env: "mc" },

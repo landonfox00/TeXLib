@@ -55,6 +55,13 @@ function sumPoints(entries, byId, problems) {
   return n;
 }
 
+// Theme preference: "auto" (follow the OS), "light", "dark". Auto is expressed as
+// the ABSENCE of a data-theme attribute -- that is what lets the prefers-color-
+// scheme rules keep tracking the OS live -- so themeAttr returns null for it.
+const THEMES = ["auto", "light", "dark"];
+function normalizeTheme(v) { return THEMES.includes(v) ? v : "auto"; }
+function themeAttr(pref) { const t = normalizeTheme(pref); return t === "auto" ? null : t; }
+
 // the \begin{problems}/\begin{mcproblems} body from the current entries
 function examBody(entries) {
   const fr = (entries || []).filter((e) => e.env === "fr");
@@ -68,5 +75,6 @@ function examBody(entries) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { esc, uniquifySVG, cssId, matchWith, argForMode, filterRep, sumPoints, examBody };
+  module.exports = { esc, uniquifySVG, cssId, matchWith, argForMode, filterRep, sumPoints, examBody,
+                     THEMES, normalizeTheme, themeAttr };
 }
