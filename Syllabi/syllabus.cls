@@ -287,11 +287,13 @@
 	\syllInfoIfPresent{%
 		\vspace{-0.98cm}
 		\begin{center}
-			\rule{6.5in}{0.4pt}
-			\begin{minipage}[t]{0.8\textwidth}
-			\renewcommand{\arraystretch}{1.0}%
-			\syllInfoTable
-			\end{minipage}
+			\rule{6.5in}{0.4pt}\\[5pt]
+			% Center the info tabular directly rather than left-aligning it in a
+			% fixed-width (0.8\textwidth) minipage: a wide layout (e.g. a 3-column
+			% \setsyllabusinfo) overran that box and sat off-centre, shifted right.
+			% \\[5pt] gives symmetric space above the bottom rule (mirrors the top).
+			{\renewcommand{\arraystretch}{1.0}%
+			\syllInfoTable}\\[5pt]
 			\rule{6.5in}{0.4pt}
 		\end{center}
 		\vspace{-0.55cm}

@@ -11,6 +11,10 @@ course-metadata_old.sty
 # Local feature-idea scratch log (cron-appended; not distributed to coworkers)
 /FEATURE-IDEAS.md
 
+# Generated accessibility feature gallery (a11y_gallery.py output; multi-MB,
+# environment-specific renders — regenerate locally, don't commit)
+/a11y_gallery.html
+
 # LaTeX build artifacts
 *.aux
 *.log

@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TeXaM</title>
   <link rel="stylesheet" href="app.css">
+  <!-- Applies a saved theme before the first paint. app.js runs at the end of
+       <body>, which is far too late: a dark-by-choice user on a light OS would
+       get a full white flash of the desk first. Auto stores nothing. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("texam.theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <header class="topbar">
@@ -31,7 +42,11 @@
     </div>
     <button class="icon-btn" id="toggle-rail" title="Show / hide the filter panel" aria-label="Toggle left panel" aria-pressed="false">&#9703;</button>
     <button class="icon-btn" id="toggle-tray" title="Show / hide the exam panel" aria-label="Toggle right panel" aria-pressed="false">&#9704;</button>
-    <button class="icon-btn" id="theme-btn" title="Toggle light / dark" aria-label="Toggle theme">&#9680;</button>
+    <div class="seg theme-seg" id="theme-seg" role="group" aria-label="Colour theme">
+      <button data-set-theme="auto" aria-pressed="true" title="Follow the system theme"><span class="lbl">Auto</span><span class="ico" aria-hidden="true">&#9680;</span></button>
+      <button data-set-theme="light" aria-pressed="false" title="Always light"><span class="lbl">Light</span><span class="ico" aria-hidden="true">&#9788;</span></button>
+      <button data-set-theme="dark" aria-pressed="false" title="Always dark"><span class="lbl">Dark</span><span class="ico" aria-hidden="true">&#9790;</span></button>
+    </div>
     <button class="icon-btn" id="quit-btn" title="Quit TeXaM (stop the server)" aria-label="Quit">&#9211;</button>
   </header>
 
