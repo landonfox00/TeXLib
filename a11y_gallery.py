@@ -512,23 +512,37 @@ def _build_html(items: list[dict], stats: dict) -> str:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TeXLib — normal vs accessible feature gallery</title>
+<script>
+  /* Applies a saved theme before the first paint, so a dark-by-choice reader on
+     a light OS never sees a white flash. Auto stores nothing. */
+  (function () {{
+    try {{
+      var t = localStorage.getItem("texlib.gallery.theme");
+      if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+    }} catch (e) {{}}
+  }})();
+</script>
 <style>
+  /* Three theme states: Auto (the default), Light, Dark. Auto is the ABSENCE of
+     a data-theme attribute -- that is what lets the query keep tracking the OS
+     as it flips -- so the dark rules are guarded against an explicit Light
+     choice instead of relying on a duplicate light block to outrank them. */
   :root {{
+    color-scheme:light;
     --bg:#ffffff; --fg:#1a1a1a; --muted:#6b7280; --card:#f7f7f8; --border:#e2e2e6;
     --accent:#2563eb; --pass:#15803d; --passbg:#dcfce7; --fail:#b91c1c; --failbg:#fee2e2;
     --na:#6b7280; --nabg:#eef0f2; --code:#f2f2f5;
   }}
   @media (prefers-color-scheme: dark) {{
-    :root {{ --bg:#0f1115; --fg:#e6e6e6; --muted:#9aa1ac; --card:#171a21; --border:#2a2e37;
+    :root:not([data-theme="light"]) {{ color-scheme:dark;
+      --bg:#0f1115; --fg:#e6e6e6; --muted:#9aa1ac; --card:#171a21; --border:#2a2e37;
       --accent:#60a5fa; --pass:#4ade80; --passbg:#0c2a17; --fail:#f87171; --failbg:#2a1113;
       --na:#9aa1ac; --nabg:#20242c; --code:#1b1f27; }}
   }}
-  :root[data-theme="dark"] {{ --bg:#0f1115; --fg:#e6e6e6; --muted:#9aa1ac; --card:#171a21;
+  :root[data-theme="dark"] {{ color-scheme:dark;
+    --bg:#0f1115; --fg:#e6e6e6; --muted:#9aa1ac; --card:#171a21;
     --border:#2a2e37; --accent:#60a5fa; --pass:#4ade80; --passbg:#0c2a17; --fail:#f87171;
     --failbg:#2a1113; --na:#9aa1ac; --nabg:#20242c; --code:#1b1f27; }}
-  :root[data-theme="light"] {{ --bg:#ffffff; --fg:#1a1a1a; --muted:#6b7280; --card:#f7f7f8;
-    --border:#e2e2e6; --accent:#2563eb; --pass:#15803d; --passbg:#dcfce7; --fail:#b91c1c;
-    --failbg:#fee2e2; --na:#6b7280; --nabg:#eef0f2; --code:#f2f2f5; }}
   * {{ box-sizing:border-box; }}
   body {{ margin:0; background:var(--bg); color:var(--fg);
     font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }}
@@ -539,6 +553,14 @@ def _build_html(items: list[dict], stats: dict) -> str:
   .genline {{ color:var(--muted); font-size:13px; }}
   #q {{ width:300px; flex:0 0 auto; padding:8px 12px; font-size:14px; border:1px solid var(--border);
     border-radius:8px; background:var(--card); color:var(--fg); }}
+  .hcontrols {{ display:flex; align-items:center; gap:12px; flex:0 0 auto; }}
+  .themeseg {{ display:flex; gap:2px; padding:3px; border:1px solid var(--border);
+    border-radius:8px; background:var(--card); }}
+  .themeseg button {{ font:inherit; font-size:12px; font-weight:600; color:var(--muted);
+    background:none; border:0; padding:4px 9px; border-radius:6px; cursor:pointer; }}
+  .themeseg button:hover {{ color:var(--fg); }}
+  .themeseg button[aria-pressed="true"] {{ background:var(--accent); color:#fff; }}
+  .themeseg button:focus-visible {{ outline:2px solid var(--accent); outline-offset:2px; }}
   details.legend {{ border-bottom:1px solid var(--border); background:var(--card);
     padding:8px 20px; font-size:12px; color:var(--muted); }}
   details.legend summary {{ cursor:pointer; color:var(--fg); font-weight:600; font-size:13px; }}
@@ -606,7 +628,14 @@ def _build_html(items: list[dict], stats: dict) -> str:
       <h1>TeXLib — normal vs accessible feature gallery</h1>
       <div class="genline">{html.escape(genline)}</div>
     </div>
-    <input id="q" type="search" placeholder="Filter features…">
+    <div class="hcontrols">
+      <input id="q" type="search" placeholder="Filter features…">
+      <div class="themeseg" id="themeseg" role="group" aria-label="Colour theme">
+        <button data-set-theme="auto" aria-pressed="true" title="Follow the system theme">Auto</button>
+        <button data-set-theme="light" aria-pressed="false" title="Always light">Light</button>
+        <button data-set-theme="dark" aria-pressed="false" title="Always dark">Dark</button>
+      </div>
+    </div>
   </div>
 </header>
 <details class="legend">
@@ -625,6 +654,29 @@ def _build_html(items: list[dict], stats: dict) -> str:
     for (const s of secs) s.style.display =
       (!t || s.dataset.search.includes(t)) ? '' : 'none';
   }});
+
+  /* Theme: Auto (default, follows the OS) / Light / Dark, persisted. Auto is
+     stored as the absence of the key, so a fresh reader follows the OS. */
+  (() => {{
+    const root = document.documentElement;
+    const btns = [...document.querySelectorAll('#themeseg button[data-set-theme]')];
+    const apply = (pref, remember) => {{
+      const p = ['auto', 'light', 'dark'].includes(pref) ? pref : 'auto';
+      if (p === 'auto') root.removeAttribute('data-theme');
+      else root.setAttribute('data-theme', p);
+      if (remember) {{
+        try {{
+          if (p === 'auto') localStorage.removeItem('texlib.gallery.theme');
+          else localStorage.setItem('texlib.gallery.theme', p);
+        }} catch (e) {{}}
+      }}
+      for (const b of btns) b.setAttribute('aria-pressed', b.dataset.setTheme === p);
+    }};
+    for (const b of btns) b.addEventListener('click', () => apply(b.dataset.setTheme, true));
+    let saved = null;
+    try {{ saved = localStorage.getItem('texlib.gallery.theme'); }} catch (e) {{}}
+    apply(saved, false);
+  }})();
 </script>
 </body></html>"""
 
