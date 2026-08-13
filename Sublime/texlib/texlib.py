@@ -51,6 +51,7 @@ MODES = [
     ("rubric", "Rubric", "Injects \\def\\ShowRubric{}."),
     ("draft", "Draft", "Injects \\def\\ShowDraft{}."),
     ("quick", "Quick (single pass)", "One pass, no biber, no reruns."),
+    ("full", "Full (2-pass)", "Force the settling 2-pass build even when default_build_mode is quick."),
 ]
 MODE_TOKENS = {m[0] for m in MODES}
 
@@ -152,6 +153,19 @@ def _raw_engine(src):
     owns that (its _select_engine), so forcing stays a single source of truth."""
     m = PROGRAM_RE.search(src)
     return m.group(1).strip().lower() if m else "pdflatex"
+
+
+def _resolve_texinputs(raw):
+    """Normalize the `texinputs` setting (string or list of segments) into the
+    child engine's TEXINPUTS. Guarantees an empty segment: kpathsea only APPENDS
+    its default path at one -- without it TEXINPUTS REPLACES the default, so
+    texmf-dist drops out and every build fatals at startup (luaotfload can't
+    even find its Unicode data files). No working config can want that."""
+    if isinstance(raw, list):
+        raw = os.pathsep.join(raw)
+    if raw and "" not in raw.split(os.pathsep):
+        raw += os.pathsep
+    return raw
 
 
 # --- Shadow-install warning (N3) ---------------------------------------------
@@ -354,6 +368,16 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         log_path = _aux_log_path(root, base)
 
         settings = sublime.load_settings("TeXLib.sublime-settings")
+        # Quick-preview default: the plain build (mode "default", i.e. Ctrl+B /
+        # the Build menu entry) honors default_build_mode. "quick" runs a single
+        # fast pass (cross-refs / "page X of Y" may be stale) for tight authoring
+        # loops; "full" or unset runs the settling 2-pass build. Only "default"
+        # is remapped -- explicit modes (key/solutions/quick/full/...) pass
+        # through untouched, so "Build — Full" always forces a settling build.
+        if mode == "default":
+            _dbm = str(settings.get("default_build_mode") or "default").strip().lower()
+            if _dbm in ("quick", "full"):
+                mode = _dbm
         # Panel visibility, LaTeXTools-style: 'errors' (default) surfaces the panel
         # only on failure, as a condensed report; 'always' streams the raw log
         # live; 'never' keeps it hidden (status bar only).
@@ -372,19 +396,18 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
 
         # Optional TEXINPUTS: real cross-package builds need the repo root on the
         # path (comma-free junction). Resolved on the main thread; blank inherits.
-        texinputs = settings.get("texinputs") or ""
-        if isinstance(texinputs, list):
-            texinputs = os.pathsep.join(texinputs)
+        texinputs = _resolve_texinputs(settings.get("texinputs") or "")
 
         host = texlib_build.TexlibBuild(
             tex_root=root, engine=engine,
             options=["--texlib-mode=%s" % mode], display=emit,
         )
-        # Publish toggles: the native host has no LaTeXTools builder_settings, so
+        # Build toggles: the native host has no LaTeXTools builder_settings, so
         # feed the sublime settings in (the brain's _setting_on reads them first,
-        # else falls back to the TEXLIB_PUBLISH* env vars).
+        # else falls back to the matching TEXLIB_* env vars).
         toggles = {}
-        for _k in ("publish_shareable_copies", "copy_published_path_to_clipboard"):
+        for _k in ("publish_shareable_copies", "copy_published_path_to_clipboard",
+                   "detect_reruns_by_state"):
             _v = settings.get(_k)
             if _v is not None:
                 toggles[_k] = _v

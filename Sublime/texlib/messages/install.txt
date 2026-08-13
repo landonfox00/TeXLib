@@ -12,12 +12,24 @@ Sync, View PDF).
 First steps
 -----------
 1.  Run  Tools → TeXLib → Edit Settings  and set "texinputs" to your comma-free
-    TeXLib checkout, e.g.:
+    TeXLib checkout as an EXPLICIT, non-recursive list — the repo root plus the
+    module dirs, e.g.:
 
-        "texinputs": ".;C:/_texlibjunc//;"
+        "texinputs": [
+            ".", "C:/_texlibjunc",
+            "C:/_texlibjunc/Exams", "C:/_texlibjunc/Quizzes", "C:/_texlibjunc/Notes",
+            "C:/_texlibjunc/Problem Sets", "C:/_texlibjunc/Report Cards",
+            "C:/_texlibjunc/Schedule", "C:/_texlibjunc/Syllabi",
+            "C:/_texlibjunc/Bingo", "C:/_texlibjunc/Bank", ""
+        ]
 
     This is how builds resolve the shared texlib-*.sty and the class files —
-    from your live checkout, so you never need to copy classes into TEXMF.
+    from your live checkout, so you never need to copy classes into TEXMF. Use
+    this explicit list rather than a recursive "C:/_texlibjunc//": recursion
+    walks .git and any .claude/worktrees copies (slow, worse on a cold cache)
+    and can let a stale examples/*.aux shadow a same-named build. Keep the
+    trailing "" — kpathsea appends its default TeX Live path at an empty
+    segment; without one TEXINPUTS replaces the default path outright.
 
 2.  If a previous install copied the classes into TEXMFHOME, run
     Tools → TeXLib → Uninstall Classes from TEXMF  to remove that copy, so it

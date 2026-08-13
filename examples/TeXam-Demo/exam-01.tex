@@ -1,0 +1,32 @@
+% Exam 01 — TeXam demo exam.
+%
+% There is NO \loadbank here: the bank is wired through coursemeta.tex's
+% bank-path (Bank/bank.tex), which autoexam auto-loads. The \problem{topic=...}
+% filters pull a matching problem from the bank each build; \shuffle makes the
+% A/B/C versions differ. Open this file in TeXam to browse the whole bank and
+% compose the exam:  python texam.py examples/TeXam-Demo/exam-01.tex
+%
+% Build the collated A/B/C student exams:  lualatex exam-01.tex
+% Build the answer keys:                    lualatex "\def\ShowKey{}\input{exam-01.tex}"
+
+\documentclass[exam-number = 1]{autoexam}
+
+\versions{A, B, C}
+\shuffle
+
+\begin{document}
+\maketitle
+
+\begin{problems}
+	\problem{topic=limit}
+	\problem{topic=derivative}
+	\problem{topic=integral}
+\end{problems}
+
+\begin{mcproblems}
+	\problem{topic=limit}
+	\problem{topic=derivative}
+	\problem{topic=integral}
+\end{mcproblems}
+
+\end{document}

@@ -1,6 +1,7 @@
-/* Bank Studio -- Library Desk.  Ink-on-paper identity: a math-serif display
+/* TeXam -- Library Desk.  Ink-on-paper identity: a math-serif display
    (Cambria), native UI sans (Segoe UI), Consolas for LaTeX; cobalt accent. */
 :root{
+  color-scheme:light;
   --paper:#F1F2EE; --panel:#FFFFFF; --panel-2:#F6F7F9; --inset:#EDEFF3;
   --ink:#171A21; --ink-2:#586173; --ink-3:#8A93A3;
   --line:#DCE0E7; --line-2:#E9ECF1;
@@ -13,8 +14,15 @@
   --ui:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
   --mono:"Cascadia Code","Cascadia Mono",Consolas,"SFMono-Regular",ui-monospace,monospace;
 }
+/* Three theme states: Auto (the default), Light, Dark. Auto is the ABSENCE of a
+   data-theme attribute -- that is what lets the query below keep tracking the OS
+   as it flips -- so the dark rules are guarded against an explicit Light choice
+   rather than being outranked by a duplicate light block. Light stays on bare
+   :root, so every token has a definition outside any media query.
+   color-scheme rides along so native scrollbars/controls follow suit. */
 @media (prefers-color-scheme:dark){
-  :root{
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
     --paper:#0F1217; --panel:#161A21; --panel-2:#1C212B; --inset:#12161D;
     --ink:#E8EBF1; --ink-2:#9BA4B4; --ink-3:#6C7484;
     --line:#262C37; --line-2:#2E3543;
@@ -25,15 +33,8 @@
     --shadow-lift:0 2px 8px rgba(0,0,0,.5),0 22px 50px rgba(0,0,0,.55);
   }
 }
-:root[data-theme="light"]{
-  --paper:#F1F2EE; --panel:#FFFFFF; --panel-2:#F6F7F9; --inset:#EDEFF3;
-  --ink:#171A21; --ink-2:#586173; --ink-3:#8A93A3; --line:#DCE0E7; --line-2:#E9ECF1;
-  --accent:#2E48D6; --accent-weak:#E6EAFB; --accent-ink:#22349E;
-  --mc:#9A5B00; --mc-weak:#F7EBD8; --ok:#0E7A50; --ok-weak:#E1F1E9; --warn:#9A3412;
-  --shadow:0 1px 2px rgba(20,26,45,.05),0 8px 24px rgba(20,26,45,.06);
-  --shadow-lift:0 2px 6px rgba(20,26,45,.08),0 18px 44px rgba(20,26,45,.14);
-}
 :root[data-theme="dark"]{
+  color-scheme:dark;
   --paper:#0F1217; --panel:#161A21; --panel-2:#1C212B; --inset:#12161D;
   --ink:#E8EBF1; --ink-2:#9BA4B4; --ink-3:#6C7484; --line:#262C37; --line-2:#2E3543;
   --accent:#7E98FF; --accent-weak:#1D2640; --accent-ink:#B7C5FF;
@@ -41,6 +42,12 @@
   --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
   --shadow-lift:0 2px 8px rgba(0,0,0,.5),0 22px 50px rgba(0,0,0,.55);
 }
+
+/* explicit scrollbar thumb on top of the color-scheme default */
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--ink-3);border:3px solid transparent;border-radius:8px;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:var(--ink-2);border:3px solid transparent;background-clip:content-box}
 
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -55,6 +62,7 @@ button{font:inherit}
 .topbar{
   display:flex; align-items:center; gap:16px; padding:10px 18px; flex:0 0 auto;
   background:var(--panel); border-bottom:1px solid var(--line); box-shadow:var(--shadow);
+  position:relative; z-index:100;   /* stays above overlays: not blurred, still clickable */
 }
 .brand{display:flex; align-items:center; gap:11px; min-width:0}
 .brand-mark{
@@ -70,6 +78,14 @@ button{font:inherit}
 .seg button{font-size:12px; font-weight:600; border:0; background:transparent; color:var(--ink-2);
   padding:5px 11px; border-radius:6px; cursor:pointer; font-family:var(--mono)}
 .seg button[aria-pressed="true"]{background:var(--accent); color:#fff}
+/* theme picker: the seg component at topbar scale. The glyphs replace the words
+   once the topbar gets tight, so the control never pushes the quit button off. */
+.theme-seg button{padding:5px 9px; font-size:11.5px}
+.theme-seg .ico{display:none}
+@media (max-width:1240px){
+  .theme-seg .lbl{display:none}
+  .theme-seg .ico{display:inline; font-size:13px}
+}
 .icon-btn{width:34px; height:34px; border-radius:8px; border:1px solid var(--line);
   background:var(--panel); color:var(--ink-2); cursor:pointer; display:grid; place-items:center; font-size:15px}
 .icon-btn:hover{color:var(--ink); border-color:var(--ink-3)}
@@ -78,10 +94,26 @@ button{font:inherit}
 .render-badge.off{color:var(--warn); background:var(--mc-weak)}
 
 /* ---------- desk ---------- */
-.desk{flex:1; min-height:0; display:grid; grid-template-columns:300px minmax(0,1fr) 330px}
+.desk{--rail-w:300px; --tray-w:330px; flex:1; min-height:0; display:grid;
+  grid-template-columns:var(--rail-w) minmax(0,1fr) var(--tray-w)}
 .desk>section{min-width:0; display:flex; flex-direction:column; min-height:0}
-.rail{border-right:1px solid var(--line); background:var(--panel-2)}
-.tray{border-left:1px solid var(--line); background:var(--panel-2)}
+.rail{border-right:1px solid var(--line); background:var(--panel-2); position:relative}
+.tray{border-left:1px solid var(--line); background:var(--panel-2); position:relative}
+
+/* drag-to-resize handles on the panel edges + collapse (widths persisted in JS) */
+.splitter{position:absolute; top:0; bottom:0; width:9px; z-index:6; cursor:col-resize; transition:background .12s}
+.splitter[data-split="rail"]{right:-4px}
+.splitter[data-split="tray"]{left:-4px}
+.splitter::after{content:""; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:3px; height:36px; border-radius:3px; background:var(--line-2)}   /* always-visible grip */
+.splitter:hover, .splitter:active{background:var(--accent-weak)}
+.splitter:hover::after, .splitter:active::after{background:var(--accent)}
+.desk.rail-collapsed{--rail-w:0px}
+.desk.tray-collapsed{--tray-w:0px}
+.desk.rail-collapsed .rail, .desk.tray-collapsed .tray{overflow:hidden; border:0}
+.desk.rail-collapsed .splitter[data-split="rail"],
+.desk.tray-collapsed .splitter[data-split="tray"]{display:none}
+.icon-btn[aria-pressed="true"]{background:var(--accent-weak); color:var(--accent-ink); border-color:transparent}
 
 .rail-head{padding:12px 14px; border-bottom:1px solid var(--line)}
 .search{width:100%; font:inherit; font-size:13px; padding:9px 11px 9px 32px; border-radius:8px;
@@ -89,6 +121,13 @@ button{font:inherit}
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238A93A3' stroke-width='2'><circle cx='7' cy='7' r='5'/><path d='M11 11l4 4'/></svg>");
   background-repeat:no-repeat; background-position:9px center}
 .filters{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px}
+.filters.tags-hidden{display:none}
+.tagtoggle{font-size:11.5px; color:var(--ink-2); background:transparent; border:1px solid var(--line);
+  border-radius:7px; padding:3px 9px; cursor:pointer; display:inline-flex; gap:6px; align-items:center}
+.tagtoggle:hover{color:var(--ink); border-color:var(--ink-3)}
+.tagtoggle .chev{font-size:10px; transition:transform .15s}
+.tagtoggle[aria-pressed="false"] .chev{transform:rotate(-90deg)}
+.rail-head .tagtoggle{margin-top:10px}
 .fchip{font-size:12px; font-weight:600; cursor:pointer; border:1px solid var(--line);
   background:var(--panel); color:var(--ink-2); padding:4px 10px; border-radius:20px}
 .fchip[aria-pressed="true"]{background:var(--accent-weak); color:var(--accent-ink);
@@ -146,7 +185,6 @@ button{font:inherit}
 .pv-toolbar{display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap}
 .render-box{border:1px solid var(--line); border-radius:12px; background:#fff; padding:18px;
   min-height:120px; display:flex; align-items:flex-start; justify-content:flex-start; overflow-x:auto}
-:root[data-theme="dark"] .render-box, @media(prefers-color-scheme:dark){}
 .render-box svg{max-width:100%; height:auto}
 .render-box.center{align-items:center; justify-content:center; color:var(--ink-3); font-size:13px}
 .spinner{width:22px; height:22px; border:2.5px solid var(--line); border-top-color:var(--accent);
@@ -222,7 +260,19 @@ button{font:inherit}
 .comp-hint{font-size:12px; color:var(--ink-2)}
 .comp-hint kbd,.pal-foot kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--line);
   border-radius:4px; padding:1px 5px; background:var(--panel)}
-.comp-body{flex:1; min-height:0; overflow-y:auto; padding:24px clamp(16px,5vw,56px); background:var(--panel)}
+.comp-main{flex:1; min-height:0; display:flex}
+.comp-body{flex:1; min-width:0; min-height:0; overflow-y:auto; padding:24px clamp(16px,5vw,56px); background:var(--panel)}
+.recent-panel{flex:0 0 250px; border-left:1px solid var(--line); background:var(--panel-2); overflow-y:auto; display:flex; flex-direction:column}
+.recent-panel[hidden]{display:none}
+.recent-head{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--line); font-family:var(--serif); font-size:14px}
+.recent-x{border:0; background:transparent; color:var(--ink-3); font-size:18px; cursor:pointer; line-height:1}
+.recent-x:hover{color:var(--ink)}
+.recent-list{padding:10px 12px; display:flex; flex-direction:column; gap:7px}
+.recent-item{display:flex; align-items:center; gap:8px; padding:7px 9px; border:1px solid var(--line); border-radius:8px; background:var(--panel)}
+.recent-item .earg{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:var(--mono); font-size:11.5px}
+.recent-item .re-add{border:1px solid var(--line); background:var(--accent-weak); color:var(--accent-ink); border-radius:6px; padding:2px 8px; cursor:pointer; font-size:12px}
+.recent-item .re-add:hover{background:var(--accent); color:#fff}
+.recent-empty{padding:16px 12px; color:var(--ink-3); font-size:12.5px}
 .doc{max-width:760px; margin:0 auto}
 .doc-cover{border-left:3px solid var(--accent); padding:2px 0 2px 16px; margin-bottom:6px}
 .doc-cover .t{font-family:var(--serif); font-size:21px; font-weight:700}
@@ -250,6 +300,11 @@ button{font:inherit}
 .caret-gap.here::after{content:"caret \00b7 \2318K to insert"; position:absolute; left:8px; top:-8px;
   font-size:10px; font-family:var(--mono); color:var(--accent); background:var(--panel); padding:0 5px}
 @keyframes blink{50%{opacity:.3}}
+/* keyboard cursor (arrow-key navigation): a highlighted problem or gap */
+.qblock.cursor{outline:2px solid var(--accent); outline-offset:3px}
+.caret-gap.cursor{background:var(--accent-weak)}
+.caret-gap.cursor::before{content:""; position:absolute; left:6px; right:6px; top:6px; height:3px;
+  background:var(--accent); border-radius:2px}
 .comp-source pre{max-width:760px; margin:0 auto; padding:18px 20px; background:var(--inset);
   border:1px solid var(--line); border-radius:12px; font-family:var(--mono); font-size:13px;
   line-height:1.7; overflow-x:auto; tab-size:2}
@@ -319,6 +374,9 @@ button{font:inherit}
 
 @media (max-width:1000px){
   .desk{grid-template-columns:260px minmax(0,1fr)}
+  .desk.rail-collapsed{grid-template-columns:minmax(0,1fr)}
   .tray{grid-column:1 / -1; border-left:0; border-top:1px solid var(--line); max-height:38vh}
+  .splitter{display:none}
+  .desk.rail-collapsed .rail, .desk.tray-collapsed .tray{display:none}
 }
 @media (max-width:720px){ .tabs .lbl{display:none} }

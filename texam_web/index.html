@@ -3,22 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Bank Studio</title>
+  <title>TeXaM</title>
   <link rel="stylesheet" href="app.css">
+  <!-- Applies a saved theme before the first paint. app.js runs at the end of
+       <body>, which is far too late: a dark-by-choice user on a light OS would
+       get a full white flash of the desk first. Auto stores nothing. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("texam.theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <div class="brand-mark">&Sigma;</div>
       <div>
-        <div class="brand-title">Bank Studio</div>
+        <div class="brand-title">TeXaM</div>
         <div class="brand-sub" id="exam-name">&mdash;</div>
       </div>
     </div>
     <nav class="tabs" role="tablist" aria-label="Views">
-      <button class="tab" role="tab" data-tab="desk" aria-selected="true">Library Desk</button>
+      <button class="tab" role="tab" data-tab="desk" aria-selected="true">Desk</button>
       <button class="tab" role="tab" data-tab="composer" aria-selected="false">Composer</button>
-      <button class="tab" role="tab" data-tab="wall" aria-selected="false">Card Wall</button>
+      <button class="tab" role="tab" data-tab="wall" aria-selected="false">Library</button>
     </nav>
     <span id="render-badge" class="render-badge off">rendering&hellip;</span>
     <div class="spacer"></div>
@@ -29,7 +40,14 @@
         <button data-mode="filter" aria-pressed="false">{topic=&hellip;}</button>
       </div>
     </div>
-    <button class="icon-btn" id="theme-btn" title="Toggle light / dark" aria-label="Toggle theme">&#9680;</button>
+    <button class="icon-btn" id="toggle-rail" title="Show / hide the filter panel" aria-label="Toggle left panel" aria-pressed="false">&#9703;</button>
+    <button class="icon-btn" id="toggle-tray" title="Show / hide the exam panel" aria-label="Toggle right panel" aria-pressed="false">&#9704;</button>
+    <div class="seg theme-seg" id="theme-seg" role="group" aria-label="Colour theme">
+      <button data-set-theme="auto" aria-pressed="true" title="Follow the system theme"><span class="lbl">Auto</span><span class="ico" aria-hidden="true">&#9680;</span></button>
+      <button data-set-theme="light" aria-pressed="false" title="Always light"><span class="lbl">Light</span><span class="ico" aria-hidden="true">&#9788;</span></button>
+      <button data-set-theme="dark" aria-pressed="false" title="Always dark"><span class="lbl">Dark</span><span class="ico" aria-hidden="true">&#9790;</span></button>
+    </div>
+    <button class="icon-btn" id="quit-btn" title="Quit TeXaM (stop the server)" aria-label="Quit">&#9211;</button>
   </header>
 
   <main class="stage">
@@ -38,13 +56,16 @@
       <section class="rail">
         <div class="rail-head">
           <input class="search" id="search" type="search" placeholder="Search stems, ids, topics&hellip;" aria-label="Search problems">
+          <button class="tagtoggle" id="filters-toggle" aria-pressed="true" title="Show / hide filter tags"><span>Filters</span><span class="chev">&#9662;</span></button>
           <div class="filters" id="filters"></div>
         </div>
         <div class="count" id="count"></div>
         <div class="rowlist" id="rows"></div>
+        <div class="splitter" data-split="rail" title="Drag to resize"></div>
       </section>
       <section class="preview" id="preview"><div class="empty">Loading bank&hellip;</div></section>
       <section class="tray">
+        <div class="splitter" data-split="tray" title="Drag to resize"></div>
         <div class="tray-head"><h2>Exam in progress</h2><span class="n" id="tray-n"></span></div>
         <div class="examlist" id="examlist"></div>
         <div class="tray-foot">
@@ -59,20 +80,28 @@
     <section id="view-composer" class="view composer" role="tabpanel">
       <div class="comp-bar">
         <button class="btn primary sm" id="palette-open"><span>&#8984;K</span> Insert problem</button>
-        <span class="comp-hint">Click a gap to move the <b>caret</b>, then insert. <kbd>&#8984;K</kbd>/<kbd>Ctrl&nbsp;K</kbd> anytime.</span>
+        <span class="comp-hint"><kbd>&#8593;</kbd><kbd>&#8595;</kbd> move through problems &amp; gaps &middot; <kbd>&#8984;K</kbd> insert &middot; <kbd>&#8984;C</kbd>/<kbd>X</kbd>/<kbd>V</kbd> copy/cut/paste</span>
         <div class="seg" style="margin-left:auto" role="group" aria-label="View mode">
           <button data-comp-view="rendered" aria-pressed="true">Rendered</button>
           <button data-comp-view="source" aria-pressed="false">Source</button>
         </div>
+        <button class="btn sm" id="recent-toggle" aria-pressed="false" title="Show recently removed problems">&#9851; Recently deleted</button>
         <button class="btn sm" id="comp-copy"><span>&#9106;</span> Copy document</button>
       </div>
-      <div class="comp-body" id="comp-body"></div>
+      <div class="comp-main" id="comp-main">
+        <div class="comp-body" id="comp-body"></div>
+        <aside class="recent-panel" id="recent-panel" hidden>
+          <div class="recent-head">Recently deleted<button class="recent-x" id="recent-close" title="Hide" aria-label="Hide">&times;</button></div>
+          <div class="recent-list" id="recent-list"></div>
+        </aside>
+      </div>
     </section>
 
     <!-- ========== CARD WALL ========== -->
     <section id="view-wall" class="view wall" role="tabpanel">
       <div class="wall-top">
-        <input class="search" id="wall-search" type="search" placeholder="Search the wall&hellip;" aria-label="Search problems">
+        <input class="search" id="wall-search" type="search" placeholder="Search the library&hellip;" aria-label="Search problems">
+        <button class="tagtoggle" id="wall-filters-toggle" aria-pressed="true" title="Show / hide filter tags"><span>Filters</span><span class="chev">&#9662;</span></button>
         <div class="filters" id="wall-filters"></div>
         <span class="wall-tag" id="wall-tag"></span>
       </div>
@@ -98,6 +127,7 @@
   <div class="overlay" id="modal-overlay"><div class="modal" id="modal-inner" role="dialog" aria-label="Problem detail"></div></div>
 
   <div class="toast" id="toast"></div>
+  <script src="logic.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -381,6 +381,28 @@
 % student build honors it; solution/key builds keep the answer beside/below the
 % choices unchanged.
 \providecommand{\@mc@answergap}{}
+% Key-build counterpart of \@mc@answergap (see autoexam.cls for why the two can't
+% be the same glue).  Empty by default, so quiz -- which spreads neither build --
+% is unaffected.
+\providecommand{\@mc@keyanswergap}{}
+% The boxed key letter, sized to match the width of the blank copy's answer rule
+% so "Answer:" lands at the same x on both builds; grows past that for a
+% multi-answer key ("A, B, C") rather than overflowing the frame.
+%
+% Content is flush LEFT in the box, not centred.  Centring puts ~1cm of space
+% between colon and letter, which pdftotext then extracts as two separate lines --
+% breaking every consumer that scrapes "Answer: X" as one line (test_engine_
+% correctness.py's _ANSWER_RE, collate_keys.py).  Flush left keeps the letter one
+% \fboxsep from the label, so the extracted line is intact and the box reads like
+% the student's answer blank with the answer filled in.
+\newlength{\@mc@answerrule}  \setlength{\@mc@answerrule}{2.4cm}
+\newlength{\@mc@keyboxw}
+\newcommand{\@mc@answerbox}{%
+	\settowidth{\@mc@keyboxw}{\strut\@mc@letter}%
+	\addtolength{\@mc@keyboxw}{\dimexpr2\fboxsep+2\fboxrule\relax}%
+	\ifdim\@mc@keyboxw<\@mc@answerrule \setlength{\@mc@keyboxw}{\@mc@answerrule}\fi
+	\framebox[\@mc@keyboxw][l]{\strut\@mc@letter}%
+}
 % Right-aligned answer line; the letter is filled in for the key.  \noindent
 % leaves vertical mode before \hfill (which would otherwise error there).
 % Side-by-side (vertical {choices}, \ifsolutions, not \if@mc@inline) defers
@@ -392,14 +414,14 @@
 	\ifsolutions
 		\if@mc@inline
 			\par\nobreak\medskip
-			\noindent\hfill\textbf{Answer:}~\fbox{\strut\@mc@letter}%
+			\noindent\hfill\textbf{Answer:}~\@mc@answerbox
 			\par
 		\else
 			\par
 		\fi
 	\else
 		\par\nobreak\medskip\@mc@answergap
-		\noindent\hfill\textbf{Answer:}~\rule{2.4cm}{0.4pt}%
+		\noindent\hfill\textbf{Answer:}~\rule{\@mc@answerrule}{0.4pt}%
 		\par
 	\fi
 }
@@ -419,14 +441,21 @@
 }
 \renewcommand{\@mcframe@end}{%
 	\ifsolutions \if@mc@inline\else
-		% Place the key letter at the FOOT of the (right) solution column, while it
-		% is still open -- not on a new full-width line below both columns.  On the
-		% choice-tall problems (stacked integrals, etc.) the short solution column
-		% has vertical slack here, so the letter costs no extra page height; this is
-		% what lets the eight MC keys pack four to a page like the blank copy.
-		\par\nobreak\vskip2pt
-		\noindent\hfill\textbf{Answer:}~\fbox{\strut\@mc@letter}%
 		\if@mc@keystacked\else\end{minipage}\fi% side-by-side: close the solution column
+		% The key letter goes exactly where the blank copy puts its answer rule:
+		% full width, flush right, at the FOOT of the problem's slot just above the
+		% separator rule -- NOT at the foot of the (narrow) solution column, which
+		% left it floating mid-problem while the leftover height pooled beneath.
+		% \@mc@keyanswergap floats it down there, mirroring \@mc@answergap in
+		% \@mcframe@answer, and the answer line that follows is what protects that
+		% glue: emitted as the LAST item of the problem it would instead be the end
+		% of the vertical list when the next \question runs \addvspace, whose
+		% \removelastskip drops it (an infinite skip compares as its 0pt natural
+		% size, so it always loses).  \nobreak keeps the letter on the same page as
+		% its solution -- a breakpoint at glue needs a non-discardable item before
+		% it, and a penalty is discardable, so this also blocks a break at the gap.
+		\par\nobreak\@mc@keyanswergap
+		\noindent\hfill\textbf{Answer:}~\@mc@answerbox
 	\fi \fi
 	\par
 }

@@ -1,4 +1,4 @@
-/* Bank Studio client -- three views (Library Desk, Composer, Card Wall) over one
+/* TeXam client -- three views (Library Desk, Composer, Card Wall) over one
    shared exam state and one renderer.  Talks to the stdlib server: browse the
    parsed bank, render problems with the real engine (SVG), and add/remove/
    reorder problems, which the server writes into the exam .tex. */
@@ -12,8 +12,10 @@ const S = {
   filters: { q: "", topic: "all", type: "all", fresh: false },
   // composer
   compMode: "rendered", caret: "end", flashArg: null,
+  recentlyDeleted: [], recentOpen: false,
+  compCursor: -1, clip: null,
   // wall
-  wallF: { q: "", topic: "all", type: "all" },
+  wallF: { q: "", topic: "all", type: "all" }, modalId: null,
   // palette
   pal: { q: "", sel: 0, list: [] },
   renderCache: {},
@@ -21,7 +23,8 @@ const S = {
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+// esc, uniquifySVG, cssId, matchWith, argForMode, filterRep, sumPoints, examBody
+// live in logic.js (pure + unit-tested); loaded before this file.
 
 async function api(path, opts) {
   const res = await fetch(path, opts);
@@ -54,9 +57,9 @@ function injectSVG(el, id, sol) {
   if (!el) return;
   if (!S.renderAvailable) { el.className = "render-box center"; el.textContent = "No engine on PATH."; return; }
   const cached = S.renderCache[`${id}|${sol ? 1 : 0}`];
-  if (cached) { el.className = "render-box"; el.innerHTML = cached; return; }
+  if (cached) { el.className = "render-box"; el.innerHTML = uniquifySVG(cached); return; }
   el.className = "render-box center"; el.innerHTML = `<span class="spinner"></span>rendering&hellip;`;
-  fetchSVG(id, sol).then((svg) => { el.className = "render-box"; el.innerHTML = svg; })
+  fetchSVG(id, sol).then((svg) => { el.className = "render-box"; el.innerHTML = uniquifySVG(svg); })
     .catch((e) => { el.className = "render-box center"; el.textContent = "render failed: " + e.message; });
 }
 function typeChip(p) { return p.type === "mc" ? `<span class="chip mc">MC</span>` : `<span class="chip fr">FR</span>`; }
@@ -91,16 +94,9 @@ async function boot() {
 
 /* ---------- filters shared ---------- */
 function topics() { const t = []; S.problems.forEach((p) => { if (p.topic && !t.includes(p.topic)) t.push(p.topic); }); return t; }
-function matchWith(p, f) {
-  if (f.topic !== "all" && p.topic !== f.topic) return false;
-  if (f.type !== "all" && p.type !== f.type) return false;
-  if (f.fresh && (p.used_in || []).length) return false;
-  if (f.q) { const hay = `${p.id} ${p.topic} ${p.section} ${p.preview}`.toLowerCase(); if (!hay.includes(f.q.toLowerCase())) return false; }
-  return true;
-}
 function usedFiles(p) { return [...new Set((p.used_in || []).map((u) => u.file))]; }
 function inExam(id) { const p = S.byId[id] || {}; return S.exam.entries.some((e) => e.arg === id || e.arg === "topic=" + p.topic); }
-function argFor(p) { return (S.insertMode === "filter" && p.topic) ? "topic=" + p.topic : p.id; }
+function argFor(p) { return argForMode(p, S.insertMode); }
 
 /* =======================================================================
    LIBRARY DESK
@@ -183,16 +179,8 @@ function renderTray() {
   $("#tray-total").innerHTML = `${entries.length} &middot; ${knownPoints()}`;
   renderCoverage();
 }
-function filterRep(arg) { const m = /topic=([^,]+)/.exec(arg); if (!m) return null; const t = m[1].trim(); return S.problems.find((p) => p.topic === t && p.points != null) || null; }
-function knownPoints() {
-  let n = 0;
-  S.exam.entries.forEach((e) => {
-    if (e.is_filter) { const c = filterRep(e.arg); if (c) n += c.points; }
-    else { const p = S.byId[e.arg]; if (p && p.points != null) n += p.points; }
-  });
-  return n;
-}
-function pointsApprox() { return S.exam.entries.some((e) => e.is_filter && filterRep(e.arg)); }
+function knownPoints() { return sumPoints(S.exam.entries, S.byId, S.problems); }
+function pointsApprox() { return S.exam.entries.some((e) => e.is_filter && filterRep(e.arg, S.problems)); }
 function usedText(p) {
   const u = p.used_in || [];
   if (!u.length) return `<span class="fresh-tag">&#10022; Fresh &mdash; not used in your other assessments</span>`;
@@ -252,6 +240,58 @@ function renderComposer() {
     const p = S.byId[e.arg]; if (!p) return;
     injectSVG($(`#cb-${e.index} .render-box`), p.id, true);
   });
+  renderRecent();
+  applyCursor();
+}
+
+/* ---- Composer keyboard cursor (arrows) + cut/copy/paste ---- */
+function compStopEls() {
+  const b = $("#comp-body");
+  return b ? [...b.querySelectorAll(".caret-gap, .qblock")] : [];   // gaps + problems, in doc order
+}
+function applyCursor() {
+  const els = compStopEls();
+  els.forEach((e) => e.classList.remove("cursor"));
+  if (S.compCursor < 0 || !els.length) return;
+  if (S.compCursor >= els.length) S.compCursor = els.length - 1;
+  const el = els[S.compCursor]; if (!el) return;
+  el.classList.add("cursor");
+  if (el.classList.contains("caret-gap")) S.caret = el.dataset.caret;   // a gap is the insert point
+  el.scrollIntoView({ block: "nearest" });
+}
+function moveCursor(delta) {
+  const els = compStopEls(); if (!els.length) return;
+  S.compCursor = S.compCursor < 0 ? (delta > 0 ? 0 : els.length - 1)
+                                  : Math.max(0, Math.min(els.length - 1, S.compCursor + delta));
+  applyCursor();
+}
+function cursorEntry() {
+  const el = compStopEls()[S.compCursor];
+  if (!el || !el.classList.contains("qblock")) return null;
+  return S.exam.entries.find((x) => x.index === +el.id.slice(3)) || null;
+}
+function copyCursor() { const e = cursorEntry(); if (e) { S.clip = e.arg; toast("Copied " + e.arg); } }
+async function cutCursor() {
+  const e = cursorEntry(); if (!e) return;
+  S.clip = e.arg;
+  await removeIdx(e.index);
+  toast("Cut " + e.arg);
+}
+async function pasteCursor() {
+  if (!S.clip) return;
+  const el = compStopEls()[S.compCursor];
+  let after;
+  if (el && el.classList.contains("caret-gap")) after = el.dataset.caret === "end" ? null : Number(el.dataset.caret);
+  else if (el && el.classList.contains("qblock")) after = Number(el.id.slice(3));   // after this problem
+  else after = S.caret === "end" ? null : Number(S.caret);
+  const m = /^topic=(.+)$/.exec(S.clip);
+  let id, mode;
+  if (m) { const rep = S.problems.find((p) => p.topic === m[1].trim()); if (!rep) { toast("no problem for " + S.clip, true); return; } id = rep.id; mode = "filter"; }
+  else if (S.byId[S.clip]) { id = S.clip; mode = "id"; }
+  else { toast("cannot paste " + S.clip, true); return; }
+  const body = after != null ? { id, mode, after } : { id, mode };
+  try { refreshExam(await api("/api/exam/add", post(body))); toast("Pasted " + S.clip); }
+  catch (e) { toast(e.message, true); }
 }
 function qblock(e) {
   const flash = S.flashArg === e.arg ? " flash" : "";
@@ -338,7 +378,6 @@ function renderWall() {
   cards.forEach((p) => injectSVG($(`#wc-${cssId(p.id)}`), p.id, false));
   renderWallDock();
 }
-function cssId(id) { return id.replace(/[^A-Za-z0-9_-]/g, "_"); }
 function renderWallDock() {
   const film = $("#wall-film"); const entries = S.exam.entries;
   film.innerHTML = entries.length ? entries.map((e) => `
@@ -364,22 +403,15 @@ function openModal(id) {
         : `<button class="btn primary" data-act="modal-add" data-pid="${esc(p.id)}"><span>&#43;</span> Add to exam</button>`}
       <button class="btn ghost" data-act="copy-line-id" data-pid="${esc(p.id)}">Copy <code>\\problem{${esc(argFor(p))}}</code></button></div>`;
   injectSVG($("#modal-render"), p.id, true);
+  S.modalId = id;
   $("#modal-overlay").classList.add("open");
 }
-function closeModal() { $("#modal-overlay").classList.remove("open"); }
+function closeModal() { S.modalId = null; $("#modal-overlay").classList.remove("open"); }
 
 /* =======================================================================
    exam mutations + tabs + misc
 ======================================================================= */
-function generateTeX() {
-  const fr = S.exam.entries.filter((e) => e.env === "fr");
-  const mc = S.exam.entries.filter((e) => e.env === "mc");
-  const blk = (name, arr) => `\\begin{${name}}\n${arr.map((e) => "\t\\problem{" + e.arg + "}").join("\n")}\n\\end{${name}}`;
-  const out = [];
-  if (fr.length) out.push(blk("problems", fr));
-  if (mc.length) out.push(blk("mcproblems", mc));
-  return out.join("\n\n") || "% add problems to build the exam body";
-}
+function generateTeX() { return examBody(S.exam.entries); }
 function refreshExam(data) {
   S.exam = data;
   renderTray(); renderRows();
@@ -394,8 +426,47 @@ async function addToExam(id, after) {
   try { refreshExam(await api("/api/exam/add", post(bodyObj))); toast(`Added ${id}`); }
   catch (e) { toast(e.message, true); }
 }
-async function removeIdx(idx) { try { refreshExam(await api("/api/exam/remove", post({ index: idx }))); } catch (e) { toast(e.message, true); } }
+async function removeIdx(idx) {
+  const e = S.exam.entries.find((x) => x.index === idx);   // capture before it's gone
+  try { refreshExam(await api("/api/exam/remove", post({ index: idx }))); if (e) noteDeleted(e); }
+  catch (err) { toast(err.message, true); }
+}
 async function moveIdx(idx, dir) { try { refreshExam(await api("/api/exam/reorder", post({ index: idx, dir }))); } catch (e) { toast(e.message, true); } }
+async function undo() { try { const d = await api("/api/exam/undo", post({})); refreshExam(d); toast(d.undone ? "Undid: " + d.undone : "Nothing to undo", !d.undone); } catch (e) { toast(e.message, true); } }
+async function redo() { try { const d = await api("/api/exam/redo", post({})); refreshExam(d); toast(d.redone ? "Redid: " + d.redone : "Nothing to redo", !d.redone); } catch (e) { toast(e.message, true); } }
+/* recently-deleted stack (client-side), newest first, deduped */
+function noteDeleted(entry) {
+  S.recentlyDeleted = S.recentlyDeleted.filter((r) => r.arg !== entry.arg);
+  S.recentlyDeleted.unshift({ arg: entry.arg, is_filter: entry.is_filter });
+  S.recentlyDeleted = S.recentlyDeleted.slice(0, 12);
+  renderRecent();
+}
+function renderRecent() {
+  const list = $("#recent-list"), panel = $("#recent-panel"), btn = $("#recent-toggle");
+  if (!list) return;
+  panel.hidden = !S.recentOpen;
+  if (btn) { btn.setAttribute("aria-pressed", S.recentOpen); btn.innerHTML = "&#9851; Recently deleted" + (S.recentlyDeleted.length ? ` (${S.recentlyDeleted.length})` : ""); }
+  list.innerHTML = S.recentlyDeleted.length
+    ? S.recentlyDeleted.map((r) => `<div class="recent-item">
+        <span class="earg" title="${esc(r.arg)}">\\problem{${esc(r.arg)}}</span>
+        <button class="re-add" data-readd="${esc(r.arg)}">Add</button></div>`).join("")
+    : `<div class="recent-empty">Nothing removed yet. Remove a problem and it lands here to re-add.</div>`;
+}
+async function addArg(id, mode) {
+  try { refreshExam(await api("/api/exam/add", post({ id, mode }))); toast(`Re-added ${id}`); }
+  catch (e) { toast(e.message, true); }
+}
+function reAdd(arg) {
+  const m = /^topic=(.+)$/.exec(arg);
+  if (m) {
+    const rep = S.problems.find((p) => p.topic === m[1].trim());
+    if (!rep) { toast("no problem with topic " + m[1].trim(), true); return; }
+    addArg(rep.id, "filter");
+  } else if (S.byId[arg]) { addArg(arg, "id"); }
+  else { toast("cannot re-add " + arg + " (not in bank)", true); return; }
+  S.recentlyDeleted = S.recentlyDeleted.filter((r) => r.arg !== arg);
+  renderRecent();
+}
 async function removeByPid(id) {
   const p = S.byId[id];
   const e = S.exam.entries.find((x) => x.arg === id || x.arg === "topic=" + p.topic);
@@ -403,8 +474,19 @@ async function removeByPid(id) {
 }
 function post(obj) { return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(obj) }; }
 
+/* inverse search: open a problem's \begin{problem} definition in Sublime */
+async function revealInSublime(id) {
+  const p = S.byId[id];
+  if (!p) { toast("no bank source for a topic filter", true); return; }
+  try {
+    const r = await api("/api/reveal", post({ id }));
+    toast("Opened in Sublime: " + (r.file ? r.file.split(/[\\/]/).pop() : id) + ":" + r.line);
+  } catch (e) { toast(e.message, true); }
+}
+
 function switchTab(tab) {
   S.tab = tab;
+  closeModal(); closePalette();          // don't strand an open overlay on the old view
   $$(".tab").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
   $$(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + tab));
   if (tab === "composer") renderComposer();
@@ -427,7 +509,7 @@ function copyText(txt, msg) {
 
 /* ---------- events ---------- */
 document.addEventListener("click", (ev) => {
-  const el = ev.target.closest("[data-tab],[data-pid],[data-topic],[data-type],[data-fresh],[data-pv],[data-mode],[data-comp-view],[data-caret],[data-pal],[data-card],[data-wadd],[data-wtopic],[data-wtype],[data-act]");
+  const el = ev.target.closest("[data-tab],[data-pid],[data-topic],[data-type],[data-fresh],[data-pv],[data-mode],[data-comp-view],[data-caret],[data-pal],[data-card],[data-wadd],[data-wtopic],[data-wtype],[data-readd],[data-act]");
   if (!el) return;
   const d = el.dataset;
   if (d.tab) switchTab(d.tab);
@@ -440,10 +522,11 @@ document.addEventListener("click", (ev) => {
   else if (d.compView != null) { S.compMode = d.compView; $$('[data-comp-view]').forEach((b) => b.setAttribute("aria-pressed", b.dataset.compView === S.compMode)); renderComposer(); }
   else if (d.caret != null) { S.caret = d.caret; renderComposer(); }
   else if (d.pal != null) { S.pal.sel = +d.pal; paletteInsert(); }
-  else if (d.wadd != null) { ev.stopPropagation(); addToExam(d.wadd, null); }
+  else if (d.wadd != null) { ev.stopPropagation(); if (inExam(d.wadd)) removeByPid(d.wadd); else addToExam(d.wadd, null); }
   else if (d.card != null) { openModal(d.card); }
   else if (d.wtopic != null) { S.wallF.topic = d.wtopic; renderWall(); }
   else if (d.wtype != null) { S.wallF.type = S.wallF.type === d.wtype ? "all" : d.wtype; renderWall(); }
+  else if (d.readd != null) reAdd(d.readd);
   else if (d.act) handleAct(d.act, d);
 });
 function handleAct(a, d) {
@@ -470,6 +553,24 @@ document.addEventListener("keydown", (ev) => {
     return;
   }
   if ($("#modal-overlay").classList.contains("open") && ev.key === "Escape") { closeModal(); return; }
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName) || ev.target.isContentEditable;
+  if ((ev.metaKey || ev.ctrlKey) && !typing) {
+    const k = ev.key.toLowerCase();
+    if (k === "z" && !ev.shiftKey) { ev.preventDefault(); undo(); return; }
+    if ((k === "z" && ev.shiftKey) || k === "y") { ev.preventDefault(); redo(); return; }
+  }
+  // Composer: arrow keys walk problems + gaps; Ctrl/Cmd+C/X/V on a problem/gap
+  if (S.tab === "composer" && !typing) {
+    if (ev.key === "ArrowDown") { moveCursor(1); ev.preventDefault(); return; }
+    if (ev.key === "ArrowUp") { moveCursor(-1); ev.preventDefault(); return; }
+    if (ev.metaKey || ev.ctrlKey) {
+      const k = ev.key.toLowerCase();
+      const noSel = !(window.getSelection && String(window.getSelection()));
+      if (k === "c" && noSel && cursorEntry()) { copyCursor(); ev.preventDefault(); return; }
+      if (k === "x" && noSel && cursorEntry()) { cutCursor(); ev.preventDefault(); return; }
+      if (k === "v" && S.clip) { pasteCursor(); ev.preventDefault(); return; }
+    }
+  }
   if ((ev.metaKey || ev.ctrlKey) && (ev.key === "k" || ev.key === "K")) { ev.preventDefault(); if (S.tab !== "composer") switchTab("composer"); openPalette(); return; }
   if ((ev.key === "Enter" || ev.key === " ")) {
     const row = ev.target.closest?.("[data-pid]"); if (row && row.dataset.act == null) { S.selected = row.dataset.pid; renderRows(); renderPreview(); ev.preventDefault(); return; }
@@ -482,13 +583,109 @@ $("#pal-input").addEventListener("input", (e) => { S.pal.q = e.target.value; S.p
 $("#copy-btn").addEventListener("click", () => copyText(generateTeX(), "Copied exam body"));
 $("#wall-copy").addEventListener("click", () => copyText(generateTeX(), "Copied exam body"));
 $("#comp-copy").addEventListener("click", () => copyText(composerSource(), "Copied document"));
+$("#recent-toggle").addEventListener("click", () => { S.recentOpen = !S.recentOpen; renderRecent(); });
+$("#recent-close").addEventListener("click", () => { S.recentOpen = false; renderRecent(); });
 $("#palette-open").addEventListener("click", openPalette);
 $("#palette-overlay").addEventListener("click", (e) => { if (e.target.id === "palette-overlay") closePalette(); });
 $("#modal-overlay").addEventListener("click", (e) => { if (e.target.id === "modal-overlay") closeModal(); });
-$("#theme-btn").addEventListener("click", () => {
-  const root = document.documentElement;
-  const cur = root.getAttribute("data-theme") || (matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light");
-  root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+/* theme: Auto (default, follows the OS) / Light / Dark, persisted.
+   Auto is stored as the ABSENCE of the key -- see themeAttr in logic.js. The
+   pre-paint script in index.html applies the saved value; this only keeps the
+   buttons in sync and handles clicks. */
+function initTheme() {
+  const root = document.documentElement, LS = window.localStorage;
+  const buttons = $$("#theme-seg button[data-set-theme]");
+  const apply = (pref, remember) => {
+    const attr = themeAttr(pref);
+    if (attr) root.setAttribute("data-theme", attr); else root.removeAttribute("data-theme");
+    const norm = normalizeTheme(pref);
+    if (remember) { norm === "auto" ? LS.removeItem("texam.theme") : LS.setItem("texam.theme", norm); }
+    buttons.forEach((b) => b.setAttribute("aria-pressed", b.dataset.setTheme === norm));
+  };
+  buttons.forEach((b) => b.addEventListener("click", () => apply(b.dataset.setTheme, true)));
+  apply(LS.getItem("texam.theme"), false);
+}
+
+/* keep the (console-less) server alive while this tab is open; it auto-quits a
+   few minutes after the last ping, so closing the tab cleans it up. */
+let _heartbeat = setInterval(() => fetch("/api/ping").catch(() => {}), 30000);
+$("#quit-btn").addEventListener("click", async () => {
+  if (!confirm("Quit TeXaM? This stops the local server. Your exam changes are already saved to disk.")) return;
+  clearInterval(_heartbeat);
+  try { await fetch("/api/quit", { method: "POST" }); } catch (e) {}
+  document.body.innerHTML =
+    '<div style="display:grid;place-items:center;height:100vh;font-family:system-ui;color:#888">' +
+    'TeXaM stopped &mdash; you can close this tab.</div>';
 });
 
+/* double-click the RENDERED problem -> reveal its definition in Sublime.
+   Scoped to .render-box so buttons (show solution / add / copy) never trigger it. */
+document.addEventListener("dblclick", (ev) => {
+  if (!ev.target.closest(".render-box")) return;
+  let id = null;
+  const card = ev.target.closest("[data-card]");
+  const cb = ev.target.closest(".qblock[id^='cb-']");
+  if (card) id = card.dataset.card;                                  // Library card
+  else if (cb) { const e = S.exam.entries.find((x) => x.index === +cb.id.slice(3)); if (e && !e.is_filter) id = e.arg; }  // Composer block
+  else if (ev.target.closest("#modal-render")) id = S.modalId;       // Library modal
+  else if (ev.target.closest("#render-slot")) id = S.selected;       // Desk preview
+  if (id) { ev.preventDefault(); revealInSublime(id); }
+});
+
+/* resizable + collapsible desk panels (widths + collapsed state persisted) */
+function initPanels() {
+  const desk = $("#view-desk"), LS = window.localStorage;
+  const rw = LS.getItem("texam.railW"), tw = LS.getItem("texam.trayW");
+  if (rw) desk.style.setProperty("--rail-w", rw);
+  if (tw) desk.style.setProperty("--tray-w", tw);
+  const setCollapsed = (side, on) => {
+    desk.classList.toggle(side + "-collapsed", on);
+    LS.setItem("texam." + side + "Hidden", on ? "1" : "0");
+    const btn = $("#toggle-" + side); if (btn) btn.setAttribute("aria-pressed", on);
+  };
+  setCollapsed("rail", LS.getItem("texam.railHidden") === "1");
+  setCollapsed("tray", LS.getItem("texam.trayHidden") === "1");
+  $("#toggle-rail").addEventListener("click", () => setCollapsed("rail", !desk.classList.contains("rail-collapsed")));
+  $("#toggle-tray").addEventListener("click", () => setCollapsed("tray", !desk.classList.contains("tray-collapsed")));
+  $$(".splitter").forEach((h) => h.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    const side = h.dataset.split, rect = desk.getBoundingClientRect();
+    const move = (mv) => {
+      const w = side === "rail" ? Math.max(180, Math.min(560, mv.clientX - rect.left))
+                                : Math.max(220, Math.min(620, rect.right - mv.clientX));
+      desk.style.setProperty("--" + side + "-w", w + "px");
+    };
+    const up = () => {
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", up);
+      document.body.style.userSelect = "";
+      LS.setItem("texam." + side + "W",
+                 getComputedStyle(desk).getPropertyValue("--" + side + "-w").trim());
+    };
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", up);
+  }));
+}
+
+/* show/hide the filter-tag rows (Desk + Library), persisted */
+function initTagToggles() {
+  const bind = (btnId, boxId, key) => {
+    const btn = $("#" + btnId), box = $("#" + boxId);
+    if (!btn || !box) return;
+    const set = (hidden) => {
+      box.classList.toggle("tags-hidden", hidden);
+      btn.setAttribute("aria-pressed", !hidden);
+      window.localStorage.setItem(key, hidden ? "1" : "0");
+    };
+    set(window.localStorage.getItem(key) === "1");
+    btn.addEventListener("click", () => set(!box.classList.contains("tags-hidden")));
+  };
+  bind("filters-toggle", "filters", "texam.deskTagsHidden");
+  bind("wall-filters-toggle", "wall-filters", "texam.wallTagsHidden");
+}
+
+initPanels();
+initTagToggles();
+initTheme();
 boot();

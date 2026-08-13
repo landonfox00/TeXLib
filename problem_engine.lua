@@ -378,6 +378,52 @@ function calc_var(name, expr)
 	else tex.error("AutoExam Math Error: " .. (err or "Unknown")) end
 end
 
+-- Evaluate `expr` as a boolean over the current vars (same sandbox as calc_var)
+-- and hand the verdict back to TeX as \@pbank@condtrue / \@pbank@condfalse.
+-- Backs \ifvar and the conditional-correctness \cchoiceif; a broken expression
+-- reports the error and falls through to FALSE rather than aborting the build,
+-- so one bad condition costs one wrong branch instead of the whole PDF.
+function eval_cond(expr)
+	local ok, verdict = pcall(function()
+		local env = {math = math}
+		for k, v in pairs(vars) do env[k] = v end
+		local chunk, err = load("return " .. expr, "cond", "t", env)
+		if not chunk then error(err or "unknown", 0) end
+		return chunk()
+	end)
+	if not ok then
+		texio.write_nl("TeXLib warning: condition '" .. tostring(expr) ..
+			"' failed to evaluate (" .. tostring(verdict) .. "); treating as false.")
+		verdict = false
+	end
+	-- \csname...\endcsname, not a literal \@pbank@cond..., because @ is catcode-12
+	-- in the document body: the literal form tokenises as \@ (end-of-sentence)
+	-- plus the stray text "pbank@condtrue", which typesets into the PDF and
+	-- leaves \if@pbank@cond holding whatever it held last.  Same guard the
+	-- engine uses for \@@input and the \@mcframe@* hooks.
+	tex.print(verdict and "\\csname @pbank@condtrue\\endcsname"
+	                  or  "\\csname @pbank@condfalse\\endcsname")
+	return verdict and true or false
+end
+
+-- Same evaluation without the TeX round-trip, for engine-internal callers
+-- (\cchoiceif's correctness test, resolved at emit time).
+local function eval_cond_value(expr)
+	local ok, verdict = pcall(function()
+		local env = {math = math}
+		for k, v in pairs(vars) do env[k] = v end
+		local chunk, err = load("return " .. expr, "cond", "t", env)
+		if not chunk then error(err or "unknown", 0) end
+		return chunk()
+	end)
+	if not ok then
+		texio.write_nl("TeXLib warning: choice condition '" .. tostring(expr) ..
+			"' failed to evaluate (" .. tostring(verdict) .. "); treating as false.")
+		return false
+	end
+	return verdict and true or false
+end
+
 function push_scope()
 	local saved = {}
 	for k, v in pairs(vars) do saved[k] = v end
@@ -680,11 +726,38 @@ local function find_env_block(s, env)
 	return nil   -- \begin without matching \end
 end
 
+-- Peel a leading {...} group off `seg`, honouring nesting.  Returns the group's
+-- contents and the remainder; (nil, seg) when seg does not start with a group.
+-- Used for \cchoiceif's condition, which is a BRACED argument rather than a
+-- bracketed one precisely so it can't be confused with option text that opens
+-- with a bracket (an interval such as [0,1] -- the ambiguity \fchoice[i] has to
+-- work around by accepting only a clean integer).
+local function split_braced_arg(seg)
+	local i = seg:find('%S')
+	if not i or seg:sub(i, i) ~= '{' then return nil, seg end
+	local depth, pos, len = 0, i, #seg
+	while pos <= len do
+		local c = seg:sub(pos, pos)
+		if c == '\\' then pos = pos + 1            -- skip an escaped brace
+		elseif c == '{' then depth = depth + 1
+		elseif c == '}' then
+			depth = depth - 1
+			if depth == 0 then
+				return seg:sub(i + 1, pos - 1), seg:sub(pos + 1)
+			end
+		end
+		pos = pos + 1
+	end
+	return nil, seg   -- unbalanced: leave the text alone, caller warns
+end
+
 -- Split a choices inner string into option items at depth-0 \choice / \cchoice /
--- \fchoice.  Returns a list of { kind = 'pool'|'correct'|'forced', index, text }.
+-- \cchoiceif / \fchoice.  Returns a list of
+-- { kind = 'pool'|'correct'|'forced', index, cond, text }.
 -- \fchoice may carry a leading [i] (forced placement index); only a clean
 -- [integer] is consumed as the index, so option text beginning with a bracketed
--- non-integer (e.g. an interval) is left intact.
+-- non-integer (e.g. an interval) is left intact.  \cchoiceif carries a leading
+-- {lua-expr} whose truth at typeset time decides whether the option is correct.
 local function parse_choice_items(inner)
 	local marks = {}
 	local depth, pos, len = 0, 1, #inner
@@ -695,7 +768,8 @@ local function parse_choice_items(inner)
 		elseif c == '\\' then
 			local nm = inner:match('^\\(%a+)', pos)
 			if nm and depth == 0
-					and (nm == 'choice' or nm == 'cchoice' or nm == 'fchoice') then
+					and (nm == 'choice' or nm == 'cchoice' or nm == 'cchoiceif'
+						or nm == 'fchoice') then
 				marks[#marks + 1] = { kind = nm, cmd = pos, after = pos + 1 + #nm }
 				pos = pos + 1 + #nm
 			else
@@ -708,15 +782,20 @@ local function parse_choice_items(inner)
 		local stop = (i < #marks) and (marks[i + 1].cmd - 1) or len
 		local seg  = inner:sub(m.after, stop)
 		local kind = (m.kind == 'choice') and 'pool'
-				or (m.kind == 'cchoice') and 'correct' or 'forced'
-		local index
+				or (m.kind == 'cchoice' or m.kind == 'cchoiceif') and 'correct'
+				or 'forced'
+		local index, cond
 		if m.kind == 'fchoice' then
 			local num, rest = seg:match('^%s*%[%s*(%-?%d+)%s*%](.*)$')
 			if num then index = tonumber(num); seg = rest end
+		elseif m.kind == 'cchoiceif' then
+			cond, seg = split_braced_arg(seg)
+			cond = cond or ''   -- missing/unbalanced group: flagged in build_choice_plan
 		end
 		items[#items + 1] = {
 			kind  = kind,
 			index = index,
+			cond  = cond,
 			text  = (seg:gsub('^%s+', ''):gsub('%s+$', '')),
 		}
 	end
@@ -745,7 +824,25 @@ local function build_choice_plan(items, opts, has_solution, id, sf, sl)
 	for _, it in ipairs(items) do
 		if it.kind == 'correct' then
 			nc = nc + 1
-			if nc == 1 then it.is_correct = true end
+			if it.cond and it.cond ~= '' then
+				-- \cchoiceif: correctness is decided at typeset time, once this
+				-- problem's \setrng has drawn (see emit_mc_tail).  Still always
+				-- present, so the option is on the page whichever way it falls.
+				plan.has_cond = true
+			else
+				if it.cond then
+					-- Malformed \cchoiceif (no braced condition, or unbalanced).
+					-- Degrade to an unconditional answer rather than silently
+					-- leaving the problem with nothing marked correct.
+					pbank_warn(id, sf, sl,
+						'\\cchoiceif has no {condition}; treating it as \\cchoice.')
+				end
+				-- EVERY \cchoice is correct: a problem may legitimately have more
+				-- than one right option (equivalent antiderivative forms, "select
+				-- all that apply").  All are always-present (floating), so a
+				-- shuffled selection can never drop one and strand the key.
+				it.is_correct = true
+			end
 			table.insert(floating, it)
 		elseif it.kind == 'forced' then
 			if it.index ~= nil then table.insert(pinned, it)
@@ -753,9 +850,6 @@ local function build_choice_plan(items, opts, has_solution, id, sf, sl)
 		else
 			table.insert(pool, it)
 		end
-	end
-	if nc > 1 then
-		pbank_warn(id, sf, sl, 'multiple \\cchoice given; only the first counts as correct.')
 	end
 	local m = plan.m_opt or n
 	if plan.m_opt and plan.m_opt > n then
@@ -934,11 +1028,27 @@ end
 -- the side-by-side instructor key).  The stem has already been emitted (via the
 -- bank \@@input) before this is called.
 local function emit_mc_tail(p)
-	local out = resolve_mc_order(p.choices_plan)
-	local letter = '?'
-	for i, it in ipairs(out) do
-		if it.is_correct then letter = string.char(64 + i) end
+	local plan = p.choices_plan
+	-- \cchoiceif: settle each conditional option against the variables THIS
+	-- problem drew, before the order (and therefore the letters) is resolved.
+	-- typeset_problem defers this whole call until TeX has executed the stem, so
+	-- vars[] here holds the current draw rather than the previous problem's.
+	if plan.has_cond then
+		for _, it in ipairs(plan.items) do
+			if it.cond and it.cond ~= '' then
+				it.is_correct = eval_cond_value(it.cond)
+			end
+		end
 	end
+	local out = resolve_mc_order(plan)
+	-- Answer label: every correct option's letter, in presented order, joined as
+	-- "B, D" for a multi-answer problem.  A single \cchoice still yields the bare
+	-- letter it always did, so existing keys are byte-identical.
+	local letters = {}
+	for i, it in ipairs(out) do
+		if it.is_correct then letters[#letters + 1] = string.char(64 + i) end
+	end
+	local letter = (#letters == 0) and '?' or table.concat(letters, ', ')
 	local env = p.choices_env or 'choices'
 	-- oneparchoices is inline: the inline flag tells the frame to render it stacked
 	-- (answer line + solution below) rather than side-by-side.  @ is catcode-12 in
@@ -973,6 +1083,13 @@ local function emit_choices_plain(p)
 		else tex.print('\\choice ' .. it.text) end
 	end
 	tex.print('\\end{' .. env .. '}')
+end
+
+-- Deferred entry point for the MC tail, used only by \cchoiceif problems (see
+-- typeset_problem).  Global so the printed \pbank@lua{...} can reach it.
+function pbank_emit_mc_tail(pid)
+	local p = problem_db[pid]
+	if p then emit_mc_tail(p) end
 end
 
 local function typeset_problem(p, stretch)
@@ -1099,7 +1216,23 @@ local function typeset_problem(p, stretch)
 		-- engine-generated tokens (selected/shuffled per version).  The stem above
 		-- came from the bank \@@input; the choices are engine-selected and never
 		-- file-served, but emit_mc_tail's solution gets its own bank redirect.
-		emit_mc_tail(p)
+		if p.choices_plan and p.choices_plan.has_cond then
+			-- \cchoiceif conditions read variables the STEM sets, and the stem is
+			-- so far only \@@input TOKENS -- tex.print output is not consumed until
+			-- this callback returns, so calling emit_mc_tail inline would evaluate
+			-- them against the PREVIOUS problem's draw.  Print a follow-up
+			-- \pbank@lua instead: TeX reaches it only after it has read past the
+			-- stem, so the conditions see this problem's own values.  (Same
+			-- deferral, and the same reason, as pbank_stage_solution.)
+			--
+			-- Deferring moves this problem's math.random draws (the option
+			-- shuffle) later in the stream, so only \cchoiceif problems take that
+			-- path -- every existing exam keeps its byte-identical option order.
+			tex.print('\\csname pbank@lua\\endcsname{pbank_emit_mc_tail(' ..
+				pbank_lua_quote(pid) .. ')}')
+		else
+			emit_mc_tail(p)
+		end
 	else
 		if p.is_mc then emit_choices_plain(p) end   -- MC problem in an FR section
 		emit_solution_block(p)

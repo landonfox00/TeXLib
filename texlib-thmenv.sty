@@ -52,10 +52,12 @@
 % The problem-shaped environments (example, exercise, question, challenge, and
 % the exam-class statements exam*/ex*/ques*/prob*) bind a small family of inline
 % lead-ins for writing a worked solution / answer / proof in line with the
-% statement. ALL ALWAYS VISIBLE: a worked solution is exposition, not a build-
-% mode-gated key, so they carry no \ifsolutions guard -- the gated mechanism
-% stays the separate {solution}/{partsolution} box. Each is an italic label with
-% a \bigskip before and an inline space after (matching didactic's \answer).
+% statement. In example / exercise / question these are ALWAYS VISIBLE: there the
+% worked solution is exposition, not a build-mode-gated key. {challenge} is the
+% exception -- see the gating block below -- because a challenge is posed to be
+% attempted, so its worked response ships only in a solutions/key build. Each is
+% an italic label with a \bigskip before and an inline space after (matching
+% didactic's \answer).
 %
 % Two of the requested names collide with existing constructs and are
 % deliberately OMITTED rather than allowed to shadow them inside a worked env:
@@ -64,18 +66,118 @@
 % The non-colliding members (\solution, \answer, \ans, \pf) cover the same need,
 % and {soln} / {proof} stay fully usable (as a sibling after the statement, or
 % nested -- neither token is rebound).
-\newcommand{\texlib@inline@solution}{\par\bigskip\noindent\textit{Solution.}\space}
-\newcommand{\texlib@inline@answer}  {\par\bigskip\noindent\textit{Answer.}\space}
-\newcommand{\texlib@inline@proof}   {\par\bigskip\noindent\textit{Proof.}\space}
+% Worked-solution numbering ---------------------------------------------------
+% A worked environment may carry more than one \solution; when it does they are
+% labelled "Solution 1." / "Solution 2." / ..., but a lone \solution stays a bare
+% "Solution.". Whether to number can only be known from the TOTAL, so it is
+% resolved across runs via the .aux (the builders compile twice): each worked-env
+% instance gets a stable id (globally stepped, in document order), each \solution
+% steps a per-instance counter, and the total is written to the aux at \end and
+% read back at the next \begin. A single-pass build shows every solution
+% unnumbered until the second pass settles the count. (Assumes worked envs are
+% not nested inside one another -- not a pattern the library uses.) Both the def
+% and the lookup go through \csname, so the @-named control sequence works even
+% though the aux is read back with @ at its ordinary (non-letter) catcode.
+\newcount\texlib@worked@id
+\newcount\texlib@soln@ct
+\newcommand{\texlib@soln@total}{0}   % \solutions in this instance (previous run)
+
+\newcommand{\texlib@worked@begin}{%
+	\global\advance\texlib@worked@id\@ne
+	\global\texlib@soln@ct\z@
+	\ifcsname texlib@solntot@\the\texlib@worked@id\endcsname
+		\edef\texlib@soln@total{\csname texlib@solntot@\the\texlib@worked@id\endcsname}%
+	\else
+		\def\texlib@soln@total{0}%
+	\fi
+}
+\newcommand{\texlib@worked@end}{%
+	% Close a discard box opened by a gated lead-in (see \texlib@worked@discard).
+	% Runs before the environment's own \end code, so the box is balanced inside
+	% the environment group.
+	\if@texlib@discarding
+		\egroup
+		\global\@texlib@discardingfalse
+	\fi
+	\ifnum\texlib@soln@ct>\z@
+		\protected@write\@auxout{}{%
+			\string\csgdef{texlib@solntot@\the\texlib@worked@id}{\the\texlib@soln@ct}}%
+	\fi
+}
+
+% Worked-response gating (challenge) ------------------------------------------
+% A {challenge} is posed for the reader to attempt, so by DEFAULT its worked
+% response is hidden outside a solutions/key build (\ifsolutions, from
+% texlib-build). All four lead-ins are gated, not just \solution: \answer, \ans
+% and \pf give the result away just as completely. example / exercise / question
+% are untouched -- their worked answer IS the exposition.
+%
+% Hiding has to swallow the REST of the environment, because a lead-in is an
+% inline marker rather than a group: everything from \solution to
+% \end{challenge} is the response. It is collected into a scratch \vbox that is
+% never used -- the same discard trick texlib-solutions.sty uses for a
+% suppressed {solution} box -- and \texlib@worked@end closes it.
+% \if@texlib@discarding keeps a second lead-in in the same challenge from
+% opening a nested box.
+%
+% Caveat inherited from that trick: discarded material is still TYPESET into the
+% dead box, so counters stepped inside it (a numbered equation, a nested
+% theorem) still advance and \labels still fire. Keep numbered constructs out of
+% a challenge's response, or the student build's numbering will skip.
+\newif\if@texlib@gatechallenge  \@texlib@gatechallengetrue
+\newif\if@texlib@workedgated    % this environment's lead-ins are gated
+\newif\if@texlib@discarding     % a discard box is currently open
+
+% \TeXLibShowChallengeSolutions — opt out: challenges behave like the other
+% worked envs and always print their response. \TeXLibHideChallengeSolutions
+% restores the default.
+\newcommand{\TeXLibShowChallengeSolutions}{\@texlib@gatechallengefalse}
+\newcommand{\TeXLibHideChallengeSolutions}{\@texlib@gatechallengetrue}
+
+% True when the lead-in about to run should be swallowed rather than printed.
+\newcommand{\texlib@worked@ifhidden}[2]{%
+	\if@texlib@workedgated
+		\if@texlib@gatechallenge
+			\ifsolutions #2\else #1\fi
+		\else #2\fi
+	\else #2\fi
+}
+\newcommand{\texlib@worked@discard}{%
+	\if@texlib@discarding\else
+		\par
+		\global\@texlib@discardingtrue
+		\setbox\z@\vbox\bgroup
+	\fi
+}
+
+\newcommand{\texlib@inline@solution}{%
+	\texlib@worked@ifhidden{\texlib@worked@discard}{%
+		\par\bigskip\noindent
+		\global\advance\texlib@soln@ct\@ne
+		\textit{Solution\ifnum\texlib@soln@total>\@ne\space\the\texlib@soln@ct\fi.}\space}}
+\newcommand{\texlib@inline@answer}  {%
+	\texlib@worked@ifhidden{\texlib@worked@discard}{%
+		\par\bigskip\noindent\textit{Answer.}\space}}
+\newcommand{\texlib@inline@proof}   {%
+	\texlib@worked@ifhidden{\texlib@worked@discard}{%
+		\par\bigskip\noindent\textit{Proof.}\space}}
 
 % Bound inside each worked env via \AtBeginEnvironment, so the redefinitions are
 % scoped to that environment's group and revert at \end (the class's standalone
 % {solution} box, the global \answer, and amsthm's \proof are untouched outside).
 \newcommand{\texlib@bind@worked}{%
+	\texlib@worked@begin
+	\@texlib@workedgatedfalse
 	\let\solution\texlib@inline@solution
 	\let\answer\texlib@inline@answer
 	\let\ans\texlib@inline@answer
 	\let\pf\texlib@inline@proof
+}
+% Same bindings, but this environment's worked response is build-mode gated (see
+% the gating block above).  Bound to {challenge} only.
+\newcommand{\texlib@bind@worked@gated}{%
+	\texlib@bind@worked
+	\@texlib@workedgatedtrue
 }
 
 % ------------------------------------------------------------------------------
@@ -191,6 +293,7 @@
 \__texlib_thm_entry:nnnnn {remark}      {Remark}      {remark}     {none}              {rmk}
 \__texlib_thm_entry:nnnnn {recall}      {Recall}      {remark}     {texlibnote}        {rcl}
 \__texlib_thm_entry:nnnnn {note}        {Note}        {remark}     {texlibnote}        {nte}
+\__texlib_thm_entry:nnnnn {warning}     {Warning}     {definition} {texlibwarning}     {warn}
 
 % ------------------------------------------------------------------------------
 % Options
@@ -203,6 +306,7 @@
 \tl_new:N   \l__texlib_thm_style_tl
 \tl_new:N   \l__texlib_thm_box_tl
 \tl_new:N   \l__texlib_thm_alias_tl
+\tl_new:N   \l__texlib_thm_bind_tl        % which worked-lead-in binder this env gets
 
 \keys_define:nn { texlib/thm } {
 	numbering .choice:,
@@ -282,9 +386,18 @@
 		% \AtBeginEnvironment so the redefinitions revert at \end (the class's
 		% standalone {solution} box keeps \solution elsewhere); the unnumbered
 		% `*' twin gets the same hook.
+		% {challenge} takes the GATED binder (its worked response is hidden
+		% outside a solutions build); the rest take the always-visible one.
 		\clist_if_in:nnT { example , exercise , question , challenge } {#1} {
-			\AtBeginEnvironment{#1}{\texlib@bind@worked}
-			\AtBeginEnvironment{#1*}{\texlib@bind@worked}
+			\str_if_eq:nnTF {#1} { challenge }
+				{ \tl_set:Nn \l__texlib_thm_bind_tl { \texlib@bind@worked@gated } }
+				{ \tl_set:Nn \l__texlib_thm_bind_tl { \texlib@bind@worked } }
+			\use:x { \exp_not:N \AtBeginEnvironment { \exp_not:n {#1} }
+				{ \exp_not:V \l__texlib_thm_bind_tl } }
+			\use:x { \exp_not:N \AtBeginEnvironment { \exp_not:n {#1} * }
+				{ \exp_not:V \l__texlib_thm_bind_tl } }
+			\AtEndEnvironment{#1}{\texlib@worked@end}
+			\AtEndEnvironment{#1*}{\texlib@worked@end}
 		}
 	}{
 		\msg_error:nnn { texlib-thmenv } { unknown-env } {#1}
@@ -338,7 +451,7 @@
 	\TeXLibTheorems[#1]{%
 		theorem, corollary, lemma, conjecture, proposition,
 		definition, convention, procedure, challenge, exercise,
-		example, notation, question, remark, recall, note}%
+		example, notation, question, remark, recall, note, warning}%
 }
 
 % ------------------------------------------------------------------------------
@@ -376,6 +489,10 @@
 	\AtBeginEnvironment{ex*}{\texlib@bind@worked}%
 	\AtBeginEnvironment{ques*}{\texlib@bind@worked}%
 	\AtBeginEnvironment{prob*}{\texlib@bind@worked}%
+	\AtEndEnvironment{exam*}{\texlib@worked@end}%
+	\AtEndEnvironment{ex*}{\texlib@worked@end}%
+	\AtEndEnvironment{ques*}{\texlib@worked@end}%
+	\AtEndEnvironment{prob*}{\texlib@worked@end}%
 	% Restore the default style so later class code starts clean.
 	\theoremstyle{plain}%
 }

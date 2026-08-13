@@ -6,8 +6,8 @@ starred ``\\begin{problems}*`` / ``\\begin{mcproblems}*`` section (star = no
 "Part N" heading), with ``\\def\\ShowSolutions{}`` so the worked solution shows.
 
 Mirrors the build tooling's engine invocation (Sublime/texlib/texlib_build.py):
-lualatex through the comma-free ``C:\\_texlibjunc`` junction
-(``TEXINPUTS=.;C:/_texlibjunc//;``) with aux routed to ``%TEMP%``, cwd = the
+lualatex through the comma-free ``C:\\_texlibjunc`` junction (an explicit,
+non-recursive TEXINPUTS: repo root + module dirs) with aux routed to ``%TEMP%``, cwd = the
 bank's own directory so ``\\loadbank`` resolves.  The PDF is tight-cropped
 (pdfcrop) and converted to SVG (dvisvgm, else pdftocairo).  Results are cached
 by (id, bank mtime, solution flag); a background pre-warm renders the whole bank.
@@ -18,6 +18,7 @@ RenderUnavailable so the server can degrade to the source view.
 
 import hashlib
 import os
+import queue
 import re
 import shutil
 import subprocess
@@ -26,12 +27,36 @@ import tempfile
 import threading
 
 JUNCTION = r"C:\_texlibjunc"
-TEXINPUTS_JUNCTION = ".;C:/_texlibjunc//;"
+_JUNC_FS = "C:/_texlibjunc"    # forward-slash form for TEXINPUTS entries
+# Explicit, non-recursive TEXINPUTS: repo root + the 9 module dirs, the only
+# places .sty/.cls/.lua live. NOT recursive "C:/_texlibjunc//" -- that walked
+# ~1200 dirs (incl. .git + .claude/worktrees copies), cost ~1-3.5s/pass (worse
+# cold), and let a stale examples/*.aux shadow the render. Mirrors the build
+# tooling's path (Sublime/texlib/texlib_build.py).
+_MODULE_DIRS = ("Exams", "Quizzes", "Notes", "Problem Sets", "Report Cards",
+                "Schedule", "Syllabi", "Bingo", "Bank")
+TEXINPUTS_JUNCTION = ";".join((".", _JUNC_FS)
+                              + tuple(_JUNC_FS + "/" + m for m in _MODULE_DIRS)) + ";"
 _NO_WINDOW = 0x08000000 if os.name == "nt" else 0
-_CACHE_ROOT = os.path.join(tempfile.gettempdir(), "texlib-bankstudio")
+_CACHE_ROOT = os.path.join(tempfile.gettempdir(), "texlib-texam")
 _RERUN_RE = re.compile(r"Rerun to get .* right\.|Label\(s\) may have changed")
 
-_lock = threading.Lock()      # serialize compiles (one engine at a time)
+# Background prewarm pool size (capped again to cpu-1 at call time).
+_PREWARM_WORKERS = 4
+
+# Per-problem render locks: different problems compile in parallel, but the same
+# (bank, id, solution) is serialized so two concurrent renders don't clobber the
+# shared harness / aux / cache. Keyed by the cache path (unique per that triple).
+_locks = {}
+_locks_guard = threading.Lock()
+
+
+def _render_lock(key):
+    with _locks_guard:
+        lk = _locks.get(key)
+        if lk is None:
+            lk = _locks[key] = threading.Lock()
+        return lk
 
 
 class RenderUnavailable(Exception):
@@ -129,7 +154,7 @@ def render_svg(problem, show_solution=True, use_cache=True):
     bank_dir = os.path.dirname(os.path.abspath(bank_file))
     bank_name = os.path.basename(bank_file)
     safe = re.sub(r"[^A-Za-z0-9._-]", "_", problem.id)
-    harness_name = f"_bankstudio_{safe}.tex"
+    harness_name = f"_texam_{safe}.tex"
     harness_path = os.path.join(bank_dir, harness_name)
     base = os.path.splitext(harness_name)[0]
 
@@ -141,7 +166,12 @@ def render_svg(problem, show_solution=True, use_cache=True):
     env["TEXINPUTS"] = _texinputs(bank_dir)
     env["TEXLIB_AUX_DIR"] = aux
 
-    with _lock:
+    with _render_lock(cache):
+        # Re-check under the lock: a concurrent render of the same problem may
+        # have populated the cache while we waited on the lock.
+        if use_cache and os.path.isfile(cache) and os.path.getsize(cache) > 0:
+            with open(cache, "r", encoding="utf-8") as fh:
+                return fh.read()
         try:
             with open(harness_path, "w", encoding="utf-8") as fh:
                 fh.write(_harness(bank_name, problem.id, problem.is_mc))
@@ -161,7 +191,7 @@ def render_svg(problem, show_solution=True, use_cache=True):
             _quiet_remove(harness_path)
             _quiet_remove(os.path.join(bank_dir, base + ".synctex.gz"))
 
-    if use_cache:
+    if use_cache and _is_complete_svg(svg):
         with open(cache, "w", encoding="utf-8") as fh:
             fh.write(svg)
     return svg
@@ -174,13 +204,24 @@ def _pdf_to_svg(pdf, aux, base):
     if _which("pdftocairo"):
         proc = _run(["pdftocairo", "-svg", "-f", "1", "-l", "1", pdf, out], aux)
         if proc.returncode == 0 and os.path.isfile(out):
-            return _read(out)
+            svg = _read(out)
+            if _is_complete_svg(svg):
+                return svg
     if _which("dvisvgm"):
         proc = _run(["dvisvgm", "--pdf", "--page=1", "--no-fonts",
                      "--output=" + out, pdf], aux)
         if proc.returncode == 0 and os.path.isfile(out):
-            return _read(out)
+            svg = _read(out)
+            if _is_complete_svg(svg):
+                return svg
     raise RenderError("PDF->SVG conversion failed (need pdftocairo or dvisvgm)")
+
+
+def _is_complete_svg(svg):
+    """A converter can exit 0 having written an empty or half-flushed file
+    (seen once on a cold first render). Require a real, closed SVG so a blank is
+    retried on demand rather than cached and served as an empty preview."""
+    return bool(svg) and "<svg" in svg and "</svg>" in svg
 
 
 def _read(path):
@@ -203,20 +244,44 @@ def _quiet_remove(path):
         pass
 
 
-def prewarm(problems, show_solution=True, on_done=None):
-    """Render every problem in a background thread, populating the cache so the
-    UI is instant after warm-up.  Silent on per-problem failure."""
+def prewarm(problems, show_solution=True, on_done=None, workers=None):
+    """Render every problem into the cache using a small pool of background
+    threads, so a big bank's previews warm up in parallel instead of one engine
+    at a time.  Best-effort: a per-problem failure (compile error, timeout, ...)
+    is swallowed so it never crashes a worker; the UI renders that one on demand.
+    Returns the worker threads (daemon)."""
+    problems = list(problems)
+    if not problems:
+        return []
+    if workers is None:
+        workers = max(1, min(_PREWARM_WORKERS, (os.cpu_count() or 2) - 1))
+    workers = min(workers, len(problems))
+
+    q = queue.Queue()
+    for p in problems:
+        q.put(p)
+
     def worker():
-        for p in problems:
+        while True:
+            try:
+                p = q.get_nowait()
+            except queue.Empty:
+                return
             try:
                 render_svg(p, show_solution=show_solution)
-            except (RenderUnavailable, RenderError, OSError):
+            except Exception:
                 pass
-            if on_done:
-                on_done(p.id)
-    t = threading.Thread(target=worker, daemon=True)
-    t.start()
-    return t
+            finally:
+                if on_done:
+                    on_done(p.id)
+                q.task_done()
+
+    threads = []
+    for _ in range(workers):
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+        threads.append(t)
+    return threads
 
 
 if __name__ == "__main__":

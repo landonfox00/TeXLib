@@ -1,0 +1,51 @@
+% integrals.tex — integral problems for the TeXam demo bank.
+
+% --- Free response ----------------------------------------------------------
+\begin{problem}{int-poly}[topic=integral, section=5.4, style=fr, diff=easy]
+	Evaluate $\displaystyle \int (3x^2 - 2x)\,dx$.
+	\begin{solution} $x^3 - x^2 + C$. \end{solution}
+\end{problem}
+
+\begin{problem}{int-exp}[topic=integral, section=5.5, style=fr, diff=med]
+	Evaluate $\displaystyle \int e^{2x}\,dx$.
+	\begin{solution} $\tfrac{1}{2} e^{2x} + C$. \end{solution}
+\end{problem}
+
+\begin{problem}{int-definite}[topic=integral, section=5.3, style=fr, diff=med]
+	Evaluate $\displaystyle \int_0^2 x^2 \,dx$.
+	\begin{solution} $\left[\tfrac{x^3}{3}\right]_0^2 = \tfrac{8}{3}$. \end{solution}
+\end{problem}
+
+% --- Multiple choice --------------------------------------------------------
+\begin{problem}{int-usub-mc}[topic=integral, section=5.5, style=mc, diff=med]
+	Evaluate $\displaystyle \int 2x\,(x^2+1)^3 \,dx$.
+	\begin{choices}
+		\cchoice $\dfrac{(x^2+1)^4}{4} + C$
+		\choice $(x^2+1)^4 + C$
+		\choice $\dfrac{(x^2+1)^3}{3} + C$
+		\choice $6x^2(x^2+1)^2 + C$
+	\end{choices}
+	\begin{solution} $u = x^2+1$, $du = 2x\,dx$: $\int u^3\,du = \tfrac{u^4}{4}+C$. \end{solution}
+\end{problem}
+
+\begin{problem}{int-trig-mc}[topic=integral, section=5.4, style=mc, diff=easy]
+	Evaluate $\displaystyle \int \sin x \,dx$.
+	\begin{choices}
+		\cchoice $-\cos x + C$
+		\choice $\cos x + C$
+		\choice $-\sin x + C$
+		\choice $\sin x + C$
+	\end{choices}
+	\begin{solution} $\frac{d}{dx}(-\cos x) = \sin x$. \end{solution}
+\end{problem}
+
+\begin{problem}{int-area-mc}[topic=integral, section=5.3, style=mc, diff=med]
+	What is the area under $y = x^2$ from $x = 0$ to $x = 3$?
+	\begin{choices}
+		\cchoice $9$
+		\choice $27$
+		\choice $3$
+		\choice $\tfrac{27}{2}$
+	\end{choices}
+	\begin{solution} $\int_0^3 x^2\,dx = \tfrac{27}{3} = 9$. \end{solution}
+\end{problem}

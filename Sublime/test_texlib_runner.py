@@ -75,15 +75,26 @@ class FakePopen:
 
 class PopenFactory:
     """Returns one scripted FakePopen per call; records the argv AND env of each
-    call (env is how we prove each build's aux dir reaches ITS own subprocess)."""
+    call (env is how we prove each build's aux dir reaches ITS own subprocess).
 
-    def __init__(self, scripts):
+    `effects[i]`, when given, is a callable run as the i-th process starts: the
+    aux files that pass leaves behind. The build brain fingerprints those to
+    decide whether another pass is warranted, so a scripted rerun signal only
+    re-runs if the pass it came from also moved the state -- as a real one does.
+    """
+
+    def __init__(self, scripts, effects=None):
         self.scripts = list(scripts)
+        self.effects = list(effects or [])
         self.calls = []
         self.envs = []
         self.last = None
 
     def __call__(self, cmd, **kw):
+        if self.effects:
+            effect = self.effects.pop(0)
+            if effect:
+                effect()
         self.calls.append(cmd)
         self.envs.append(kw.get("env"))
         lines = self.scripts.pop(0) if self.scripts else []
@@ -119,16 +130,24 @@ ok &= check(factory.envs[0].get("TEXLIB_AUX_DIR") == r"C:\aux\buildA",
 
 # 2. _drive feeds output back so a rerun signal re-runs THROUGH the runner, and
 #    clears the build's registry entry when it finishes.
-factory = PopenFactory([
-    ["Rerun to get cross-references right.\n"],  # pass 1 -> ask for a rerun
-    [],                                          # pass 2 -> settled
-])
-texlib.subprocess.Popen = factory
 msgs = []
 with tempfile.TemporaryDirectory() as tmp:
     root = os.path.join(tmp, "doc.tex")
     with open(root, "w", encoding="utf-8") as fh:
         fh.write("\\documentclass{pset}\n\\begin{document}\nx\n\\end{document}\n")
+
+    def _pass1_moves_the_aux():
+        """The label shift that makes LaTeX ask for the rerun in the first place
+        (aux_directory is <<root>>, so the aux dir is this tmp dir)."""
+        with open(os.path.join(tmp, "doc.aux"), "w", encoding="utf-8") as fh:
+            fh.write(r"\newlabel{x}{{1}{3}}")
+
+    factory = PopenFactory(
+        [["Rerun to get cross-references right.\n"],  # pass 1 -> ask for a rerun
+         []],                                         # pass 2 -> settled
+        effects=[_pass1_moves_the_aux, None],
+    )
+    texlib.subprocess.Popen = factory
     host = texlib_build.TexlibBuild(
         tex_root=root, engine="pdflatex",
         options=["--texlib-mode=default"], display=msgs.append,

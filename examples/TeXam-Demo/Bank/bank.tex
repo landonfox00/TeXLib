@@ -1,0 +1,9 @@
+% bank.tex — master bank for the TeXam demo course.
+%
+% A thin loader: it \loadbank's each per-topic file, exactly like a real course
+% bank. \GetCourseMetaDir makes the same paths resolve from any document depth
+% (an exam two folders down still finds these). TeXam follows this transitively.
+
+\loadbank{\GetCourseMetaDir Bank/limits.tex}
+\loadbank{\GetCourseMetaDir Bank/derivatives.tex}
+\loadbank{\GetCourseMetaDir Bank/integrals.tex}

@@ -80,6 +80,23 @@ UNDEFINED_MARKERS = (
 )
 
 
+def pdf_text(tex_dir):
+    """The built PDF's text, or None if pdftotext isn't installed (soft-skip,
+    per this file's degrade-don't-fail rule)."""
+    if not shutil.which("pdftotext"):
+        return None
+    out = os.path.join(tex_dir, "doc.txt")
+    try:
+        subprocess.run(
+            ["pdftotext", "-layout", os.path.join(tex_dir, "doc.pdf"), out],
+            capture_output=True, timeout=60,
+        )
+        with open(out, "r", encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
 def run_build(tex_dir, engine):
     """Drive the real builder coroutine, executing each yielded command.
 
@@ -177,6 +194,18 @@ def main():
         print(f"  build 3 (bib edited): {r3['heads']}")
         check("build 3: biber re-runs after .bib edit",
               "biber" in r3["heads"], r3["heads"])
+        # The post-biber pass settles everything here, so the rerun biblatex asks
+        # for afterwards is vetoed by the state fingerprint (one pass fewer than
+        # the cold build). Assert the document really is settled without it --
+        # the veto's whole claim is that the pass it skipped was a no-op.
+        check("build 3: settles with no undefined references",
+              all(m not in r3["final"] for m in UNDEFINED_MARKERS), r3["final"][:400])
+        body = pdf_text(tex_dir)
+        if body is None:
+            print("  skip: pdftotext absent -> PDF bibliography content unchecked")
+        else:
+            check("build 3: the PDF bibliography reflects the edited .bib",
+                  "Revised" in body, body[-400:])
 
         if dt2 and dt1:
             print(f"\n  note: unchanged rebuild {dt1/dt2:.1f}x faster "

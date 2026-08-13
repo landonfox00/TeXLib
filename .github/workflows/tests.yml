@@ -19,6 +19,32 @@ jobs:
         run: python -m pip install --quiet pypdf
       - name: Builder logic + orchestration tests
         run: python Sublime/test_texlib_builder.py
+      - name: TeXaM app + bank-plugin tests (headless, no toolchain)
+        run: |
+          set -e
+          python test_texam.py
+          python test_texam_server.py
+          python Sublime/test_texlib_texam.py
+          python Sublime/test_texlib_bank.py
+          python Sublime/test_texlib_domain.py
+
+  # TeXaM client-side pure logic (texam_web/logic.js) under Node's built-in test
+  # runner -- no npm dependencies. Covers the browser-only helpers with no server
+  # equivalent (HTML escaping, SVG id-namespacing, filter matching, points math,
+  # exam-body serialization). Node isn't needed to *use* TeXaM; only to run these.
+  js-logic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # `node --test` from the dir globs *.test.js -- stable across node 20..24
+      # (the bare-directory-path form changed behavior in node 24) and auto-picks
+      # up new test files.
+      - name: TeXaM client pure-logic tests
+        working-directory: texam_web/test
+        run: node --test
 
   # Pure-Lua unit tests for the class-local Lua engines. No TeX toolchain — a
   # stock lua 5.3 runs them (the engines are tex-independent; the tests stub the
@@ -129,3 +155,9 @@ jobs:
             python3 test_class_render.py
             # MC answer-key marks the correct choice + schedule grid content.
             python3 test_mc_schedule_render.py
+            # TeXaM real-render integration: lualatex + pdftocairo on the demo
+            # bank (the composer preview pipeline). LUAINPUTS points at the repo
+            # root so the class-local .lua engines resolve in the container
+            # (bank_render sets TEXINPUTS itself; there is no _texlibjunc here).
+            export LUAINPUTS=".:$(pwd)//:"
+            python3 test_texam_render.py
