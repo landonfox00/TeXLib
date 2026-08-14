@@ -46,7 +46,9 @@
 \RequirePackage{tocloft, multirow}
 \RequirePackage[many]{tcolorbox}
 \RequirePackage{cancel}
-\RequirePackage[capitalise,nameinlink]{cleveref}
+% \cref, via cleveref normally and zref-clever in an accessible build --
+% cleveref's amsthm patch is fatal under tagging=on. See texlib-crossref.sty.
+\RequirePackage{texlib-crossref}
 \RequirePackage{course-metadata}
 
 % PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty.

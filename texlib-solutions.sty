@@ -45,9 +45,16 @@
 
 % \@rubricline{pts}{text} — one aligned rubric item: a [N pts] label in a fixed
 % 1.4 cm makebox, then the description.
+% \hangindent/\hangafter so a criterion that wraps keeps its continuation lines
+% under the description instead of running back to the label column -- the same
+% hanging shape the {commonerrors} list gets from its \leftmargin, which is what
+% makes the two footer panels read as a pair rather than as two loose lists.
+\newlength{\@rubriclabelwd}
+\setlength{\@rubriclabelwd}{1.4cm}
 \newcommand{\@rubricline}[2]{%
-	\noindent
-	\makebox[1.4cm][l]{%
+	\par\noindent
+	\hangindent\@rubriclabelwd \hangafter1
+	\makebox[\@rubriclabelwd][l]{%
 		\textbf{\textcolor{teal!80!black}{%
 			[#1\,\ifnum#1=1 pt\else pts\fi]}}}%
 	#2\par\smallskip
@@ -64,19 +71,151 @@
 % rubric builds, and the alternative (reflowing the solution's own already-
 % \box'd first lines around the overlay) needs a two-pass height measurement
 % that isn't worth it here.
+% Kept for {partsolution}, which emits it BENEATH its prose rather than beside
+% the header; the argument is the accumulator to render.
 \newcommand{\@emit@rubric@overlay}[1]{%
-	\hfill
-	\llap{%
-		\setlength{\fboxsep}{4pt}%
-		\colorbox{teal!8}{%
-			\begin{minipage}[t]{\dimexpr\rubricboxwidth-8pt\relax}%
-				\raggedright\small\sffamily
-				\vspace{2pt}%
-				\textbf{\textcolor{teal!80!black}{Rubric:}}\\[0.25em]%
-				#1%
-			\end{minipage}%
-		}%
+	\setlength{\fboxsep}{4pt}%
+	\colorbox{teal!8}{%
+		\begin{minipage}[t]{\dimexpr\rubricboxwidth-8pt\relax}%
+			\raggedright\small\sffamily
+			\vspace{2pt}%
+			\textbf{\textcolor{teal!80!black}{Rubric:}}\\[0.25em]%
+			#1%
+		\end{minipage}%
 	}%
+}
+
+% --- The grading footer: common errors (left) beside the rubric (right) -----
+%
+% Both panels sit BENEATH the worked solution, inside the same green box.
+%
+% They used to be elsewhere, and both placements were wrong. The rubric was an
+% overlay \llap'd onto the "Solution." header line with natural height/depth, so
+% \par charged that line for the whole box -- meaning a four-item rubric shoved
+% the solution four lines down, whether or not the solution's own first line came
+% anywhere near it. {commonerrors} meanwhile typeset itself inline wherever it
+% appeared in the source, so it landed mid-solution or trailed off the bottom
+% depending on where the author happened to put it.
+%
+% Now neither is positioned by the author: {commonerrors} only CAPTURES its body
+% (see below), \rubric only accumulates, and the solution's end-code lays both
+% out here, after the work they annotate. Nothing pushes the solution anywhere.
+% The panels are styled as a matched pair -- same \fboxsep, tint depth,
+% \small\sffamily, bold coloured heading -- teal for the rubric (what the work
+% earns) against red for the errors (what it loses), so the two read as one
+% object rather than two unrelated boxes.
+%
+% Widths come from \hsize, not \linewidth: this runs inside the solution's own
+% \vbox, whose \hsize the environment sets while LaTeX's \linewidth goes on
+% holding the wider enclosing value.
+\newlength{\@sol@footgap}    \setlength{\@sol@footgap}{1em}
+\newlength{\@sol@cerrwd}
+\newlength{\@sol@rubwd}
+% Rubric's share of the width when both panels are present. Rubric entries are
+% fragments ("[5 pts] ratio-test limit reduced"), common-error entries are whole
+% sentences, so the split is deliberately uneven.
+\newcommand{\@sol@rubshare}{0.40}
+
+\newcommand{\@rubric@panel}[1]{%
+	\setlength{\fboxsep}{4pt}%
+	\colorbox{teal!8}{%
+		\begin{minipage}[t]{\dimexpr#1-8pt\relax}%
+			\raggedright\small\sffamily
+			\vspace{2pt}%
+			\textbf{\textcolor{teal!80!black}{Rubric:}}\\[0.25em]%
+			\@sol@rubric
+		\end{minipage}%
+	}%
+}
+
+% Item labels: \item[4] prints [-4 pts], the deduction that error costs, in the
+% label column where the rubric prints what the step earns.  The magnitude is
+% what the author writes and the minus is supplied here, so the two panels can
+% never disagree about the sign.  \item[0] means "costs nothing" (a wasted-effort
+% note rather than a penalty) and prints a muted [0 pts].  A bare \item still
+% works and falls back to the old square bullet -- documents predating the
+% deduction labels keep rendering unchanged.
+%
+% The fallback is detected by giving the list a \relax default label and
+% comparing against it: LaTeX routes both \item and \item[x] through \makelabel,
+% so this is the only way to tell them apart from inside.  A non-integer optional
+% argument is not supported (the \ifnum below would choke) -- the label column is
+% for a number of points, and prose belongs in the item body.
+\newlength{\@cerrlabelwd}
+\setlength{\@cerrlabelwd}{1.55cm}
+\def\@cerr@nolabel{\relax}
+\newcommand{\@cerr@makelabel}[1]{%
+	\def\@cerr@tmp{#1}%
+	\makebox[\@cerrlabelwd][l]{%
+		\ifx\@cerr@tmp\@cerr@nolabel
+			\textcolor{red!70!black}{\rule[0.15ex]{0.45em}{0.45em}}%
+		\else
+			\textbf{\ifnum#1=0
+				\textcolor{black!45}{[0\,pts]}%
+			\else
+				\textcolor{red!70!black}{%
+					[$-$#1\,\ifnum#1=1 pt\else pts\fi]}%
+			\fi}%
+		\fi
+	}%
+}
+
+% Same shell as the rubric panel, and the same hanging shape: label column of a
+% fixed width, body indented past it.  {list} rather than {itemize} so every
+% dimension is pinned outright instead of inherited from whatever nesting depth
+% the surrounding {questions}/{parts} list left behind.
+\newcommand{\@cerr@panel}[1]{%
+	\setlength{\fboxsep}{4pt}%
+	\colorbox{red!6}{%
+		\begin{minipage}[t]{\dimexpr#1-8pt\relax}%
+			\raggedright\small\sffamily
+			\vspace{2pt}%
+			\textbf{\textcolor{red!70!black}{Common Errors:}}\\[0.25em]%
+			\begin{list}{\relax}{%
+				\setlength{\topsep}{0pt}%
+				\setlength{\partopsep}{0pt}%
+				\setlength{\parsep}{0pt}%
+				\setlength{\itemsep}{\smallskipamount}%
+				\setlength{\labelwidth}{\@cerrlabelwd}%
+				\setlength{\labelsep}{0.45em}%
+				\setlength{\leftmargin}{\dimexpr\@cerrlabelwd+0.45em\relax}%
+				\setlength{\itemindent}{0pt}%
+				\setlength{\listparindent}{0pt}%
+				\let\makelabel\@cerr@makelabel
+			}%
+				\@sol@cerr
+			\end{list}%
+			\vspace{1pt}%
+		\end{minipage}%
+	}%
+}
+
+% Lay out whichever panels exist. A lone panel keeps to its own side (errors
+% left, rubric right) rather than stretching: a full-width rubric of four short
+% fragments reads as a table, and holding the edge makes a run of solutions
+% easier to skim.
+\newcommand{\@emit@sol@footer}{%
+	\ifx\@sol@cerr\@empty
+		\ifx\@sol@rubric\@empty
+		\else
+			\par\vspace{8pt}\noindent
+			\setlength{\@sol@rubwd}{\@sol@rubshare\hsize}%
+			\hfill\@rubric@panel{\@sol@rubwd}\par
+		\fi
+	\else
+		\par\vspace{8pt}\noindent
+		\ifx\@sol@rubric\@empty
+			\setlength{\@sol@cerrwd}{\dimexpr\hsize-\@sol@rubshare\hsize-\@sol@footgap\relax}%
+			\@cerr@panel{\@sol@cerrwd}\hfill\par
+		\else
+			\setlength{\@sol@rubwd}{\@sol@rubshare\hsize}%
+			\setlength{\@sol@cerrwd}{\dimexpr\hsize-\@sol@rubwd-\@sol@footgap\relax}%
+			\@cerr@panel{\@sol@cerrwd}%
+			\hfill
+			\@rubric@panel{\@sol@rubwd}%
+			\par
+		\fi
+	\fi
 }
 
 % ===========================================================================
@@ -126,14 +265,21 @@
 	\ifsolutions
 		\par
 		\gdef\@sol@rubric{}%
+		\gdef\@sol@cerr{}%
 		\@in@solutiontrue
 		\setbox\@sol@box\vbox\bgroup
 			\hsize\dimexpr\textwidth-12pt\relax
 	\else
+		\gdef\@sol@cerr{}%
 		\setbox\z@\vbox\bgroup
 	\fi
 }{%
 	\ifsolutions
+			% Still inside \@sol@box's \vbox: every \rubric call and the
+			% {commonerrors} capture have run by now, and emitting here (rather
+			% than after \box\@sol@box below) is what puts the panels INSIDE the
+			% green fill, whose height is measured from this box.
+			\ifrubric \@emit@sol@footer \fi
 		\egroup
 		\@in@solutionfalse
 		\par\vspace{\@sol@outervsep}%
@@ -152,7 +298,7 @@
 					% vertical list, BEHIND the content -- NOT a \colorbox.  \colorbox
 					% wraps its content in an \hbox whose inner nodes are orphaned for
 					% SyncTeX reverse search, so `synctex edit` on the solution
-					% resolved to nothing (task_b7217810 / task_dbeb33f6) even though
+					% resolved to nothing (free-response-solution-inverse-search / mc-key-inverse-search) even though
 					% the solution's redirected bank-file records were present.  An
 					% \rlap at the OUTER horizontal level orphans it the same way; drawn
 					% inside the parbox (like the accent) the content stays reachable,
@@ -174,11 +320,8 @@
 							height \dimexpr\ht\strutbox+6pt\relax
 							depth \dimexpr\ht\@sol@box+\dp\@sol@box+6pt\relax}}}%
 				\noindent\texlibsolheader%
-				\ifrubric
-					\ifx\@sol@rubric\@empty\else
-						\@emit@rubric@overlay{\@sol@rubric}%
-					\fi
-				\fi
+				% No rubric here any more -- it is inside \@sol@box, beneath the
+				% solution, beside the common errors (see \@emit@sol@footer).
 				\par\vskip2pt
 				\box\@sol@box
 			}%
@@ -210,14 +353,19 @@
 		\egroup
 		\@in@partsolutionfalse
 		\noindent\texlibsolheader%
-		\ifrubric
-			\ifx\@partsol@rubric\@empty\else
-				\@emit@rubric@overlay{\@partsol@rubric}%
-			\fi
-		\fi
 		\par
 		{\color{green!40!black}\unvbox\@partsol@box}%
-		\normalcolor\par\smallskip
+		\normalcolor
+		% Beneath the prose, right-aligned -- same reason as {solution}: as an
+		% overlay on the header line it pushed the part's own text down by the
+		% full height of the rubric box.
+		\ifrubric
+			\ifx\@partsol@rubric\@empty\else
+				\par\vspace{6pt}\noindent
+				\hfill\@emit@rubric@overlay{\@partsol@rubric}%
+			\fi
+		\fi
+		\par\smallskip
 	\else
 		\egroup
 	\fi
@@ -240,22 +388,36 @@
 	\fi
 }
 
-% {commonerrors} — a block of common student errors (\item each) shown only in
-% rubric builds; collected into a discarded box otherwise (no overhead in student
-% PDFs).  Does not support verbatim content in the hidden branch.
-\newenvironment{commonerrors}{%
+% {commonerrors} — a block of common student errors (\item each), shown only in
+% rubric builds and only ever as the left panel of the solution footer.
+%
+% It CAPTURES rather than typesets: \NewEnviron stashes the body in \BODY, which
+% is copied to \@sol@cerr for \@emit@sol@footer to render once the solution's
+% own material is complete.  Three things fall out of that:
+%   - Placement stops depending on where in the source the block sits.  It used
+%     to typeset inline at that point, so a block written mid-solution rendered
+%     mid-solution.
+%   - Nothing is typeset at all when \ifrubric is false, where the old version
+%     still set the body into a discarded \vbox (and so could still choke on
+%     fragile content it was never going to show).
+%   - The width is chosen at render time, which is what lets the panel size
+%     itself against the rubric beside it.
+% Verbatim content remains unsupported -- \BODY, like the old discarded box,
+% re-reads the body as ordinary tokens.
+%
+% Outside a {solution} (a bare block, or one inside {partsolution}) there is no
+% footer to defer to, so it renders where it stands, in the same panel style.
+\NewEnviron{commonerrors}{%
 	\ifrubric
-		\par\smallskip
-		\noindent\textcolor{red!80!black}{\small\sffamily\textbf{Common Errors:}}%
-		\begin{itemize}\small\sffamily
-	\else
-		\setbox\z@\vbox\bgroup
-	\fi
-}{%
-	\ifrubric
-		\end{itemize}\smallskip
-	\else
-		\egroup
+		\if@in@solution
+			\global\let\@sol@cerr\BODY
+		\else
+			\par\smallskip\noindent
+			\global\let\@sol@cerr\BODY
+			\@cerr@panel{\hsize}%
+			\global\let\@sol@cerr\@empty
+			\par\smallskip
+		\fi
 	\fi
 }
 
@@ -325,7 +487,7 @@
 % four keys pack to a page) vs STACKED (solution full-width below the choices).
 % Side-by-side is more compact, but it sets the {solution} in a minipage whose box
 % orphans the content for SyncTeX reverse search, so the MC solution is not
-% inverse-searchable there (task_dbeb33f6). \TeXLibMCKeyStacked opts into the
+% inverse-searchable there (mc-key-inverse-search). \TeXLibMCKeyStacked opts into the
 % stacked layout, which keeps the solution in the vertical list -- so clicking an
 % MC solution in the key inverse-searches to the bank -- at the cost of the
 % four-per-page packing.

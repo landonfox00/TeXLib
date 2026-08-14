@@ -26,7 +26,7 @@ First steps
     This is how builds resolve the shared texlib-*.sty and the class files —
     from your live checkout, so you never need to copy classes into TEXMF. Use
     this explicit list rather than a recursive "C:/_texlibjunc//": recursion
-    walks .git and any .claude/worktrees copies (slow, worse on a cold cache)
+    walks .git and any tool scratch dirs (slow, worse on a cold cache)
     and can let a stale examples/*.aux shadow a same-named build. Keep the
     trailing "" — kpathsea appends its default TeX Live path at an empty
     segment; without one TEXINPUTS replaces the default path outright.

@@ -31,15 +31,39 @@
 %       \item Stewart, Calculus, §2.1--2.2.
 %       \item Course notes, Lecture 1.
 %   \end{readings}
-\newenvironment{readings}
-	{%
-		\par\addvspace{6pt}%
-		\noindent{\bfseries Readings.}\par\nopagebreak
-		\begin{itemize}[leftmargin=2em, topsep=2pt, parsep=2pt,
-						itemsep=2pt, label={\textendash}]%
-	}
-	{%
-		\end{itemize}\addvspace{4pt}%
-	}
+% Accessible build: the same keys, declared with \setlist on a dedicated list
+% instead of inline. Under \DocumentMetadata{tagging=on} the new block
+% implementation takes over \begin{itemize}'s optional argument and rejects
+% enumitem's keys outright -- "Some keys specified on the itemize environment
+% are unknown", fatal, and it fires on ANY key, not a particular one. That made
+% every lecture containing a {readings} block produce no accessible PDF at all.
+% Preamble \setlist declarations are still honoured, so the accessible branch
+% routes the body through a \newlist-declared list configured there. The normal
+% branch is untouched, so a normal build's output is unchanged.
+\ifdefined\TeXLibAccessibleMode
+	\newlist{texlibreadings}{itemize}{1}
+	\setlist[texlibreadings]{leftmargin=2em, topsep=2pt, parsep=2pt,
+							 itemsep=2pt, label={\textendash}}
+	\newenvironment{readings}
+		{%
+			\par\addvspace{6pt}%
+			\noindent{\bfseries Readings.}\par\nopagebreak
+			\begin{texlibreadings}%
+		}
+		{%
+			\end{texlibreadings}\addvspace{4pt}%
+		}
+\else
+	\newenvironment{readings}
+		{%
+			\par\addvspace{6pt}%
+			\noindent{\bfseries Readings.}\par\nopagebreak
+			\begin{itemize}[leftmargin=2em, topsep=2pt, parsep=2pt,
+							itemsep=2pt, label={\textendash}]%
+		}
+		{%
+			\end{itemize}\addvspace{4pt}%
+		}
+\fi
 
 \endinput

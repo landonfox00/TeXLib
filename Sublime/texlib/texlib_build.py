@@ -143,20 +143,42 @@ MODE_MACROS = {
 }
 
 # --- Accessible (tagged PDF/UA) mode ----------------------------------------
-# Produces a tagged, screen-reader-friendly PDF ALONGSIDE the normal one, as
-# <base>_accessible.pdf, so the primary build is never touched. The tagging
-# engine can only be switched on by \DocumentMetadata issued BEFORE
+# A PAIRED build: the document is typeset twice and both PDFs are kept, as
+# <base>.pdf (normal) and <base>_accessible.pdf (tagged). Pairing rather than
+# replacing is deliberate -- tagging=on costs real visual fidelity (tcolorbox
+# wraps are dropped because their inner list breaks under tagging; see
+# texlib-thmenv.sty), so the normal PDF stays the pretty one for print and
+# lecture while the tagged twin is the one a screen reader can navigate.
+#
+# The two halves use DIFFERENT engines on purpose. The normal half keeps the
+# class's natural engine (pdflatex for syllabus/notes/pset), so the primary PDF
+# is byte-for-byte what a plain Ctrl+B produces; the tagged half forces lualatex
+# because MathML math tagging is a Unicode-engine feature. Overriding the engine
+# for both would silently change the normal PDF's rendering in accessible mode.
+#
+# Tagging can only be switched on by \DocumentMetadata issued BEFORE
 # \documentclass, so the builder injects it on the command line ahead of
-# \input{<doc>} (the same prefix trick used for \def\ShowKey{}). Requires
-# lualatex regardless of the class's normal engine. Config mirrors UNR's
-# Hurtado v0.5 template (tag structure + MathML math + tagged table headers;
-# ua-2 for accessibility, a-4f for archival). \TeXLibAccessibleMode lets the
-# TeXLib classes/packages adapt (texlib-build.sty -> \ifTeXLibAccessible).
+# \input{<doc>} (the same prefix trick used for \def\ShowKey{}).
+# \TeXLibAccessibleMode lets the TeXLib classes/packages adapt
+# (texlib-build.sty -> \ifTeXLibAccessible).
 ACCESSIBLE_MODE   = "accessible"
 ACCESSIBLE_SUFFIX = "_accessible"
+ACCESSIBLE_ENGINE = "lualatex"
+# math/setup carries BOTH MathML methods because PDF readers split on which one
+# they understand, and the split falls across how a student actually opens the
+# file. AF (associated files) is what Firefox's viewer and Foxit read -- i.e.
+# the in-browser path from an LMS link -- while SE (structure elements) is what
+# Adobe Acrobat reads. Emitting only one silently drops the math to "x 2 plus y
+# 2" on the other half of the readers. a-4f's "f" (files) is the conformance
+# level that permits the AF attachments, and was already being paid for.
+#
+# NOT set, deliberately: \tagpdfsetup{math/alt/use}. It raises the score an
+# Ally/UDOIT-style checker reports, but it does so by replacing the MathML with
+# flat alt text that hides the real markup from screen readers -- a better
+# number for worse accessibility. See CHANGELOG 0.6.0.
 ACCESSIBLE_DOCMETA = (
     r"\DocumentMetadata{lang=en,tagging=on,"
-    r"tagging-setup={math/setup={mathml-SE},table/header-rows=1},"
+    r"tagging-setup={math/setup={mathml-AF,mathml-SE},table/header-rows=1},"
     r"pdfstandard={ua-2,a-4f}}"
 )
 
@@ -309,15 +331,10 @@ class TexlibBuildCore:
 
         engine = self._select_engine(src)
 
-        # The accessible (tagged PDF/UA) build always needs lualatex -- MathML
-        # math tagging is a Unicode-engine feature -- even for the pdflatex
-        # classes (syllabus, notes, pset).
-        if mode == ACCESSIBLE_MODE and engine != "lualatex":
-            self.display(
-                "TeXLib: accessible build requires lualatex "
-                f"-- overriding {engine}.\n"
-            )
-            engine = "lualatex"
+        # Accessible mode deliberately does NOT override `engine` here. Its
+        # normal half must keep the class's natural engine so the primary PDF is
+        # what a plain build would have produced; only the tagged half is forced
+        # to lualatex, inside _build_accessible.
 
         # Report cards: turn the one gradebook.xlsx (source of truth) into the
         # report-view CSV the class reads. Done in-process before the engine
@@ -344,7 +361,9 @@ class TexlibBuildCore:
         if mode == MODE_QUICK:
             yield from self._count_passes(self._build_quick(base, engine))
         elif mode == ACCESSIBLE_MODE:
-            yield from self._count_passes(self._build_accessible(base, engine))
+            yield from self._count_passes(
+                self._build_accessible(base, engine, tex_dir, engine_options)
+            )
         else:
             yield from self._count_passes(self._build_once(base, engine, mode))
 
@@ -637,19 +656,30 @@ class TexlibBuildCore:
         cmd = base + [self.tex_name]
         yield (cmd, f"{engine} [quick] single pass (refs may be stale)...")
 
-    def _build_accessible(self, base, engine):
-        """Build the tagged PDF/UA variant, kept beside the primary PDF.
+    def _build_accessible(self, base, engine, tex_dir, engine_options):
+        """Build the document twice -- normal, then tagged -- and keep both.
+
+        The normal half runs first, through the ordinary _build_once path, so it
+        gets the full biber + cross-reference settling loop and lands as
+        <base>.pdf exactly as a plain build would: same engine, same flags, same
+        output. The tagged half then re-typesets the same source under
+        \\DocumentMetadata and is copied out as <base>_accessible.pdf.
+
+        Order matters. _postprocess copies the primary PDF back from the aux dir
+        and only afterwards reads the .pubmeta sidecar and publishes; running the
+        tagged half first would leave the primary copy-back looking at whichever
+        PDF happened to be newest, and the publish step guesses nothing.
 
         The jobname MUST stay the document's real base name. A suffixed jobname
         looked like the tidy way to avoid clobbering <base>.pdf, but several
         TeXLib engines key off \\jobname: autoexam reads the document body from
         <jobname>.tex and simply aborts ("AutoExam: Cannot read document body")
         when it does not exist, which silently truncated the tagged exam from 6
-        pages to 2. So instead of renaming the job, the build is redirected to an
-        `a11y` subdirectory of the aux dir; _postprocess copies the result out as
-        <base>_accessible.pdf. \\jobname is unchanged, every jobname-keyed engine
-        behaves exactly as in a normal build, and the primary PDF is untouched
-        because nothing is written next to the source until the copy.
+        pages to 2. So instead of renaming the job, the tagged half is redirected
+        to an `a11y` subdirectory of the aux dir; _postprocess copies the result
+        out as <base>_accessible.pdf. \\jobname is unchanged, every jobname-keyed
+        engine behaves exactly as in a normal build, and the two halves never
+        share an output directory, so neither can clobber the other.
 
         The DocumentMetadata prefix goes AHEAD of \\input{<doc>} so it precedes
         the document's \\documentclass, the only position from which tagging can
@@ -657,15 +687,29 @@ class TexlibBuildCore:
         after the support file DocumentMetadata opens before the \\input.
 
         Two fixed passes settle cross-references and the "page X of Y" footer;
-        no biber loop yet, so a bibliography-bearing class may need one when the
-        rollout reaches it.
+        no biber loop on the tagged half yet, so a bibliography-bearing class may
+        need one when the rollout reaches it.
         """
+        yield from self._build_once(base, engine, None)
+
+        # MathML math tagging is a Unicode-engine feature, so the tagged half is
+        # always lualatex -- including for the pdflatex classes (syllabus, notes,
+        # pset), whose normal half above ran under their own engine.
+        if engine != ACCESSIBLE_ENGINE:
+            self.display(
+                f"TeXLib: normal PDF built with {engine}; tagged PDF needs "
+                f"{ACCESSIBLE_ENGINE}.\n"
+            )
+        tagged_base = self._base_engine_cmd(
+            ACCESSIBLE_ENGINE, self._aux_target, tex_dir, engine_options
+        )
         out_dir = self._accessible_out_dir()
-        cmd = [c for c in base if not str(c).startswith("-output-directory=")]
+        cmd = [c for c in tagged_base
+               if not str(c).startswith("-output-directory=")]
         cmd += [f"-output-directory={out_dir}", f"--jobname={self.base_name}",
                 ACCESSIBLE_MACRO + f"\\input{{{self.tex_name}}}"]
-        yield (cmd, f"{engine} [accessible] run 1...")
-        yield (cmd, f"{engine} [accessible] run 2 (settle)...")
+        yield (cmd, f"{ACCESSIBLE_ENGINE} [accessible] run 1...")
+        yield (cmd, f"{ACCESSIBLE_ENGINE} [accessible] run 2 (settle)...")
 
     def _accessible_out_dir(self):
         """Aux subdirectory the accessible build writes into (created on demand)."""
@@ -1773,14 +1817,17 @@ class TexlibBuildCore:
         folder pointing at the coded copy. The sidecar is always consumed so it
         never litters; a no-op for every non-publishable build. Disabling publish
         (builder_settings / env) still consumes the sidecar but skips the copies.
+
+        On an accessible build the copies are cloned from the TAGGED PDF -- see
+        _publish_source_pdf for why the LMS-bound files get that half.
         """
         meta = self._read_pubmeta(tex_dir)   # consumes the sidecar if present
         if meta is None:
             return                           # not a publishable build
         if not self._publish_enabled():
             return                           # feature off: copies/shortcut skipped
-        pdf = base_path + ".pdf"
-        if not os.path.exists(pdf):
+        pdf = self._publish_source_pdf(base_path)
+        if not pdf:
             return
         course   = meta.get("course", "").strip()
         section  = meta.get("section", "").strip()
@@ -1822,6 +1869,32 @@ class TexlibBuildCore:
             self._copy_to_clipboard(coded_pdf)
         if made:
             self.display("TeXLib: published " + ", ".join(made) + extra + ".\n")
+
+    def _publish_source_pdf(self, base_path):
+        """Which PDF the shareable copies are cloned from; None if there is none.
+
+        An accessible build publishes its TAGGED half. The shareable copies are
+        precisely the files that go up to WebCampus, where an untagged PDF is
+        what the LMS accessibility checker flags -- and where the tagged twin
+        costs nothing visually for the only two publishable classes: syllabus and
+        schedule box no theorems, so the tcolorbox fallback that makes the tagged
+        variant plainer elsewhere never fires for them.
+
+        Gated on THIS build having produced the tagged file. A stale
+        <base>_accessible.pdf left behind by an earlier accessible run must never
+        be published behind a normal build's back -- it would ship content from
+        whenever that run happened.
+        """
+        normal = base_path + ".pdf"
+        if getattr(self, "_accessible_build", False):
+            tagged = base_path + ACCESSIBLE_SUFFIX + ".pdf"
+            if os.path.exists(tagged):
+                self.display(
+                    "TeXLib: publishing the tagged PDF -- shareable copies are "
+                    "screen-reader ready.\n"
+                )
+                return tagged
+        return normal if os.path.exists(normal) else None
 
     def _read_pubmeta(self, tex_dir):
         """Read and DELETE the <base>.pubmeta sidecar; return its key=value map,

@@ -636,7 +636,20 @@
 		{\@texlib@psection@begin{fr}{Free Response}{#2}{0}}
 		{\@texlib@psection@begin{fr}{Free Response}{#2}{1}}%
 }{\@texlib@psection@end}
+% Multiple choice carries NO grading rubric.  A rubric apportions partial credit
+% and an MC item is all-or-nothing, so there is nothing to apportion: both the
+% \rubric overlay and the {commonerrors} block are suppressed for the section.
+% \rubricfalse is local to the environment's group, so a {problems} section
+% elsewhere in the same document still renders its rubrics normally.
+%
+% Emission happens in \@texlib@psection@end (pbank_emit_section), which runs
+% inside this group, so setting the flag here covers every item in the section.
+%
+% Bank sources keep their MC {commonerrors} blocks: they are useful distractor
+% notes when writing or revising an item, they cost nothing in any build, and
+% deleting the \rubricfalse below is all it takes to print them again.
 \NewDocumentEnvironment{mcproblems}{s O{}}{%
+	\rubricfalse
 	\IfBooleanTF{#1}
 		{\@texlib@psection@begin{mc}{Multiple Choice}{#2}{0}}
 		{\@texlib@psection@begin{mc}{Multiple Choice}{#2}{1}}%

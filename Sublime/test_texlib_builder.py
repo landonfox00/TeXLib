@@ -275,17 +275,35 @@ def main():
     check("quick -> single-pass message shown",
           bool(cmds) and "quick" in cmds[0][1], cmds[0][1] if cmds else "")
 
-    # (k) accessible mode: syllabus (a pdflatex class) -> forced lualatex, the
-    # DocumentMetadata prefix is injected AHEAD of \input, a jobname suffix
-    # keeps the tagged PDF beside the primary, and two passes settle refs.
+    # (k) accessible mode is a PAIRED build: the class's own engine produces the
+    # normal PDF first, then lualatex re-typesets the same source with the
+    # DocumentMetadata prefix into an a11y/ output dir. syllabus is a pdflatex
+    # class, so this also pins that the normal half is NOT dragged onto lualatex
+    # -- that would silently change the primary PDF's rendering in this mode.
     cmds, disp = run_builder(
         r"\documentclass{syllabus}\begin{document}x\end{document}",
         options=["--texlib-mode=accessible"])
-    check("accessible -> forced lualatex",
-          bool(cmds) and cmds[0][0][0] == "lualatex", cmds)
-    check("accessible -> 'requires lualatex' message shown",
-          "requires lualatex" in disp, repr(disp))
-    aarg = cmds[0][0][-1] if cmds else ""
+    normal = [c for c in cmds if r"\DocumentMetadata" not in str(c[0][-1])]
+    tagged = [c for c in cmds if r"\DocumentMetadata" in str(c[0][-1])]
+    check("accessible -> produces both halves",
+          bool(normal) and bool(tagged), [c[1] for c in cmds])
+    check("accessible -> normal half runs FIRST (publish reads the primary PDF)",
+          bool(cmds) and r"\DocumentMetadata" not in str(cmds[0][0][-1]),
+          cmds[0][1] if cmds else "")
+    check("accessible -> normal half keeps the class's own engine (pdflatex)",
+          bool(normal) and normal[0][0][0] == "pdflatex",
+          normal[0][0] if normal else "")
+    check("accessible -> normal half gets a plain filename arg (untagged)",
+          bool(normal) and normal[0][0][-1] == "doc.tex",
+          normal[0][0] if normal else "")
+    check("accessible -> normal half NOT written into a11y",
+          bool(normal) and not any(str(c).endswith("a11y") for c in normal[0][0]),
+          normal[0][0] if normal else "")
+    check("accessible -> tagged half forced to lualatex",
+          bool(tagged) and all(c[0][0] == "lualatex" for c in tagged), tagged)
+    check("accessible -> engine-split message shown",
+          "tagged PDF needs lualatex" in disp, repr(disp))
+    aarg = tagged[0][0][-1] if tagged else ""
     check("accessible -> \\DocumentMetadata injected", r"\DocumentMetadata" in aarg, aarg)
     check("accessible -> tagging=on requested", "tagging=on" in aarg, aarg)
     check("accessible -> DocumentMetadata precedes \\input",
@@ -293,25 +311,43 @@ def main():
           and aarg.index(r"\DocumentMetadata") < aarg.index(r"\input"), aarg)
     check("accessible -> \\def\\TeXLibAccessibleMode injected",
           r"\def\TeXLibAccessibleMode{}" in aarg, aarg)
+    # Both MathML methods, because readers split on which one they understand:
+    # AF is what Firefox's viewer and Foxit read (the in-browser path from an LMS
+    # link), SE is what Adobe Acrobat reads. Shipping one drops the math to
+    # "x 2 plus y 2" for everyone on the other side of that split.
+    check("accessible -> both MathML methods requested",
+          "mathml-AF" in aarg and "mathml-SE" in aarg, aarg)
     # The jobname must stay the REAL base name: autoexam reads its document body
     # from <jobname>.tex, so a suffixed jobname truncated the tagged exam. The
     # output is separated by directory (aux/a11y) instead, and _postprocess
     # copies it out as <base>_accessible.pdf.
     check("accessible -> --jobname stays the real base name",
-          bool(cmds) and "--jobname=doc" in cmds[0][0]
-          and "--jobname=doc_accessible" not in cmds[0][0],
-          cmds[0][0] if cmds else "")
-    check("accessible -> redirected to an a11y output dir",
-          bool(cmds) and any(str(c).startswith("-output-directory=")
-                             and str(c).endswith("a11y") for c in cmds[0][0]),
-          cmds[0][0] if cmds else "")
+          bool(tagged) and "--jobname=doc" in tagged[0][0]
+          and "--jobname=doc_accessible" not in tagged[0][0],
+          tagged[0][0] if tagged else "")
+    check("accessible -> tagged half redirected to an a11y output dir",
+          bool(tagged) and any(str(c).startswith("-output-directory=")
+                               and str(c).endswith("a11y") for c in tagged[0][0]),
+          tagged[0][0] if tagged else "")
     check("accessible -> exactly one -output-directory (base one replaced)",
-          bool(cmds) and sum(1 for c in cmds[0][0]
-                             if str(c).startswith("-output-directory=")) == 1,
-          cmds[0][0] if cmds else "")
-    check("accessible -> two settle passes", len(cmds) == 2, f"{len(cmds)} builds")
+          bool(tagged) and sum(1 for c in tagged[0][0]
+                               if str(c).startswith("-output-directory=")) == 1,
+          tagged[0][0] if tagged else "")
+    check("accessible -> two settle passes on the tagged half",
+          len(tagged) == 2, f"{len(tagged)} tagged passes")
     check("accessible -> --texlib-mode token NOT passed to engine",
-          not any("--texlib-mode" in str(x) for x in cmds[0][0]), cmds[0][0] if cmds else "")
+          not any("--texlib-mode" in str(x) for c in cmds for x in c[0]), cmds)
+
+    # (k2) a lualatex class in accessible mode: same pairing, one engine.
+    cmds, _ = run_builder(
+        r"\documentclass{quiz}\begin{document}x\end{document}",
+        options=["--texlib-mode=accessible"])
+    check("accessible (lua class) -> still produces both halves",
+          any(r"\DocumentMetadata" not in str(c[0][-1]) for c in cmds)
+          and any(r"\DocumentMetadata" in str(c[0][-1]) for c in cmds),
+          [c[1] for c in cmds])
+    check("accessible (lua class) -> every pass is lualatex",
+          all(c[0][0] == "lualatex" for c in cmds), cmds)
 
     # (j3) biber change-detection
     BCF = "<bcf>cite-keys</bcf>"
@@ -1354,16 +1390,24 @@ def main():
     check("pubmeta: absent -> None", pb._read_pubmeta(tmpp) is None)
 
     def _publish_case(base, kind, generic, noun, course, section, term,
-                      settings=None, publish_name=""):
+                      settings=None, publish_name="",
+                      accessible_build=False, tagged_present=False):
         d = tempfile.mkdtemp(prefix="texlib_pub_")
         with open(os.path.join(d, base + ".pdf"), "wb") as fh:
-            fh.write(b"%PDF-1.5 test")
+            fh.write(b"%PDF-1.5 normal")
+        # tagged_present is deliberately independent of accessible_build so the
+        # stale case (file left by an EARLIER accessible run, current build
+        # normal) can be pinned: it must never be published.
+        if tagged_present:
+            with open(os.path.join(d, base + "_accessible.pdf"), "wb") as fh:
+                fh.write(b"%PDF-1.5 tagged")
         with open(os.path.join(d, base + ".pubmeta"), "w", encoding="utf-8") as fh:
             fh.write(f"kind={kind}\ngeneric={generic}\nnoun={noun}\n"
                      f"course={course}\nsection={section}\nterm={term}\n"
                      f"publish-name={publish_name}\n")
         b = TexlibBuilder(); b.tex_dir = d; b.base_name = base
         b._aux_target = None
+        b._accessible_build = accessible_build
         if settings is not None:
             b.builder_settings = settings
         shortcuts, clips = [], []
@@ -1424,6 +1468,47 @@ def main():
     check("publish: disabled -> only source PDF, sidecar still consumed",
           pdfs == ["doc.pdf"]
           and not os.path.exists(os.path.join(d, "doc.pubmeta")), pdfs)
+
+    # Publish source selection. The shareable copies are the files that go up to
+    # WebCampus, so an accessible build publishes its TAGGED half -- an untagged
+    # PDF is exactly what the LMS accessibility checker flags.
+    def _published_bytes(d, name):
+        with open(os.path.join(d, name), "rb") as fh:
+            return fh.read()
+
+    d, pdfs, _, _, disp = _publish_case(
+        "schedule", "schedule", "Tentative Schedule", "Schedule",
+        "Math 181", "1001", "Fall 2026",
+        accessible_build=True, tagged_present=True)
+    check("publish (accessible): generic copy carries the TAGGED bytes",
+          _published_bytes(d, "Tentative Schedule.pdf") == b"%PDF-1.5 tagged",
+          _published_bytes(d, "Tentative Schedule.pdf"))
+    check("publish (accessible): coded copy carries the TAGGED bytes",
+          _published_bytes(d, "Math181.1001_Fall2026.pdf") == b"%PDF-1.5 tagged",
+          _published_bytes(d, "Math181.1001_Fall2026.pdf"))
+    check("publish (accessible): both halves survive next to the source",
+          "schedule.pdf" in pdfs and "schedule_accessible.pdf" in pdfs, pdfs)
+    check("publish (accessible): says so", "tagged PDF" in disp, repr(disp))
+
+    # A stale <base>_accessible.pdf from an earlier run must NOT hijack a normal
+    # build's publish -- it would ship content from whenever that run happened.
+    d, pdfs, _, _, _ = _publish_case(
+        "schedule", "schedule", "Tentative Schedule", "Schedule",
+        "Math 181", "1001", "Fall 2026",
+        accessible_build=False, tagged_present=True)
+    check("publish (normal build, stale tagged file): publishes the NORMAL bytes",
+          _published_bytes(d, "Tentative Schedule.pdf") == b"%PDF-1.5 normal",
+          _published_bytes(d, "Tentative Schedule.pdf"))
+
+    # Accessible build whose tagged half failed to appear: fall back rather than
+    # publishing nothing.
+    d, pdfs, _, _, _ = _publish_case(
+        "schedule", "schedule", "Tentative Schedule", "Schedule",
+        "Math 181", "1001", "Fall 2026",
+        accessible_build=True, tagged_present=False)
+    check("publish (accessible, tagged missing): falls back to the normal PDF",
+          _published_bytes(d, "Tentative Schedule.pdf") == b"%PDF-1.5 normal",
+          _published_bytes(d, "Tentative Schedule.pdf"))
 
     # _setting_on precedence: builder_settings > env > default.
     so = TexlibBuilder()

@@ -39,7 +39,7 @@ with tempfile.TemporaryDirectory() as root:
                 "find_coursemeta: None when absent")
 
 # aux_dir_for: reproduces the brain's key exactly.
-sample = "C:/Users/Landon/texlib-sublime-wt/examples/Math181-Fall2026/exam-01.tex"
+sample = "C:/Users/Landon/Documents/TeXLib-worktrees/texlib-sublime-wt/examples/Math181-Fall2026/exam-01.tex"
 expect_key = hashlib.md5(sample.encode("utf-8")).hexdigest()[:12]
 got = texlib_locate.aux_dir_for(sample)
 ok &= check(os.path.basename(got) == expect_key,

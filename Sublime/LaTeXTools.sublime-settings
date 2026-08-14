@@ -21,7 +21,7 @@
 			// we route via the comma-free junction. The value is an EXPLICIT,
 			// non-recursive list (repo root + the 9 module dirs). NOT recursive
 				// "C:/_texlibjunc//": that walked ~1200 dirs incl. .git and the
-				// .claude/worktrees copies (~1-3.5s/pass, worse cold) and let a stale
+				// tool scratch dirs (~1-3.5s/pass, worse cold) and let a stale
 				// examples/*.aux shadow a same-named build. Add a segment only when
 				// you add a new top-level module dir.
 			"env" : {
@@ -65,7 +65,11 @@
 	"viewer" : "sumatra",
 	"open_pdf_on_build" : true,
 	"forward_sync" : false,
-	"keep_focus" : true,
+	// false = let Sumatra pop up and KEEP the focus after a build. With true,
+	// LaTeXTools runs its focus hack (Sumatra's viewer plugin doesn't implement
+	// keep_focus itself, so it falls back to a delayed bring_to_front() on the
+	// ST window) and yanks focus back out of the viewer.
+	"keep_focus" : false,
 
 	"preview_math_mode" : "none",
 

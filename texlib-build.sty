@@ -38,7 +38,11 @@
 % Compile-time toggles
 \ifdefined\ShowSolutions      \solutionstrue        \fi
 \ifdefined\ShowKey            \keytrue              \fi
-\ifdefined\ShowRubric         \rubrictrue           \fi
+% A rubric annotates a worked solution, so it implies one: a rubric-only build
+% renders point apportionments and common-error notes floating against blank
+% answer space, which is of no use to anyone.  \ShowRubric therefore raises
+% \ifsolutions too, and the standalone "Rubric" build mode was retired.
+\ifdefined\ShowRubric         \rubrictrue\solutionstrue \fi
 \ifdefined\ShowDraft          \drafttrue            \fi
 \ifdefined\StudentMode        \studenttrue          \fi
 \ifdefined\InstructorMode     \instructortrue       \fi

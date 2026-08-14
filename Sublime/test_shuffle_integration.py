@@ -27,7 +27,7 @@ are what this asserts -- properties, never a byte match to one drawn order.
 
 A second block asserts three rendering GEOMETRY properties (solution-box right
 margin, extra-credit chrome, workbox suppression). Two of them encode the
-CORRECTED behavior of a separately-tracked fix (task_c3867d2b) that is not on
+CORRECTED behavior of a separately-tracked fix (solution-box-geometry-fix) that is not on
 this base branch yet, so they are marked known_issue: honest (they start
 passing, loudly, the moment that fix lands) without failing CI for a gap that
 is deliberately not fixed here. Do NOT weaken them to the current buggy state.
@@ -644,7 +644,7 @@ def scenario_geometry(pdf, copies, texts, wpages, tmp):
 
     # --- geom (a): the green {solution} box right edge aligns with the
     # inter-problem separator-rule right edge (both at the right text margin).
-    # CORRECTED behavior of task_c3867d2b: on this base branch the full-textwidth
+    # CORRECTED behavior of solution-box-geometry-fix: on this base branch the full-textwidth
     # box renders inside the {questions} list indent that \noindent does not
     # remove, so it overhangs the right margin (box right > separator right).
     solA = by[("A", True)]
@@ -668,11 +668,11 @@ def scenario_geometry(pdf, copies, texts, wpages, tmp):
                       abs(sep_right - box_right) <= tol,
                       f"box_right={box_right}px sep_right={sep_right}px "
                       f"diff={abs(sep_right - box_right)}px (tol {tol}px)",
-                      known_issue="task_c3867d2b")
+                      known_issue="solution-box-geometry-fix")
 
     # --- geom (b): on a STUDENT build the extra-credit item gets the same chrome
     # as a graded problem -- a separator rule ABOVE it and answer space BELOW it.
-    # CORRECTED behavior of task_c3867d2b: the base branch replays the deferred
+    # CORRECTED behavior of solution-box-geometry-fix: the base branch replays the deferred
     # bonus with neither. -------------------------------------------------------
     stuA = by[("A", False)]
     pb = _part_page_with(stuA, texts, wpages, "II", EC_NEEDLE)
@@ -697,7 +697,7 @@ def scenario_geometry(pdf, copies, texts, wpages, tmp):
     check("geom(b) extra credit reserves answer space below it (like a problem)",
           med_gap > 0 and gap_below >= 0.6 * med_gap,
           f"gap below EC={gap_below:.0f}pt median graded gap={med_gap:.0f}pt",
-          known_issue="task_c3867d2b")
+          known_issue="solution-box-geometry-fix")
 
     # separator rule above EC (pixels): a text-block rule between the last graded
     # problem's stem and the EC stem.
@@ -712,7 +712,7 @@ def scenario_geometry(pdf, copies, texts, wpages, tmp):
           sep_above,
           f"EC stem yTop={bonus[0]:.0f}pt, last graded yBot={last_reg[1]:.0f}pt, "
           f"separator rule ys={[round(y) for y in rule_ys_pt]}",
-          known_issue="task_c3867d2b")
+          known_issue="solution-box-geometry-fix")
 
 
 # ============================================================================

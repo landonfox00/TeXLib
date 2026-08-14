@@ -15,7 +15,7 @@ All are in the Command Palette (`Ctrl+Shift+P` → "TeXLib: …") and under
 
 | Command | What it does |
 |---------|--------------|
-| **Build** / **Build — Pick Mode** | Native build (default, or key/solutions/student/rubric/draft/quick). A status-bar spinner shows the current step; the panel pops only on failure. On success, opens/forward-syncs the PDF via LaTeXTools. |
+| **Build** / **Build — Pick Mode** | Native build (default, or key/solutions/student/draft/quick). `solutions` is the instructor build and carries the grading rubric with it; there is no rubric-only mode, since a rubric annotates a worked solution. A status-bar spinner shows the current step; the panel pops only on failure. On success, opens/forward-syncs the PDF via LaTeXTools. |
 | **Cancel Build** / **Cancel All Builds** / **Build Status** | Cancel this document's build, cancel every running build, or list running builds (documents build in parallel). |
 | **View PDF** / **Forward Sync** / **Show Build Output** | Delegate to LaTeXTools' `view_pdf` / `jumpto_pdf`; or re-open this document's build panel. |
 | **Word Count** / **Table of Contents** / **Jump to \ref / \cite** | Delegate to LaTeXTools' `texcount` / `toc_quickpanel` / `jumpto_anywhere`. |
@@ -67,6 +67,16 @@ split view with **Edit Settings**).
 - `texinputs` — the child engine's `TEXINPUTS`; how builds resolve the classes.
   Point it at the comma-free repo checkout. No TEXMF install is needed.
 - `open_pdf_on_build` — open/refresh + forward-sync the PDF after a build (default true).
+- `preferred_pdf` — *which* of the build's PDFs the viewer opens: `"combined"`
+  (default, `<base>.pdf`), `"solutions"` (`<base>_A_solutions.pdf` for
+  `\versions{A,B,C}`; `<base>_Solutions.pdf` for a `.spl` key build), `"student"`,
+  or a literal suffix like `"_B_solutions"`. Every copy is still written — this
+  only picks the one you land in. Falls back to `<base>.pdf` when the build made
+  no such copy. A sliced copy gets its own `.synctex`, so inverse search works in
+  it, and `View PDF` / `Forward Sync` aim at it rather than at `<base>.pdf`.
+  (Forward *search* into a multi-version exam is unreliable in the combined PDF
+  too — the version loop attributes body lines to its scratch file, and a bank
+  file gets one Input tag per `\@@input`. Upstream of this setting.)
 - `show_panel_on_build` — `"errors"` (default), `"always"`, or `"never"`.
 - `build_on_save` — rebuild on every save (default false; use Toggle Build on Save).
 - `class_source` — path to the TeXLib repo (for LMS packaging / coursemeta key

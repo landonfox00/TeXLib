@@ -83,7 +83,7 @@ VERAPDF = shutil.which("verapdf") or shutil.which("verapdf.bat")
 # variant, and (when veraPDF is present) validates PDF/UA-2 conformance.
 ACCESSIBLE_DOCMETA = (
     r"\DocumentMetadata{lang=en,tagging=on,"
-    r"tagging-setup={math/setup={mathml-SE},table/header-rows=1},"
+    r"tagging-setup={math/setup={mathml-AF,mathml-SE},table/header-rows=1},"
     r"pdfstandard={ua-2,a-4f}}"
 )
 ACCESSIBLE_MACRO = ACCESSIBLE_DOCMETA + r"\def\TeXLibAccessibleMode{}"
