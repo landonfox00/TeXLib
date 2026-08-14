@@ -43,16 +43,12 @@
 % because the discarded box opens while the surrounding question paragraph is
 % still active, that structure nests INSIDE the stem's <text>: a "P contains P /
 % P contains Part" PDF/UA Table-5 violation with no visible cause.  Suspend
-% tagging around the discarded box so it emits no structure at all.  Uses the
-% kernel expl3 hooks via \csname (no ExplSyntaxOn needed, so the @-names stay
-% intact); no-ops in a normal build where the tagging layer is absent.
-\ifdefined\TeXLibAccessibleMode
-	\newcommand\texlib@acc@tagsuspend{\csname tag_suspend:n\endcsname{texlibhiddensol}}
-	\newcommand\texlib@acc@tagresume{\csname tag_resume:n\endcsname{texlibhiddensol}}
-\else
-	\newcommand\texlib@acc@tagsuspend{}
-	\newcommand\texlib@acc@tagresume{}
-\fi
+% tagging around the discarded box so it emits no structure at all.
+%
+% \texlib@acc@tagsuspend / \texlib@acc@tagresume are defined in texlib-build.sty,
+% which every consumer of this package loads first (via texlib-assessment).  They
+% moved there because didactic.cls gates inline worked lead-ins into a discard box
+% the same way and hits the identical violation, but does not load this package.
 
 \newbox\@partsol@box
 \newbox\@sol@box

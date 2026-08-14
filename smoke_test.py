@@ -1093,8 +1093,8 @@ def main() -> int:
     p.add_argument(
         "--accessible", action="store_true",
         help="Also build the tagged PDF/UA variant (forces lualatex) and validate "
-             "it with veraPDF. Soft-skips validation if veraPDF is absent. Note: "
-             "only rolled-out classes (syllabus, didactic) are expected to pass.",
+             "it with veraPDF. Soft-skips validation if veraPDF is absent. All "
+             "nine classes are expected to pass, so a failure here is a regression.",
     )
     p.add_argument(
         "--modes",
