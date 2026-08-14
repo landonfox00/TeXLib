@@ -81,10 +81,22 @@
 % mildly preferable -- for accessibility.)
 \NewDocumentCommand \TeXLibInstructionsTitledBox { +m } {
 	\fbox { \fbox { \parbox { \dimexpr \linewidth - 4\fboxsep - 4\fboxrule \relax } {
-		\bool_if:NTF \g__texlibinstr_accessible_bool
-			{ \begin{flushleft}
-				% ~ is an explicit space: literal spaces are ignored under
-				% \ExplSyntaxOn, and inline instructions must not run into the header.
+		\bool_lazy_and:nnTF
+			{ \g__texlibinstr_accessible_bool } { \g__texlibinstr_decenter_bool }
+			{ % Only the exam cover sets this box inside a `center`, which under
+			  % tagging becomes a centered structure block whose alignment leaks
+			  % into the bullets. Only a flushleft ENVIRONMENT (its trivlist opens a
+			  % fresh left-aligned structure) stops that leak -- a minipage or a bare
+			  % \raggedright/\rightskip reset does not. Zero the trivlist's skips so
+			  % it adds no vertical gap before "Instructions:", and restore
+			  % \rightskip=0 inside so the text still justifies like normal. Gated on
+			  % \g__texlibinstr_decenter_bool: the quiz box is NOT centered, so it
+			  % takes the plain branch below and stays pixel-identical to normal
+			  % (flushleft's looser line-breaking would otherwise spread its prose).
+			  % ~ is an explicit space (literal spaces vanish under \ExplSyntaxOn).
+			  \setlength\topsep{0pt}\setlength\partopsep{0pt}\setlength\parskip{0pt}%
+			  \begin{flushleft}
+				\setlength\rightskip{0pt}%
 				\noindent {\large\bf Instructions:}~#1
 			  \end{flushleft} }
 			{ \noindent {\large\bf Instructions:}~#1 }
@@ -101,6 +113,15 @@
 \bool_new:N \g__texlibinstr_accessible_bool
 \cs_if_exist:NT \TeXLibAccessibleMode
 	{ \bool_gset_true:N \g__texlibinstr_accessible_bool }
+
+% \g__texlibinstr_decenter_bool -- set true by a cover that renders the titled
+% instructions box inside a `center` (only autoexam does; the quiz box is not
+% centered). It tells \TeXLibInstructionsTitledBox to wrap the content in a
+% leak-stopping flushleft under an accessible build. \TeXLibInstructionsDecenter
+% is the public setter the exam \maketitle calls.
+\bool_new:N \g__texlibinstr_decenter_bool
+\NewDocumentCommand \TeXLibInstructionsDecenter { } {
+	\bool_gset_true:N \g__texlibinstr_decenter_bool }
 
 \bool_new:N \g__texlibinstr_boxed_bool
 \bool_gset_true:N \g__texlibinstr_boxed_bool

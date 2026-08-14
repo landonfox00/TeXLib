@@ -541,6 +541,13 @@
 % reference point right and swallow the -\texlibsectionhang hang; \@totalleftmargin
 % (0 outside a list) cancels that indent so the hang measures from the true margin.
 \providecommand{\texlib@partheading}[1]{\section*{\hspace*{-\@totalleftmargin}#1}}
+% ACCESSIBLE: the heading is hoisted OUT of the {questions} list (see
+% \@texlib@psection@begin), so there is no list indent to cancel — drop the
+% \@totalleftmargin hang and emit a plain starred section that tags cleanly as a
+% top-level <Sect> sibling of the <L> rather than a child inside it.
+\ifdefined\TeXLibAccessibleMode
+	\renewcommand{\texlib@partheading}[1]{\section*{#1}}%
+\fi
 
 % \if@texlib@cursectionmc — true while the section now opening/closing is an
 %   {mcproblems} (vs. {problems}), so a class's page-policy hooks can tell them
@@ -579,6 +586,23 @@
 	\fi
 	\stepcounter{texlibpartno}%
 	\problems@begin@hook
+	% ---- ACCESSIBLE: hoist the "Part N — Label" heading OUT of {questions} -----
+	%   A \section inside the exam-class {questions} list tags as <Sect> nested
+	%   directly under the list's <L> (PDF/UA Table 5 "L-Sect" violation) and, in
+	%   -halt-on-error, throws "missing \item" at \end{problems}. Emit it here,
+	%   before \begin{questions} AND before \section is \let to \@sec@collect, so
+	%   it renders through the real \section (a top-level sibling of the <L>) and
+	%   is NOT captured into the shuffle stream — pbank_emit_section therefore
+	%   never replays it in-list. Normal builds keep the in-list emission below.
+	\ifdefined\TeXLibAccessibleMode
+		\if 1#4%
+			\def\@texlib@ulbl{#3}%
+			\texlib@partheading{%
+				Part~\Roman{texlibpartno}\space\textemdash\space
+				\ifx\@texlib@ulbl\@empty #2\else #3\fi
+			}%
+		\fi
+	\fi
 	% ---- inter-problem separator: first problem on a page gets no rule -------
 	\pbank@lua{pbank_first_on_page = true}%
 	\let\@problems@saved@newpage\newpage
@@ -598,12 +622,17 @@
 	\renewcommand{\newpage}{\pbank@lua{pbank_collect_break()}}%
 	\pbank@lua{pbank_begin_collect()}%
 	% ---- auto "Part N — Label" heading (user label overrides the default) -----
-	\if 1#4%
-		\def\@texlib@ulbl{#3}%
-		\texlib@partheading{%
-			Part~\Roman{texlibpartno}\space\textemdash\space
-			\ifx\@texlib@ulbl\@empty #2\else #3\fi
-		}%
+	%   Normal builds emit it INSIDE the list (texlib-sectionhang aligns it via
+	%   the -\@totalleftmargin hang). Accessible builds already emitted it above,
+	%   hoisted out of the list, so skip here to avoid a duplicate.
+	\ifdefined\TeXLibAccessibleMode\else
+		\if 1#4%
+			\def\@texlib@ulbl{#3}%
+			\texlib@partheading{%
+				Part~\Roman{texlibpartno}\space\textemdash\space
+				\ifx\@texlib@ulbl\@empty #2\else #3\fi
+			}%
+		\fi
 	\fi
 }
 \newcommand{\@texlib@psection@end}{%

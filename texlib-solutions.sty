@@ -35,8 +35,28 @@
 \newif\if@in@partsolution  \@in@partsolutionfalse
 \newif\if@in@solution      \@in@solutionfalse
 
+% ACCESSIBLE: when solutions are HIDDEN (non-key build) the {solution} /
+% {partsolution} environments still typeset their body into a DISCARDED \vbox
+% (\setbox\z@) so counters/labels inside a solution stay consistent.  The box is
+% dropped, so no glyphs ship -- but under PDF tagging tagpdf still records the
+% solution body's structure (its inline math becomes empty <Formula>s) and,
+% because the discarded box opens while the surrounding question paragraph is
+% still active, that structure nests INSIDE the stem's <text>: a "P contains P /
+% P contains Part" PDF/UA Table-5 violation with no visible cause.  Suspend
+% tagging around the discarded box so it emits no structure at all.  Uses the
+% kernel expl3 hooks via \csname (no ExplSyntaxOn needed, so the @-names stay
+% intact); no-ops in a normal build where the tagging layer is absent.
+\ifdefined\TeXLibAccessibleMode
+	\newcommand\texlib@acc@tagsuspend{\csname tag_suspend:n\endcsname{texlibhiddensol}}
+	\newcommand\texlib@acc@tagresume{\csname tag_resume:n\endcsname{texlibhiddensol}}
+\else
+	\newcommand\texlib@acc@tagsuspend{}
+	\newcommand\texlib@acc@tagresume{}
+\fi
+
 \newbox\@partsol@box
 \newbox\@sol@box
+\newbox\@sol@vtop
 \gdef\@partsol@rubric{}
 \gdef\@sol@rubric{}
 
@@ -271,7 +291,7 @@
 			\hsize\dimexpr\textwidth-12pt\relax
 	\else
 		\gdef\@sol@cerr{}%
-		\setbox\z@\vbox\bgroup
+		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }{%
 	\ifsolutions
@@ -284,6 +304,25 @@
 		\@in@solutionfalse
 		\par\vspace{\@sol@outervsep}%
 		\setlength{\fboxsep}{6pt}%
+		% Collect the "Solution." header (+ any \rubric overlay) and the pre-\box'd
+		% body into ONE \vtop, whose reference point is the header baseline. Then
+		% \dp\@sol@vtop is the EXACT distance from that baseline down to the body's
+		% bottom, so the green fill / left accent size to the real rendered content.
+		% The old formula reconstructed the header->body gap from \ht\strutbox + a
+		% fixed pad; that held for the full-width free-response box but came up short
+		% in the narrow side-by-side MC-key column (the body sat a full extra line
+		% below where the formula assumed), leaving the last line outside the fill.
+		\setbox\@sol@vtop\vtop{%
+			\hsize\dimexpr\textwidth-12pt\relax
+			\noindent\texlibsolheader%
+			\ifrubric
+				\ifx\@sol@rubric\@empty\else
+					\@emit@rubric@overlay{\@sol@rubric}%
+				\fi
+			\fi
+			\par\vskip2pt
+			\box\@sol@box
+		}%
 		% Full-bleed to the true text margins.  {solution} renders inside the
 		% exam-class {questions} list body, whose left indent (\@totalleftmargin)
 		% \noindent does NOT remove; without this the full-\textwidth box is shifted
@@ -294,40 +333,30 @@
 		% is a no-op there and the box keeps its narrow column.
 		\noindent\hspace*{-\@totalleftmargin}%
 			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
-					% The green fill is a \smash\rlap'd rule drawn INSIDE the parbox's
-					% vertical list, BEHIND the content -- NOT a \colorbox.  \colorbox
-					% wraps its content in an \hbox whose inner nodes are orphaned for
-					% SyncTeX reverse search, so `synctex edit` on the solution
-					% resolved to nothing (free-response-solution-inverse-search / mc-key-inverse-search) even though
-					% the solution's redirected bank-file records were present.  An
-					% \rlap at the OUTER horizontal level orphans it the same way; drawn
-					% inside the parbox (like the accent) the content stays reachable,
-					% so clicking the solution in the PDF now inverse-searches.  The
-					% fill spans the header line down past the box, +6pt pad each side,
-					% matching the old \colorbox{}'s \fboxsep=6pt.
+				\noindent
+					% Green fill + left accent \smash\rlap'd BEHIND the content on this
+					% one line (the \box\@sol@vtop below shares this baseline = the
+					% header baseline). NOT a \colorbox, which orphans the content for
+					% SyncTeX reverse search (free-response-solution-inverse-search /
+					% mc-key-inverse-search); the \rlap inside the parbox keeps the
+					% \box'd nodes reachable. +6pt pad each side, matching the old
+					% \colorbox{}'s \fboxsep=6pt.
 					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsoltint}{%
-						\rule[-\dimexpr\ht\@sol@box+\dp\@sol@box+6pt\relax]%
+						\rule[-\dimexpr\dp\@sol@vtop+6pt\relax]%
 							{\dimexpr\textwidth\relax}%
-							{\dimexpr\ht\strutbox+\ht\@sol@box+\dp\@sol@box+12pt\relax}}}}%
-					% Left accent, drawn flush with the green fill above: its top/bottom
-					% match the fill's own edges (\ht\strutbox+6pt up, box+6pt down --
-					% the same 6pt pad the \rule uses) so it reads as a full-height left
-					% border like pset/didactic's tcolorbox borderline west, not a short
-					% header-line tick.  \smash'd so it adds nothing to the box's own
-					% height/depth.
+							{\dimexpr\ht\@sol@vtop+\dp\@sol@vtop+12pt\relax}}}}%
+					% Left accent, top/bottom flush with the green fill (the same 6pt
+					% pad), reading as a full-height left border like pset/didactic's
+					% tcolorbox borderline west. \smash'd so it adds no height/depth.
 					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsolrulecolor}{%
 						\vrule width 1.5pt
-							height \dimexpr\ht\strutbox+6pt\relax
-							depth \dimexpr\ht\@sol@box+\dp\@sol@box+6pt\relax}}}%
-				\noindent\texlibsolheader%
-				% No rubric here any more -- it is inside \@sol@box, beneath the
-				% solution, beside the common errors (see \@emit@sol@footer).
-				\par\vskip2pt
-				\box\@sol@box
+							height \dimexpr\ht\@sol@vtop+6pt\relax
+							depth \dimexpr\dp\@sol@vtop+6pt\relax}}}%
+				\box\@sol@vtop
 			}%
 		\vspace{\@sol@outervsep}%
 	\else
-		\egroup
+		\egroup\texlib@acc@tagresume
 	\fi
 }
 
@@ -346,7 +375,7 @@
 			% full-bleed {solution} box above (verified: no right-margin overhang).
 			\hsize\textwidth
 	\else
-		\setbox\z@\vbox\bgroup
+		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }{%
 	\ifsolutions
@@ -367,7 +396,7 @@
 		\fi
 		\par\smallskip
 	\else
-		\egroup
+		\egroup\texlib@acc@tagresume
 	\fi
 }
 

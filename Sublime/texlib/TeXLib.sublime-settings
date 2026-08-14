@@ -117,4 +117,11 @@
     // unusual layout where the command can't find it.
     //
     // "texam_path": "C:/_texlibjunc/texam.py"
+
+    // a11y_gallery_path: absolute path to a11y_gallery.py (or its folder) for
+    // the "Open/Rebuild Accessibility Gallery" commands. Leave unset to resolve
+    // it from class_source / the repo root (a11y_gallery.py lives there, and
+    // writes a11y_gallery.html beside itself); set it only for an unusual layout.
+    //
+    // "a11y_gallery_path": "C:/_texlibjunc/a11y_gallery.py"
 }
