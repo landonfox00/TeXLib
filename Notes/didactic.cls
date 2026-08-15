@@ -353,13 +353,17 @@
 	\if@sol@show
 		\begin{@sol@shown}%
 	\else
-		\setbox\z@\vbox\bgroup
+		% ACCESSIBLE: suspend tagging over the discarded body, or its phantom
+		% structure nests inside the live surrounding paragraph (Table 5 P-Part /
+		% P-P). Resumed below BEFORE the blank write-space box, which is real
+		% output and must still be tagged.
+		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }{%
 	\if@sol@show
 		\end{@sol@shown}%
 	\else
-		\egroup
+		\egroup\texlib@acc@tagresume
 		\begin{@sol@blank}\@sol@blankfill{#2}\end{@sol@blank}%
 	\fi
 }

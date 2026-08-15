@@ -32,6 +32,7 @@
 
 \RequirePackage{amsthm}
 \RequirePackage{etoolbox}   % \AtBeginEnvironment, for the example \solution hook
+\RequirePackage{texlib-build}  % \texlib@acc@tagsuspend around the discard box
 
 % ------------------------------------------------------------------------------
 % Alias builder (traditional catcodes: needs raw #/## for the env's optional arg)
@@ -96,7 +97,7 @@
 	% Runs before the environment's own \end code, so the box is balanced inside
 	% the environment group.
 	\if@texlib@discarding
-		\egroup
+		\egroup\texlib@acc@tagresume
 		\global\@texlib@discardingfalse
 	\fi
 	\ifnum\texlib@soln@ct>\z@
@@ -142,11 +143,18 @@
 		\else #2\fi
 	\else #2\fi
 }
+% ACCESSIBLE: the box is dropped, but tagpdf still walks what is typeset into it,
+% and it opens while the surrounding environment's paragraph is live -- so the
+% phantom nests INSIDE it as a <text-unit> within a <text> (PDF/UA Table 5
+% "P-Part" + "P-P"). Same fault the {solution} envs and didactic's \pf lead-ins
+% hit; see \texlib@acc@tagsuspend in texlib-build.sty. This is the layer that
+% gates \solution/\answer inside {example}/{question}, distinct from didactic's
+% own \texlib@wrk@lead.
 \newcommand{\texlib@worked@discard}{%
 	\if@texlib@discarding\else
 		\par
 		\global\@texlib@discardingtrue
-		\setbox\z@\vbox\bgroup
+		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }
 
