@@ -1,12 +1,25 @@
-% Smoke build for course-metadata.sty's arbitrary-key auto-vivification.
+% Smoke build for course-metadata.sty's document-facing behaviour: custom-key
+% absorption, the derived \Get/\Set commands, the \meta alias, and the PDF
+% document title.
 %
-% Each custom key below must (a) be absorbed by the catch-all without erroring
-% and (b) mint a working \Get<Key> getter.  Rendering all three markers proves
-% both halves: a regressed catch-all (.unknown) errors under -halt-on-error, and
-% a regressed getter derivation leaves \Get... undefined -> also a build error.
-% Asserted by EXPECT_TEXT["Test/Metadata"] in smoke_test.py.
+% Custom keys: each one below must (a) be absorbed by the catch-all without
+% erroring and (b) mint a working \Get<Key> getter.  Rendering all three markers
+% proves both halves: a regressed catch-all (.unknown) errors under
+% -halt-on-error, and a regressed getter derivation leaves \Get... undefined ->
+% also a build error.  Asserted by EXPECT_TEXT["Test/Metadata"] in smoke_test.py.
+%
+% hyperref is loaded because course-metadata sets the PDF title through
+% \hypersetup, guarded by \ifdefined and deferred to \AtBeginDocument.  Without
+% it this fixture built untitled and was the tree's only PDF/UA-2 8.11.1 failure
+% under --accessible -- a permanently red conformance gate for a path no shipped
+% class takes, since all nine reach hyperref.  Loaded AFTER course-metadata on
+% purpose: that is the ordering the \AtBeginDocument deferral exists to survive,
+% so this also covers the deferral.  The resulting title composes through
+% \GetCourse, which makes the accessible build's title check a second, metadata-
+% level assertion that \SetCourseTitle below really round-tripped.
 \documentclass{article}
 \usepackage{course-metadata}
+\usepackage{hyperref}
 
 % Loud branch: warnings ON -> the auto-create note is a \PackageWarning (.log,
 % non-fatal). Must not halt the build.
