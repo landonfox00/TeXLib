@@ -330,9 +330,15 @@ ok &= check(texlib._recall_preferred(_root_real) is None,
 ok &= check(_post_build(_FakeView(built), built, built_pdf)
             == [("latextools_jumpto_pdf", {})],
             "post-build: preference resolved BACK to <base>.pdf keeps forward sync")
-ok &= check(_post_build(_FakeView(built), built, built_pdf.upper())
-            == [("latextools_jumpto_pdf", {})],
-            "post-build: the <base>.pdf comparison is case-insensitive (Windows)")
+# Only where the filesystem folds case. os.path.normcase lowercases on Windows
+# and is the identity on POSIX, so on Linux an uppercased path is a genuinely
+# DIFFERENT file and resolving it to <base>.pdf would be the bug, not the fix.
+# Probe the behaviour rather than the platform name -- that is the property the
+# assertion actually rests on.
+if os.path.normcase("A") == "a":
+    ok &= check(_post_build(_FakeView(built), built, built_pdf.upper())
+                == [("latextools_jumpto_pdf", {})],
+                "post-build: the <base>.pdf comparison is case-insensitive (Windows)")
 
 
 class _NoOpenSettings:
