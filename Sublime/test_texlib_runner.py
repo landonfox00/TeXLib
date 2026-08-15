@@ -14,6 +14,7 @@ Run:  python Sublime/test_texlib_runner.py
 """
 import hashlib
 import os
+import shutil
 import sys
 import tempfile
 import threading
@@ -264,7 +265,7 @@ ok &= check(len(r["warns"]) == 1, "classify: the warning is collected")
 
 # 6. _aux_log_path reproduces the build's md5[:12] key; _build_report formats a
 #    clickable full-log link and keeps error lines unprefixed.
-log_path = texlib._aux_log_path("/some/doc.tex", "doc")
+log_path = texlib._aux_log_path("/some/doc.tex")
 expect_tail = os.path.join(
     "texlib-aux", hashlib.md5(b"/some/doc.tex").hexdigest()[:12], "doc.log")
 ok &= check(log_path.endswith(expect_tail),
@@ -277,6 +278,43 @@ ok &= check("\n./doc.tex:14: Undefined control sequence.\n" in report,
             "report: error line kept unprefixed (stays clickable)")
 ok &= check(("%s:1: [full build log" % log_path) in report,
             "report: full-log link is a clickable path:1: line")
+
+# 7. Regression: that link has to name the log the ENGINE actually writes. It is
+#    built from the tex root alone, so it must agree with the -output-directory
+#    and jobname of a REAL invocation -- both read back off the recorded argv
+#    here, never hand-written, since a hand-written "doc.log" is exactly what let
+#    the call site pass the basename WITH its extension and link "doc.tex.log".
+with tempfile.TemporaryDirectory() as tmp:
+    root = os.path.join(tmp, "doc.tex")
+    with open(root, "w", encoding="utf-8") as fh:
+        fh.write("\\documentclass{pset}\n\\begin{document}\nx\n\\end{document}\n")
+    factory = PopenFactory([[]])  # one pass, settles immediately
+    texlib.subprocess.Popen = factory
+    host = texlib_build.TexlibBuild(          # aux_directory defaults to <<temp>>
+        tex_root=root, engine="pdflatex",
+        options=["--texlib-mode=default"], display=lambda t: None)
+    ev = threading.Event()
+    texlib.TexlibBuildCommand()._drive(
+        host, tmp, lambda t: None, ev, "", root,
+        {"thread": None, "cancel": ev, "proc": None})
+    shutil.rmtree(getattr(host, "_aux_target", "") or os.devnull,
+                  ignore_errors=True)
+
+argv = [str(a) for a in factory.calls[0]]
+out_dir = next(a.split("=", 1)[1] for a in argv
+               if a.startswith("-output-directory="))
+# The jobname the engine is given: pinned as --jobname= on the modes that pin one
+# (bank catalog, accessible), else derived by TeX from the file argument.
+jobname = next((a.split("=", 1)[1] for a in argv if a.startswith("--jobname=")),
+               os.path.splitext(os.path.basename(argv[-1]))[0])
+engine_log = os.path.join(out_dir, jobname + ".log")
+ok &= check(texlib._aux_log_path(root) == engine_log,
+            "aux log path: resolves to the engine's own <jobname>.log")
+ok &= check(("%s:1: [full build log" % engine_log)
+            in texlib._build_report(os.path.basename(root),
+                                    ["./doc.tex:14: Undefined control sequence."],
+                                    [], texlib._aux_log_path(root)),
+            "report: the full-log link points at the file the engine writes")
 
 print("\nALL PASS" if ok else "\nFAILURES ABOVE")
 sys.exit(0 if ok else 1)

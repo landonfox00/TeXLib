@@ -4,6 +4,10 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Fixed
+
+- **The build-failure panel's "full build log — double-click to open" link now opens the log.** The link was assembled from the tex root's basename *with* its extension, so it named `doc.tex.log` in the aux directory; the engine's jobname is the extension-stripped base name (`TexlibBuild.base_name`), so the file sitting there is `doc.log` and double-clicking the link did nothing. The runner now derives that name inside `_aux_log_path` from the tex root alone rather than taking it from the caller — the display basename the status bar and report header want is not the one the filesystem wants, and passing the former in is what went wrong. The regression test reads the target directory and jobname back off a real recorded engine invocation instead of a hand-written path, so the link stays tied to whatever the engine is actually told to write.
+
 ## [0.5.0] — 2026-07-30
 
 ### Added

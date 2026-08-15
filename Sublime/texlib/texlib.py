@@ -72,10 +72,17 @@ MAX_WARNINGS = 30
 BUILD_SYNTAX = "Packages/TeXLib/TeXLib Build Output.sublime-syntax"
 
 
-def _aux_log_path(tex_root, base):
-    """Absolute path of the build's <base>.log in the <<temp>> aux dir -- the same
-    md5(tex_root)[:12] key texlib_build routes aux files to."""
+def _aux_log_path(tex_root):
+    """Absolute path of the build's .log in the <<temp>> aux dir -- the same
+    md5(tex_root)[:12] key texlib_build routes aux files to.
+
+    The name is the ENGINE'S jobname, i.e. the basename with its extension
+    stripped (TexlibBuild.base_name), so the file this points at is the one the
+    engine actually writes -- "doc.log", never "doc.tex.log". Derived here rather
+    than passed in: the caller has the display basename in hand, and handing that
+    over is exactly how the report's full-log link came to point at nothing."""
     key = hashlib.md5((tex_root or "").encode("utf-8")).hexdigest()[:12]
+    base = os.path.splitext(os.path.basename(tex_root or ""))[0]
     return os.path.join(tempfile.gettempdir(), "texlib-aux", key, base + ".log")
 
 
@@ -364,8 +371,8 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
 
         panel = _panel(self.window, root, tex_dir)
         window = self.window
-        base = os.path.basename(root)
-        log_path = _aux_log_path(root, base)
+        base = os.path.basename(root)   # display name (status bar, report header)
+        log_path = _aux_log_path(root)   # the engine's <jobname>.log
 
         settings = sublime.load_settings("TeXLib.sublime-settings")
         # Quick-preview default: the plain build (mode "default", i.e. Ctrl+B /
