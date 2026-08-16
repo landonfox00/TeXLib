@@ -30,7 +30,7 @@ JUNCTION = r"C:\_texlibjunc"
 _JUNC_FS = "C:/_texlibjunc"    # forward-slash form for TEXINPUTS entries
 # Explicit, non-recursive TEXINPUTS: repo root + the 9 module dirs, the only
 # places .sty/.cls/.lua live. NOT recursive "C:/_texlibjunc//" -- that walked
-# ~1200 dirs (incl. .git + .claude/worktrees copies), cost ~1-3.5s/pass (worse
+# ~1200 dirs (incl. .git and tool scratch dirs), cost ~1-3.5s/pass (worse
 # cold), and let a stale examples/*.aux shadow the render. Mirrors the build
 # tooling's path (Sublime/texlib/texlib_build.py).
 _MODULE_DIRS = ("Exams", "Quizzes", "Notes", "Problem Sets", "Report Cards",

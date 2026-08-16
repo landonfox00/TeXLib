@@ -1,0 +1,3 @@
+# Unify the two author names used on the same address, so shortlog/blame and
+# contribution graphs show one person instead of two.
+Landon Fox <23734685+landonfox00@users.noreply.github.com> landonfox00 <23734685+landonfox00@users.noreply.github.com>

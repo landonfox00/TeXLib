@@ -169,6 +169,11 @@
 \ifdefined\ShowKey           \def\AutoExamSolMode{only}\solutionstrue\fi
 \ifdefined\ShowSolutions     \def\AutoExamSolMode{dual}\fi
 \ifdefined\ShowJustSolutions \def\AutoExamSolMode{only}\solutionstrue\fi
+% \ShowRubric implies \solutionstrue (see texlib-build.sty), so it needs a copy
+% mode as well -- left at `none' the rubric would render into the one copy the
+% builder then slices as the STUDENT PDF. Same `dual' as \ShowSolutions, and
+% checked after it so combining the two is idempotent, not order-dependent.
+\ifdefined\ShowRubric        \def\AutoExamSolMode{dual}\fi
 % If BOTH source commands were used, warn and keep dual (\justsolutions ignored).
 \AtBeginDocument{%
 	\if@ax@src@dual\if@ax@src@only

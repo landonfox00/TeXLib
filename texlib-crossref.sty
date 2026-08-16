@@ -1,0 +1,75 @@
+% texlib-crossref.sty
+% Smart cross-references (\cref) for the boxed teaching classes (didactic,
+% pset), routed to whichever backend survives the current build.
+%
+% NORMAL build: cleveref, exactly as both classes loaded it before this package
+% existed -- same [capitalise,nameinlink] options, byte-identical output.
+%
+% ACCESSIBLE build: zref-clever, with a \cref-family shim on top. cleveref
+% CANNOT be used under \DocumentMetadata{tagging=on}: it patches amsthm's
+% \@begintheorem, and that patch leaves a block-level list open when the new
+% tagged block implementation typesets a theorem head, so the very first
+% definition-style or remark-style environment dies with
+%
+%     ! LaTeX Error: Something's wrong--perhaps a missing \item.
+%
+% and the run ends "no output PDF file produced". tagpdf names the underlying
+% structure fault first: "Parent-Child 'pdf2:L' --> 'pdf2:Sect' ... is not
+% allowed". This is why Notes and Problem Sets -- the only two classes that load
+% cleveref -- produced no accessible PDF at all. plain-style theorems happen to
+% survive it, which is why the failure looked selective. cleveref is unmaintained
+% and not tagging-aware; zref-clever is its supported successor and builds clean.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-crossref}[2026/08/08 v1.0 TeXLib cross-reference backend]
+
+% Keyed on \TeXLibAccessibleMode, not \ifTeXLibAccessible: the classes load this
+% package well before texlib-build.sty, but the builder \def's the marker on the
+% command line ahead of \documentclass, so it is reliably visible here. Same
+% pattern texlib-thmenv.sty uses for its tcolorbox guard.
+\newif\if@texlib@xref@zref
+\ifdefined\TeXLibAccessibleMode \@texlib@xref@zreftrue \fi
+
+\if@texlib@xref@zref
+	% zref-clever takes NO load-time options -- it hard-errors on any, directing
+	% you to \zcsetup -- so the cleveref-equivalent settings are applied after
+	% loading. cap+nameinlink mirror cleveref's capitalise+nameinlink, so a
+	% reference reads "Definition 3" with the hyperlink on the name.
+	\RequirePackage{zref-clever}
+	\zcsetup{cap, nameinlink}
+
+	% --- \cref-family shim ----------------------------------------------------
+	% zref-clever is not a drop-in: its user command is \zcref. Documents in the
+	% wild are written against cleveref, so map the commands that actually get
+	% used. Multi-label lists work unchanged -- \zcref takes a comma list and
+	% does its own sorting/compression, as cleveref did.
+	% The starred cleveref forms suppress the type name, so they map to
+	% \zcref[noname]. Declared with the core `s' argument type rather than the
+	% suffix package -- no new dependency for two star variants.
+	\NewDocumentCommand{\cref}{sm}{%
+		\IfBooleanTF{#1}{\zcref[noname]{#2}}{\zcref{#2}}}
+	\NewDocumentCommand{\Cref}{sm}{%
+		\IfBooleanTF{#1}{\zcref[noname]{#2}}{\zcref{#2}}}
+	\NewDocumentCommand{\cpageref}{sm}{\zcpageref{#2}}
+	\NewDocumentCommand{\Cpageref}{sm}{\zcpageref{#2}}
+	% Number only, no type name -- cleveref's \labelcref.
+	\NewDocumentCommand{\labelcref}{m}{\zcref[noname]{#1}}
+
+	% \crefname / \Crefname retune cleveref's type names. zref-clever carries its
+	% own (correct, language-aware) names and retunes them through a different
+	% interface entirely, so honouring these faithfully is not possible here.
+	% Swallow them rather than let an undefined control sequence stop the build,
+	% and say so once -- silently ignoring a naming override would be worse than
+	% a visible note when the tagged PDF disagrees with the normal one.
+	\newcommand{\@texlib@xref@nameskip}[3]{%
+		\PackageWarning{texlib-crossref}{%
+			\string\crefname\space is ignored in an accessible build --
+			zref-clever supplies its own type names.\MessageBreak
+			Retune them with \string\zcRefTypeSetup\space if the default
+			for `#1' is wrong}}
+	\let\crefname\@texlib@xref@nameskip
+	\let\Crefname\@texlib@xref@nameskip
+\else
+	\RequirePackage[capitalise,nameinlink]{cleveref}
+\fi
+
+\endinput

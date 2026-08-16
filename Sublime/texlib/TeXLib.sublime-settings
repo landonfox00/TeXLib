@@ -10,7 +10,7 @@
     // segment containing a comma, so use the junction, NOT the OneDrive path). Use
     // an EXPLICIT, non-recursive list -- the repo root + the 9 module dirs, the
     // only places .sty/.cls/.lua live -- NOT the recursive "C:/_texlibjunc//":
-    // that walked ~1200 dirs (incl. .git and .claude/worktrees copies), cost
+    // that walked ~1200 dirs (incl. .git and tool scratch dirs), cost
     // ~1-3.5s/pass (worse cold), and let a stale examples/*.aux shadow a
     // same-named build. End the list with an empty segment ("") -- kpathsea
     // APPENDS its default path at an empty segment; without one TEXINPUTS
@@ -35,6 +35,32 @@
     // LaTeXTools forward_sync / keep_focus settings). Default: true.
     //
     // "open_pdf_on_build": true
+
+    // preferred_pdf: WHICH of the build's PDFs to put in front of you. A
+    // multi-copy exam (\versions{A,B,C}, or \solutions) builds one combined
+    // <base>.pdf and is then sliced into a PDF per copy; every one of them is
+    // still written, this only picks the one the viewer opens.
+    //   "combined" (default) -- <base>.pdf, the whole build.
+    //   "solutions"          -- the first solutions copy: <base>_A_solutions.pdf
+    //                           for \versions{A,B,C}, <base>_Solutions.pdf for a
+    //                           .spl key build.
+    //   "student"            -- likewise the first student copy (_A, _Exam).
+    //   "_B_solutions"       -- anything else is a literal suffix, resolved
+    //                           against <base>.
+    // Always falls back to <base>.pdf when this build produced no such copy, so
+    // it is safe to leave set while you work on a document that isn't an exam.
+    //
+    // SyncTeX: both directions are wired for a sliced copy -- the builder cuts it
+    // a matching <name>.synctex, inverse search (double-click -> Sublime) works,
+    // and TeXLib's own View PDF / Forward Sync aim at the copy you are reading
+    // rather than snapping back to <base>.pdf. Forward search *into* a
+    // multi-version exam is separately unreliable, in the combined PDF just as
+    // much as in a slice: the version loop re-emits the body through a scratch
+    // file, so document-body lines are attributed to it and resolve to nothing,
+    // and a bank file picks up one Input tag per \@@input so a bank line lands on
+    // whichever copy owns the last tag. That is upstream of this setting.
+    //
+    // "preferred_pdf": "combined"
 
     // show_panel_on_build: when to surface the build output panel.
     //   "errors" (default) -- hidden while building (a spinner + current step

@@ -71,5 +71,16 @@ else:
 ok &= check(texlib_gallery._BUILD_LOG.endswith("a11y-gallery-build.log"),
             "build log path names the gallery build")
 
+# The generator must run under a CONSOLE python, never pythonw.exe. A
+# GUI-subsystem parent has no console to hand down, so every lualatex/veraPDF/
+# pdftoppm child allocates its own -- which is a screenful of popup windows.
+# CREATE_NO_WINDOW + console python gives them one invisible console to inherit.
+_py = texlib_gallery._python()
+if _py is None:
+    print("  [SKIP] no python on PATH to check the launcher flavour")
+else:
+    ok &= check(os.path.basename(_py).lower() != "pythonw.exe",
+                "generator runs under console python, not pythonw.exe")
+
 print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 sys.exit(0 if ok else 1)

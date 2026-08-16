@@ -252,7 +252,14 @@ The class predefines: `\mbb`, `\mrm`, `\mcal`, `\msf`, `\mf`, `\mscr`,
 	long section labels (like "R.10") from colliding with their titles in
 	the auto-generated TOC.
 - **Loading enumitem:** `enumitem` is loaded with `[shortlabels]` so
-	you can write `\begin{enumerate}[(a)]` without extra setup.
+	you can write `\begin{enumerate}[(a)]` without extra setup — but **not
+	in a document you intend to build accessible.** Under
+	`\DocumentMetadata{tagging=on}` the kernel's `block` code takes over
+	the optional argument and rejects enumitem's keys outright ("Some keys
+	specified on the enumerate environment are unknown"), fatally, and on
+	*any* key rather than some particular one. Declare the list in the
+	preamble instead — `\setlist[enumerate]{label=(\alph*)}` — which is
+	honoured in both builds.
 
 ## Related
 

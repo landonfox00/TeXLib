@@ -434,7 +434,16 @@
 % value for legacy document-relative banks, then a sibling bank.tex. Every probe
 % uses lfs (see \pbank@iffilelocal) rather than \IfFileExists so a recursive
 % TEXINPUTS entry can't silently match a stray library sample bank.
+% ENGINE GUARD: every path below ends in \loadbank, which requires LuaLaTeX, and
+% the lfs probes are LuaTeX-only themselves -- so under pdflatex this can only
+% ever fatal, and it would do so at \begin{document}, before the body had a
+% chance to use a bank command. didactic is a pdflatex class that calls this
+% resolver, and its contract (CLAUDE.md) is that a lecture doc using NO bank
+% command still compiles under pdflatex; auto-loading would silently break that.
+% Do nothing instead: a doc that really does \getproblem still gets the package's
+% clear "Problem-bank features require LuaLaTeX" error from \loadbank itself.
 \newcommand{\pbank@load@coursebank}{%
+	\ifdefined\directlua
 	\@ifundefined{GetBankPath}{}{%
 		\edef\@tmpbankpath{\GetBankPath}%
 		\ifx\@tmpbankpath\empty\else
@@ -450,11 +459,12 @@
 			}%
 		\fi
 	}%
-	\directlua{%
-		if lfs.attributes('bank.tex', 'mode') == 'file' then
-			tex.print('\string\\loadbank{bank.tex}')
-		end
-	}%
+	% Sibling bank.tex, probed through the same helper as every branch above --
+	% it used to be a second raw \directlua, and being OUTSIDE the GetBankPath
+	% guard it ran for every document, so it fataled under pdflatex even when no
+	% bank-path was configured at all.
+	\pbank@iffilelocal{bank.tex}{\loadbank{bank.tex}}{}%
+	\fi
 }
 
 % \importproblem{path}{overrides}  — import a standalone problem file with
@@ -665,7 +675,20 @@
 		{\@texlib@psection@begin{fr}{Free Response}{#2}{0}}
 		{\@texlib@psection@begin{fr}{Free Response}{#2}{1}}%
 }{\@texlib@psection@end}
+% Multiple choice carries NO grading rubric.  A rubric apportions partial credit
+% and an MC item is all-or-nothing, so there is nothing to apportion: both the
+% \rubric overlay and the {commonerrors} block are suppressed for the section.
+% \rubricfalse is local to the environment's group, so a {problems} section
+% elsewhere in the same document still renders its rubrics normally.
+%
+% Emission happens in \@texlib@psection@end (pbank_emit_section), which runs
+% inside this group, so setting the flag here covers every item in the section.
+%
+% Bank sources keep their MC {commonerrors} blocks: they are useful distractor
+% notes when writing or revising an item, they cost nothing in any build, and
+% deleting the \rubricfalse below is all it takes to print them again.
 \NewDocumentEnvironment{mcproblems}{s O{}}{%
+	\rubricfalse
 	\IfBooleanTF{#1}
 		{\@texlib@psection@begin{mc}{Multiple Choice}{#2}{0}}
 		{\@texlib@psection@begin{mc}{Multiple Choice}{#2}{1}}%

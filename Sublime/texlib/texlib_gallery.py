@@ -38,8 +38,10 @@ import sublime
 import sublime_plugin
 
 # Windowless generation: no console popup, no taskbar window (CREATE_NO_WINDOW on
-# Windows). The full build takes several minutes; output goes to a log (python -u)
-# so a failure is recoverable.
+# Windows). The flag must be paired with a CONSOLE python (see _python) -- it is
+# what gives the generator an invisible console for its many TeX/veraPDF children
+# to inherit. The full build takes several minutes; output goes to a log
+# (python -u) so a failure is recoverable.
 _CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 _BUILD_LOG = os.path.join(tempfile.gettempdir(), "a11y-gallery-build.log")
 
@@ -80,14 +82,17 @@ def _open_html(html):
 
 
 def _python():
-    """Windowless python for the build (pythonw.exe on Windows), else console
-    python. Returns None if none is found."""
-    py = shutil.which("python") or shutil.which("python3") or shutil.which("py")
-    if py and os.name == "nt":
-        pyw = os.path.join(os.path.dirname(py), "pythonw.exe")
-        if os.path.isfile(pyw):
-            return pyw
-    return py
+    """Console python to run the generator with. Returns None if none is found.
+
+    Deliberately NOT pythonw.exe. A GUI-subsystem parent owns no console, so
+    every console tool the generator shells out to -- lualatex, veraPDF,
+    pdftoppm, magick, dozens per run and several concurrently -- has to allocate
+    its OWN console, and each one flashes a window. Console python launched under
+    CREATE_NO_WINDOW (below) instead gets a single *invisible* console that the
+    whole descendant tree inherits, so nothing ever appears on screen. The
+    generator's own subprocess calls therefore need no creationflags of their
+    own, and stay clean for CLI/CI use."""
+    return shutil.which("python") or shutil.which("python3") or shutil.which("py")
 
 
 def _run_build(script, html, on_done):

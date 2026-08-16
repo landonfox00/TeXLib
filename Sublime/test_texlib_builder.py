@@ -275,17 +275,35 @@ def main():
     check("quick -> single-pass message shown",
           bool(cmds) and "quick" in cmds[0][1], cmds[0][1] if cmds else "")
 
-    # (k) accessible mode: syllabus (a pdflatex class) -> forced lualatex, the
-    # DocumentMetadata prefix is injected AHEAD of \input, a jobname suffix
-    # keeps the tagged PDF beside the primary, and two passes settle refs.
+    # (k) accessible mode is a PAIRED build: the class's own engine produces the
+    # normal PDF first, then lualatex re-typesets the same source with the
+    # DocumentMetadata prefix into an a11y/ output dir. syllabus is a pdflatex
+    # class, so this also pins that the normal half is NOT dragged onto lualatex
+    # -- that would silently change the primary PDF's rendering in this mode.
     cmds, disp = run_builder(
         r"\documentclass{syllabus}\begin{document}x\end{document}",
         options=["--texlib-mode=accessible"])
-    check("accessible -> forced lualatex",
-          bool(cmds) and cmds[0][0][0] == "lualatex", cmds)
-    check("accessible -> 'requires lualatex' message shown",
-          "requires lualatex" in disp, repr(disp))
-    aarg = cmds[0][0][-1] if cmds else ""
+    normal = [c for c in cmds if r"\DocumentMetadata" not in str(c[0][-1])]
+    tagged = [c for c in cmds if r"\DocumentMetadata" in str(c[0][-1])]
+    check("accessible -> produces both halves",
+          bool(normal) and bool(tagged), [c[1] for c in cmds])
+    check("accessible -> normal half runs FIRST (publish reads the primary PDF)",
+          bool(cmds) and r"\DocumentMetadata" not in str(cmds[0][0][-1]),
+          cmds[0][1] if cmds else "")
+    check("accessible -> normal half keeps the class's own engine (pdflatex)",
+          bool(normal) and normal[0][0][0] == "pdflatex",
+          normal[0][0] if normal else "")
+    check("accessible -> normal half gets a plain filename arg (untagged)",
+          bool(normal) and normal[0][0][-1] == "doc.tex",
+          normal[0][0] if normal else "")
+    check("accessible -> normal half NOT written into a11y",
+          bool(normal) and not any(str(c).endswith("a11y") for c in normal[0][0]),
+          normal[0][0] if normal else "")
+    check("accessible -> tagged half forced to lualatex",
+          bool(tagged) and all(c[0][0] == "lualatex" for c in tagged), tagged)
+    check("accessible -> engine-split message shown",
+          "tagged PDF needs lualatex" in disp, repr(disp))
+    aarg = tagged[0][0][-1] if tagged else ""
     check("accessible -> \\DocumentMetadata injected", r"\DocumentMetadata" in aarg, aarg)
     check("accessible -> tagging=on requested", "tagging=on" in aarg, aarg)
     check("accessible -> DocumentMetadata precedes \\input",
@@ -293,25 +311,43 @@ def main():
           and aarg.index(r"\DocumentMetadata") < aarg.index(r"\input"), aarg)
     check("accessible -> \\def\\TeXLibAccessibleMode injected",
           r"\def\TeXLibAccessibleMode{}" in aarg, aarg)
+    # Both MathML methods, because readers split on which one they understand:
+    # AF is what Firefox's viewer and Foxit read (the in-browser path from an LMS
+    # link), SE is what Adobe Acrobat reads. Shipping one drops the math to
+    # "x 2 plus y 2" for everyone on the other side of that split.
+    check("accessible -> both MathML methods requested",
+          "mathml-AF" in aarg and "mathml-SE" in aarg, aarg)
     # The jobname must stay the REAL base name: autoexam reads its document body
     # from <jobname>.tex, so a suffixed jobname truncated the tagged exam. The
     # output is separated by directory (aux/a11y) instead, and _postprocess
     # copies it out as <base>_accessible.pdf.
     check("accessible -> --jobname stays the real base name",
-          bool(cmds) and "--jobname=doc" in cmds[0][0]
-          and "--jobname=doc_accessible" not in cmds[0][0],
-          cmds[0][0] if cmds else "")
-    check("accessible -> redirected to an a11y output dir",
-          bool(cmds) and any(str(c).startswith("-output-directory=")
-                             and str(c).endswith("a11y") for c in cmds[0][0]),
-          cmds[0][0] if cmds else "")
+          bool(tagged) and "--jobname=doc" in tagged[0][0]
+          and "--jobname=doc_accessible" not in tagged[0][0],
+          tagged[0][0] if tagged else "")
+    check("accessible -> tagged half redirected to an a11y output dir",
+          bool(tagged) and any(str(c).startswith("-output-directory=")
+                               and str(c).endswith("a11y") for c in tagged[0][0]),
+          tagged[0][0] if tagged else "")
     check("accessible -> exactly one -output-directory (base one replaced)",
-          bool(cmds) and sum(1 for c in cmds[0][0]
-                             if str(c).startswith("-output-directory=")) == 1,
-          cmds[0][0] if cmds else "")
-    check("accessible -> two settle passes", len(cmds) == 2, f"{len(cmds)} builds")
+          bool(tagged) and sum(1 for c in tagged[0][0]
+                               if str(c).startswith("-output-directory=")) == 1,
+          tagged[0][0] if tagged else "")
+    check("accessible -> two settle passes on the tagged half",
+          len(tagged) == 2, f"{len(tagged)} tagged passes")
     check("accessible -> --texlib-mode token NOT passed to engine",
-          not any("--texlib-mode" in str(x) for x in cmds[0][0]), cmds[0][0] if cmds else "")
+          not any("--texlib-mode" in str(x) for c in cmds for x in c[0]), cmds)
+
+    # (k2) a lualatex class in accessible mode: same pairing, one engine.
+    cmds, _ = run_builder(
+        r"\documentclass{quiz}\begin{document}x\end{document}",
+        options=["--texlib-mode=accessible"])
+    check("accessible (lua class) -> still produces both halves",
+          any(r"\DocumentMetadata" not in str(c[0][-1]) for c in cmds)
+          and any(r"\DocumentMetadata" in str(c[0][-1]) for c in cmds),
+          [c[1] for c in cmds])
+    check("accessible (lua class) -> every pass is lualatex",
+          all(c[0][0] == "lualatex" for c in cmds), cmds)
 
     # (j3) biber change-detection
     BCF = "<bcf>cite-keys</bcf>"
@@ -1019,8 +1055,176 @@ def main():
             "slice", bpc + ".vmap", bpc + ".pdf", tmpc)
         check("_run_pdfpost: returns produced names",
               sorted(_produced) == ["doc_A.pdf", "doc_B.pdf"], _produced)
+        check("_run_pdfpost: absorbs the produced names in typeset order",
+              rb.produced_pdfs == ["doc_A.pdf", "doc_B.pdf"], rb.produced_pdfs)
+        check("_run_pdfpost: absorbs each copy's page span",
+              rb._copy_ranges == {"doc_A.pdf": (1, 3), "doc_B.pdf": (4, 6)},
+              rb._copy_ranges)
+
+        # ================================================================== #
+        # (v4) preferred_pdf resolution against what the build produced.
+        # ================================================================== #
+        tmpp = tempfile.mkdtemp(prefix="texlib_pref_")
+        bpp = os.path.join(tmpp, "doc")
+        _blank_pdf(bpp + ".pdf", 6)
+        with open(bpp + ".vmap", "w", encoding="utf-8") as fh:
+            fh.write("A|stu|1\nB|stu|2\nA|sol|3\nB|sol|5\n")
+        pb = TexlibBuilder(); pb.tex_dir = tmpp; pb.base_name = "doc"
+        pb._aux_target = None
+        pb.produced_pdfs, pb._copy_ranges = [], {}
+        pb._slice_versions_from_vmap(tmpp, bpp)
+        check("preferred_pdf: 'solutions' -> the FIRST solutions copy",
+              pb.preferred_pdf_path("solutions") == bpp + "_A_solutions.pdf",
+              pb.preferred_pdf_path("solutions"))
+        check("preferred_pdf: 'student' -> the first student copy",
+              pb.preferred_pdf_path("student") == bpp + "_A.pdf")
+        check("preferred_pdf: an explicit suffix resolves against <base>",
+              pb.preferred_pdf_path("_B_solutions") == bpp + "_B_solutions.pdf")
+        check("preferred_pdf: unset -> the combined PDF",
+              pb.preferred_pdf_path(None) == bpp + ".pdf")
+        check("preferred_pdf: 'combined' -> the combined PDF",
+              pb.preferred_pdf_path("combined") == bpp + ".pdf")
+        check("preferred_pdf: a suffix that wasn't produced falls back",
+              pb.preferred_pdf_path("_Z_solutions") == bpp + ".pdf")
+        check("preferred_pdf: the combined PDF survives the slicing",
+              len(PdfReader(bpp + ".pdf").pages) == 6,
+              "<base>.pdf must still be produced whatever the preference")
+
+        # A student-mode build slices no solutions copy: the preference must
+        # fall back rather than open nothing.
+        tmpp2 = tempfile.mkdtemp(prefix="texlib_pref_")
+        bpp2 = os.path.join(tmpp2, "doc")
+        _blank_pdf(bpp2 + ".pdf", 4)
+        with open(bpp2 + ".vmap", "w", encoding="utf-8") as fh:
+            fh.write("A|stu|1\nB|stu|3\n")
+        pb2 = TexlibBuilder(); pb2.tex_dir = tmpp2; pb2.base_name = "doc"
+        pb2._aux_target = None
+        pb2.produced_pdfs, pb2._copy_ranges = [], {}
+        pb2._slice_versions_from_vmap(tmpp2, bpp2)
+        check("preferred_pdf: no solutions copy produced -> combined PDF",
+              pb2.preferred_pdf_path("solutions") == bpp2 + ".pdf")
+
+        # And a build that produced no copies at all (any ordinary document).
+        pb3 = TexlibBuilder(); pb3.tex_dir = tmpp2; pb3.base_name = "doc"
+        check("preferred_pdf: nothing sliced at all -> combined PDF",
+              pb3.preferred_pdf_path("solutions") == bpp2 + ".pdf")
     else:
         print("  SKIP  pypdf not installed -- PDF split/vmap tests skipped")
+
+    # ====================================================================== #
+    # (v5) SyncTeX maps for the sliced copies. Needs no pypdf -- the page spans
+    # are handed over by the slicer, and the cut is pure text surgery.
+    # ====================================================================== #
+
+    def _synthetic_synctex(pages, eol="\n"):
+        """A minimal but structurally real .synctex: preamble, Content: with one
+        sheet per page (an Input: row between sheets, as a real one has),
+        Postamble. Anchors deliberately WRONG so a correct rewrite is visible."""
+        out = ["SyncTeX Version:1",
+               "Input:1:/tmp/doc.tex",
+               "Output:pdf", "Magnification:1000", "Unit:1",
+               "X Offset:0", "Y Offset:0", "Content:"]
+        for p in range(1, pages + 1):
+            out += ["!999", "{%d" % p,
+                    "[1,%d:0,0:100,100,0" % (10 * p), "]", "!999", "}%d" % p]
+            if p < pages:
+                out.append("Input:%d:/tmp/bank%d.tex" % (p + 1, p))
+        out += ["!999", "Postamble:", "Count:%d" % (pages * 2),
+                "!999", "Post scriptum:", ""]
+        return eol.join(out).encode("utf-8")
+
+    _cut = TexlibBuildCore._synctex_page_slice
+
+    def _sheets(blob, eol=b"\n"):
+        return [l for l in blob.split(eol)
+                if l[:1] in (b"{", b"}") and l[1:].isdigit()]
+
+    def _anchors_consistent(blob, eol=b"\n"):
+        """Each !N must equal its own byte offset minus the previous anchor's."""
+        off = last = 0
+        for line in blob.split(eol):
+            if line.startswith(b"!"):
+                if int(line[1:]) != off - last:
+                    return False
+                last = off
+            off += len(line) + len(eol)
+        return True
+
+    six = _synthetic_synctex(6)
+    cut = _cut(six, 3, 4)
+    check("synctex cut: keeps only the requested pages, renumbered from 1",
+          _sheets(cut) == [b"{1", b"}1", b"{2", b"}2"], _sheets(cut))
+    check("synctex cut: the kept records travel with their page",
+          b"[1,30:" in cut and b"[1,40:" in cut
+          and b"[1,10:" not in cut and b"[1,50:" not in cut)
+    check("synctex cut: anchors are recomputed, not copied", _anchors_consistent(cut))
+    check("synctex cut: every Input: row survives (they are the tag table)",
+          cut.count(b"Input:") == six.count(b"Input:"),
+          "%d vs %d" % (cut.count(b"Input:"), six.count(b"Input:")))
+    check("synctex cut: postamble survives",
+          b"Postamble:" in cut and b"Post scriptum:" in cut)
+    check("synctex cut: a span holding no page -> None", _cut(six, 9, 9) is None)
+    check("synctex cut: not a SyncTeX file -> None",
+          _cut(b"hello\nworld\n", 1, 1) is None)
+    _crlf = _synthetic_synctex(3, eol="\r\n")
+    check("synctex cut: CRLF map stays CRLF",
+          b"\n" not in _cut(_crlf, 2, 2).replace(b"\r\n", b""))
+    check("synctex cut: CRLF anchors measured in CRLF bytes",
+          _anchors_consistent(_cut(_crlf, 2, 3), eol=b"\r\n"))
+
+    # Round-trip: keeping every page must reproduce a REAL map byte-for-byte,
+    # which is the strongest available statement that the rewrite is faithful.
+    _real = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "Exams", "template.synctex")
+    if os.path.exists(_real):
+        with open(_real, "rb") as fh:
+            _rd = fh.read()
+        _npages = sum(1 for l in _rd.split(b"\n")
+                      if l[:1] == b"{" and l[1:].isdigit())
+        check("synctex cut: keeping every page round-trips a real map exactly",
+              _cut(_rd, 1, _npages) == _rd)
+    else:
+        print("  SKIP  Exams/template.synctex absent -- round-trip check skipped")
+
+    # The build step: one .synctex per sliced copy, beside the source.
+    tmps = tempfile.mkdtemp(prefix="texlib_synccut_")
+    with open(os.path.join(tmps, "doc.synctex"), "wb") as fh:
+        fh.write(_synthetic_synctex(6))
+    sb = TexlibBuilder(); sb.tex_dir = tmps; sb.base_name = "doc"
+    sb._copy_ranges = {"doc_A.pdf": (1, 2), "doc_A_solutions.pdf": (3, 6)}
+    sb._slice_synctex_for_copies(tmps)
+    check("synctex cut: a map is written for each sliced copy",
+          os.path.exists(os.path.join(tmps, "doc_A.synctex"))
+          and os.path.exists(os.path.join(tmps, "doc_A_solutions.synctex")))
+    with open(os.path.join(tmps, "doc_A_solutions.synctex"), "rb") as fh:
+        _sol = fh.read()
+    check("synctex cut: the solutions map holds its own 4 pages",
+          _sheets(_sol) == [b"{1", b"}1", b"{2", b"}2", b"{3", b"}3", b"{4", b"}4"],
+          _sheets(_sol))
+    check("synctex cut: the parent map is left alone",
+          _sheets(open(os.path.join(tmps, "doc.synctex"), "rb").read())
+          == _sheets(_synthetic_synctex(6)))
+    check("synctex cut: no complaint on the happy path", sb._displayed == "",
+          sb._displayed)
+
+    # Nothing was sliced (the ordinary single-copy build) -> silent no-op.
+    tmps2 = tempfile.mkdtemp(prefix="texlib_synccut_")
+    with open(os.path.join(tmps2, "doc.synctex"), "wb") as fh:
+        fh.write(_synthetic_synctex(2))
+    sb2 = TexlibBuilder(); sb2.tex_dir = tmps2; sb2.base_name = "doc"
+    sb2._slice_synctex_for_copies(tmps2)
+    check("synctex cut: no sliced copies -> no-op, no stray maps",
+          os.listdir(tmps2) == ["doc.synctex"] and sb2._displayed == "",
+          os.listdir(tmps2))
+
+    # A build with -synctex=0 (or a map that never landed) must not complain:
+    # the copies simply have no inverse search, as before this existed.
+    tmps3 = tempfile.mkdtemp(prefix="texlib_synccut_")
+    sb3 = TexlibBuilder(); sb3.tex_dir = tmps3; sb3.base_name = "doc"
+    sb3._copy_ranges = {"doc_A.pdf": (1, 2)}
+    sb3._slice_synctex_for_copies(tmps3)
+    check("synctex cut: no parent map -> silent no-op",
+          os.listdir(tmps3) == [] and sb3._displayed == "", sb3._displayed)
 
     # ====================================================================== #
     # (w) gradebook xlsx -> report-view CSV conversion (report-card class).
@@ -1186,16 +1390,24 @@ def main():
     check("pubmeta: absent -> None", pb._read_pubmeta(tmpp) is None)
 
     def _publish_case(base, kind, generic, noun, course, section, term,
-                      settings=None, publish_name=""):
+                      settings=None, publish_name="",
+                      accessible_build=False, tagged_present=False):
         d = tempfile.mkdtemp(prefix="texlib_pub_")
         with open(os.path.join(d, base + ".pdf"), "wb") as fh:
-            fh.write(b"%PDF-1.5 test")
+            fh.write(b"%PDF-1.5 normal")
+        # tagged_present is deliberately independent of accessible_build so the
+        # stale case (file left by an EARLIER accessible run, current build
+        # normal) can be pinned: it must never be published.
+        if tagged_present:
+            with open(os.path.join(d, base + "_accessible.pdf"), "wb") as fh:
+                fh.write(b"%PDF-1.5 tagged")
         with open(os.path.join(d, base + ".pubmeta"), "w", encoding="utf-8") as fh:
             fh.write(f"kind={kind}\ngeneric={generic}\nnoun={noun}\n"
                      f"course={course}\nsection={section}\nterm={term}\n"
                      f"publish-name={publish_name}\n")
         b = TexlibBuilder(); b.tex_dir = d; b.base_name = base
         b._aux_target = None
+        b._accessible_build = accessible_build
         if settings is not None:
             b.builder_settings = settings
         shortcuts, clips = [], []
@@ -1257,6 +1469,47 @@ def main():
           pdfs == ["doc.pdf"]
           and not os.path.exists(os.path.join(d, "doc.pubmeta")), pdfs)
 
+    # Publish source selection. The shareable copies are the files that go up to
+    # WebCampus, so an accessible build publishes its TAGGED half -- an untagged
+    # PDF is exactly what the LMS accessibility checker flags.
+    def _published_bytes(d, name):
+        with open(os.path.join(d, name), "rb") as fh:
+            return fh.read()
+
+    d, pdfs, _, _, disp = _publish_case(
+        "schedule", "schedule", "Tentative Schedule", "Schedule",
+        "Math 181", "1001", "Fall 2026",
+        accessible_build=True, tagged_present=True)
+    check("publish (accessible): generic copy carries the TAGGED bytes",
+          _published_bytes(d, "Tentative Schedule.pdf") == b"%PDF-1.5 tagged",
+          _published_bytes(d, "Tentative Schedule.pdf"))
+    check("publish (accessible): coded copy carries the TAGGED bytes",
+          _published_bytes(d, "Math181.1001_Fall2026.pdf") == b"%PDF-1.5 tagged",
+          _published_bytes(d, "Math181.1001_Fall2026.pdf"))
+    check("publish (accessible): both halves survive next to the source",
+          "schedule.pdf" in pdfs and "schedule_accessible.pdf" in pdfs, pdfs)
+    check("publish (accessible): says so", "tagged PDF" in disp, repr(disp))
+
+    # A stale <base>_accessible.pdf from an earlier run must NOT hijack a normal
+    # build's publish -- it would ship content from whenever that run happened.
+    d, pdfs, _, _, _ = _publish_case(
+        "schedule", "schedule", "Tentative Schedule", "Schedule",
+        "Math 181", "1001", "Fall 2026",
+        accessible_build=False, tagged_present=True)
+    check("publish (normal build, stale tagged file): publishes the NORMAL bytes",
+          _published_bytes(d, "Tentative Schedule.pdf") == b"%PDF-1.5 normal",
+          _published_bytes(d, "Tentative Schedule.pdf"))
+
+    # Accessible build whose tagged half failed to appear: fall back rather than
+    # publishing nothing.
+    d, pdfs, _, _, _ = _publish_case(
+        "schedule", "schedule", "Tentative Schedule", "Schedule",
+        "Math 181", "1001", "Fall 2026",
+        accessible_build=True, tagged_present=False)
+    check("publish (accessible, tagged missing): falls back to the normal PDF",
+          _published_bytes(d, "Tentative Schedule.pdf") == b"%PDF-1.5 normal",
+          _published_bytes(d, "Tentative Schedule.pdf"))
+
     # _setting_on precedence: builder_settings > env > default.
     so = TexlibBuilder()
     so.builder_settings = {"k": False}
@@ -1275,6 +1528,45 @@ def main():
     # _human_size formatting.
     check("human-size: bytes", TexlibBuilder._human_size(512) == "512 B")
     check("human-size: KB", TexlibBuilder._human_size(2048) == "2.0 KB")
+
+    # ====================================================================== #
+    # Copy-back from the aux dir. The .schedmeta case is the one with an
+    # out-of-build consumer: TeXLib Sync reads it from beside the source, so a
+    # builder build that left it in %TEMP% would look to that tool like "the
+    # schedule was never built" -- or worse, hand it a stale in-place copy.
+    # ====================================================================== #
+    tmpc = tempfile.mkdtemp(prefix="texlib_copyback_")
+    src_dir = os.path.join(tmpc, "src")
+    aux_dir = os.path.join(tmpc, "aux")
+    os.makedirs(src_dir)
+    os.makedirs(aux_dir)
+    for name in ("doc.pdf", "doc.synctex.gz", "doc.spl", "doc.schedmeta",
+                 "doc_A.pdf", "doc.aux", "doc.log", "doc.schedmap"):
+        with open(os.path.join(aux_dir, name), "w", encoding="utf-8") as fh:
+            fh.write("x")
+
+    cb = TexlibBuilder()
+    cb.base_name = "doc"
+    cb._aux_target = aux_dir
+    cb.display = lambda *a, **k: None
+    cb._copy_back_from_aux(src_dir)
+
+    landed = set(os.listdir(src_dir))
+    check("copy-back: .schedmeta lands next to the source",
+          "doc.schedmeta" in landed, sorted(landed))
+    check("copy-back: pdf/synctex/spl still land",
+          {"doc.pdf", "doc.synctex.gz", "doc.spl", "doc_A.pdf"} <= landed,
+          sorted(landed))
+    check("copy-back: aux files stay in the aux dir",
+          not ({"doc.aux", "doc.log"} & landed), sorted(landed))
+    check("copy-back: .schedmap is NOT copied (its consumer is the builder, "
+          "which probes both dirs)",
+          "doc.schedmap" not in landed, sorted(landed))
+    for d in (src_dir, aux_dir):
+        for n in os.listdir(d):
+            os.remove(os.path.join(d, n))
+        os.rmdir(d)
+    os.rmdir(tmpc)
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL
