@@ -21,6 +21,13 @@ jobs:
         run: python Sublime/test_texlib_builder.py
       - name: Native runner (fake Popen; async driver + post-build delegation)
         run: python Sublime/test_texlib_runner.py
+      - name: Derived TEXINPUTS default (how builds find the classes)
+        # Unset `texinputs` used to mean "inherit the environment", which for
+        # Sublime meant nothing -- so every document failed at \documentclass
+        # unless the standalone installer had written the setting. It is derived
+        # from the package location now, and that resolution is a real
+        # filesystem walk keyed off __file__, so it is worth a real test.
+        run: python Sublime/test_texlib_texinputs.py
       - name: TeXaM app + bank-plugin tests (headless, no toolchain)
         run: |
           set -e

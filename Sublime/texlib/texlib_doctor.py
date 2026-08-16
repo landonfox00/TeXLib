@@ -81,12 +81,32 @@ def check_shadow():
 
 
 def check_texinputs():
+    """Report the TEXINPUTS builds will actually use.
+
+    Unset no longer means "inherit the environment" -- the plugin derives the
+    path from its own location. Reporting the setting alone would have said
+    "unset" on a machine that builds perfectly well, and said the same on one
+    where nothing builds at all, which is the distinction this check exists to
+    draw. So ask for the value that would really be handed to the engine.
+    """
     ti = sublime.load_settings("TeXLib.sublime-settings").get("texinputs")
-    if not ti:
-        return ("texinputs setting", OK,
-                "unset — builds inherit the process TEXINPUTS")
-    value = os.pathsep.join(ti) if isinstance(ti, list) else str(ti)
-    return ("texinputs setting", OK, value)
+    if ti:
+        value = os.pathsep.join(ti) if isinstance(ti, list) else str(ti)
+        return ("texinputs setting", OK, "explicit — " + value)
+    try:
+        from TeXLib import texlib
+    except ImportError:
+        try:
+            import texlib
+        except ImportError:
+            texlib = None
+    derived = texlib._derive_texinputs() if texlib else ""
+    if derived:
+        return ("texinputs setting", OK, "derived from the package location — " + derived)
+    return ("texinputs setting", FAIL,
+            "unset, and could not be derived: this package is not inside a TeXLib "
+            "library (expected the core .sty two directories up). Builds will fail "
+            "at \\documentclass until you set \"texinputs\" by hand.")
 
 
 def check_coursemeta(view):

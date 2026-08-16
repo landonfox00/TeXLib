@@ -170,6 +170,77 @@ def _resolve_texinputs(raw):
     return raw
 
 
+# --- Default TEXINPUTS, derived from where this package actually lives --------
+#
+# `texinputs` shipped commented out, documented as "leave unset to inherit the
+# process environment". Sublime inherits no TEXINPUTS, and the classes live in
+# the checkout rather than a TEXMF tree, so unset meant EVERY document failed at
+# \documentclass with "File `didactic.cls' not found". Anyone who installed this
+# package without the standalone installer got a plugin that could not build
+# anything, and nothing said why.
+#
+# The plugin knows where it is, so it can work this out. It loads from
+# <library>/Sublime/texlib -- reached through Packages/TeXLib, which the
+# installer makes a junction -- so the library root is two directories up from
+# this file. os.path.realpath resolves that junction; without it the answer
+# would be inside Sublime's Packages folder.
+#
+# Deliberately conservative: the derived root is USED only if it actually looks
+# like a TeXLib library. A package copied somewhere else entirely resolves to
+# something that fails the probe, and the default stays empty rather than
+# pointing builds at a wrong tree. An explicit `texinputs` setting always wins.
+_CORE_LIBRARY_FILES = ("course-metadata.sty", "texlib-build.sty", "basic-utilities.sty")
+_TEX_SOURCE_EXTS = (".sty", ".cls", ".lua")
+_derived_texinputs_cache = []
+
+
+def _looks_like_library_root(path):
+    """A directory counts as the library only when the core .sty are in it --
+    the same probe the installer and Doctor use, so a coincidental parent
+    directory can never pass for a library."""
+    try:
+        return all(os.path.isfile(os.path.join(path, f)) for f in _CORE_LIBRARY_FILES)
+    except Exception:  # noqa: BLE001 - a bad path must not break the build
+        return False
+
+
+def _derive_texinputs():
+    """TEXINPUTS for a library that has not been configured by hand: the library
+    root plus each immediate subdirectory that actually holds a .cls/.sty/.lua.
+
+    Explicit and non-recursive, for the same reason the installer's is: a
+    recursive "<root>//" re-walks the whole tree on every pass and lets a stale
+    .aux shadow a same-named build. Generated rather than hardcoded, so a new
+    module directory needs no code change. Returns "" when the root cannot be
+    identified, which leaves the previous inherit-the-environment behaviour."""
+    if _derived_texinputs_cache:
+        return _derived_texinputs_cache[0]
+
+    value = ""
+    try:
+        here = os.path.dirname(os.path.realpath(__file__))
+        root = os.path.dirname(os.path.dirname(here))   # <root>/Sublime/texlib -> <root>
+        if _looks_like_library_root(root):
+            segments = [".", root.replace("\\", "/")]
+            for name in sorted(os.listdir(root)):
+                sub = os.path.join(root, name)
+                if name.startswith(".") or name == "Sublime" or not os.path.isdir(sub):
+                    continue
+                try:
+                    entries = os.listdir(sub)
+                except OSError:
+                    continue
+                if any(e.lower().endswith(_TEX_SOURCE_EXTS) for e in entries):
+                    segments.append((root + "/" + name).replace("\\", "/"))
+            # _resolve_texinputs appends the load-bearing empty segment.
+            value = os.pathsep.join(segments)
+    except Exception:  # noqa: BLE001 - never let path probing break a build
+        value = ""
+
+    _derived_texinputs_cache.append(value)
+    return value
+
+
 # --- Shadow-install warning (N3) ---------------------------------------------
 _shadow_warned = [False]
 
@@ -177,8 +248,13 @@ _shadow_warned = [False]
 def _shadow_warning_line(settings):
     """One-time nudge (N3): if `texinputs` points at your checkout but a TeXLib
     copy is installed under TEXMFHOME, the .lua engine (LUAINPUTS) can still
-    resolve the stale install. Returns a warning string, or None."""
-    if _shadow_warned[0] or not settings.get("texinputs"):
+    resolve the stale install. Returns a warning string, or None.
+
+    Gated on there being a checkout path in play at all -- which now includes a
+    DERIVED one. Checking only the setting would have silenced this warning for
+    exactly the users who never configure anything by hand, i.e. the ones most
+    likely to be unaware of a stale TEXMF copy shadowing their builds."""
+    if _shadow_warned[0] or not (settings.get("texinputs") or _derive_texinputs()):
         return None
     try:
         from TeXLib import texlib_texmf
@@ -549,9 +625,12 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             sublime.set_timeout(lambda: _show_panel(window, root), 0)
         view.set_status("texlib_build", "TeXLib: building %s..." % base)
 
-        # Optional TEXINPUTS: real cross-package builds need the repo root on the
-        # path (comma-free junction). Resolved on the main thread; blank inherits.
-        texinputs = _resolve_texinputs(settings.get("texinputs") or "")
+        # TEXINPUTS: cross-package builds need the library root on the path.
+        # An explicit setting always wins; otherwise derive it from where this
+        # package lives, so a plugin installed without the standalone installer
+        # can still resolve the classes instead of failing every build at
+        # \documentclass. Resolved on the main thread.
+        texinputs = _resolve_texinputs(settings.get("texinputs") or _derive_texinputs())
 
         host = texlib_build.TexlibBuild(
             tex_root=root, engine=engine,
