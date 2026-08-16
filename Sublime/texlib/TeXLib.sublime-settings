@@ -20,7 +20,20 @@
     // classes load from your checkout, NO TEXMF install is needed (and none
     // should shadow it -- see "Uninstall Classes from TEXMF" / Doctor).
     //
-    // Leave unset (the default) to inherit the process environment.
+    // Leave unset (the default) and the plugin DERIVES this from its own
+    // location: it loads from <library>/Sublime/texlib, so the library root is
+    // two directories up, and the search path becomes that root plus each
+    // subdirectory holding a .cls/.sty/.lua, ending in the empty segment.
+    //
+    // Until 0.6.x unset meant "inherit the process environment" -- and since
+    // Sublime inherits no TEXINPUTS, that meant every document failed at
+    // \documentclass with "File `didactic.cls' not found" unless something
+    // else had written this setting for you. Setting it by hand is now an
+    // override, not a prerequisite.
+    //
+    // The derivation is deliberately cautious: if the directory two levels up
+    // does not actually contain the core .sty, nothing is derived and builds
+    // inherit the environment as before, rather than pointing at a wrong tree.
     //
     // "texinputs": [
     //     ".", "C:/_texlibjunc",
