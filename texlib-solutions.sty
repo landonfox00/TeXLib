@@ -287,6 +287,21 @@
 			\hsize\dimexpr\textwidth-12pt\relax
 	\else
 		\gdef\@sol@cerr{}%
+		% ACCESSIBLE: close the stem's paragraph before opening the discard box.
+		% The \ifsolutions branch above makes \par its very first action; this one
+		% never did. So when a source writes \begin{solution} with no blank line
+		% before it -- which the sample bank does, straight after \end{parts} --
+		% the throwaway vbox opens while the paragraph is still live, and the
+		% phantom lands nested inside the enclosing list instead of as a sibling.
+		% Everything typeset afterwards then becomes a child of that list: the
+		% next \question nests LI-in-LI and following stems become P-in-L.
+		% Suspending tagging is not sufficient on its own -- the box also has to
+		% START in vertical mode, which is what the render branch gets for free.
+		%
+		% Bisected: parts alone 0, solution alone 0, parts THEN solution 1, and
+		% the real quad problem (which is exactly that pair) is the only bank
+		% entry that corrupts what follows it.
+		\ifdefined\TeXLibAccessibleMode\par\fi
 		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }{%
@@ -371,6 +386,10 @@
 			% full-bleed {solution} box above (verified: no right-margin overhang).
 			\hsize\textwidth
 	\else
+		% Same asymmetry as {solution} above: the render branch opens with
+		% \par\smallskip, this one opened the discard box in whatever mode the
+		% part's prose left behind.
+		\ifdefined\TeXLibAccessibleMode\par\fi
 		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }{%
