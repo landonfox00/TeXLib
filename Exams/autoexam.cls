@@ -443,44 +443,6 @@
 \let\oldparts\parts
 \let\endoldparts\endparts
 
-% ACCESSIBLE: hang the counter bookkeeping off exam.cls's own {parts} rather
-% than \let-ing its internals out and re-wrapping them.
-%
-% The \else branch below calls \oldparts / \endoldparts directly, which enters
-% and leaves the list WITHOUT going through the environment, so the
-% environment-level hooks latex-lab uses to open and close the list's <L>
-% structure never pair up. The <L> is left open, and everything typeset after it
-% becomes its child: the next \question nests as LI inside LI, and following
-% stems become P inside L. tagpdf 0.99w never checked those relations, so this
-% was invisible until 1.0c made it fatal.
-%
-% Bisected rather than guessed. sample_quad_solve is the bank's only {parts}
-% problem, and it is exactly the one whose presence corrupts what FOLLOWS it --
-% alone 0 violations, ratineq+graph 0, quad+ratineq 1, quad+graph 6, all three
-% 7 = 1 + 6. Pairwise-additive with quad as the common factor, which is the
-% signature of a container that never closed.
-%
-% \AtBeginEnvironment fires after the environment's own begin code, so partno is
-% restored after exam.cls resets it -- the same order the wrapper had.
-% \AtEndEnvironment fires before the end code, likewise matching. Normal builds
-% keep the wrapper untouched, so print output is bit-for-bit unchanged.
-\ifdefined\TeXLibAccessibleMode
-	\AtBeginEnvironment{parts}{%
-		\inpartstrue
-		\ifnum\value{question}=\value{tracker_question_no}
-			\ifnum\value{global_partno_storage}>0
-				\setcounter{partno}{\value{global_partno_storage}}%
-			\fi
-		\else
-			\setcounter{global_partno_storage}{0}%
-			\setcounter{tracker_question_no}{\value{question}}%
-		\fi
-	}
-	\AtEndEnvironment{parts}{%
-		\setcounter{global_partno_storage}{\value{partno}}%
-		\inpartsfalse
-	}
-\else
 \RenewDocumentEnvironment{parts}{}{%
 	\oldparts\inpartstrue
 	\ifnum\value{question}=\value{tracker_question_no}
@@ -495,7 +457,6 @@
 	\setcounter{global_partno_storage}{\value{partno}}%
 	\endoldparts\inpartsfalse
 }
-\fi
 
 % ACCESSIBLE: multicol cannot be tagged (its column balancing rebuilds the
 % galley below the structure layer, so tagpdf cannot bracket the columns) --
