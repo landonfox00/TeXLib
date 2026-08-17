@@ -45,7 +45,8 @@ jobs:
             for v in v1-noparts v2-parts v3-parts-maketitle v4-multiversion \
                      v5-real-quad v5-real-ratineq v5-real-graph \
                      v6-three-problems v7-three-maketitle v8-template-shape \
-                     v9-sep-none v10-sep-vmode; do
+                     v9-sep-none v10-sep-vmode \
+                     v12-three-simple v13-three-parts-nostretch v14-three-stretch; do
               rm -f "$v.log" "$v.pdf"
               lualatex -interaction=nonstopmode -shell-escape -jobname="$v" \
                 "${DOCMETA}\\input{$v.tex}" >/dev/null 2>&1

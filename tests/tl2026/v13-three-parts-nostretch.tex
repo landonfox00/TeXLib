@@ -1,0 +1,36 @@
+% #69 -- three problems WITH {parts} but no \vspace{\stretch}.
+% If v12 is 0 and this is 0, the parts are innocent too and the stretch glue
+% (page-fill) is the remaining difference.
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=99, date={Probe}}
+
+\begin{problem}{p1}[topic=p1]
+	Solve each.
+	\begin{parts}
+		\part[4] First.
+		\part[2] Second.
+	\end{parts}
+\end{problem}
+\begin{problem}{p2}[topic=p2]
+	Solve each.
+	\begin{parts}
+		\part[4] First.
+		\part[2] Second.
+	\end{parts}
+\end{problem}
+\begin{problem}{p3}[topic=p3]
+	Solve each.
+	\begin{parts}
+		\part[4] First.
+		\part[2] Second.
+	\end{parts}
+\end{problem}
+
+\begin{document}
+\begin{problems}
+	\problem{topic=p1}
+	\problem{topic=p2}
+	\problem{topic=p3}
+\end{problems}
+\end{document}

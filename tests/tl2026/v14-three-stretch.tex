@@ -1,0 +1,43 @@
+% #69 -- v13 plus the \vspace{\stretch{}} the real bank problems carry.
+% Stretch glue is what forces the page-fill behaviour, so if the violations
+% appear here and not in v13, page breaking inside the tagged {questions} list
+% is confirmed as the mechanism.
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=99, date={Probe}}
+
+\begin{problem}{q1}[topic=q1]
+	Solve each.
+	\begin{parts}
+		\part[4] First.
+			\vspace{\stretch{2}}
+		\part[2] Second.
+			\vspace{\stretch{1}}
+	\end{parts}
+\end{problem}
+\begin{problem}{q2}[topic=q2]
+	Solve each.
+	\begin{parts}
+		\part[4] First.
+			\vspace{\stretch{2}}
+		\part[2] Second.
+			\vspace{\stretch{1}}
+	\end{parts}
+\end{problem}
+\begin{problem}{q3}[topic=q3]
+	Solve each.
+	\begin{parts}
+		\part[4] First.
+			\vspace{\stretch{2}}
+		\part[2] Second.
+			\vspace{\stretch{1}}
+	\end{parts}
+\end{problem}
+
+\begin{document}
+\begin{problems}
+	\problem{topic=q1}
+	\problem{topic=q2}
+	\problem{topic=q3}
+\end{problems}
+\end{document}

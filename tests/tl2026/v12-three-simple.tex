@@ -1,0 +1,24 @@
+% #69 -- three SIMPLE problems: no {parts}, no \vspace{\stretch}, no tikz.
+% Isolates "three problems" from "these three problems". If this is 0, count
+% alone is innocent and the trigger is content the real problems carry.
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=99, date={Probe}}
+
+\begin{problem}{s1}[topic=s1]
+	Solve $2x + 5 = 11$ for $x$.
+\end{problem}
+\begin{problem}{s2}[topic=s2]
+	Solve $3x - 1 = 8$ for $x$.
+\end{problem}
+\begin{problem}{s3}[topic=s3]
+	Solve $x/4 = 2$ for $x$.
+\end{problem}
+
+\begin{document}
+\begin{problems}
+	\problem{topic=s1}
+	\problem{topic=s2}
+	\problem{topic=s3}
+\end{problems}
+\end{document}
