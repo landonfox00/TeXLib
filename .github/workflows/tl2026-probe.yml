@@ -48,7 +48,8 @@ jobs:
                      v9-sep-none v10-sep-vmode \
                      v12-three-simple v13-three-parts-nostretch v14-three-stretch \
                      v15-three-solutions v16-three-displaymath v17-three-center \
-                     v18-forced-pagebreaks; do
+                     v18-forced-pagebreaks \
+                     v19-pair-quad-ratineq v19-pair-quad-graph v19-pair-ratineq-graph; do
               rm -f "$v.log" "$v.pdf"
               lualatex -interaction=nonstopmode -shell-escape -jobname="$v" \
                 "${DOCMETA}\\input{$v.tex}" >/dev/null 2>&1
