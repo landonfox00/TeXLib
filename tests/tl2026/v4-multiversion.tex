@@ -1,0 +1,21 @@
+% #69 isolation variant 4 -- v3 with three versions, i.e. the template's shape.
+% Multi-version emission re-runs the body through the engine per copy, so if
+% the violation count scales with version count this is where it comes from.
+\documentclass{autoexam}
+\versions{A, B, C}
+\examsetup{number=99, date={Probe}}
+
+\begin{problem}{withparts}[topic=parts]
+	Solve each equation.
+	\begin{parts}
+		\part $x + 1 = 2$.
+		\part $x - 1 = 0$.
+	\end{parts}
+\end{problem}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem{topic=parts}
+\end{problems}
+\end{document}

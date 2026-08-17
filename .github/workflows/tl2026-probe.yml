@@ -7,8 +7,7 @@ name: tl2026-probe
 #
 # Scoped to probe/** branches: workflow_dispatch alone is unusable here, because
 # GitHub only offers it for workflows already on the default branch, and this
-# one deliberately never lands there. Nothing on main or any feature branch
-# triggers it.
+# one deliberately never lands there.
 
 on:
   push:
@@ -22,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Probe the unpinned (TL2026) tagging stack
+      - name: Isolate the autoexam structure violations on TL2026
         uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
           docker_image: ghcr.io/xu-cheng/texlive-full:latest
@@ -31,46 +30,45 @@ jobs:
             apk add --no-cache python3 py3-pip poppler-utils
             pip install --no-cache-dir --break-system-packages pypdf
 
+            REPO="$PWD"
             echo "===================== TOOLCHAIN ====================="
             tex --version | head -1
-            echo "--- tagpdf ---"
-            kpsewhich tagpdf.sty
             grep -m1 -E "ProvidesExplPackage" "$(kpsewhich tagpdf.sty)" || true
-            echo "--- latex-lab block ---"
-            kpsewhich latex-lab-block.ltx  || echo "(no latex-lab-block.ltx)"
-            kpsewhich latex-lab-testphase-block.sty || echo "(no testphase block sty)"
 
-            echo "===================== PROBE DOC ====================="
-            cd tests
-            lualatex -interaction=nonstopmode -shell-escape tl2026-probe.tex >/dev/null 2>&1
-            echo "--- PROBE lines ---"
-            grep -E "^PROBE:" tl2026-probe.log || echo "(no PROBE lines)"
-            echo "--- errors in probe log ---"
-            grep -nE "^! |Missing number|Package tagpdf Error" tl2026-probe.log | head -20 || true
-            cd ..
+            export TEXINPUTS=".:$REPO:$REPO/Exams:$REPO/Quizzes:$REPO/Notes:$REPO/Problem Sets:$REPO/Report Cards:$REPO/Schedule:$REPO/Syllabi:$REPO/Bingo:$REPO/Bank:"
+            DOCMETA='\DocumentMetadata{lang=en,tagging=on,tagging-setup={math/setup={mathml-AF,mathml-SE},table/header-rows=1},pdfstandard={ua-2,a-4f}}\def\TeXLibAccessibleMode{}'
 
-            echo "===================== SMOKE (the 3 failures) ====================="
-            python3 smoke_test.py --accessible -v Exams "Problem Sets" 2>&1 | tail -60
-
-            echo "===================== ERROR CONTEXT (inline) ====================="
-            # Printed inline as well as uploaded: the first run of this probe
-            # uploaded nothing useful because upload-artifact@v4 skips
-            # dot-prefixed paths by default and the logs live in .smoke_logs.
-            for f in .smoke_logs/*.log; do
-              [ -f "$f" ] || continue
-              echo ""
-              echo "######################## $f"
-              grep -nE "^! " "$f" | head -5
-              echo "------------------------ 45 lines before the first error:"
-              awk '/^! /{ for (i = (NR>45 ? NR-45 : 1); i <= NR+12; i++) print i": "L[i]; exit } { L[NR]=$0 }' "$f"
+            echo "===================== VARIANT ISOLATION ====================="
+            # One feature added per variant. The passing fixture has none of
+            # them; the failing template has all of them.
+            cd "$REPO/tests/tl2026"
+            for v in v1-noparts v2-parts v3-parts-maketitle v4-multiversion; do
+              rm -f "$v.log" "$v.pdf"
+              lualatex -interaction=nonstopmode -shell-escape -jobname="$v" \
+                "${DOCMETA}\\input{$v.tex}" >/dev/null 2>&1
+              if [ -f "$v.log" ]; then
+                viol=$(grep -c "Relation is not allowed" "$v.log")
+                fatal=$(grep -cE "^! " "$v.log")
+                pdf=$([ -f "$v.pdf" ] && echo yes || echo NO)
+                echo ""
+                echo "### $v : violations=$viol  errors=$fatal  pdf=$pdf"
+                grep -oE "Parent-Child '[^']+' --> '[^']+'" "$v.log" \
+                  | sort | uniq -c | sort -rn | head -6
+                grep -E "^! " "$v.log" | head -3
+              else
+                echo "### $v : NO LOG (build did not start)"
+              fi
             done
+            cd "$REPO"
 
-            echo "===================== COLLECT LOGS ====================="
+            echo "===================== SMOKE (real documents) ====================="
+            python3 smoke_test.py --accessible -v Exams "Problem Sets" 2>&1 | tail -30
+
+            echo "===================== COLLECT ====================="
             mkdir -p probe-artifacts
-            # Copy WITHOUT the leading dot so the upload keeps it.
             cp -r .smoke_logs probe-artifacts/smoke_logs 2>/dev/null || true
-            cp tests/tl2026-probe.log probe-artifacts/ 2>/dev/null || true
-            ls -la probe-artifacts/ probe-artifacts/smoke_logs 2>/dev/null || true
+            cp tests/tl2026/*.log probe-artifacts/ 2>/dev/null || true
+            ls -la probe-artifacts/ 2>/dev/null || true
             exit 0
 
       - name: Upload probe artifacts

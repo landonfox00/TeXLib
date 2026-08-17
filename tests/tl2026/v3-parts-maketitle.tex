@@ -1,0 +1,20 @@
+% #69 isolation variant 3 -- v2 plus \maketitle (cover page + boxed
+% instructions). The failing template calls it; the passing fixture does not.
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=99, date={Probe}}
+
+\begin{problem}{withparts}[topic=parts]
+	Solve each equation.
+	\begin{parts}
+		\part $x + 1 = 2$.
+		\part $x - 1 = 0$.
+	\end{parts}
+\end{problem}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem{topic=parts}
+\end{problems}
+\end{document}

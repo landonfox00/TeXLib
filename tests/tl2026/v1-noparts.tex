@@ -1,0 +1,16 @@
+% #69 isolation variant 1 (CONTROL) -- autoexam, no {parts}, no \maketitle.
+% Mirrors tests/fixtures/Exams/fix-test.tex, which PASSES on TeX Live 2026.
+% Expect: 0 Parent-Child violations.
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=99, date={Probe}}
+
+\begin{problem}{plainstem}[topic=plain]
+	Solve $2x + 5 = 11$ for $x$.
+\end{problem}
+
+\begin{document}
+\begin{problems}
+	\problem{topic=plain}
+\end{problems}
+\end{document}

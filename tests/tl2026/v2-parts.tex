@@ -1,0 +1,21 @@
+% #69 isolation variant 2 -- v1 plus a problem that uses {parts}.
+% The template's topic=quad problem opens {parts}; the passing fixture's
+% problems never do. If the violations appear here and not in v1, {parts}
+% nested inside the exam-class {questions} list is the trigger.
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=99, date={Probe}}
+
+\begin{problem}{withparts}[topic=parts]
+	Solve each equation.
+	\begin{parts}
+		\part $x + 1 = 2$.
+		\part $x - 1 = 0$.
+	\end{parts}
+\end{problem}
+
+\begin{document}
+\begin{problems}
+	\problem{topic=parts}
+\end{problems}
+\end{document}
