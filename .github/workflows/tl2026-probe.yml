@@ -73,7 +73,10 @@ jobs:
             cd "$REPO"
 
             echo "===================== SMOKE (real documents) ====================="
-            python3 smoke_test.py --accessible -v Exams "Problem Sets" 2>&1 | tail -30
+            # FULL accessible suite now, not just the two known failures: the
+            # fix has to hold for every module on TL2026, not only the ones
+            # that were red.
+            python3 smoke_test.py --accessible -v 2>&1 | tail -45
 
             echo "===================== COLLECT ====================="
             mkdir -p probe-artifacts
