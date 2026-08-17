@@ -1,0 +1,18 @@
+% #69 candidate A -- suppress the decorative separator entirely.
+% Same shape as v8 (39 violations). If this drops to 0 the separator is
+% confirmed as the whole cause.
+\documentclass[exam-number=5, exam-date={May 2, 2026}]{autoexam}
+\versions{A, B, C}
+\loadbank{bank.tex}
+\makeatletter
+\renewcommand{\autoexam@problem@sep}{}
+\makeatother
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem{topic=quad}
+	\problem{topic=ratineq}
+	\problem{topic=graph}
+\end{problems}
+\end{document}

@@ -1,0 +1,25 @@
+% #69 candidate B -- keep the rule but emit it in VERTICAL mode.
+% The current separator uses \noindent\rule, which is horizontal mode and so
+% starts a paragraph -- a text-unit whose parent is the <L>. \hrule in vmode
+% adds no paragraph at all, so the rule stays visible and the structure stays
+% legal. Same shape as v8.
+\documentclass[exam-number=5, exam-date={May 2, 2026}]{autoexam}
+\versions{A, B, C}
+\loadbank{bank.tex}
+\makeatletter
+\renewcommand{\autoexam@problem@sep}{%
+	\par
+	\vspace{0.25em}%
+	\hrule height 0.4pt\relax
+	\vspace{0.25em}%
+}
+\makeatother
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem{topic=quad}
+	\problem{topic=ratineq}
+	\problem{topic=graph}
+\end{problems}
+\end{document}
