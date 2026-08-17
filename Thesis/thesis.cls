@@ -83,6 +83,13 @@
 \RequirePackage{caption}
 \RequirePackage[title]{appendix}
 \RequirePackage[hidelinks, linktoc=page, pdfusetitle]{hyperref}
+% cleveref direct, NOT texlib-crossref: that package exists because
+% cleveref's amsthm patch leaves a block-level list open under tagging and
+% kills the first definition-style environment. This class never uses
+% amsthm's theorem environments -- section 9 defines trivlist-free ones of
+% its own -- so \@begintheorem is never patched and the fault cannot fire.
+% Keeping cleveref also keeps the per-environment \crefname naming set up
+% there, which the zref-clever shim does not reproduce.
 \RequirePackage[capitalise, nameinlink]{cleveref}
 % Bibliography (biber backend). The document adds its .bib with \addbibresource
 % and prints the list with \makereferences, which titles it and adds it to the

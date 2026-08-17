@@ -129,6 +129,13 @@ MODULES = [
     ("Syllabi",      "syllabus-template.tex"),
     ("Problem Sets", "pset-template.tex"),
     ("Bank",         "bank-template.tex"),
+    # The thesis/dissertation class. Unlike every other template this one
+    # carries its OWN \DocumentMetadata (a dissertation should be tagged on a
+    # plain build, not only under --accessible), so the default-mode run is
+    # already a tagged build. The accessible run injects a second
+    # \DocumentMetadata on top; LaTeX accepts that, and the injected
+    # mathml-AF/SE + ua-2/a-4f settings are what the gate then validates.
+    ("Thesis",       "thesis-template.tex"),
     # Feature-test fixtures (live under tests/fixtures/<Module>/). Each is a
     # self-contained .tex that exercises something the canonical template
     # doesn't — e.g. the fix-overrides syntax \problem{id}[a=1,b=2]. Treated
@@ -159,7 +166,7 @@ MODULES = [
 
 # Classes that require lualatex (use \directlua, luaotfload, or sibling .lua
 # files; report-card's \gradebook reads its CSV via lualatex).
-LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "bingo", "report-card", "bank"}
+LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "bingo", "report-card", "bank", "thesis"}
 
 # Maps a \documentclass to the module dir shipping its .cls and default include
 # files (instructions, title). Used to give a build whose source lives OUTSIDE
@@ -240,6 +247,11 @@ EXPECT_TEXT = {
     # (always shown). "Bank coverage" == the summary rendered; "Solution" == a
     # cataloged solution rendered.
     "Bank":         ["Bank coverage", "Solution"],
+    # Front-matter page, a body chapter, and a theorem head from the
+    # class's own trivlist-free environments. The bibliography is NOT
+    # asserted: smoke does not run biber, so the reference list is empty
+    # by design here and asserting it would fail for the wrong reason.
+    "Thesis":       ["Abstract", "Introduction", "Theorem 1.1"],
     # MULTILINEHEADEROK is the stem of the mlheader problem, whose [meta] header
     # wraps lines; its presence proves that problem rendered (paired with the
     # EXPECT_ABSENT leak token below).
