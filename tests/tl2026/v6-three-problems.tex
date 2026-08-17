@@ -1,0 +1,16 @@
+% #69 -- three real problems in ONE {problems} block, one version, no title.
+% Each problem passes alone (v5-*), so if this fails the trigger is material
+% emitted BETWEEN questions -- the inter-problem separator landing directly in
+% the {questions} list rather than inside an item.
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=99, date={Probe}}
+\loadbank{bank.tex}
+
+\begin{document}
+\begin{problems}
+	\problem{topic=quad}
+	\problem{topic=ratineq}
+	\problem{topic=graph}
+\end{problems}
+\end{document}

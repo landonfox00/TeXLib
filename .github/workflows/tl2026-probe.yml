@@ -43,7 +43,8 @@ jobs:
             # them; the failing template has all of them.
             cd "$REPO/tests/tl2026"
             for v in v1-noparts v2-parts v3-parts-maketitle v4-multiversion \
-                     v5-real-quad v5-real-ratineq v5-real-graph; do
+                     v5-real-quad v5-real-ratineq v5-real-graph \
+                     v6-three-problems v7-three-maketitle v8-template-shape; do
               rm -f "$v.log" "$v.pdf"
               lualatex -interaction=nonstopmode -shell-escape -jobname="$v" \
                 "${DOCMETA}\\input{$v.tex}" >/dev/null 2>&1

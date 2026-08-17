@@ -1,0 +1,15 @@
+% #69 -- the failing template's exact shape: three problems, cover page, three
+% versions. If this reproduces and v6/v7 do not, the trigger needs multi-version
+% emission on top of the rest.
+\documentclass[exam-number=5, exam-date={May 2, 2026}, exam-postscript={Good luck!}]{autoexam}
+\versions{A, B, C}
+\loadbank{bank.tex}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem{topic=quad}
+	\problem{topic=ratineq}
+	\problem{topic=graph}
+\end{problems}
+\end{document}
