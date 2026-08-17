@@ -1,67 +1,53 @@
 % Temporary diagnostic for issue #69 -- NOT part of the library.
 %
-% Answers two questions about the TeX Live 2026 tagging stack that cannot be
-% asked from a TeX Live 2025 machine:
+% texlib-build.sty reaches the tagging suspend/resume through \csname, so if
+% tagpdf renamed them between 0.99w (TL2025) and 1.0c (TL2026) the call degrades
+% to \relax SILENTLY. The discard boxes would then be walked by tagpdf, which is
+% the shape of the "automatic begin > end" error the Exams builds die on.
 %
-%   1. Do the expl3 tagging suspend/resume commands still exist under the names
-%      texlib-build.sty reaches for? It calls them through \csname, so a rename
-%      degrades to \relax SILENTLY -- the discard boxes would then be walked by
-%      tagpdf, which is exactly the shape of the "automatic begin > end" error.
-%
-%   2. Does enumitem's leftmargin=* survive \setlist under the new block-based
-%      list implementation? pset.cls's accessible branch is the tree's only
-%      accessible-mode use of it, and it is the one document failing with
-%      "Missing number, treated as zero".
-%
-% Run under lualatex. Every answer is \typeout'd with a PROBE: prefix.
+% Asked through expl3 rather than \csname + \ifx: the names carry `_' and `:',
+% which are catcode 8 and 12 under normal catcodes, so a naive \probe@show{...}
+% wrapper tokenises as subscripts and math shifts instead of a control sequence
+% name. (That is exactly how the first version of this probe failed.)
 \DocumentMetadata{tagging=on, pdfstandard=ua-2}
 \documentclass{article}
 
 \usepackage{enumitem}
 
-\makeatletter
-\newcommand\probe@show[1]{%
-	\expandafter\ifx\csname #1\endcsname\relax
-		\typeout{PROBE: [MISSING] #1}%
-	\else
-		\typeout{PROBE: [present] #1}%
-	\fi
+\ExplSyntaxOn
+\cs_new_protected:Npn \probeshow #1#2 {
+	\cs_if_exist:NTF #1
+		{ \iow_term:x { PROBE:~[present]~#2 } }
+		{ \iow_term:x { PROBE:~[MISSING]~#2 } }
 }
-\makeatother
+\iow_term:x { PROBE:~=====~command~existence~===== }
+\probeshow \tag_suspend:n   { tag_suspend:n }
+\probeshow \tag_resume:n    { tag_resume:n }
+\probeshow \tag_suspend:    { tag_suspend: }
+\probeshow \tag_resume:     { tag_resume: }
+\probeshow \tag_stop:       { tag_stop: }
+\probeshow \tag_start:      { tag_start: }
+\probeshow \tagsuspend      { tagsuspend~(document~level) }
+\probeshow \tagresume       { tagresume~(document~level) }
+\probeshow \SuspendTagging  { SuspendTagging }
+\probeshow \ResumeTagging   { ResumeTagging }
+\ExplSyntaxOff
 
-\typeout{PROBE: ===== command existence =====}
-\probe@show{tag_suspend:n}
-\probe@show{tag_resume:n}
-\probe@show{tag_suspend:}
-\probe@show{tag_resume:}
-\probe@show{tagsuspend}
-\probe@show{tagresume}
-\probe@show{SuspendTagging}
-\probe@show{ResumeTagging}
-\probe@show{tag_stop:}
-\probe@show{tag_start:}
-
-\typeout{PROBE: ===== package versions =====}
 \makeatletter
-\typeout{PROBE: tagpdf   = \@ifpackageloaded{tagpdf}{loaded}{NOT loaded}}
+\typeout{PROBE: tagpdf = \@ifpackageloaded{tagpdf}{loaded}{NOT loaded}}
 \typeout{PROBE: fmtversion = \fmtversion}
 \makeatother
 
-% ---------------------------------------------------------------------------
-% Question 2: leftmargin=* through \setlist, exactly as pset.cls does it.
-% ---------------------------------------------------------------------------
 \newlist{parts}{enumerate}{4}
 \setlist[parts]{label=\textbf{(\alph*)}, leftmargin=*, topsep=2pt, parsep=2pt}
 
 \begin{document}
 
-\typeout{PROBE: ===== about to open a parts list with leftmargin=* =====}
-
+\typeout{PROBE: ===== opening parts with leftmargin=* =====}
 \begin{parts}
 	\item first part
 	\item second part
 \end{parts}
-
 \typeout{PROBE: ===== survived leftmargin=* =====}
 
 \end{document}

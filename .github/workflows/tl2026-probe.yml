@@ -52,11 +52,25 @@ jobs:
             echo "===================== SMOKE (the 3 failures) ====================="
             python3 smoke_test.py --accessible -v Exams "Problem Sets" 2>&1 | tail -60
 
+            echo "===================== ERROR CONTEXT (inline) ====================="
+            # Printed inline as well as uploaded: the first run of this probe
+            # uploaded nothing useful because upload-artifact@v4 skips
+            # dot-prefixed paths by default and the logs live in .smoke_logs.
+            for f in .smoke_logs/*.log; do
+              [ -f "$f" ] || continue
+              echo ""
+              echo "######################## $f"
+              grep -nE "^! " "$f" | head -5
+              echo "------------------------ 45 lines before the first error:"
+              awk '/^! /{ for (i = (NR>45 ? NR-45 : 1); i <= NR+12; i++) print i": "L[i]; exit } { L[NR]=$0 }' "$f"
+            done
+
             echo "===================== COLLECT LOGS ====================="
             mkdir -p probe-artifacts
-            cp -r .smoke_logs probe-artifacts/ 2>/dev/null || true
+            # Copy WITHOUT the leading dot so the upload keeps it.
+            cp -r .smoke_logs probe-artifacts/smoke_logs 2>/dev/null || true
             cp tests/tl2026-probe.log probe-artifacts/ 2>/dev/null || true
-            ls -la probe-artifacts/ probe-artifacts/.smoke_logs 2>/dev/null || true
+            ls -la probe-artifacts/ probe-artifacts/smoke_logs 2>/dev/null || true
             exit 0
 
       - name: Upload probe artifacts
@@ -65,4 +79,5 @@ jobs:
         with:
           name: tl2026-probe-logs
           path: probe-artifacts/
+          include-hidden-files: true
           if-no-files-found: warn
