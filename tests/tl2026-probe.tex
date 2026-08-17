@@ -1,53 +1,43 @@
 % Temporary diagnostic for issue #69 -- NOT part of the library.
 %
-% texlib-build.sty reaches the tagging suspend/resume through \csname, so if
-% tagpdf renamed them between 0.99w (TL2025) and 1.0c (TL2026) the call degrades
-% to \relax SILENTLY. The discard boxes would then be walked by tagpdf, which is
-% the shape of the "automatic begin > end" error the Exams builds die on.
+% v3. The first two rounds killed both starting hypotheses: tag_suspend:n and
+% tag_resume:n are BOTH still present in tagpdf 1.0c (nothing silently became
+% \relax), and a flat list took leftmargin=* without complaint. The real pset
+% log shows the `*' itself as the offending token, so the sentinel IS the
+% trigger -- it just needs the conditions the flat probe lacked.
 %
-% Asked through expl3 rather than \csname + \ifx: the names carry `_' and `:',
-% which are catcode 8 and 12 under normal catcodes, so a naive \probe@show{...}
-% wrapper tokenises as subscripts and math shifts instead of a control sequence
-% name. (That is exactly how the first version of this probe failed.)
-\DocumentMetadata{tagging=on, pdfstandard=ua-2}
+% This round isolates which condition: the real accessible \DocumentMetadata
+% (previous probes used a bare tagging=on), and {parts} NESTED inside an outer
+% list, which is how pset-template reaches it (\begin{parts} inside
+% \begin{problem}).
+\DocumentMetadata{lang=en,tagging=on,tagging-setup={math/setup={mathml-AF,mathml-SE},table/header-rows=1},pdfstandard={ua-2,a-4f}}
 \documentclass{article}
 
 \usepackage{enumitem}
 
-\ExplSyntaxOn
-\cs_new_protected:Npn \probeshow #1#2 {
-	\cs_if_exist:NTF #1
-		{ \iow_term:x { PROBE:~[present]~#2 } }
-		{ \iow_term:x { PROBE:~[MISSING]~#2 } }
-}
-\iow_term:x { PROBE:~=====~command~existence~===== }
-\probeshow \tag_suspend:n   { tag_suspend:n }
-\probeshow \tag_resume:n    { tag_resume:n }
-\probeshow \tag_suspend:    { tag_suspend: }
-\probeshow \tag_resume:     { tag_resume: }
-\probeshow \tag_stop:       { tag_stop: }
-\probeshow \tag_start:      { tag_start: }
-\probeshow \tagsuspend      { tagsuspend~(document~level) }
-\probeshow \tagresume       { tagresume~(document~level) }
-\probeshow \SuspendTagging  { SuspendTagging }
-\probeshow \ResumeTagging   { ResumeTagging }
-\ExplSyntaxOff
-
-\makeatletter
-\typeout{PROBE: tagpdf = \@ifpackageloaded{tagpdf}{loaded}{NOT loaded}}
-\typeout{PROBE: fmtversion = \fmtversion}
-\makeatother
-
 \newlist{parts}{enumerate}{4}
 \setlist[parts]{label=\textbf{(\alph*)}, leftmargin=*, topsep=2pt, parsep=2pt}
 
+\newlist{outerproblem}{enumerate}{2}
+\setlist[outerproblem]{label=\arabic*., leftmargin=2em}
+
 \begin{document}
 
-\typeout{PROBE: ===== opening parts with leftmargin=* =====}
+\typeout{PROBE: ===== A: flat parts, leftmargin=* =====}
 \begin{parts}
-	\item first part
-	\item second part
+	\item flat first
+	\item flat second
 \end{parts}
-\typeout{PROBE: ===== survived leftmargin=* =====}
+\typeout{PROBE: ===== A survived =====}
+
+\typeout{PROBE: ===== B: parts NESTED in a list, leftmargin=* =====}
+\begin{outerproblem}
+	\item Outer problem text.
+	\begin{parts}
+		\item nested first
+		\item nested second
+	\end{parts}
+\end{outerproblem}
+\typeout{PROBE: ===== B survived =====}
 
 \end{document}
