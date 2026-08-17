@@ -14,6 +14,7 @@ Run:  python Sublime/test_texlib_runner.py
 """
 import hashlib
 import os
+import shutil
 import sys
 import tempfile
 import threading
@@ -30,6 +31,8 @@ _sublime.set_timeout = lambda fn, ms=0: fn()  # run marshaled callbacks inline
 _sublime.status_message = lambda *a, **k: None
 _sublime.error_message = lambda *a, **k: None
 _sublime.Region = lambda a, b: (a, b)
+_sublime.platform = lambda: "windows"
+_sublime.active_window = lambda: None  # the keep-focus hack no-ops headless
 
 
 class _Settings:
@@ -218,7 +221,139 @@ ok &= check(_drive_delegation(pdf_exists=False, cancel_on_pass1=False) is False,
 ok &= check(_drive_delegation(pdf_exists=True, cancel_on_pass1=True) is False,
             "delegation: on_success skipped when the build was cancelled")
 
-# 5. Outcome classification + error collection (drives on_finish).
+# 5. The post-build open targets the document that was BUILT, not whatever tab
+#    happens to be active when the (async) build lands. LaTeXTools' jumpto_pdf
+#    resolves its PDF from window.active_view(), so a tab switch mid-build used
+#    to launch the viewer on the NEW tab's PDF -- or on nothing at all, if that
+#    tab wasn't a .tex file.
+class _FakeView:
+    def __init__(self, path, text=""):
+        self._path, self._text = path, text
+
+    def file_name(self):
+        return self._path
+
+    def match_selector(self, point, selector):
+        return False  # fall through to _is_tex's extension check
+
+    def size(self):
+        return len(self._text)
+
+    def substr(self, region):
+        return self._text
+
+
+class _FakeWindow:
+    def __init__(self, active):
+        self.active, self.commands = active, []
+
+    def active_view(self):
+        return self.active
+
+    def run_command(self, name, args=None):
+        self.commands.append((name, args or {}))
+
+
+def _post_build(active_view, built_root, pdf=None):
+    win = _FakeWindow(active_view)
+    texlib._post_build_view(win, built_root, pdf)
+    return win.commands
+
+
+built = os.path.join(HERE, "built.tex")
+built_pdf = os.path.join(HERE, "built.pdf")
+
+ok &= check(_post_build(_FakeView(built), built) == [("latextools_jumpto_pdf", {})],
+            "post-build: still on the built document -> jumpto_pdf (forward sync)")
+ok &= check(_post_build(_FakeView(os.path.join(HERE, "other.tex")), built)
+            == [("latextools_view_pdf", {"file": built_pdf})],
+            "post-build: switched to another .tex -> the BUILT pdf opens, by path")
+ok &= check(_post_build(_FakeView(os.path.join(HERE, "notes.md")), built)
+            == [("latextools_view_pdf", {"file": built_pdf})],
+            "post-build: active tab isn't a .tex at all -> built pdf still opens")
+ok &= check(_post_build(_FakeView(os.path.join(HERE, "ch1.tex"),
+                                  "%!TeX root = built.tex\n"), built)
+            == [("latextools_jumpto_pdf", {})],
+            "post-build: an \\input child of the built root is the same document")
+
+# preferred_pdf: a sliced copy is opened by path even while the cursor sits in
+# the document that produced it -- jumpto_pdf can only ever resolve <root>.pdf,
+# so taking that branch would silently undo the preference.
+sol_pdf = os.path.join(HERE, "built_A_solutions.pdf")
+ok &= check(_post_build(_FakeView(built), built, sol_pdf)
+            == [("latextools_view_pdf", {"file": sol_pdf})],
+            "post-build: a preferred slice opens by path, not via jumpto_pdf")
+ok &= check(_post_build(_FakeView(os.path.join(HERE, "other.tex")), built, sol_pdf)
+            == [("latextools_view_pdf", {"file": sol_pdf})],
+            "post-build: the preferred slice wins after a tab switch too")
+
+# Forward sync INTO the slice. jumpto_pdf can't be aimed at one, so the runner
+# reaches the viewer plugin underneath it; stub that to check the three branches
+# (it can't succeed headless -- there is no LaTeXTools to import -- which is
+# exactly why the two checks above land on the view_pdf fallback).
+_synced = []
+_real_vfs = texlib._viewer_forward_sync
+texlib._viewer_forward_sync = lambda view, pdf: (_synced.append(pdf), True)[1]
+ok &= check(_post_build(_FakeView(built), built, sol_pdf) == [] and _synced == [sol_pdf],
+            "post-build: cursor in the built doc -> forward-sync INTO the slice, no reopen")
+_synced.clear()
+ok &= check(_post_build(_FakeView(os.path.join(HERE, "other.tex")), built, sol_pdf)
+            == [("latextools_view_pdf", {"file": sol_pdf})] and _synced == [],
+            "post-build: cursor in another document -> open the slice, do NOT sync")
+
+
+class _NoForwardSync:
+    def get(self, key, default=None):
+        return False if key == "forward_sync" else default
+
+
+_saved_ls = _sublime.load_settings
+_sublime.load_settings = lambda name: _NoForwardSync()
+ok &= check(_post_build(_FakeView(built), built, sol_pdf)
+            == [("latextools_view_pdf", {"file": sol_pdf})] and _synced == [],
+            "post-build: LaTeXTools forward_sync:false is honored for a slice too")
+_sublime.load_settings = _saved_ls
+texlib._viewer_forward_sync = _real_vfs
+
+# The build remembers what it opened, so View PDF / Forward Sync aim there too
+# instead of snapping back to the combined PDF.
+ok &= check(texlib._recall_preferred(built) is None,
+            "recall: a slice that doesn't exist on disk is not offered")
+_sol_real = os.path.join(tempfile.mkdtemp(prefix="texlib_pref_"), "built_A_solutions.pdf")
+open(_sol_real, "wb").close()
+_root_real = os.path.join(os.path.dirname(_sol_real), "built.tex")
+texlib._remember_preferred(_root_real, _sol_real)
+ok &= check(texlib._recall_preferred(_root_real) == _sol_real,
+            "recall: the last build's preferred copy is offered back")
+texlib._remember_preferred(_root_real, os.path.splitext(_root_real)[0] + ".pdf")
+ok &= check(texlib._recall_preferred(_root_real) is None,
+            "recall: <base>.pdf is not 'preferred' -- plain delegation handles it")
+ok &= check(_post_build(_FakeView(built), built, built_pdf)
+            == [("latextools_jumpto_pdf", {})],
+            "post-build: preference resolved BACK to <base>.pdf keeps forward sync")
+# Only where the filesystem folds case. os.path.normcase lowercases on Windows
+# and is the identity on POSIX, so on Linux an uppercased path is a genuinely
+# DIFFERENT file and resolving it to <base>.pdf would be the bug, not the fix.
+# Probe the behaviour rather than the platform name -- that is the property the
+# assertion actually rests on.
+if os.path.normcase("A") == "a":
+    ok &= check(_post_build(_FakeView(built), built, built_pdf.upper())
+                == [("latextools_jumpto_pdf", {})],
+                "post-build: the <base>.pdf comparison is case-insensitive (Windows)")
+
+
+class _NoOpenSettings:
+    def get(self, key, default=None):
+        return False if key == "open_pdf_on_build" else default
+
+
+_saved_load = _sublime.load_settings
+_sublime.load_settings = lambda name: _NoOpenSettings()
+ok &= check(_post_build(_FakeView(os.path.join(HERE, "other.tex")), built) == [],
+            "post-build: open_pdf_on_build:false opens nothing, drifted or not")
+_sublime.load_settings = _saved_load
+
+# 6. Outcome classification + error collection (drives on_finish).
 def _drive_finish(script_lines):
     captured = {}
     texlib.subprocess.Popen = PopenFactory([script_lines])
@@ -262,9 +397,9 @@ r = _drive_finish(["LaTeX Warning: Reference `x' undefined on input line 5.\n",
 ok &= check(r["state"] == "ok", "classify: warnings alone do NOT fail the build")
 ok &= check(len(r["warns"]) == 1, "classify: the warning is collected")
 
-# 6. _aux_log_path reproduces the build's md5[:12] key; _build_report formats a
+# 7. _aux_log_path reproduces the build's md5[:12] key; _build_report formats a
 #    clickable full-log link and keeps error lines unprefixed.
-log_path = texlib._aux_log_path("/some/doc.tex", "doc")
+log_path = texlib._aux_log_path("/some/doc.tex")
 expect_tail = os.path.join(
     "texlib-aux", hashlib.md5(b"/some/doc.tex").hexdigest()[:12], "doc.log")
 ok &= check(log_path.endswith(expect_tail),
@@ -277,6 +412,43 @@ ok &= check("\n./doc.tex:14: Undefined control sequence.\n" in report,
             "report: error line kept unprefixed (stays clickable)")
 ok &= check(("%s:1: [full build log" % log_path) in report,
             "report: full-log link is a clickable path:1: line")
+
+# 7. Regression: that link has to name the log the ENGINE actually writes. It is
+#    built from the tex root alone, so it must agree with the -output-directory
+#    and jobname of a REAL invocation -- both read back off the recorded argv
+#    here, never hand-written, since a hand-written "doc.log" is exactly what let
+#    the call site pass the basename WITH its extension and link "doc.tex.log".
+with tempfile.TemporaryDirectory() as tmp:
+    root = os.path.join(tmp, "doc.tex")
+    with open(root, "w", encoding="utf-8") as fh:
+        fh.write("\\documentclass{pset}\n\\begin{document}\nx\n\\end{document}\n")
+    factory = PopenFactory([[]])  # one pass, settles immediately
+    texlib.subprocess.Popen = factory
+    host = texlib_build.TexlibBuild(          # aux_directory defaults to <<temp>>
+        tex_root=root, engine="pdflatex",
+        options=["--texlib-mode=default"], display=lambda t: None)
+    ev = threading.Event()
+    texlib.TexlibBuildCommand()._drive(
+        host, tmp, lambda t: None, ev, "", root,
+        {"thread": None, "cancel": ev, "proc": None})
+    shutil.rmtree(getattr(host, "_aux_target", "") or os.devnull,
+                  ignore_errors=True)
+
+argv = [str(a) for a in factory.calls[0]]
+out_dir = next(a.split("=", 1)[1] for a in argv
+               if a.startswith("-output-directory="))
+# The jobname the engine is given: pinned as --jobname= on the modes that pin one
+# (bank catalog, accessible), else derived by TeX from the file argument.
+jobname = next((a.split("=", 1)[1] for a in argv if a.startswith("--jobname=")),
+               os.path.splitext(os.path.basename(argv[-1]))[0])
+engine_log = os.path.join(out_dir, jobname + ".log")
+ok &= check(texlib._aux_log_path(root) == engine_log,
+            "aux log path: resolves to the engine's own <jobname>.log")
+ok &= check(("%s:1: [full build log" % engine_log)
+            in texlib._build_report(os.path.basename(root),
+                                    ["./doc.tex:14: Undefined control sequence."],
+                                    [], texlib._aux_log_path(root)),
+            "report: the full-log link points at the file the engine writes")
 
 print("\nALL PASS" if ok else "\nFAILURES ABOVE")
 sys.exit(0 if ok else 1)

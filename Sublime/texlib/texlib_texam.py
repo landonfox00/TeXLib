@@ -22,6 +22,7 @@
 import os
 import shutil
 import subprocess
+import tempfile
 
 import sublime
 import sublime_plugin
@@ -31,9 +32,13 @@ try:
 except ImportError:
     import texlib_locate
 
-# CREATE_NEW_CONSOLE: the server gets its own window showing "serving http://...
-# (Ctrl+C to stop)", so it is visible and killable rather than an invisible orphan.
-_NEW_CONSOLE = 0x00000010 if os.name == "nt" else 0
+# No console at all: launch via pythonw.exe (windowless Python) when available,
+# with CREATE_NO_WINDOW as a backstop -- no popup, no taskbar window, no focus
+# steal. It cleans itself up rather than orphaning: the page pings to keep it
+# alive and auto-quits ~5 min after the tab closes, plus a Quit button stops it
+# immediately. Output goes to a log (python -u) so a startup error is recoverable.
+_CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
+_LAUNCH_LOG = os.path.join(tempfile.gettempdir(), "texam-launch.log")
 
 
 def resolve_script(settings):
@@ -64,6 +69,13 @@ class TexlibOpenTexamCommand(sublime_plugin.WindowCommand):
         if not exam:
             sublime.status_message("TeXLib: save the exam document first.")
             return
+        # Save first (like Ctrl+B) so TeXaM opens on the CURRENT text, not a stale
+        # on-disk copy: the active buffer, plus the resolved %!TeX root view if it
+        # is a different open file. A titled+dirty view saves silently; the second
+        # pass is a no-op once the first has cleared the dirty flag.
+        for v in (view, self.window.find_open_file(exam)):
+            if v is not None and v.file_name() and v.is_dirty():
+                v.run_command("save")
         settings = sublime.load_settings("TeXLib.sublime-settings")
         script = resolve_script(settings)
         if not os.path.isfile(script):
@@ -77,15 +89,25 @@ class TexlibOpenTexamCommand(sublime_plugin.WindowCommand):
         if not py:
             sublime.error_message("TeXLib: no python found on PATH to run it.")
             return
+        # Prefer pythonw.exe (the windowless Python) so there is genuinely NO
+        # console -- the definitive fix on Windows; CREATE_NO_WINDOW stays as a
+        # belt-and-suspenders. Fall back to python.exe if pythonw isn't beside it.
+        if os.name == "nt":
+            pyw = os.path.join(os.path.dirname(py), "pythonw.exe")
+            if os.path.isfile(pyw):
+                py = pyw
         try:
-            subprocess.Popen([py, script, exam], cwd=os.path.dirname(script),
-                             creationflags=_NEW_CONSOLE)
+            log = open(_LAUNCH_LOG, "ab")            # child dups the fd; safe to close after
+            subprocess.Popen([py, "-u", script, exam], cwd=os.path.dirname(script),
+                             creationflags=_CREATE_NO_WINDOW,
+                             stdout=log, stderr=subprocess.STDOUT)   # -u: live log
+            log.close()
         except OSError as exc:
             sublime.error_message("TeXLib: could not launch TeXam: %s" % exc)
             return
         sublime.status_message(
             "TeXLib: TeXam launching -- it opens in your browser "
-            "(close its console window to stop).")
+            "(use the Quit button there to stop it).")
 
     def is_enabled(self):
         return texlib_locate._is_tex(self.window.active_view())

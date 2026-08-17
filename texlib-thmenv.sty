@@ -32,6 +32,7 @@
 
 \RequirePackage{amsthm}
 \RequirePackage{etoolbox}   % \AtBeginEnvironment, for the example \solution hook
+\RequirePackage{texlib-build}  % \texlib@acc@tagsuspend around the discard box
 
 % ------------------------------------------------------------------------------
 % Alias builder (traditional catcodes: needs raw #/## for the env's optional arg)
@@ -96,7 +97,7 @@
 	% Runs before the environment's own \end code, so the box is balanced inside
 	% the environment group.
 	\if@texlib@discarding
-		\egroup
+		\egroup\texlib@acc@tagresume
 		\global\@texlib@discardingfalse
 	\fi
 	\ifnum\texlib@soln@ct>\z@
@@ -142,11 +143,18 @@
 		\else #2\fi
 	\else #2\fi
 }
+% ACCESSIBLE: the box is dropped, but tagpdf still walks what is typeset into it,
+% and it opens while the surrounding environment's paragraph is live -- so the
+% phantom nests INSIDE it as a <text-unit> within a <text> (PDF/UA Table 5
+% "P-Part" + "P-P"). Same fault the {solution} envs and didactic's \pf lead-ins
+% hit; see \texlib@acc@tagsuspend in texlib-build.sty. This is the layer that
+% gates \solution/\answer inside {example}/{question}, distinct from didactic's
+% own \texlib@wrk@lead.
 \newcommand{\texlib@worked@discard}{%
 	\if@texlib@discarding\else
 		\par
 		\global\@texlib@discardingtrue
-		\setbox\z@\vbox\bgroup
+		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }
 
@@ -178,6 +186,82 @@
 \newcommand{\texlib@bind@worked@gated}{%
 	\texlib@bind@worked
 	\@texlib@workedgatedtrue
+}
+
+% ------------------------------------------------------------------------------
+% Accessible (tagged PDF/UA) theorem environments  (trivlist-free)
+% ------------------------------------------------------------------------------
+% amsthm builds every theorem on \trivlist, tagged as a list <L>; the body then
+% becomes a <P>/<Sect> directly inside <L> -- a PDF/UA structure-nesting failure
+% ("<L> shall not contain <P>"), the dominant cause of non-conformance in pset
+% and didactic. Overriding amsthm's \@thm in place is a quagmire (cleveref
+% rebuilds \newtheorem to route through its own trivlist code, and tagpdf tracks
+% structure via that trivlist). So in an ACCESSIBLE build we do not use amsthm's
+% \newtheorem at all: each catalog environment becomes a self-contained plain
+% \newenvironment -- a bold run-in head on an ordinary paragraph, body as
+% ordinary paragraphs -- which tags cleanly. cleveref never sees it (it only
+% patches amsthm's \newtheorem), so cross-references are wired explicitly with
+% \refstepcounter[<type>]{<shared-counter>} + \crefname. Numbering matches the
+% amsthm build: ONE shared master counter, section-reset or flat.
+%
+% Style -> fonts, matching amsthm's plain/definition/remark:
+\def\texlib@accstyle@plain{\let\texlib@thmhead\bfseries \let\texlib@thmbody\itshape}
+\def\texlib@accstyle@definition{\let\texlib@thmhead\bfseries \let\texlib@thmbody\relax}
+\def\texlib@accstyle@remark{\let\texlib@thmhead\itshape \let\texlib@thmbody\relax}
+\newif\iftexlib@accthmsec   % section-numbered (true) vs flat (false)
+
+% \texlib@acc@refstep{<type>}{<counter>} -- cleveref-typed step when available
+% (needed because all environments SHARE one counter, so the type disambiguates
+% "Definition 1" from "Theorem 2" in \cref); plain step otherwise.
+\newcommand{\texlib@acc@refstep}[2]{%
+	\@ifundefined{cref@old@refstepcounter}{\refstepcounter{#2}}{\refstepcounter[#1]{#2}}%
+}
+
+% \texlib@acc@newmaster{<counter>} -- create the shared master counter.
+\newcommand{\texlib@acc@newmaster}[1]{%
+	\iftexlib@accthmsec
+		\newcounter{#1}[section]%
+		\@namedef{the#1}{\thesection.\arabic{#1}}%
+	\else
+		\newcounter{#1}%
+		\@namedef{the#1}{\arabic{#1}}%
+	\fi
+}
+
+% Vertical skip around an accessible (boxless) theorem, mirroring the normal
+% tcolorbox's `before skip=10pt, after skip=10pt` (texlib-theorems.sty). Emitted
+% with \vspace (additive, like tcolorbox) rather than \addvspace, so two adjacent
+% theorems separate by ~20pt like the boxed ones -- the boxless run-in version was
+% noticeably tighter with the old \medskipamount (6pt, max-collapsed).
+\newcommand{\texlib@acc@thmskip}{10pt plus 2pt minus 2pt}
+
+% \texlib@acc@mkthm{<env>}{<Label>}{<master>}{<style>} -- numbered environment.
+% Uses \NewDocumentEnvironment{...}{o} (matching \texlib@thm@mkalias, the proven
+% nested-env-in-\newcommand pattern in this file) so the optional [title] flows
+% through ##1 cleanly.
+\newcommand{\texlib@acc@mkthm}[4]{%
+	\@ifundefined{crefname}{}{\crefname{#1}{#2}{#2s}\Crefname{#1}{#2}{#2s}}%
+	\NewDocumentEnvironment{#1}{o}{%
+		\csname texlib@accstyle@#4\endcsname
+		\par\vspace{\texlib@acc@thmskip}\noindent
+		\texlib@acc@refstep{#1}{#3}%
+		{\texlib@thmhead #2~\csname the#3\endcsname}%
+		\IfNoValueF{##1}{\space{\normalfont(##1)}}%
+		{\texlib@thmhead .}\hskip.5em\relax
+		\texlib@thmbody\ignorespaces
+	}{\par\vspace{\texlib@acc@thmskip}}%
+}
+
+% \texlib@acc@mkthmstar{<env>}{<Label>}{<style>} -- unnumbered twin.
+\newcommand{\texlib@acc@mkthmstar}[3]{%
+	\NewDocumentEnvironment{#1}{o}{%
+		\csname texlib@accstyle@#3\endcsname
+		\par\vspace{\texlib@acc@thmskip}\noindent
+		{\texlib@thmhead #2}%
+		\IfNoValueF{##1}{\space{\normalfont(##1)}}%
+		{\texlib@thmhead .}\hskip.5em\relax
+		\texlib@thmbody\ignorespaces
+	}{\par\vspace{\texlib@acc@thmskip}}%
 }
 
 \ExplSyntaxOn
@@ -262,25 +346,42 @@
 	\prop_get:NnNTF \g__texlib_thm_label_prop {#1} \l__texlib_thm_label_tl {
 		\prop_get:NnN \g__texlib_thm_style_prop {#1} \l__texlib_thm_style_tl
 		\prop_get:NnN \g__texlib_thm_box_prop   {#1} \l__texlib_thm_box_tl
-		\exp_args:NV \theoremstyle \l__texlib_thm_style_tl
-		\bool_if:NTF \l__texlib_thm_first_bool {
-			\tl_set:Nn \l__texlib_thm_master_tl {#1}
-			\bool_set_false:N \l__texlib_thm_first_bool
-			\bool_if:NTF \l__texlib_thm_section_bool {
-				\use:x { \exp_not:N \newtheorem { \exp_not:n {#1} }
-					{ \l__texlib_thm_label_tl } [ section ] }
+		\bool_if:NTF \g__texlib_thm_accessible_bool {
+			% ACCESSIBLE: self-contained trivlist-free envs sharing one master
+			% counter (see the \texlib@acc@* helpers). No amsthm \newtheorem, so
+			% cleveref/tcolorbox/trivlist are all sidestepped.
+			\bool_if:NT \l__texlib_thm_first_bool {
+				\tl_set:Nn \l__texlib_thm_master_tl {#1}
+				\bool_set_false:N \l__texlib_thm_first_bool
+				\bool_if:NTF \l__texlib_thm_section_bool
+					{ \texlib@accthmsectrue } { \texlib@accthmsecfalse }
+				\use:x { \exp_not:N \texlib@acc@newmaster { \l__texlib_thm_master_tl } }
+			}
+			\use:x { \exp_not:N \texlib@acc@mkthm { \exp_not:n {#1} }
+				{ \l__texlib_thm_label_tl } { \l__texlib_thm_master_tl }
+				{ \l__texlib_thm_style_tl } }
+			\use:x { \exp_not:N \texlib@acc@mkthmstar { \exp_not:n {#1} * }
+				{ \l__texlib_thm_label_tl } { \l__texlib_thm_style_tl } }
+		}{
+			% NORMAL: amsthm \newtheorem (shared master counter) + tcolorbox wrap.
+			\exp_args:NV \theoremstyle \l__texlib_thm_style_tl
+			\bool_if:NTF \l__texlib_thm_first_bool {
+				\tl_set:Nn \l__texlib_thm_master_tl {#1}
+				\bool_set_false:N \l__texlib_thm_first_bool
+				\bool_if:NTF \l__texlib_thm_section_bool {
+					\use:x { \exp_not:N \newtheorem { \exp_not:n {#1} }
+						{ \l__texlib_thm_label_tl } [ section ] }
+				}{
+					\use:x { \exp_not:N \newtheorem { \exp_not:n {#1} }
+						{ \l__texlib_thm_label_tl } }
+				}
 			}{
 				\use:x { \exp_not:N \newtheorem { \exp_not:n {#1} }
-					{ \l__texlib_thm_label_tl } }
+					[ \l__texlib_thm_master_tl ] { \l__texlib_thm_label_tl } }
 			}
-		}{
-			\use:x { \exp_not:N \newtheorem { \exp_not:n {#1} }
-				[ \l__texlib_thm_master_tl ] { \l__texlib_thm_label_tl } }
-		}
-		% Unnumbered twin (same style; no \theoremstyle change in between).
-		\use:x { \exp_not:N \newtheorem * { \exp_not:n {#1} * }
-			{ \l__texlib_thm_label_tl } }
-		\bool_if:NF \g__texlib_thm_accessible_bool {
+			% Unnumbered twin (same style; no \theoremstyle change in between).
+			\use:x { \exp_not:N \newtheorem * { \exp_not:n {#1} * }
+				{ \l__texlib_thm_label_tl } }
 			\str_if_eq:VnF \l__texlib_thm_box_tl { none } {
 				\use:x { \exp_not:N \tcolorboxenvironment { \exp_not:n {#1} }
 					{ \l__texlib_thm_box_tl } }

@@ -11,9 +11,15 @@ Sync, View PDF).
 
 First steps
 -----------
-1.  Run  Tools → TeXLib → Edit Settings  and set "texinputs" to your comma-free
-    TeXLib checkout as an EXPLICIT, non-recursive list — the repo root plus the
-    module dirs, e.g.:
+1.  Nothing, usually. "texinputs" — how builds resolve the shared texlib-*.sty
+    and the class files — is now DERIVED from where this package sits: it loads
+    from <library>/Sublime/texlib, so the library root is two directories up,
+    and the search path is that root plus each subdirectory holding a
+    .cls/.sty/.lua. Run  Tools → TeXLib → Doctor  to see the value in use.
+
+    Set it by hand only to OVERRIDE that — for instance to build against a
+    different checkout. Use an EXPLICIT, non-recursive list: the repo root plus
+    the module dirs, e.g.:
 
         "texinputs": [
             ".", "C:/_texlibjunc",
@@ -23,10 +29,10 @@ First steps
             "C:/_texlibjunc/Bingo", "C:/_texlibjunc/Bank", ""
         ]
 
-    This is how builds resolve the shared texlib-*.sty and the class files —
-    from your live checkout, so you never need to copy classes into TEXMF. Use
-    this explicit list rather than a recursive "C:/_texlibjunc//": recursion
-    walks .git and any .claude/worktrees copies (slow, worse on a cold cache)
+    Either way the classes resolve from your live checkout, so you never need
+    to copy them into TEXMF. Use an explicit list rather than a recursive
+    "C:/_texlibjunc//": recursion
+    walks .git and any tool scratch dirs (slow, worse on a cold cache)
     and can let a stale examples/*.aux shadow a same-named build. Keep the
     trailing "" — kpathsea appends its default TeX Live path at an empty
     segment; without one TEXINPUTS replaces the default path outright.

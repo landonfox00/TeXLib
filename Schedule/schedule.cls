@@ -126,6 +126,7 @@
 \clist_new:N \g__sched_lecture_caps_clist
 \clist_new:N \g__sched_quiz_days_clist
 \clist_new:N \g__sched_recitation_days_clist
+\clist_new:N \g__sched_exam_days_clist
 \bool_new:N  \g__sched_landscape_bool
 \bool_new:N  \g__sched_monthpages_bool
 \bool_new:N  \g__sched_boxgrid_bool
@@ -134,6 +135,13 @@
 	lecture-caps     .clist_gset:N = \g__sched_lecture_caps_clist,
 	quiz-days        .clist_gset:N = \g__sched_quiz_days_clist,
 	recitation-days  .clist_gset:N = \g__sched_recitation_days_clist,
+
+	% exam-days = F  ->  \exam places on the next day in this set instead of the
+	% next lecture day. For a course whose exams sit in a recitation or lab
+	% section rather than in lecture: topics still flow across the lecture
+	% columns, but an exam jumps to the next matching day. Unset (the default)
+	% keeps the historic behaviour of placing exams on lecture days.
+	exam-days        .clist_gset:N = \g__sched_exam_days_clist,
 
 	% month-pages = true  ->  one table per calendar month, each on its own
 	% page, with month-boundary weeks repeated so every month shows full weeks.
@@ -180,6 +188,9 @@
 \NewExpandableDocumentCommand{\GetRecitationDays}{}{
 	\clist_use:Nn \g__sched_recitation_days_clist {,}
 }
+\NewExpandableDocumentCommand{\GetExamDays}{}{
+	\clist_use:Nn \g__sched_exam_days_clist {,}
+}
 
 % Expands to the Lua literal `true`/`false` for the month-pages flag, so the
 % \end{schedule} hook can pass it straight into render_grid(...).
@@ -195,6 +206,17 @@
 % Apply document metadata from the class option list now that the keys above and
 % coursemeta.tex are loaded (so document options override coursemeta defaults).
 \MetaApplyClassOptions
+
+% ACCESSIBLE: force the box-grid renderer on. The default xltabular (tabularray)
+% calendar cannot be tagged -- tabularray rebuilds the galley below the structure
+% layer, so its cells produce a deeply mis-nested tree (hundreds of P-P/P-Part/
+% StructTreeRoot-* violations). The box grid draws the same calendar from stacked
+% \hbox rows that tag cleanly (paired with the \tagstructbegin{Sect} wrapper in
+% the schedule environment). This overrides box-grid=false; a normal build keeps
+% whatever the user chose. Tradeoff: the box grid shows the day-name header only
+% on the first page of a continuous grid (month-pages repeats it per month).
+\cs_if_exist:NT \TeXLibAccessibleMode
+	{ \bool_gset_true:N \g__sched_boxgrid_bool }
 
 \ExplSyntaxOff
 
@@ -304,7 +326,8 @@
 			"\GetRecitationDays",
 			"\GetQuizDays",
 			"\GetLectureCaps",
-			"\GetYear"
+			"\GetYear",
+			"\GetExamDays"
 		)
 	}
 
@@ -363,7 +386,17 @@
 	\NewDocumentCommand{\debugdate}{ }{ \directlua{ L_debug_cursor() } }
 }
 {
+	% ACCESSIBLE: wrap the grid in an explicit structure element. The box-grid
+	% renderer (forced on earlier) draws each week as a bare \hbox in the vertical
+	% list; bare boxes don't engage LaTeX's block/paragraph tagging, so their
+	% cell structure (Div/text) orphans as a direct child of StructTreeRoot
+	% instead of nesting under the document's single <Document> element -- failing
+	% PDF/UA 8.2.5.2 (one Document) and the Table 5 StructTreeRoot-* rules. An
+	% explicit <Sect> opened here (a proper child of <Document>) re-parents every
+	% row under it. Gated: \tagstructbegin exists only under \DocumentMetadata.
+	\ifdefined\TeXLibAccessibleMode\tagstructbegin{tag=Sect}\fi
 	\directlua{ render_grid(\GetMonthPagesFlag, \GetBoxGridFlag) }
+	\ifdefined\TeXLibAccessibleMode\tagstructend\fi
 }
 
 \endinput

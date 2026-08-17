@@ -150,6 +150,8 @@ STEM_NEEDLES_FR = ["STEMANCHORFR"]
 SOLUTION_NEEDLES = ["SOLLEAKFR", "SOLLEAKMC"]
 SOLUTION_NEEDLES_FR = ["SOLLEAKFR"]
 RUBRIC_NEEDLES = ["RUBRICLEAKFR", "RUBRICLEAKMC"]
+# Asserted absent in every mode: {mcproblems} suppresses rubrics section-wide.
+MC_RUBRIC_NEEDLE = "RUBRICLEAKMC"
 ANSWER_BADGE_RE = re.compile(r"Answer:\s*[A-E]\b")
 STUDENT_BOX_RE = re.compile(r"Show your work here")
 
@@ -164,7 +166,12 @@ EXAM_QUIZ_MODES = [
     ("ShowSolutions", r"\def\ShowSolutions{}", dict(sol=True, ans=True, rub=False)),
     ("ShowSolutions+ShowRubric", r"\def\ShowSolutions{}\def\ShowRubric{}",
      dict(sol=True, ans=True, rub=True)),
-    ("ShowRubric", r"\def\ShowRubric{}", dict(sol=False, ans=False, rub=False)),
+    # \ShowRubric alone now behaves as \ShowSolutions+\ShowRubric: a rubric
+    # annotates a worked solution, so texlib-build.sty raises \ifsolutions with
+    # it (and autoexam hands it the same `dual' copy mode). It used to render
+    # nothing whatsoever, which is what made the rubric-only build worth
+    # retiring rather than fixing.
+    ("ShowRubric", r"\def\ShowRubric{}", dict(sol=True, ans=True, rub=True)),
 ]
 
 PSET_MODES = [
@@ -297,6 +304,14 @@ def run_class(cfg: dict) -> None:
             rub = any(n in text for n in RUBRIC_NEEDLES)
             check(f"[{cfg['name']}/{label}] rubric {'present' if expect['rub'] else 'absent'}",
                   rub == expect["rub"], _mismatch("rubric", RUBRIC_NEEDLES, text, expect["rub"]))
+            # Multiple choice never carries a rubric, in ANY mode: an MC item is
+            # all-or-nothing, so there is no partial credit to apportion.
+            # {mcproblems} sets \rubricfalse for its whole section
+            # (texlib-problembank.sty). The FR rubric above must still appear,
+            # so this is a targeted absence, not a blanket one.
+            check(f"[{cfg['name']}/{label}] MC rubric absent",
+                  MC_RUBRIC_NEEDLE not in text,
+                  f"LEAK: {MC_RUBRIC_NEEDLE} rendered; multiple choice must carry no rubric")
         else:  # pset: check the StudentMode blank answer box
             blank = bool(STUDENT_BOX_RE.search(text))
             check(f"[{cfg['name']}/{label}] student blank box {'present' if expect['blank'] else 'absent'}",

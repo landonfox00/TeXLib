@@ -37,10 +37,15 @@ jobs:
 
       # Pinned to the commit v2 resolved to, so rendering stays byte-stable over
       # time (a silent TeX Live bump would otherwise invalidate every ref).
+      # That silent bump DID happen: the action SHA pinned only the action, while
+      # `scheme: full` tracked texlive-full:latest. Pinning the image also pins
+      # the Alpine base, and with it the apk ImageMagick whose version decides
+      # whether a stale ref reads as a diff or as "AE metric unreliable".
+      # 20260101 is TeX Live 2025 — the toolchain refs are generated on locally.
       - name: Visual regression in pinned TeX Live
         uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
-          scheme: full
+          docker_image: ghcr.io/xu-cheng/texlive-full:20260101
           # poppler-utils -> pdftoppm (PDF->PNG); imagemagick -> magick compare.
           run: |
             set -e

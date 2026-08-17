@@ -9,6 +9,14 @@
 	{ "keys": ["ctrl+shift+b"], "command": "texlib_build_pick",
 	  "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
 
+	// Launch TeXaM (bank browser / exam composer) on the active exam. X = eXam.
+	{ "keys": ["ctrl+alt+x"], "command": "texlib_open_texam",
+	  "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
+
+	// Open the accessibility feature gallery (normal vs accessible). G = Gallery.
+	{ "keys": ["ctrl+alt+g"], "command": "texlib_open_a11y_gallery",
+	  "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },
+
 	// Editor-convenience bindings -- uncomment any you want:
 	// { "keys": ["ctrl+alt+j"], "command": "texlib_forward_sync",
 	//   "context": [{ "key": "selector", "operator": "equal", "operand": "text.tex.latex" }] },

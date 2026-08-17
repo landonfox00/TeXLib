@@ -38,7 +38,11 @@
 % Compile-time toggles
 \ifdefined\ShowSolutions      \solutionstrue        \fi
 \ifdefined\ShowKey            \keytrue              \fi
-\ifdefined\ShowRubric         \rubrictrue           \fi
+% A rubric annotates a worked solution, so it implies one: a rubric-only build
+% renders point apportionments and common-error notes floating against blank
+% answer space, which is of no use to anyone.  \ShowRubric therefore raises
+% \ifsolutions too, and the standalone "Rubric" build mode was retired.
+\ifdefined\ShowRubric         \rubrictrue\solutionstrue \fi
 \ifdefined\ShowDraft          \drafttrue            \fi
 \ifdefined\StudentMode        \studenttrue          \fi
 \ifdefined\InstructorMode     \instructortrue       \fi
@@ -66,5 +70,25 @@
 \newcommand{\texlib@buildbadge}{}
 \newcommand{\SetTeXLibBuildBadge}[1]{\renewcommand{\texlib@buildbadge}{#1}}
 \newcommand{\TeXLibBuildBadge}{\textit{\texlib@buildbadge}}
+
+% Tag suspension around DISCARDED content --------------------------------------
+% Gating a build mode off does not stop the hidden content being typeset -- the
+% classes capture it into a throwaway \vbox and drop the box. tagpdf still walks
+% that material and records its structure, so the phantom lands nested inside the
+% surrounding paragraph: a <text-unit> inside a <text>, i.e. PDF/UA "P-Part" and
+% "P-P" nesting violations for content that is not even on the page. Wrap every
+% discard box in this pair. Lives here, not in texlib-solutions.sty, because
+% didactic.cls gates inline worked lead-ins the same way and does NOT load that
+% package -- texlib-build is the one build-mode package they all share (the exam
+% path reaches it via texlib-assessment, always before texlib-solutions).
+% Kernel expl3 hooks via \csname (no ExplSyntaxOn needed, so the @-names stay
+% intact); no-ops in a normal build where the tagging layer is absent.
+\ifdefined\TeXLibAccessibleMode
+	\newcommand\texlib@acc@tagsuspend{\csname tag_suspend:n\endcsname{texlibhidden}}
+	\newcommand\texlib@acc@tagresume{\csname tag_resume:n\endcsname{texlibhidden}}
+\else
+	\newcommand\texlib@acc@tagsuspend{}
+	\newcommand\texlib@acc@tagresume{}
+\fi
 
 \endinput

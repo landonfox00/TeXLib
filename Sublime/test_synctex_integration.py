@@ -205,6 +205,18 @@ def synctex_edit(pdf_path, page, x, y):
     return {"raw": out, "input": m_in.group(1).strip(), "line": int(m_line.group(1))}
 
 
+def synctex_view(pdf_path, tex_file, line):
+    """Forward search: the pages `tex_file:line` resolves to in `pdf_path`.
+    Returns [] when the map has no record for that line under the tag the
+    lookup resolves the file to."""
+    proc = subprocess.run(
+        [SYNCTEX, "view", "-i", f"{line}:1:{tex_file}", "-o", pdf_path],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    return [l.split(":", 1)[1].strip()
+            for l in (proc.stdout or "").splitlines() if l.startswith("Page:")]
+
+
 def basename_matches(resolved_input, expected_basename):
     return bool(resolved_input) and (
         os.path.basename(resolved_input).lower() == expected_basename.lower()
@@ -272,7 +284,7 @@ def scenario_bank_multiversion():
 
 
 def scenario_bank_solutions_mode():
-    """FIXED task_27d73860, then REGRESSED (task_b7217810 -- see the two solution
+    """FIXED synctex-solution-staging, then REGRESSED (free-response-solution-inverse-search -- see the two solution
     checks below, now marked known). Historical root-cause notes retained:
     The original theory (tcolorbox defers shipout
     for internal measurement, like xltabular, consuming the redirect before
@@ -326,7 +338,7 @@ def scenario_bank_solutions_mode():
         check("found the solution needle in the PDF", pos is not None)
         if pos:
             r = synctex_edit(pdf, *pos)
-            # FIXED (task_b7217810): the solution's green fill is now a \smash\rlap'd
+            # FIXED (free-response-solution-inverse-search): the solution's green fill is now a \smash\rlap'd
             # rule drawn INSIDE the content parbox, not a \colorbox \hbox wrapper.
             # \colorbox orphaned the inner nodes for SyncTeX reverse search (the
             # redirect staged bank.tex fine, but `synctex edit` at the rendered box
@@ -335,6 +347,82 @@ def scenario_bank_solutions_mode():
                   basename_matches(r["input"], "bank.tex"), r["raw"][:300])
             check(f"...at the correct source line ({BANK_SOLUTION_LINE})",
                   r["line"] == BANK_SOLUTION_LINE, f"got line {r['line']!r}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def scenario_sliced_copy_inverse_search():
+    """The sliced per-version copies are pages carved out of the combined PDF
+    with pypdf, so they carry no SyncTeX map of their own and a viewer looks for
+    <its own name>.synctex, never the parent's -- double-clicking anywhere in
+    one did nothing at all. The builder now cuts a matching map per copy
+    (_slice_synctex_for_copies), which is what makes the preferred_pdf setting
+    usable: opening <base>_A_solutions.pdf must not cost inverse search.
+
+    Asserted against the real `synctex` CLI, and against the COMBINED map for
+    the same physical page -- the slice is only correct if it answers
+    identically, which also catches an off-by-one in the page renumbering that
+    a "resolves to bank.tex" check alone would sail past."""
+    print("\n=== Scenario 11: inverse search inside a sliced per-version copy ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_synctex_it_slice_")
+    try:
+        write(tmp, "bank.tex", BANK_TEX)
+        write(tmp, "autoexam.tex", AUTOEXAM_TEX)          # \versions{A,B}
+        run_build(tmp, "autoexam.tex", aux_directory="<<temp>>",
+                  options=["--texlib-mode=solutions"])    # -> dual: A,B then A,B sol
+
+        combined = os.path.join(tmp, "autoexam.pdf")
+        slice_pdf = os.path.join(tmp, "autoexam_A_solutions.pdf")
+        slice_map = os.path.join(tmp, "autoexam_A_solutions.synctex")
+        check("combined PDF still produced alongside the slices",
+              os.path.exists(combined))
+        check("the solutions copy was sliced out", os.path.exists(slice_pdf))
+        check("a SyncTeX map was cut for it", os.path.exists(slice_map))
+        if not (os.path.exists(slice_pdf) and os.path.exists(slice_map)):
+            return
+
+        pos = find_word(slice_pdf, "SYNCNEEDLESTEM")
+        check("found the stem needle in the sliced copy", pos is not None)
+        if not pos:
+            return
+        r = synctex_edit(slice_pdf, *pos)
+        check("click inside the SLICE resolves to bank.tex",
+              basename_matches(r["input"], "bank.tex"), r["raw"][:300])
+        check(f"...at the correct source line ({BANK_STEM_LINE})",
+              r["line"] == BANK_STEM_LINE, f"got line {r['line']!r}")
+
+        # Same point, same page, through the parent's map: the two must agree.
+        cpos = find_word(combined, "SYNCNEEDLESTEM", occurrence=3)  # A,B,then A-sol
+        if cpos:
+            rc = synctex_edit(combined, *cpos)
+            check("the slice answers exactly as the combined map does",
+                  (r["input"], r["line"]) == (rc["input"], rc["line"]),
+                  f"slice {r['input']}:{r['line']} vs combined "
+                  f"{rc['input']}:{rc['line']}")
+
+        # FORWARD search, the other direction. The fixture is 2 versions +
+        # solutions = four 2-page copies (A, B, A-sol, B-sol), so B-sol is
+        # combined pages 7-8 and a combined answer of page 8 must come back as
+        # page 2 through its slice's own map. Asserted against B-sol rather than
+        # A-sol deliberately: forward search into a multi-version exam resolves a
+        # bank line to ONE page, because the per-problem SyncTeX redirect gives
+        # bank.tex an Input: tag per \@@input and the lookup takes the last --
+        # a pre-existing limitation of the version loop, visible in the COMBINED
+        # PDF exactly as much as in a slice (a document-body line resolves to no
+        # page at all there, the body being re-emitted through a scratch file).
+        # The slice carries whatever the parent had; that faithfulness is what is
+        # being checked here, not the upstream lookup.
+        bank_tex = os.path.join(tmp, "bank.tex")
+        combined_pages = synctex_view(combined, bank_tex, BANK_STEM_LINE)
+        bsol = os.path.join(tmp, "autoexam_B_solutions.pdf")
+        if combined_pages and os.path.exists(bsol):
+            slice_pages = synctex_view(bsol, bank_tex, BANK_STEM_LINE)
+            check("forward search resolves through the slice's own map",
+                  bool(slice_pages), f"combined gave {combined_pages}")
+            check("...to the page the combined answer maps onto (7-8 -> 1-2)",
+                  slice_pages and combined_pages
+                  and int(slice_pages[0]) == int(combined_pages[0]) - 6,
+                  f"slice {slice_pages} vs combined {combined_pages}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -547,7 +635,7 @@ def scenario_mc_bank_problem():
     source line to redirect to (not asserted here); the stem and solution
     both should.
 
-    KNOWN ISSUE (task_dbeb33f6, not fixed in this change): the solution's
+    KNOWN ISSUE (mc-key-inverse-search, not fixed in this change): the solution's
     raw SyncTeX record DOES carry the correct source line (verified via bulk
     inspection of the raw .synctex stream -- 9 records on the solution's
     bank-file line, identical shape to the stem's), but the record's own
@@ -583,7 +671,7 @@ def scenario_mc_bank_problem():
         check("found the MC solution needle in the PDF", pos2 is not None)
         if pos2:
             r2 = synctex_edit(pdf, *pos2)
-            # TRADE-OFF (task_dbeb33f6): the DEFAULT side-by-side MC key sets the
+            # TRADE-OFF (mc-key-inverse-search): the DEFAULT side-by-side MC key sets the
             # solution in a minipage whose box orphans it for SyncTeX reverse search,
             # so the MC solution is not inverse-searchable in that (compact "four keys
             # per page") layout. This is now a deliberate trade-off, not an open bug:
@@ -592,10 +680,10 @@ def scenario_mc_bank_problem():
             # the compact default's non-searchability is documented, not a silent fail.
             check("click on the MC solution resolves to mcbank.tex",
                   basename_matches(r2["input"], "mcbank.tex"), r2["raw"][:300],
-                  known_issue="task_dbeb33f6")
+                  known_issue="mc-key-inverse-search")
             check(f"...at the correct source line ({MC_SOLUTION_LINE})",
                   r2["line"] == MC_SOLUTION_LINE, f"got line {r2['line']!r}",
-                  known_issue="task_dbeb33f6")
+                  known_issue="mc-key-inverse-search")
 
         # FIXED via opt-in: the side-by-side layout above is a deliberate trade-off
         # (the compact "four keys per page" packing) whose minipage box orphans the
@@ -668,7 +756,7 @@ DIDACTIC_TEX = (
     # didactic is NOT in the builder's auto-lualatex class list (only
     # autoexam/quiz/schedule/report-card are) -- it silently defers its
     # LuaLaTeX requirement until a bank command is actually used (see
-    # CLAUDE.md), so a document that calls \getproblem needs this magic
+    # project notes), so a document that calls \getproblem needs this magic
     # comment or a plain pdflatex build fatals. Matches the real, documented
     # gotcha (root chapterN.tex files needed this same fix 2026-06-16).
     "% !TeX program = lualatex\n"
@@ -690,7 +778,7 @@ def scenario_didactic_bank_problem():
         # class list, so this simulates LaTeXTools having already resolved
         # the %!TeX program magic comment in DIDACTIC_TEX before the builder
         # runs -- a plain pdflatex default would silently fatal here (see
-        # DIDACTIC_TEX's own comment and CLAUDE.md's documented gotcha).
+        # DIDACTIC_TEX's own comment and the documented gotcha).
         result = run_build(tmp, "didactic.tex", aux_directory="<<temp>>",
                             engine="lualatex")
 
@@ -866,6 +954,7 @@ def main():
     scenario_didactic_bank_problem()
     scenario_schedule_boxgrid_builder()
     scenario_schedule_boxgrid_plain_cli()
+    scenario_sliced_copy_inverse_search()
 
     summary = f"\n{_c.passed} passed, {_c.failed} failed"
     if _c.known:

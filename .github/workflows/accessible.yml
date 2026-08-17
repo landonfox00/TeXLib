@@ -1,0 +1,104 @@
+name: accessible
+
+# PDF/UA-2 conformance gate.
+#
+# All nine document classes conform as of the accessible-mode work, and until
+# this workflow existed NOTHING in CI defended that: tests.yml runs the logic
+# suites, smoke.yml builds documents but never in accessible mode, and
+# visual.yml diffs renders. Conformance was checked only when someone
+# remembered to run `python smoke_test.py --accessible` by hand. This job makes
+# a regression a red check instead of a discovery months later.
+#
+# Scope: the nine module templates + fixtures, i.e. the CLASSES. The scenario
+# packs are covered locally by a11y_gallery.py, which is far too expensive for
+# CI (it builds every scenario two-to-three ways and renders per-page diffs).
+#
+# Non-required by design, matching visual.yml: it reports a regression without
+# blocking merges until it has proven itself over a few runs.
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "30 7 * * *"   # nightly; offset from visual.yml's 07:00
+  workflow_dispatch:
+
+jobs:
+  accessible:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same pinned container as visual.yml: the tagged build is lualatex-only
+      # and depends on the tagging/tagpdf stack shipped with the TeX Live
+      # release, so an unpinned bump could change conformance under us.
+      #
+      # Pin the IMAGE, not just the action. Pinning the action SHA alone left
+      # `scheme: full` resolving to texlive-full:latest, and when that rolled to
+      # TeX Live 2026 the newer tagpdf broke three documents (Exams,
+      # examples/exam-01, Problem Sets) -- this gate was red from its first run
+      # for that reason alone. `texlive_version: 2025` does NOT help: at this
+      # action SHA it maps back to "latest". 20260101 is the last monthly
+      # snapshot before the TL2026 rollover, i.e. TeX Live 2025, matching the
+      # local toolchain the visual refs are generated on. See issue on the
+      # TL2026 tagging incompatibility before bumping this.
+      - name: PDF/UA-2 conformance in pinned TeX Live
+        uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
+        with:
+          docker_image: ghcr.io/xu-cheng/texlive-full:20260101
+          run: |
+            set -e
+            apk add --no-cache python3 py3-pip poppler-utils openjdk17-jre curl unzip
+
+            # Record what actually ran. The image used to float, and nothing in
+            # the log said which TeX Live produced a result -- which is what made
+            # the first failure here expensive to diagnose.
+            tex --version | head -1
+
+            # veraPDF ships as an IzPack installer; drive it headlessly.
+            curl -sSL -o /tmp/verapdf.zip https://software.verapdf.org/releases/verapdf-installer.zip
+            unzip -q /tmp/verapdf.zip -d /tmp/verapdf-installer
+            INSTALLER="$(find /tmp/verapdf-installer -name 'verapdf-izpack-installer-*.jar' | head -1)"
+            [ -n "$INSTALLER" ] || { echo "veraPDF installer jar not found in the release zip"; exit 1; }
+            cat > /tmp/verapdf-auto-install.xml <<'XML'
+            <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+            <AutomatedInstallation langpack="eng">
+              <com.izforge.izpack.panels.htmlhello.HTMLHelloPanel id="welcome"/>
+              <com.izforge.izpack.panels.target.TargetPanel id="install_dir">
+                <installpath>/opt/verapdf</installpath>
+              </com.izforge.izpack.panels.target.TargetPanel>
+              <com.izforge.izpack.panels.packs.PacksPanel id="sdk_pack_select">
+                <pack index="0" name="veraPDF GUI" selected="true"/>
+                <pack index="1" name="veraPDF Batch files" selected="true"/>
+                <pack index="2" name="veraPDF Validation model" selected="false"/>
+                <pack index="3" name="veraPDF Documentation" selected="false"/>
+                <pack index="4" name="veraPDF Sample Plugins" selected="false"/>
+              </com.izforge.izpack.panels.packs.PacksPanel>
+              <com.izforge.izpack.panels.install.InstallPanel id="install"/>
+              <com.izforge.izpack.panels.finish.SimpleFinishPanel id="finish"/>
+            </AutomatedInstallation>
+            XML
+            java -jar "$INSTALLER" /tmp/verapdf-auto-install.xml
+            export PATH="/opt/verapdf:$PATH"
+
+            # Fail loudly if veraPDF is missing. smoke_test SOFT-SKIPS veraPDF
+            # validation when the CLI is absent (the pdftotext/ImageMagick
+            # convention), so without this check a broken install would turn
+            # this gate into a vacuous green -- the exact trap visual.yml
+            # guards against for ImageMagick.
+            command -v verapdf >/dev/null 2>&1 \
+              || { echo "veraPDF CLI not on PATH after install"; exit 1; }
+            verapdf --version
+
+            # pypdf is the OTHER soft-skip on this path, and it was missing: the
+            # first runs of this gate logged "accessible/PDF-UA [pypdf MISSING ->
+            # those checks skipped]" while still reporting per-module PASS. The
+            # veraPDF guard above was written to stop exactly that vacuous green
+            # and then left the second half of the check unguarded. Alpine's
+            # python is externally managed (PEP 668), hence the flag.
+            pip install --no-cache-dir --break-system-packages pypdf
+            python3 -c 'import pypdf' \
+              || { echo "pypdf not importable; PDF/UA checks would soft-skip"; exit 1; }
+
+            python3 smoke_test.py --accessible

@@ -18,9 +18,12 @@ CLI (used by the external-Python fallback):
     python texlib_pdfpost.py slice <vmap> <pdf> <out_dir> <base_name>
     python texlib_pdfpost.py split <spl>  <pdf> <out_dir> <base_name>
 On success it writes one JSON object to stdout: {"produced": [...],
-"messages": [...]}.  Exit code 3 means pypdf is unavailable even here, so the
-caller can print an actionable "install pypdf" message instead of a generic
-failure.
+"messages": [...], "ranges": {name: [first_page, last_page]}}.  "ranges" gives
+the 1-based page span each produced file was cut from, which is what lets the
+builder cut a matching SyncTeX map for it (see _slice_synctex_for_copies) --
+the page count is only known here, where pypdf has the PDF open.  Exit code 3
+means pypdf is unavailable even here, so the caller can print an actionable
+"install pypdf" message instead of a generic failure.
 """
 
 from __future__ import annotations
@@ -47,13 +50,13 @@ def slice_from_vmap(vmap_path, pdf_path, out_dir, base_name):
     Each .vmap line is "version|stu-or-sol|start_page" in typeset order (version
     may be empty when the document declares no \\versions). A record's last page
     is one before the next record's start, or the PDF's real last page for the
-    final record.  Returns {"produced": [names], "messages": [strings]}; does
-    NOT delete the .vmap (the caller removes it on every outcome).  Raises
-    ImportError if pypdf is unavailable.
+    final record.  Returns {"produced": [names], "messages": [strings],
+    "ranges": {name: [first, last]}}; does NOT delete the .vmap (the caller
+    removes it on every outcome).  Raises ImportError if pypdf is unavailable.
     """
     from pypdf import PdfReader, PdfWriter
 
-    produced, messages = [], []
+    produced, messages, ranges = [], [], {}
     records = []
     with open(vmap_path, "r", encoding="utf-8") as fh:
         for line in fh:
@@ -69,7 +72,7 @@ def slice_from_vmap(vmap_path, pdf_path, out_dir, base_name):
             except ValueError:
                 continue
     if not records:
-        return {"produced": produced, "messages": messages}
+        return {"produced": produced, "messages": messages, "ranges": ranges}
 
     reader = PdfReader(pdf_path)
     total = len(reader.pages)
@@ -105,28 +108,29 @@ def slice_from_vmap(vmap_path, pdf_path, out_dir, base_name):
         with open(out_path, "wb") as fh:
             writer.write(fh)
         produced.append(out_name)
+        ranges[out_name] = [start, end]
     if produced:
         messages.append(
             "TeXLib: sliced per-version PDF(s) from the combined build: "
             + ", ".join(produced) + ".")
-    return {"produced": produced, "messages": messages}
+    return {"produced": produced, "messages": messages, "ranges": ranges}
 
 
 def split_from_spl(spl_path, pdf_path, out_dir, base_name):
     """Split a combined exam+solutions PDF at the .spl's 'split_page=N'.
 
-    Returns {"produced": [names], "messages": [strings]}; does NOT delete the
-    .spl (the caller removes it only when produced is non-empty, so an
-    out-of-range split leaves the signal in place). Raises ImportError if pypdf
-    is unavailable.
+    Returns {"produced": [names], "messages": [strings], "ranges": {name:
+    [first, last]}}; does NOT delete the .spl (the caller removes it only when
+    produced is non-empty, so an out-of-range split leaves the signal in
+    place). Raises ImportError if pypdf is unavailable.
     """
     from pypdf import PdfReader, PdfWriter
 
-    produced, messages = [], []
+    produced, messages, ranges = [], [], {}
     with open(spl_path, "r", encoding="utf-8") as fh:
         content = fh.read().strip()
     if "split_page=" not in content:
-        return {"produced": produced, "messages": messages}
+        return {"produced": produced, "messages": messages, "ranges": ranges}
     split_page = int(content.split("=", 1)[1].strip())
 
     reader = PdfReader(pdf_path)
@@ -135,7 +139,7 @@ def split_from_spl(spl_path, pdf_path, out_dir, base_name):
         messages.append(
             "TeXLib: .spl split_page={} out of range (PDF has {} pages); "
             "skipping split.".format(split_page, total))
-        return {"produced": produced, "messages": messages}
+        return {"produced": produced, "messages": messages, "ranges": ranges}
 
     exam = PdfWriter()
     for i in range(split_page):
@@ -152,9 +156,11 @@ def split_from_spl(spl_path, pdf_path, out_dir, base_name):
         solutions.write(fh)
 
     produced.extend([exam_name, sol_name])
+    ranges[exam_name] = [1, split_page]
+    ranges[sol_name] = [split_page + 1, total]
     messages.append(
         "TeXLib: split into {}_Exam.pdf / _Solutions.pdf.".format(base_name))
-    return {"produced": produced, "messages": messages}
+    return {"produced": produced, "messages": messages, "ranges": ranges}
 
 
 _OPS = {"slice": slice_from_vmap, "split": split_from_spl}

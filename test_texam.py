@@ -469,5 +469,253 @@ class RevealTests(unittest.TestCase):
             texam._find_subl = orig
 
 
+class UndoRedoTests(unittest.TestCase):
+    """Whole-file snapshot undo/redo restores the exam exactly and reports the
+    action label."""
+
+    def setUp(self):
+        texam._undo.clear(); texam._redo.clear()
+        fd, self.path = tempfile.mkstemp(suffix=".tex"); os.close(fd)
+        with open(self.path, "w", encoding="utf-8") as fh:
+            fh.write(EXAM)                       # 2 FR entries
+        texam.CTX["exam"] = self.path
+        self.addCleanup(lambda: os.path.isfile(self.path) and os.remove(self.path))
+
+    def _args(self):
+        return [e["arg"] for e in exam_writer.public_entries(
+            texam.read_exam(self.path)[0])]
+
+    def test_roundtrip(self):
+        before = self._args()
+        text, nl = texam.read_exam(self.path)     # mimic _api_add's record+mutate
+        texam._record(text, nl, "add frac-lim")
+        texam.write_exam(self.path, exam_writer.add_problem(text, "frac-lim", False), nl)
+        self.assertEqual(len(self._args()), 3)
+
+        self.assertEqual(texam.history_step(redo=False), "add frac-lim")
+        self.assertEqual(self._args(), before)    # exact restore
+        self.assertEqual(texam.history_step(redo=True), "add frac-lim")
+        self.assertEqual(len(self._args()), 3)
+        self.assertIsNone(texam.history_step(redo=True))   # nothing left to redo
+
+    def test_empty_stack_returns_none(self):
+        self.assertIsNone(texam.history_step(redo=False))
+
+    def test_new_edit_voids_redo(self):
+        text, nl = texam.read_exam(self.path)
+        texam._record(text, nl, "add a")
+        texam.history_step(redo=False)            # now redo has one entry
+        self.assertEqual(len(texam._redo), 1)
+        texam._record(*texam.read_exam(self.path), "add b")   # a fresh edit
+        self.assertEqual(len(texam._redo), 0)     # redo voided
+
+
+class RenderUnitTests(unittest.TestCase):
+    """bank_render helpers that need no TeX toolchain."""
+
+    def _bank(self):
+        fd, p = tempfile.mkstemp(suffix=".tex"); os.close(fd)
+        self.addCleanup(lambda: os.path.isfile(p) and os.remove(p))
+        return p
+
+    def test_is_complete_svg(self):
+        self.assertTrue(bank_render._is_complete_svg("<svg x><g/></svg>"))
+        self.assertFalse(bank_render._is_complete_svg(""))
+        self.assertFalse(bank_render._is_complete_svg("<svg x>truncated"))   # no </svg>
+        self.assertFalse(bank_render._is_complete_svg("plain text"))
+
+    def test_cache_path_deterministic_tagged_sanitized(self):
+        b = self._bank()
+        a1 = bank_render._cache_path(b, "p1", True)
+        a2 = bank_render._cache_path(b, "p1", True)
+        nos = bank_render._cache_path(b, "p1", False)
+        self.assertEqual(a1, a2)                       # deterministic
+        self.assertNotEqual(a1, nos)                   # solution flag matters
+        self.assertTrue(a1.endswith(".sol.svg"))
+        self.assertTrue(nos.endswith(".nosol.svg"))
+        weird = os.path.basename(bank_render._cache_path(b, "a/b c:d", True))
+        for ch in ("/", " ", ":"):
+            self.assertNotIn(ch, weird)                # id sanitized into the name
+
+    def test_harness_env_and_body(self):
+        fr = bank_render._harness("bank.tex", "pid-x", False)
+        self.assertIn("\\begin{problems}*", fr)
+        self.assertIn("\\problem{pid-x}", fr)
+        self.assertIn("\\loadbank{bank.tex}", fr)
+        self.assertIn("\\begin{mcproblems}*", bank_render._harness("b.tex", "y", True))
+
+    def test_available_mocked(self):
+        orig = bank_render._which
+        try:
+            bank_render._which = lambda n: "x" if n in ("lualatex", "pdftocairo") else None
+            self.assertTrue(bank_render.available())
+            bank_render._which = lambda n: "x" if n == "lualatex" else None  # no converter
+            self.assertFalse(bank_render.available())
+        finally:
+            bank_render._which = orig
+
+    def test_render_lock_keyed(self):
+        lk = bank_render._render_lock("k1")
+        self.assertIs(lk, bank_render._render_lock("k1"))       # same key -> same lock
+        self.assertIsNot(lk, bank_render._render_lock("k2"))    # different key -> new lock
+
+    def test_texinputs_junction_vs_fallback(self):
+        orig = os.path.isdir
+        try:
+            os.path.isdir = lambda p: p == bank_render.JUNCTION or orig(p)
+            self.assertEqual(bank_render._texinputs("/some/bank"),
+                             bank_render.TEXINPUTS_JUNCTION)
+            os.path.isdir = lambda p: False if p == bank_render.JUNCTION else orig(p)
+            self.assertIn("..", bank_render._texinputs("/some/bank"))   # relative fallback
+        finally:
+            os.path.isdir = orig
+
+    def test_quiet_remove_missing_is_silent(self):
+        bank_render._quiet_remove(os.path.join(tempfile.gettempdir(), "no_such_xyz.tmp"))
+
+
+class ParserEdgeTests(unittest.TestCase):
+    """bank_parser corner cases beyond the happy path."""
+
+    def _dir(self):
+        return tempfile.mkdtemp(prefix="texam-parse-")
+
+    def _w(self, path, text):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+
+    def test_duplicate_id_first_wins_and_flags(self):
+        d = self._dir(); bank = os.path.join(d, "bank.tex")
+        self._w(bank, "\\begin{problem}{dup}[topic=a]FIRST\\end{problem}\n"
+                      "\\begin{problem}{dup}[topic=b]SECOND\\end{problem}\n")
+        probs = bank_parser.scan_problems([bank])
+        self.assertEqual(len(probs), 1)
+        self.assertEqual(probs[0].topic, "a")          # first definition wins
+        self.assertTrue(probs[0].duplicate)            # collision flagged
+
+    def test_tex_root_directive(self):
+        d = self._dir()
+        self._w(os.path.join(d, "root.tex"), "root body")
+        child = os.path.join(d, "child.tex")
+        self._w(child, "% !TeX root = root.tex\nchild body")
+        root, text = bank_parser.resolve_root(child, bank_parser._read(child))
+        self.assertEqual(os.path.basename(root), "root.tex")
+        self.assertEqual(text, "root body")
+
+    def test_choices_flags_and_text(self):
+        items = bank_parser.parse_choices("\\cchoice right \\choice wrong \\fchoice forced")
+        self.assertEqual([i["correct"] for i in items], [True, False, False])
+        self.assertEqual(items[0]["text"], "right")
+
+    def test_oneparchoices_detected(self):
+        stem, ch, cenv, sol, is_mc = bank_parser._split_body(
+            "stem \\begin{oneparchoices}\\cchoice a\\choice b\\end{oneparchoices}")
+        self.assertTrue(is_mc); self.assertEqual(cenv, "oneparchoices")
+
+    def test_solution_excised_before_choices(self):
+        stem, ch, cenv, sol, is_mc = bank_parser._split_body(
+            "STEM \\begin{choices}\\cchoice a\\choice b\\end{choices}"
+            " \\begin{solution} SOLTEXT \\end{solution}")
+        self.assertTrue(is_mc); self.assertEqual(sol, "SOLTEXT")
+        self.assertNotIn("cchoice", stem); self.assertNotIn("SOLTEXT", stem)
+
+    def test_solution_alone_is_not_mc(self):
+        _s, _c, _e, sol, is_mc = bank_parser._split_body(
+            "stem \\begin{solution} x \\end{solution}")
+        self.assertFalse(is_mc); self.assertEqual(sol, "x")
+
+    def test_parse_meta_trims_and_drops_bare(self):
+        m = bank_parser.parse_meta("topic = a, section=1.2 , junk , k=v=w")
+        self.assertEqual(m["topic"], "a")
+        self.assertEqual(m["section"], "1.2")
+        self.assertNotIn("junk", m)
+        self.assertEqual(m["k"], "v=w")               # split on first = only
+
+    def test_bank_path_brace_wrapped(self):
+        d = self._dir()
+        self._w(os.path.join(d, "B", "bank.tex"), "")
+        cm = os.path.join(d, "coursemeta.tex")
+        self._w(cm, "\\metasetup{ bank-path = {B/bank.tex} }\n")
+        self.assertEqual(bank_parser.coursemeta_bank_path(cm),
+                         os.path.join(d, "B", "bank.tex"))
+
+    def test_bank_path_missing_file_is_none(self):
+        d = self._dir()
+        cm = os.path.join(d, "coursemeta.tex")
+        self._w(cm, "\\metasetup{ bank-path = nope/bank.tex }\n")
+        self.assertIsNone(bank_parser.coursemeta_bank_path(cm))
+
+    def test_bank_path_ignores_commented_key(self):
+        d = self._dir()
+        self._w(os.path.join(d, "R", "bank.tex"), "")
+        cm = os.path.join(d, "coursemeta.tex")
+        self._w(cm, "% bank-path = old/bank.tex\n\\metasetup{ bank-path = R/bank.tex }\n")
+        self.assertEqual(bank_parser.coursemeta_bank_path(cm),
+                         os.path.join(d, "R", "bank.tex"))
+
+    def test_loadbank_cycle_terminates(self):
+        d = self._dir()
+        self._w(os.path.join(d, "a.tex"), "\\loadbank{b.tex}\n\\begin{problem}{pa}[topic=x]s\\end{problem}\n")
+        self._w(os.path.join(d, "b.tex"), "\\loadbank{a.tex}\n\\begin{problem}{pb}[topic=y]s\\end{problem}\n")
+        srcs = bank_parser.problem_sources(os.path.join(d, "a.tex"),
+                                           bank_parser._read(os.path.join(d, "a.tex")))
+        self.assertEqual(sorted(os.path.basename(s) for s in srcs), ["a.tex", "b.tex"])
+
+    def test_expand_metadir_windows_backslashes(self):
+        self.assertEqual(
+            bank_parser._expand_metadir("\\GetCourseMetaDir Bank/ch.tex", "C:\\c\\Su 26"),
+            "C:/c/Su 26/Bank/ch.tex")
+
+    def test_importproblem_and_sibling_bank(self):
+        d = self._dir()
+        self._w(os.path.join(d, "extra.tex"), "\\begin{problem}{ext}[topic=z]s\\end{problem}\n")
+        self._w(os.path.join(d, "bank.tex"), "\\begin{problem}{sib}[topic=w]s\\end{problem}\n")
+        doc = os.path.join(d, "exam.tex")
+        text = "\\importproblem{extra.tex}{}\n"
+        self._w(doc, text)
+        names = [os.path.basename(s) for s in bank_parser.problem_sources(doc, text)]
+        self.assertIn("extra.tex", names)      # \importproblem target resolved
+        self.assertIn("bank.tex", names)       # sibling bank.tex auto-default
+
+    def test_scan_skips_missing_files(self):
+        self.assertEqual(bank_parser.scan_problems(["/no/such/file.tex"]), [])
+
+    def test_read_missing_returns_none(self):
+        self.assertIsNone(bank_parser._read("/no/such/file.tex"))
+
+    def test_strip_comments_respects_escaped_percent(self):
+        out = bank_parser.strip_comments("a \\% keep % drop\nb")
+        self.assertIn("\\% keep", out)
+        self.assertNotIn("drop", out)
+        self.assertEqual(out.count("\n"), 1)   # line count preserved
+
+
+class ExportTests(unittest.TestCase):
+    """export_bank renders each problem once and writes <id>.svg (render stubbed)."""
+
+    def test_writes_one_svg_per_problem(self):
+        d = tempfile.mkdtemp(prefix="texam-export-")
+        exam = os.path.join(d, "exam.tex")
+        with open(exam, "w", encoding="utf-8") as fh:
+            fh.write(EXAM_BARE)
+        texam.CTX["exam"] = exam
+        probs = [bank_parser.Problem("p1", "", "b.tex", 0, "", "s"),
+                 bank_parser.Problem("p2", "", "b.tex", 0, "", "s")]
+        oa, orr, opw = bank_render.available, bank_render.render_svg, bank_render.prewarm
+        bank_render.available = lambda: True
+        bank_render.render_svg = lambda p, show_solution=False: "<svg>%s</svg>" % p.id
+        bank_render.prewarm = lambda problems, show_solution=False: []
+        out = os.path.join(d, "render")
+        try:
+            texam.export_bank(probs, out)
+        finally:
+            bank_render.available, bank_render.render_svg, bank_render.prewarm = oa, orr, opw
+        self.assertTrue(os.path.isfile(os.path.join(out, "p1.svg")))
+        self.assertTrue(os.path.isfile(os.path.join(out, "p2.svg")))
+        with open(os.path.join(out, "p1.svg"), encoding="utf-8") as fh:
+            self.assertIn("<svg>p1</svg>", fh.read())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

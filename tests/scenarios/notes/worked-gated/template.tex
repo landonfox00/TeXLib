@@ -1,0 +1,80 @@
+% Scenario: notes / worked-gated   (tier: core)
+% Exercises every path that DISCARDS worked content in a default (non-instructor)
+% build, because each one typesets the hidden body into a throwaway \vbox that
+% tagpdf will still walk unless tagging is suspended around it -- the phantom
+% then nests inside the live surrounding paragraph as a <text-unit> within a
+% <text>, i.e. PDF/UA Table 5 "P-Part" + "P-P".
+%
+% Three distinct layers gate this content, and each needed its own fix:
+%   * didactic's \texlib@wrk@lead      -- \pf / \solution inside challenge+exercise
+%   * didactic's own {solution} env    -- the standalone boxed solution
+%   * thmenv's \texlib@worked@discard  -- the shared inline lead-in machinery
+% Math inside the hidden bodies is deliberate: inline math is what turns into the
+% empty <Formula> nodes that made the violation visible in the first place.
+%
+% The reference build is the STUDENT-facing one (no \ShowSolutions), which is
+% exactly the copy that ships to a screen reader.
+\documentclass{didactic}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	season         = Fall,
+	year           = 2026,
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+}
+
+\meta{ unit = Lecture, number = 1, title = Gated Worked Content }
+
+\begin{document}
+\maketitle
+
+\section{Gated Lead-Ins}
+Each block below hides its worked content in this build.
+
+\begin{exercise}
+	Show that $x^3 - x - 1 = 0$ has a root in $(1, 2)$.
+	\solution Let $f(x) = x^3 - x - 1$. Then $f(1) = -1 < 0$ and $f(2) = 5 > 0$,
+	so the Intermediate Value Theorem gives a root in $(1, 2)$.
+\end{exercise}
+
+\begin{challenge}
+	Generalize: for which $n$ does $x^n - x - 1$ have a real root?
+	\pf For odd $n$, $x^n - x - 1 \to \pm\infty$ as $x \to \pm\infty$, so the
+	Intermediate Value Theorem applies.
+\end{challenge}
+
+\section{Exposition Lead-Ins}
+These stay visible: in example and question the lead-in is exposition, not a key.
+
+\begin{example}
+	Evaluate $\lim_{x \to 0} \frac{\sin x}{x}$.
+	\solution The limit is $1$, by the squeeze theorem.
+\end{example}
+
+\begin{question}
+	Is every continuous function differentiable?
+	\ans No: $f(x) = |x|$ is continuous but not differentiable at $0$.
+\end{question}
+
+\section{Standalone Solution Box}
+The boxed {solution} environment hides its body and leaves write-space.
+
+\begin{exercise}
+	Compute $\int_0^1 x^2 \, dx$.
+\end{exercise}
+
+% NO blank line before \begin{solution}: the paragraph above must still be OPEN
+% when the discard box is created. That is the whole point -- with a blank line
+% the environment starts its own block, the phantom lands as a sibling, and the
+% document conforms even with the bug present. Opened mid-paragraph it nests, and
+% an unguarded build fails Table 5 P-Part + P-P here. Do not "tidy" this gap in.
+Evaluating it directly gives $\tfrac{1}{3}$, as the write-space below confirms.
+\begin{solution}[2cm]
+	$\int_0^1 x^2 \, dx = \left[ \tfrac{x^3}{3} \right]_0^1 = \tfrac{1}{3}$.
+\end{solution}
+
+\end{document}

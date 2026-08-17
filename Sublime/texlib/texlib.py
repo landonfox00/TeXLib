@@ -21,6 +21,7 @@
 # ============================================================================
 
 import hashlib
+import importlib
 import os
 import re
 import subprocess
@@ -46,9 +47,10 @@ _NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 MODES = [
     ("default", "Default", "No \\Show... flag."),
     ("key", "Answer Key", "Injects \\def\\ShowKey{}."),
-    ("solutions", "Solutions", "Injects \\def\\ShowSolutions{}."),
+    ("solutions", "Solutions + Rubric", "Injects \\def\\ShowSolutions{}\\def\\ShowRubric{}."),
     ("student", "Student Copy", "Injects \\def\\StudentMode{}."),
-    ("rubric", "Rubric", "Injects \\def\\ShowRubric{}."),
+    # No "rubric" mode: a rubric annotates a worked solution, so rubric-without-
+    # solutions is never wanted. Use "solutions", which now carries both.
     ("draft", "Draft", "Injects \\def\\ShowDraft{}."),
     ("quick", "Quick (single pass)", "One pass, no biber, no reruns."),
     ("full", "Full (2-pass)", "Force the settling 2-pass build even when default_build_mode is quick."),
@@ -72,10 +74,17 @@ MAX_WARNINGS = 30
 BUILD_SYNTAX = "Packages/TeXLib/TeXLib Build Output.sublime-syntax"
 
 
-def _aux_log_path(tex_root, base):
-    """Absolute path of the build's <base>.log in the <<temp>> aux dir -- the same
-    md5(tex_root)[:12] key texlib_build routes aux files to."""
+def _aux_log_path(tex_root):
+    """Absolute path of the build's .log in the <<temp>> aux dir -- the same
+    md5(tex_root)[:12] key texlib_build routes aux files to.
+
+    The name is the ENGINE'S jobname, i.e. the basename with its extension
+    stripped (TexlibBuild.base_name), so the file this points at is the one the
+    engine actually writes -- "doc.log", never "doc.tex.log". Derived here rather
+    than passed in: the caller has the display basename in hand, and handing that
+    over is exactly how the report's full-log link came to point at nothing."""
     key = hashlib.md5((tex_root or "").encode("utf-8")).hexdigest()[:12]
+    base = os.path.splitext(os.path.basename(tex_root or ""))[0]
     return os.path.join(tempfile.gettempdir(), "texlib-aux", key, base + ".log")
 
 
@@ -168,6 +177,77 @@ def _resolve_texinputs(raw):
     return raw
 
 
+# --- Default TEXINPUTS, derived from where this package actually lives --------
+#
+# `texinputs` shipped commented out, documented as "leave unset to inherit the
+# process environment". Sublime inherits no TEXINPUTS, and the classes live in
+# the checkout rather than a TEXMF tree, so unset meant EVERY document failed at
+# \documentclass with "File `didactic.cls' not found". Anyone who installed this
+# package without the standalone installer got a plugin that could not build
+# anything, and nothing said why.
+#
+# The plugin knows where it is, so it can work this out. It loads from
+# <library>/Sublime/texlib -- reached through Packages/TeXLib, which the
+# installer makes a junction -- so the library root is two directories up from
+# this file. os.path.realpath resolves that junction; without it the answer
+# would be inside Sublime's Packages folder.
+#
+# Deliberately conservative: the derived root is USED only if it actually looks
+# like a TeXLib library. A package copied somewhere else entirely resolves to
+# something that fails the probe, and the default stays empty rather than
+# pointing builds at a wrong tree. An explicit `texinputs` setting always wins.
+_CORE_LIBRARY_FILES = ("course-metadata.sty", "texlib-build.sty", "basic-utilities.sty")
+_TEX_SOURCE_EXTS = (".sty", ".cls", ".lua")
+_derived_texinputs_cache = []
+
+
+def _looks_like_library_root(path):
+    """A directory counts as the library only when the core .sty are in it --
+    the same probe the installer and Doctor use, so a coincidental parent
+    directory can never pass for a library."""
+    try:
+        return all(os.path.isfile(os.path.join(path, f)) for f in _CORE_LIBRARY_FILES)
+    except Exception:  # noqa: BLE001 - a bad path must not break the build
+        return False
+
+
+def _derive_texinputs():
+    """TEXINPUTS for a library that has not been configured by hand: the library
+    root plus each immediate subdirectory that actually holds a .cls/.sty/.lua.
+
+    Explicit and non-recursive, for the same reason the installer's is: a
+    recursive "<root>//" re-walks the whole tree on every pass and lets a stale
+    .aux shadow a same-named build. Generated rather than hardcoded, so a new
+    module directory needs no code change. Returns "" when the root cannot be
+    identified, which leaves the previous inherit-the-environment behaviour."""
+    if _derived_texinputs_cache:
+        return _derived_texinputs_cache[0]
+
+    value = ""
+    try:
+        here = os.path.dirname(os.path.realpath(__file__))
+        root = os.path.dirname(os.path.dirname(here))   # <root>/Sublime/texlib -> <root>
+        if _looks_like_library_root(root):
+            segments = [".", root.replace("\\", "/")]
+            for name in sorted(os.listdir(root)):
+                sub = os.path.join(root, name)
+                if name.startswith(".") or name == "Sublime" or not os.path.isdir(sub):
+                    continue
+                try:
+                    entries = os.listdir(sub)
+                except OSError:
+                    continue
+                if any(e.lower().endswith(_TEX_SOURCE_EXTS) for e in entries):
+                    segments.append((root + "/" + name).replace("\\", "/"))
+            # _resolve_texinputs appends the load-bearing empty segment.
+            value = os.pathsep.join(segments)
+    except Exception:  # noqa: BLE001 - never let path probing break a build
+        value = ""
+
+    _derived_texinputs_cache.append(value)
+    return value
+
+
 # --- Shadow-install warning (N3) ---------------------------------------------
 _shadow_warned = [False]
 
@@ -175,8 +255,13 @@ _shadow_warned = [False]
 def _shadow_warning_line(settings):
     """One-time nudge (N3): if `texinputs` points at your checkout but a TeXLib
     copy is installed under TEXMFHOME, the .lua engine (LUAINPUTS) can still
-    resolve the stale install. Returns a warning string, or None."""
-    if _shadow_warned[0] or not settings.get("texinputs"):
+    resolve the stale install. Returns a warning string, or None.
+
+    Gated on there being a checkout path in play at all -- which now includes a
+    DERIVED one. Checking only the setting would have silenced this warning for
+    exactly the users who never configure anything by hand, i.e. the ones most
+    likely to be unaware of a stale TEXMF copy shadowing their builds."""
+    if _shadow_warned[0] or not (settings.get("texinputs") or _derive_texinputs()):
         return None
     try:
         from TeXLib import texlib_texmf
@@ -327,15 +412,168 @@ def _delegate(window, command, args=None):
     window.run_command(command, args or {})
 
 
-def _post_build_view(window):
-    """After a successful build, open/refresh the PDF and forward-sync via
-    LaTeXTools' jumpto_pdf (which honors its own forward_sync / keep_focus
-    settings, and falls back to the PDF next to the source -- where our copy-back
-    puts it). Gated by the TeXLib open_pdf_on_build setting (default on)."""
+def _same_path(a, b):
+    """Path equality as the filesystem sees it (case-insensitive on Windows)."""
+    return (os.path.normcase(os.path.normpath(a))
+            == os.path.normcase(os.path.normpath(b)))
+
+
+# The PDF the last build of each root resolved preferred_pdf to, so the on-demand
+# View PDF / Forward Sync commands aim at the same copy the build opened instead
+# of snapping back to <base>.pdf. Keyed by normalised root; a root not built this
+# session simply isn't here and those commands fall back to plain delegation.
+_PREFERRED_PDF = {}
+
+
+def _remember_preferred(root, pdf):
+    _PREFERRED_PDF[os.path.normcase(os.path.normpath(root))] = pdf
+
+
+def _recall_preferred(root):
+    """The preferred copy for `root`, or None -- also None once it is just
+    <base>.pdf, which the plain LaTeXTools delegation already handles."""
+    pdf = _PREFERRED_PDF.get(os.path.normcase(os.path.normpath(root)))
+    if not pdf or _same_path(pdf, os.path.splitext(root)[0] + ".pdf"):
+        return None
+    return pdf if os.path.exists(pdf) else None
+
+
+def _viewer_forward_sync(view, pdf):
+    """Forward-sync the viewer to `view`'s cursor, inside `pdf`.
+
+    A deliberate exception to Tier C's couple-by-command-name rule, because the
+    command channel provably cannot express this: read LaTeXTools' jumpto_pdf and
+    its `pdffile` is BUILT from get_tex_root() + get_jobname(), never taken as an
+    argument -- so no combination of args aims it at a sliced copy. One layer
+    down, the viewer PLUGIN takes the PDF as its first parameter
+    (SumatraViewer.forward_sync runs `SumatraPDF -reuse-instance -forward-search
+    <tex> <line> <pdf>`), and that IS the documented surface every viewer plugin
+    implements -- sioyek, okular, skim and zathura all take the same signature --
+    so reaching one level past the command stays viewer-agnostic.
+
+    Works on a slice only because the builder cuts each one its own .synctex;
+    without that, the viewer would have nothing to resolve the line against.
+
+    Returns True if the sync was issued. Any failure -- no LaTeXTools, a moved
+    module, a viewer without forward_sync -- returns False, and the caller falls
+    back to opening the file plainly, i.e. to the behaviour before this existed.
+    """
+    get_viewer = None
+    for modpath in ("LaTeXTools.latextools.jumpto_pdf",   # modern layout
+                    "LaTeXTools.jumpToPDF"):              # legacy layout
+        try:
+            get_viewer = importlib.import_module(modpath).get_viewer
+            break
+        except Exception:  # noqa: BLE001 - absent/renamed: try the next
+            continue
+    if get_viewer is None:
+        return False
+    try:
+        row, col = view.rowcol(view.sel()[0].end())
+        # +1 mirrors jumpto_pdf's own `row += 1`: SyncTeX lines are 1-based.
+        get_viewer().forward_sync(pdf, view.file_name(), row + 1, col,
+                                  keep_focus=False)
+        return True
+    except Exception:  # noqa: BLE001 - best-effort; caller falls back
+        return False
+
+
+def _forward_sync_enabled():
+    """LaTeXTools' own forward_sync setting -- honored so a post-build sync into
+    a preferred copy is exactly as opt-in as one into <base>.pdf."""
+    lt = sublime.load_settings("LaTeXTools.sublime-settings")
+    return bool(lt.get("forward_sync", True))
+
+
+def _same_document(view, root):
+    """True if `view` still belongs to the document rooted at `root`.
+
+    Compared by tex ROOT, not by view identity: an `\\input` child carrying a
+    matching `%!TeX root` IS the built document (a forward sync from it lands in
+    the right PDF), while a sibling .tex in another tab is not."""
+    if not _is_tex(view):
+        return False
+    view_root, _ = _resolve_root(view)
+    if not view_root:
+        return False
+    return _same_path(view_root, root)
+
+
+def _keep_focus():
+    """Re-focus Sublime after the by-path PDF open below.
+
+    latextools_view_pdf always hands the viewer keep_focus=False -- only
+    jumpto_pdf honors the setting -- and Sumatra pops to the front regardless, so
+    on that path we run LaTeXTools' own focus hack ourselves (a delayed
+    bring_to_front on the ST window), reading its keep_focus /
+    disable_focus_hack / <platform>.keep_focus_delay settings so both post-build
+    paths behave the same."""
+    lt = sublime.load_settings("LaTeXTools.sublime-settings")
+    if not lt.get("keep_focus", True) or lt.get("disable_focus_hack", False):
+        return
+    try:
+        delay = float((lt.get(sublime.platform()) or {}).get("keep_focus_delay", 1.0))
+    except (AttributeError, TypeError, ValueError):
+        delay = 1.0
+
+    def _front():
+        # Resolved when the timer fires, like LaTeXTools' own focus_st: if the
+        # user has moved to another ST window by then, that is the one to raise.
+        win = sublime.active_window()
+        if win:
+            win.bring_to_front()
+
+    sublime.set_timeout(_front, int(delay * 1000))
+
+
+def _post_build_view(window, root, pdf=None):
+    """After a successful build, open/refresh the PDF and forward-sync. Gated by
+    the TeXLib open_pdf_on_build setting (default on).
+
+    `root` is the document that was BUILT -- captured when the build started, not
+    read back off the window when it ends. Builds are async and this runs at the
+    end of one: LaTeXTools' jumpto_pdf resolves its target from
+    window.active_view() at call time, so delegating blindly launched the viewer
+    on whatever tab the user had switched to meanwhile (another .tex file's PDF),
+    or -- if that tab wasn't a .tex file at all -- nothing, silently.
+
+    So we delegate only while the active view still belongs to the built
+    document: the case where jumpto_pdf resolves the right PDF and its forward
+    sync has a cursor worth syncing from. Otherwise we open the built PDF by
+    explicit path (latextools_view_pdf takes a "file" arg) with no forward sync
+    -- the cursor that would drive one is in a different document now.
+
+    `pdf` is the copy the preferred_pdf setting resolved to (see
+    TexlibBuild.preferred_pdf_path), already checked to exist. When it is a
+    SLICED copy rather than <root>.pdf, jumpto_pdf is unusable -- that command
+    builds its own target from the tex root and cannot be aimed elsewhere, so
+    taking its branch would pull the combined PDF to the front and undo the
+    preference. Both of the things it does for us are still done, just directly:
+    the copy is opened by path, and the forward sync goes through the viewer
+    plugin underneath it (_viewer_forward_sync), gated on the same LaTeXTools
+    forward_sync setting jumpto_pdf itself reads. So a preferred slice is not a
+    second-class target -- both directions of SyncTeX work in it."""
     settings = sublime.load_settings("TeXLib.sublime-settings")
     if not settings.get("open_pdf_on_build", True):
         return
-    _delegate(window, "latextools_jumpto_pdf")
+    built_pdf = os.path.splitext(root)[0] + ".pdf"
+    target = pdf or built_pdf
+    _remember_preferred(root, target)
+    if not _same_path(target, built_pdf):
+        view = window.active_view()
+        synced = (_same_document(view, root) and _forward_sync_enabled()
+                  and _viewer_forward_sync(view, target))
+        if not synced:
+            # No cursor worth syncing from (another tab), the setting is off, or
+            # the viewer plugin was unreachable -- just put the copy up.
+            _delegate(window, "latextools_view_pdf", {"file": target})
+        _keep_focus()
+        return
+    if _same_document(window.active_view(), root):
+        _delegate(window, "latextools_jumpto_pdf")
+        return
+    _delegate(window, "latextools_view_pdf", {"file": built_pdf})
+    _keep_focus()
 
 
 class TexlibBuildCommand(sublime_plugin.WindowCommand):
@@ -364,8 +602,8 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
 
         panel = _panel(self.window, root, tex_dir)
         window = self.window
-        base = os.path.basename(root)
-        log_path = _aux_log_path(root, base)
+        base = os.path.basename(root)   # display name (status bar, report header)
+        log_path = _aux_log_path(root)   # the engine's <jobname>.log
 
         settings = sublime.load_settings("TeXLib.sublime-settings")
         # Quick-preview default: the plain build (mode "default", i.e. Ctrl+B /
@@ -394,9 +632,12 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             sublime.set_timeout(lambda: _show_panel(window, root), 0)
         view.set_status("texlib_build", "TeXLib: building %s..." % base)
 
-        # Optional TEXINPUTS: real cross-package builds need the repo root on the
-        # path (comma-free junction). Resolved on the main thread; blank inherits.
-        texinputs = _resolve_texinputs(settings.get("texinputs") or "")
+        # TEXINPUTS: cross-package builds need the library root on the path.
+        # An explicit setting always wins; otherwise derive it from where this
+        # package lives, so a plugin installed without the standalone installer
+        # can still resolve the classes instead of failing every build at
+        # \documentclass. Resolved on the main thread.
+        texinputs = _resolve_texinputs(settings.get("texinputs") or _derive_texinputs())
 
         host = texlib_build.TexlibBuild(
             tex_root=root, engine=engine,
@@ -419,9 +660,16 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             sublime.status_message(_sw)
             emit(_sw + "\n")
 
+        # Which of the build's PDFs to put in front of you afterward. Read here,
+        # on the main thread, and resolved against what the build produced once
+        # it has (a multi-copy exam's _A_solutions.pdf only exists post-slice).
+        preferred = settings.get("preferred_pdf")
+
         def on_success():
-            # Post-build PDF open + forward sync (Tier C).
-            sublime.set_timeout(lambda: _post_build_view(window), 0)
+            # Post-build PDF open + forward sync (Tier C). `root` rides along:
+            # the active view may be a different document by the time this runs.
+            pdf = host.preferred_pdf_path(preferred)
+            sublime.set_timeout(lambda: _post_build_view(window, root, pdf), 0)
 
         def on_finish(state, error_lines, warning_lines):
             # Runs in the worker; marshal all UI changes to the main thread.
@@ -605,9 +853,17 @@ class TexlibBuildPickCommand(sublime_plugin.WindowCommand):
 
 
 class TexlibViewPdfCommand(sublime_plugin.WindowCommand):
-    """Open/refresh the built PDF in the configured viewer (delegates to LaTeXTools)."""
+    """Open/refresh the built PDF in the configured viewer (delegates to
+    LaTeXTools), or the copy preferred_pdf picked if the last build of this
+    document resolved one -- otherwise this command would snap you back to the
+    combined PDF the build had deliberately not opened."""
 
     def run(self):
+        root, _ = _resolve_root(self.window.active_view())
+        preferred = _recall_preferred(root) if root else None
+        if preferred:
+            _delegate(self.window, "latextools_view_pdf", {"file": preferred})
+            return
         _delegate(self.window, "latextools_view_pdf")
 
     def is_enabled(self):
@@ -616,9 +872,17 @@ class TexlibViewPdfCommand(sublime_plugin.WindowCommand):
 
 class TexlibForwardSyncCommand(sublime_plugin.WindowCommand):
     """Jump from the cursor to the matching place in the PDF (delegates to
-    LaTeXTools' jumpto_pdf; from_keybinding forces the forward sync)."""
+    LaTeXTools' jumpto_pdf; from_keybinding forces the forward sync).
+
+    Aimed at the preferred copy when the last build resolved one -- same reason
+    as View PDF above, and it works because that copy has its own .synctex."""
 
     def run(self):
+        view = self.window.active_view()
+        root, _ = _resolve_root(view)
+        preferred = _recall_preferred(root) if root else None
+        if preferred and _viewer_forward_sync(view, preferred):
+            return
         _delegate(self.window, "latextools_jumpto_pdf", {"from_keybinding": True})
 
     def is_enabled(self):

@@ -52,5 +52,16 @@ for s in (None, {}):
     ok &= check(os.path.basename(got) == "texam.py",
                 "fallback resolves to a texam.py path (settings=%r)" % (s,))
 
+# The launcher runs the server with NO console window (CREATE_NO_WINDOW on
+# Windows; 0 elsewhere), and logs output to a recoverable file.
+if os.name == "nt":
+    ok &= check(texlib_texam._CREATE_NO_WINDOW == 0x08000000,
+                "hidden launch: CREATE_NO_WINDOW set on Windows")
+else:
+    ok &= check(texlib_texam._CREATE_NO_WINDOW == 0,
+                "hidden launch: no window flag off Windows")
+ok &= check(texlib_texam._LAUNCH_LOG.endswith("texam-launch.log"),
+            "launch log path defined")
+
 print("\nALL PASS" if ok else "\nFAILURES ABOVE")
 sys.exit(0 if ok else 1)

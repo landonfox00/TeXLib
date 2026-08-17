@@ -1,0 +1,52 @@
+% coursemeta.tex
+%
+% Course-wide metadata for Math 126, Fall 2026. Auto-loaded by
+% course-metadata.sty from any document in this directory.
+%
+% Class details (section, title, room, days, times, term dates) transcribed from
+% the UNR class record for class number 86070 on 2026-08-07.
+%
+% STILL UNCONFIRMED:
+%   final-date / final-time — the UNR final-exam grid slot for a TuTh 10:30 class
+%   email                   — placeholder
+%   office / office-hours   — placeholder; office hours are OFF in
+%                             calendar-sync.toml until these are real
+%   exam1/2/3-date          — currently mirrored from the built schedule; see note
+
+\metasetup{
+	institution     = {University of Nevada, Reno},
+	instructor      = {Landon Fox},
+	season          = Fall,
+	year            = 2026,
+	course-subject  = Math,
+	course-number   = 126,
+	course-title    = {Precalculus I},
+	course-section  = 1003,
+	course-room     = {EJCH 103},
+	lecture-days    = TR,
+	lecture-times   = {10:30-11:45am},
+	% NB: recitation-days / quiz-days / exam-days are schedule.cls OPTIONS, set
+	% in schedule.tex's \documentclass — not coursemeta keys. Putting
+	% recitation-days here makes course-metadata.sty auto-vivify a
+	% \GetRecitationDays that collides with the one schedule.cls defines.
+	start-date      = 8-24,
+	end-date        = 12-8,
+	% Confirmed against the UNR generic finals schedule: a TR 10:30 class sits on
+	% the FOURTH day of finals week, 10:15am-12:15pm. Fall 2026 finals run
+	% Thu 12/10 - Wed 12/16 (Thu, Fri, Mon, Tue, Wed), so the fourth day is
+	% Tue 12/15. Prep Day is Wed 12/9.
+	final-date      = 12-15,
+	final-time      = {10:15am-12:15pm},
+	% --- Instructor contact + scheduling.
+	email           = {instructor@unr.edu},      % TODO confirm
+	office          = {DMSC 220},                % TODO confirm
+	office-hours    = {TR 12:30--2:00pm, or by appointment},
+	short-title     = {Math 126},
+	% --- Per-exam dates. These feed the autoexam cover and the syllabus exam
+	% table; the SCHEDULE resolves its own exam dates from \exam placement, and
+	% sync_calendar.py reads those, not these. Read them off the built
+	% .schedmeta and keep them in step by hand.
+	exam1-date      = {Sep 22, 2026},
+	exam2-date      = {Oct 20, 2026},
+	exam3-date      = {Nov 17, 2026},
+}

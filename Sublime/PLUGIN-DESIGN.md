@@ -3,7 +3,7 @@
 Status: **draft / pre-development.** No code written yet. This documents the
 intended shape so we can react to it before committing effort.
 
-Worktree: `C:\Users\Landon\texlib-sublime-wt`, branch `feat/sublime-plugin`
+Worktree: `C:\Users\Landon\Documents\TeXLib-worktrees\texlib-sublime-wt`, branch `feat/sublime-plugin`
 (off `main`), isolated from the in-progress `fix/pset-solution-tab-gotcha` tree.
 
 ---
@@ -138,8 +138,10 @@ user-facing; Python **modules** underscored (backend, not referenced from
 **Build**
 - `texlib_build` (WindowCommand, arg `mode`) — replaces the
   `latextools_make_pdf` build target. Same modes as today
-  (default/key/solutions/student/rubric/draft/quick) via a **quick-panel picker**
+  (default/key/solutions/student/draft/quick) via a **quick-panel picker**
   with descriptions (richer than the current `.sublime-build` variant list).
+  `solutions` injects `\ShowRubric` alongside `\ShowSolutions`; the rubric-only
+  mode was retired, a rubric being an annotation on a worked solution.
 
 **Domain (the elevation — new capability)**
 - `texlib_new_document` — pick a class → scaffold the template with coursemeta
@@ -247,8 +249,48 @@ code, not a delegated call.
   the source (where copy-back puts it), so it always resolves. `TeXLib: View PDF`
   and `TeXLib: Forward Sync` expose those on demand. Coupling is by stable command
   name, never import. `test_texlib_runner.py` covers the on_success trigger (fires
-  only on completed build + PDF present + not cancelled). **Needs a live check:**
+  only on completed build + PDF present + not cancelled) and, since the fix below,
+  which document the open targets. **Needs a live check:**
   confirm the viewer pops/syncs after a build.
+- **Post-build open follows the BUILT document (fixed 2026-08-01).** The Tier C
+  handoff above passed no target: `latextools_jumpto_pdf` resolves its PDF from
+  `window.active_view()` *at call time*, and the native build is async — switch
+  tabs while it runs and the viewer opened the new tab's PDF instead (or nothing,
+  if that tab wasn't a `.tex` file, since jumpto_pdf returns early on a non-`text.tex`
+  view). `_post_build_view` now takes the `root` captured at build start and
+  delegates to `jumpto_pdf` only while the active view still resolves to that root
+  (an `\input` child counts — the forward sync is meaningful there); otherwise it
+  opens the built PDF by explicit path via `latextools_view_pdf`'s `file` arg, no
+  forward sync, plus LaTeXTools' own delayed-`bring_to_front` focus hack, which
+  `view_pdf` skips (it hardcodes `keep_focus=False`). Note the same drift exists
+  upstream in LaTeXTools' own `make_pdf.py`, so the legacy *Build With: TeXLib*
+  path still has it — not ours to fix.
+- **`preferred_pdf` — the handoff can target a SLICED copy (2026-08-07).** A
+  multi-copy exam's `<base>_A_solutions.pdf` is normally the copy you are actually
+  reading, but the handoff only ever named `<base>.pdf`. The core now records what
+  post-processing produced (`produced_pdfs`, in typeset order) and resolves the
+  setting against it (`preferred_pdf_path`), always falling back to `<base>.pdf`;
+  the runner reads the setting on the main thread and passes the resolved path to
+  `_post_build_view`. A non-`<base>.pdf` target cannot go through `jumpto_pdf` at
+  all: its `pdffile` is *built* from `get_tex_root()` + `get_jobname()`, never an
+  argument, so no args aim it at a slice and its branch would pull the combined
+  PDF back to the front. Inverse search is kept by cutting each slice its own
+  `.synctex` (`_slice_synctex_for_copies`). **Documented exception to the
+  couple-by-command-name rule (2026-08-07):** forward sync reaches one layer past
+  the command to the viewer *plugin*, which does take the PDF as a parameter
+  (`viewer.forward_sync(pdf, tex, line, col)` — the signature every viewer plugin
+  implements, so this stays viewer-agnostic). Taken because the command channel
+  provably cannot express the target; `_viewer_forward_sync` imports defensively
+  and returns False on any failure, degrading to a plain open. `TeXLib: View PDF`
+  / `Forward Sync` consult `_PREFERRED_PDF`, the per-root note of what the last
+  build opened, so they don't snap back to `<base>.pdf`. Legacy *Build With:
+  TeXLib* is unaffected: LaTeXTools opens the PDF itself there.
+  - **Pre-existing, not a cost of the above:** forward *search* into a
+    multi-version exam is unreliable in the combined PDF too — the version loop
+    attributes body lines to `<base>_autoexam_body.tex`, and the per-problem
+    redirect gives a bank file one `Input:` tag per `\@@input`, so a lookup
+    resolves to one arbitrary copy. Measured with the `synctex` CLI; see the
+    CHANGELOG entry. Fixing it belongs in `problem_engine.lua`, not here.
 - **Phase 2 done (2026-07-10) — native-canonical + cutover.** Build logic is now
   ONE source: `TexlibBuildCore` in `texlib_build.py`. The native `TexlibBuild`
   subclasses it (adds the constructor); the LaTeXTools builder is a 113-line

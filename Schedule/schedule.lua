@@ -24,7 +24,8 @@ start_date = nil
 course_end_date = nil  
 sched_year = nil       
 day_capacity_map = {}
-quiz_idx_map = {} 
+quiz_idx_map = {}
+exam_idx_map = {}   -- weekdays \exam places on when exam-days is set (else empty)
 cnt_quiz = 0
 cnt_lecture = 0
 cnt_exam = 0
@@ -34,6 +35,32 @@ function sanitize(str)
 	str = str:gsub("&", "\\&"):gsub("%%", "\\%%"):gsub("%$", "\\$")
 	str = str:gsub("#", "\\#"):gsub("_", "\\_")
 	return str
+end
+
+-- ----------------------------------------------------------------------------
+-- .schedmeta text helpers
+-- ----------------------------------------------------------------------------
+-- The grid stores display strings ("\S 2.1 Tangents", "\textbf{Quiz 3}"); the
+-- sidecar has to hand a downstream tool the same entry as plain text, and a slug
+-- stable enough to use as an identity key across rebuilds.
+
+function schedmeta_plain(str)
+	if not str then return "" end
+	local s = tostring(str)
+	s = s:gsub("\\\\", " ")            -- line breaks first (before cs stripping)
+	s = s:gsub("\\[%a@]+%s*", "")      -- \S, \textbf, \hfill, ...
+	s = s:gsub("[{}]", "")
+	s = s:gsub("~", " ")               -- \winterbreak's default is "Winter~Break"
+	s = s:gsub("%s+", " ")
+	return (s:gsub("^%s*(.-)%s*$", "%1"))
+end
+
+function schedmeta_slug(str)
+	local s = schedmeta_plain(str):lower()
+	s = s:gsub("[^%w]+", "-")
+	s = s:gsub("^%-+", ""):gsub("%-+$", "")
+	if s == "" then s = "item" end
+	return s
 end
 
 function NewEvent(type_str, name_str, length_val, id_val)
@@ -185,7 +212,8 @@ end
 -- ============================================================================
 -- INITIALIZER
 -- ============================================================================
-function init_scheduler(start_str, end_str, lec_days, rec_days, q_days, cap_str, year_str)
+function init_scheduler(start_str, end_str, lec_days, rec_days, q_days, cap_str,
+                        year_str, exam_days)
 	-- 1. Parse Year (Allow fallback ONLY here, at runtime initialization)
 	local y_clean = year_str:gsub("%D", "")
 	sched_year = tonumber(y_clean) or tonumber(os.date("%Y"))
@@ -223,12 +251,45 @@ function init_scheduler(start_str, end_str, lec_days, rec_days, q_days, cap_str,
 
 	local q_list = parse_weekdays(q_days)
 	for _, idx in ipairs(q_list) do
-		quiz_idx_map[idx] = true 
+		quiz_idx_map[idx] = true
 		if not day_capacity_map[idx] then
 			calendar_mgr:register_column_type_by_idx(idx, "Quiz")
 			day_capacity_map[idx] = 0
 		end
 	end
+
+	-- exam-days: where \exam lands when the exam sits outside lecture (a
+	-- recitation or lab section).  Registered as a column like the others so the
+	-- day is drawn even if nothing else claims it; capacity stays 0 so topics
+	-- never flow onto it.
+	exam_idx_map = {}
+	for _, idx in ipairs(parse_weekdays(exam_days)) do
+		exam_idx_map[idx] = true
+		if not day_capacity_map[idx] then
+			calendar_mgr:register_column_type_by_idx(idx, "Quiz")
+			day_capacity_map[idx] = 0
+		end
+	end
+end
+
+-- Next day at or after the cursor whose weekday is in `idx_map`, skipping
+-- holidays.  Unlike L_find_next_class this ignores capacity: an exam day is
+-- deliberately a zero-capacity column (no topic flows onto it), so the
+-- capacity-driven search would never find it.
+function L_find_next_day(idx_map, from)
+	local start = from or cursor_date
+	if not start then return nil end
+	local seek = Date.new(start) + 1
+	for _ = 0, 365 do
+		if idx_map[seek:weekday()] then
+			local cell = calendar_mgr.cells[seek:to_key()]
+			if not (cell and (cell.flags.holiday or cell.flags.canceled)) then
+				return seek
+			end
+		end
+		seek = seek + 1
+	end
+	return nil
 end
 
 -- ============================================================================
@@ -273,8 +334,14 @@ function L_finals_week(start_str, final_date_str, time_str, duration_in)
 			cell.flags.exam = false
 			cell.flags.canceled = true
 
+			-- .schedmeta identity: the final is its own kind (a consumer schedules
+			-- real work off it); the rest of the week is a named closure.
+			cell.holiday_name = "Finals Week"
+
 			if final_day and ptr:to_key() == final_day:to_key() then
 				cell.color = "\\SetCell{bg=red!15}"
+				cell.final_exam = true
+				cell.final_time = time_str
 				cell:append("\\textbf{Final Exam}", "top")
 				if time_str and time_str ~= "" then
 					cell:append("\\textbf{" .. time_str .. "}", "top")
@@ -403,6 +470,32 @@ function L_section(d, n, l) L_topic(d, "\\S " .. n, l) end
 function L_exam_review(length_in)
 	local next_exam_num = cnt_exam + 1
 	local name = "Exam " .. next_exam_num .. " Review"
+
+	-- With exam-days set, the exam is not on a lecture day, so "next free slot"
+	-- puts the review wherever the unit's content happened to run out -- often
+	-- with an idle lecture day between it and the exam. A review is meant to be
+	-- the last meeting BEFORE the exam, so anchor it there and let any slack
+	-- fall earlier in the unit instead.
+	if next(exam_idx_map) then
+		-- Order matters: the exam follows the review, so the exam day cannot be
+		-- known until we know where the review could earliest go. Find that slot
+		-- first, then the exam day after it, then walk BACK to the last free
+		-- lecture day before the exam -- which is the meeting the review means.
+		local earliest = L_find_next_class()
+		local exam_day = earliest and L_find_next_day(exam_idx_map, earliest)
+		if earliest and exam_day then
+			local seek = exam_day:add_days(-1)
+			while seek >= earliest do
+				local cap = L_get_cap(seek)
+				if cap > 0 and calendar_mgr:get_cell(seek, cap):is_available() then
+					L_topic(seek:to_key(), name, length_in)
+					return
+				end
+				seek = seek:add_days(-1)
+			end
+		end
+	end
+
 	L_topic(nil, name, length_in)
 end
 
@@ -431,6 +524,10 @@ function L_holiday(date_in, date_end, name)
 		cell.flags.lecture = false
 		cell.flags.exam = false
 		cell.flags.quiz = false -- Stop auto-quiz
+
+		-- Keep the raw name: the rendered layer text is LaTeX-wrapped, and the
+		-- .schedmeta sidecar needs it back as plain text.
+		cell.holiday_name = name
 
 		cell:append("\\textbf{" .. sanitize(name) .. "}", "top")
 		cell:append("\\textbf{No Classes}", "top")
@@ -491,6 +588,7 @@ function L_quiz(options_in)
 	local cell = calendar_mgr:get_cell(target, cap)
 
 	cell.flags.quiz = true
+	cell.quiz_id = id           -- stable identity for the .schedmeta sidecar
 	cell.color = "\\SetCell{bg=orange!15}"
 
 	-- Append manually
@@ -512,8 +610,14 @@ function L_exam(options_in)
 	local evt = NewEvent("Exam", "Exam " .. cnt_exam, len, cnt_exam)
 	evt.source_line = tex.inputlineno
 
-	-- 2. Find Date
-	local target = L_find_next_class()
+	-- 2. Find Date.  With exam-days set the exam jumps to the next such day
+	-- (a recitation/lab section); otherwise it takes the next lecture day.
+	local target
+	if next(exam_idx_map) then
+		target = L_find_next_day(exam_idx_map)
+	else
+		target = L_find_next_class()
+	end
 	if not target then return end
 	cursor_date = target
 	
@@ -644,6 +748,122 @@ local function cell_color_name(color_str)
 	return name or "white"
 end
 
+-- ============================================================================
+-- .schedmeta SIDECAR
+-- ============================================================================
+-- <jobname>.schedmeta is this schedule's resolved date math as plain data, for
+-- tools that must not re-derive it (sync_calendar.py turns it into Google
+-- Calendar events and Tasks).  Written beside the .schedmap, same aux routing.
+--
+-- Format -- one record per line, TAB-separated key=value pairs:
+--     entry<TAB>id=exam-1<TAB>kind=exam<TAB>date=2026-09-25<TAB>title=Exam 1
+--
+-- Ids are deliberately date-FREE: a topic is keyed by its own slug, an exam or
+-- quiz by its number.  Shift the term by a day and every id is unchanged, which
+-- is what lets a consumer MOVE an existing event instead of orphaning it and
+-- creating a duplicate.  Continuation days of a multi-day topic take a "~N"
+-- suffix and carry cont=1.
+
+function schedmeta_records()
+	if not calendar_mgr or not calendar_mgr.cells then return {} end
+
+	local dated = {}
+	for _, cell in pairs(calendar_mgr.cells) do
+		if cell.date and cell.date.time then dated[#dated + 1] = cell end
+	end
+	-- cells is keyed MM-DD and pairs() order is undefined; sort so the sidecar
+	-- is chronological (a consumer's diff output reads in term order).
+	table.sort(dated, function(a, b) return a.date.time < b.date.time end)
+
+	local recs, used = {}, {}
+	local function add(id, kind, cell, title, cont)
+		local unique, n = id, 1
+		while used[unique] do n = n + 1; unique = id .. "~" .. n end
+		used[unique] = true
+		local rec = {
+			id    = unique,
+			kind  = kind,
+			date  = os.date("%Y-%m-%d", cell.date.time),
+			title = schedmeta_plain(title),
+			line  = cell.source_line or 0,
+			cont  = cont and true or nil,
+		}
+		recs[#recs + 1] = rec
+		return rec
+	end
+
+	local LAYER_ORDER = { "top", "middle", "bottom" }
+
+	for _, cell in ipairs(dated) do
+		if cell.final_exam then
+			-- Flagged holiday+canceled by L_finals_week (no class that day), but
+			-- for a consumer it is the single most schedulable entry of the term.
+			local r = add("final", "final", cell, "Final Exam")
+			r.time = cell.final_time
+		elseif cell.flags.holiday then
+			local name = cell.holiday_name or "No Classes"
+			add("holiday-" .. schedmeta_slug(name), "holiday", cell, name)
+		else
+			-- Exams first: they are the anchor most consumer tasks count back
+			-- from, so they lead the day's records.
+			for _, lname in ipairs(LAYER_ORDER) do
+				for _, item in ipairs(cell.layers[lname] or {}) do
+					local evt = (type(item) == "table") and item.event_ref or nil
+					if evt and evt.type == "Exam" then
+						add("exam-" .. (evt.id or 0), "exam", cell, evt.name)
+					end
+				end
+			end
+
+			-- Auto-quizzes are appended during render as bare strings, so the
+			-- number comes off the cell (set by both quiz paths), not an event.
+			if cell.flags.quiz and cell.quiz_id then
+				add("quiz-" .. cell.quiz_id, "quiz", cell, "Quiz " .. cell.quiz_id)
+			end
+
+			for _, item in ipairs(cell.layers.middle or {}) do
+				local evt = (type(item) == "table") and item.event_ref or nil
+				if evt and evt.type == "Lecture" then
+					local plain  = schedmeta_plain(evt.name)
+					local exam_n = plain:match("^Exam%s+(%d+)%s+Review$")
+					if exam_n then
+						add("review-" .. exam_n, "review", cell, plain, item.is_cont)
+					else
+						add("topic-" .. schedmeta_slug(plain), "lecture", cell,
+						    plain, item.is_cont)
+					end
+				end
+			end
+		end
+	end
+	return recs
+end
+
+function write_schedmeta(path)
+	local out = io.open(path, "w")
+	if not out then return false end
+	out:write("# texlib schedule metadata v1\n")
+	out:write("# TAB-separated key=value; ids are stable across date shifts\n")
+	if sched_year then out:write("year\t" .. sched_year .. "\n") end
+	if start_date and start_date.time then
+		out:write("term-start\t" .. os.date("%Y-%m-%d", start_date.time) .. "\n")
+	end
+	if course_end_date and course_end_date.time then
+		out:write("term-end\t" .. os.date("%Y-%m-%d", course_end_date.time) .. "\n")
+	end
+	for _, r in ipairs(schedmeta_records()) do
+		local parts = { "entry", "id=" .. r.id, "kind=" .. r.kind,
+		                "date=" .. r.date, "title=" .. r.title, "line=" .. r.line }
+		if r.time and r.time ~= "" then
+			parts[#parts + 1] = "time=" .. schedmeta_plain(r.time)
+		end
+		if r.cont then parts[#parts + 1] = "cont=1" end
+		out:write(table.concat(parts, "\t") .. "\n")
+	end
+	out:close()
+	return true
+end
+
 function render_grid(month_pages, box_grid)
 	if not start_date or not start_date.time then
 		tex.print("\\textbf{ERROR: 'start-date' is missing.}")
@@ -749,6 +969,7 @@ function render_grid(month_pages, box_grid)
 					if not manual_exists then
 						cnt_quiz = cnt_quiz + 1
 						cell.flags.quiz = true
+						cell.quiz_id = cnt_quiz   -- see L_quiz: .schedmeta identity
 						cell.color = "\\SetCell{bg=orange!15}"
 						cell:append("\\textbf{Quiz " .. cnt_quiz .. "}", "top")
 					end
@@ -992,4 +1213,8 @@ function render_grid(month_pages, box_grid)
 		end
 		mout:close()
 	end
+
+	-- Resolved-entry sidecar for downstream schedulers.  Emitted here, after the
+	-- render pass, because auto-quizzes are only materialised during rendering.
+	write_schedmeta(aux_path(tex.jobname .. '.schedmeta'))
 end

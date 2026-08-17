@@ -169,6 +169,11 @@
 \ifdefined\ShowKey           \def\AutoExamSolMode{only}\solutionstrue\fi
 \ifdefined\ShowSolutions     \def\AutoExamSolMode{dual}\fi
 \ifdefined\ShowJustSolutions \def\AutoExamSolMode{only}\solutionstrue\fi
+% \ShowRubric implies \solutionstrue (see texlib-build.sty), so it needs a copy
+% mode as well -- left at `none' the rubric would render into the one copy the
+% builder then slices as the STUDENT PDF. Same `dual' as \ShowSolutions, and
+% checked after it so combining the two is idempotent, not order-dependent.
+\ifdefined\ShowRubric        \def\AutoExamSolMode{dual}\fi
 % If BOTH source commands were used, warn and keep dual (\justsolutions ignored).
 \AtBeginDocument{%
 	\if@ax@src@dual\if@ax@src@only
@@ -453,14 +458,22 @@
 	\endoldparts\inpartsfalse
 }
 
+% ACCESSIBLE: multicol cannot be tagged (its column balancing rebuilds the
+% galley below the structure layer, so tagpdf cannot bracket the columns) --
+% \begin{multicols} fatals or produces an untaggable tree under PDF/UA. In an
+% accessible build we therefore drop to a SINGLE column: the {parts} nesting and
+% part-labelling still work, only the visual two-up layout is lost. This is the
+% documented accessible/normal tradeoff (an accessible copy is not page-for-page
+% identical to the print copy anyway, since lualatex reflows the metrics). The
+% guard keys on \TeXLibAccessibleMode so normal builds keep the multicols.
 \DeclareDocumentEnvironment{cols}{O{2}}{%
-	\par 
+	\par
 	\setlength{\columnseprule}{0pt}
 	\setlength{\columnsep}{3em}
 	\ifinparts
 		\setcounter{global_partno_storage}{\value{partno}}%
 	\fi
-	\begin{multicols}{#1}
+	\ifdefined\TeXLibAccessibleMode\else\begin{multicols}{#1}\fi
 		\ifinparts
 			\renewcommand{\partshook}{%
 				\setlength{\leftmargin}{0.0em}%
@@ -475,7 +488,7 @@
 			\end{parts}
 		\else
 		\fi
-	\end{multicols}
+	\ifdefined\TeXLibAccessibleMode\else\end{multicols}\fi
 }
 
 % \splitpage{col1}{col2}
@@ -880,6 +893,10 @@
 		% Instructions: file / inline / default alike are wrapped in the titled
 		% box. A doc can call \TeXLibInstructionsUnboxed to reclaim full layout
 		% control over its own instructions file (renders bare, no box).
+		% This cover renders the box inside the surrounding `center`; tell the
+		% instructions package so an accessible build de-centers the bullets (the
+		% quiz box is not centered and skips this). No-op in a normal build.
+		\TeXLibInstructionsDecenter
 		\TeXLibInstructionsTitled{exam}%
 		\vfill
 

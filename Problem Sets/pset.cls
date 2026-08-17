@@ -57,7 +57,9 @@
 \RequirePackage{tocloft, multirow}
 \RequirePackage[many]{tcolorbox}
 \RequirePackage{cancel}
-\RequirePackage[capitalise,nameinlink]{cleveref}
+% \cref, via cleveref normally and zref-clever in an accessible build --
+% cleveref's amsthm patch is fatal under tagging=on. See texlib-crossref.sty.
+\RequirePackage{texlib-crossref}
 \RequirePackage{xstring}            % for \IfInteger in problem's optional arg
 \RequirePackage{course-metadata}
 
@@ -222,11 +224,38 @@
 %      shorthand, so we MUST use \renewenvironment -- \newenvironment would
 %      raise "Command \parts already defined" and silently leave the
 %      upstream definition in place.
-\renewenvironment{parts}
-	{\begin{enumerate}[label=\textbf{(\alph*)}, leftmargin=*,
-						topsep=2pt, parsep=2pt]%
-		\let\part\item}
-	{\end{enumerate}}
+%   3. Accessible build: the same keys, declared with \setlist instead of
+%      inline. Under \DocumentMetadata{tagging=on} the new block implementation
+%      takes over \begin{enumerate}'s optional argument and rejects enumitem's
+%      keys outright -- "Some keys specified on the enumerate environment are
+%      unknown", fatal, and it fires on ANY key (even a lone parsep), not on
+%      some particular one. Preamble \setlist declarations are still honoured,
+%      so the accessible branch configures the list there and the environment
+%      body only rebinds \part. The normal branch is left exactly as it was, so
+%      a normal build's output is unchanged. The two branches differ slightly in
+%      labelsep/itemsep, which the \newlist `parts' carries from
+%      basic-utilities and the inline form took from enumerate's defaults.
+%   4. TeX Live 2026 / tagpdf 1.0c: leftmargin=* is fatal here, "Missing number,
+%      treated as zero" with the `*' itself reported as the offending token. It
+%      is enumitem's "compute the margin from the label width" sentinel, not a
+%      dimension, and under the new block-based lists this declaration reaches a
+%      path that reads it as one. It only fires where {parts} nests inside
+%      {problem} -- a flat list takes the value fine, which is why a standalone
+%      reproduction looks healthy. 2em is what * resolved to for a bold "(a)"
+%      (labelwidth ~1.5em + labelsep 0.5em), and matches the explicit margin the
+%      accessible {readings} list in texlib-callouts.sty already uses. The normal
+%      branch below keeps *, so print output is bit-for-bit what it was.
+\ifdefined\TeXLibAccessibleMode
+	\setlist[parts]{label=\textbf{(\alph*)}, leftmargin=2em,
+					topsep=2pt, parsep=2pt}
+	\AtBeginEnvironment{parts}{\let\part\item}
+\else
+	\renewenvironment{parts}
+		{\begin{enumerate}[label=\textbf{(\alph*)}, leftmargin=*,
+							topsep=2pt, parsep=2pt]%
+			\let\part\item}
+		{\end{enumerate}}
+\fi
 
 % Top-level enumerate: bold lowercase-roman labels (i., ii., iii., ...).
 % The `parts` environment above sets its own inline label, so it is

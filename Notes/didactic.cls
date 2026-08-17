@@ -46,7 +46,9 @@
 \RequirePackage{tocloft, multirow}
 \RequirePackage[many]{tcolorbox}
 \RequirePackage{cancel}
-\RequirePackage[capitalise,nameinlink]{cleveref}
+% \cref, via cleveref normally and zref-clever in an accessible build --
+% cleveref's amsthm patch is fatal under tagging=on. See texlib-crossref.sty.
+\RequirePackage{texlib-crossref}
 \RequirePackage{course-metadata}
 
 % PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty.
@@ -351,13 +353,17 @@
 	\if@sol@show
 		\begin{@sol@shown}%
 	\else
-		\setbox\z@\vbox\bgroup
+		% ACCESSIBLE: suspend tagging over the discarded body, or its phantom
+		% structure nests inside the live surrounding paragraph (Table 5 P-Part /
+		% P-P). Resumed below BEFORE the blank write-space box, which is real
+		% output and must still be tagged.
+		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }{%
 	\if@sol@show
 		\end{@sol@shown}%
 	\else
-		\egroup
+		\egroup\texlib@acc@tagresume
 		\begin{@sol@blank}\@sol@blankfill{#2}\end{@sol@blank}%
 	\fi
 }
@@ -429,15 +435,26 @@
 % instructor build it prints the label inline; otherwise it opens ONE discard
 % vbox (guarded by the flag so a second lead-in in the same env does not nest a
 % second box) that captures everything up to \end.
+% ACCESSIBLE: the discard box is dropped, so no glyphs ship -- but tagpdf still
+% walks the material inside it, and because the box opens while the surrounding
+% environment paragraph is still active, that phantom structure nests INSIDE it:
+% a <text-unit> within a <text>, i.e. PDF/UA "P-Part" + "P-P" Table-5 violations
+% for content that never reaches the page. (This is what kept didactic-template
+% non-conformant while the theorem scenarios passed -- only the template exercises
+% a gated \pf.) \texlib@acc@tagsuspend/@tagresume come from texlib-build.sty and
+% are no-ops in a normal build.
 \newcommand{\texlib@wrk@lead}[1]{%
 	\ifsolutions
 		#1%
 	\else
-		\if@wrk@gateopen\else \@wrk@gateopentrue \setbox\z@\vbox\bgroup \fi
+		\if@wrk@gateopen\else
+			\@wrk@gateopentrue \texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
+		\fi
 	\fi}
 % Closes the discard vbox if a gated lead-in opened one. Runs as the last tokens
 % of the environment body, i.e. still inside that vbox, so \egroup balances it.
-\newcommand{\texlib@wrk@close}{\if@wrk@gateopen \egroup \@wrk@gateopenfalse \fi}
+\newcommand{\texlib@wrk@close}{%
+	\if@wrk@gateopen \egroup\texlib@acc@tagresume \@wrk@gateopenfalse \fi}
 % Re-bind the four lead-ins to their gated form (only when gating is enabled).
 \newcommand{\texlib@wrk@gatebind}{%
 	\ifgateworked
@@ -493,31 +510,19 @@
 % ==============================================================================
 % 9. PROBLEM-BANK AUTO-LOAD
 % ==============================================================================
-% Mirrored from autoexam.cls. didactic-class documents -- exam-review handouts,
-% reference packets, etc. -- can \getproblem{id} pull from the course's bank
-% without per-document boilerplate. The resolution order is identical to
-% autoexam's so the same bank-path value works in both classes.
-\AtBeginDocument{%
-	\@ifundefined{GetBankPath}{}{%
-		\edef\@tmpbankpath{\GetBankPath}%
-		\ifx\@tmpbankpath\empty\else
-			\IfFileExists{\@tmpbankpath}{%
-				\loadbank{\@tmpbankpath}%
-			}{%
-				\@ifundefined{GetCourseMetaDir}{%
-					\loadbank{\@tmpbankpath}%
-				}{%
-					\edef\@tmpbankresolved{\GetCourseMetaDir\@tmpbankpath}%
-					\IfFileExists{\@tmpbankresolved}{%
-						\loadbank{\@tmpbankresolved}%
-					}{%
-						\loadbank{\@tmpbankpath}%
-					}%
-				}%
-			}%
-		\fi
-	}%
-}
+% didactic-class documents -- exam-review handouts, reference packets, the
+% comprehensive course document -- can \getproblem{id} from the course's bank
+% without per-document boilerplate.
+%
+% \pbank@load@coursebank (texlib-problembank.sty) is the shared resolver that
+% autoexam.cls and quiz.cls call. This class used to inline its own copy built on
+% \IfFileExists, which searches all of TEXINPUTS: with a recursive entry on the
+% path (the C:/_texlibjunc// junction, or a course building against TeXLib//) a
+% bare "Bank/bank.tex" matched the LIBRARY's own sample bank before the course's,
+% and every \getproblem came back "not found". The shared resolver probes with
+% lfs instead -- see \pbank@iffilelocal, whose comment names this exact bug -- so
+% it only ever sees the CWD-relative or absolute path it was handed.
+\AtBeginDocument{\pbank@load@coursebank}
 
 % ==============================================================================
 % Structural hang: section/subsection headings, the TOC title, the bibliography

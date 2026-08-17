@@ -434,7 +434,16 @@
 % value for legacy document-relative banks, then a sibling bank.tex. Every probe
 % uses lfs (see \pbank@iffilelocal) rather than \IfFileExists so a recursive
 % TEXINPUTS entry can't silently match a stray library sample bank.
+% ENGINE GUARD: every path below ends in \loadbank, which requires LuaLaTeX, and
+% the lfs probes are LuaTeX-only themselves -- so under pdflatex this can only
+% ever fatal, and it would do so at \begin{document}, before the body had a
+% chance to use a bank command. didactic is a pdflatex class that calls this
+% resolver, and its contract (CLAUDE.md) is that a lecture doc using NO bank
+% command still compiles under pdflatex; auto-loading would silently break that.
+% Do nothing instead: a doc that really does \getproblem still gets the package's
+% clear "Problem-bank features require LuaLaTeX" error from \loadbank itself.
 \newcommand{\pbank@load@coursebank}{%
+	\ifdefined\directlua
 	\@ifundefined{GetBankPath}{}{%
 		\edef\@tmpbankpath{\GetBankPath}%
 		\ifx\@tmpbankpath\empty\else
@@ -450,11 +459,12 @@
 			}%
 		\fi
 	}%
-	\directlua{%
-		if lfs.attributes('bank.tex', 'mode') == 'file' then
-			tex.print('\string\\loadbank{bank.tex}')
-		end
-	}%
+	% Sibling bank.tex, probed through the same helper as every branch above --
+	% it used to be a second raw \directlua, and being OUTSIDE the GetBankPath
+	% guard it ran for every document, so it fataled under pdflatex even when no
+	% bank-path was configured at all.
+	\pbank@iffilelocal{bank.tex}{\loadbank{bank.tex}}{}%
+	\fi
 }
 
 % \importproblem{path}{overrides}  — import a standalone problem file with
@@ -541,6 +551,13 @@
 % reference point right and swallow the -\texlibsectionhang hang; \@totalleftmargin
 % (0 outside a list) cancels that indent so the hang measures from the true margin.
 \providecommand{\texlib@partheading}[1]{\section*{\hspace*{-\@totalleftmargin}#1}}
+% ACCESSIBLE: the heading is hoisted OUT of the {questions} list (see
+% \@texlib@psection@begin), so there is no list indent to cancel — drop the
+% \@totalleftmargin hang and emit a plain starred section that tags cleanly as a
+% top-level <Sect> sibling of the <L> rather than a child inside it.
+\ifdefined\TeXLibAccessibleMode
+	\renewcommand{\texlib@partheading}[1]{\section*{#1}}%
+\fi
 
 % \if@texlib@cursectionmc — true while the section now opening/closing is an
 %   {mcproblems} (vs. {problems}), so a class's page-policy hooks can tell them
@@ -579,6 +596,23 @@
 	\fi
 	\stepcounter{texlibpartno}%
 	\problems@begin@hook
+	% ---- ACCESSIBLE: hoist the "Part N — Label" heading OUT of {questions} -----
+	%   A \section inside the exam-class {questions} list tags as <Sect> nested
+	%   directly under the list's <L> (PDF/UA Table 5 "L-Sect" violation) and, in
+	%   -halt-on-error, throws "missing \item" at \end{problems}. Emit it here,
+	%   before \begin{questions} AND before \section is \let to \@sec@collect, so
+	%   it renders through the real \section (a top-level sibling of the <L>) and
+	%   is NOT captured into the shuffle stream — pbank_emit_section therefore
+	%   never replays it in-list. Normal builds keep the in-list emission below.
+	\ifdefined\TeXLibAccessibleMode
+		\if 1#4%
+			\def\@texlib@ulbl{#3}%
+			\texlib@partheading{%
+				Part~\Roman{texlibpartno}\space\textemdash\space
+				\ifx\@texlib@ulbl\@empty #2\else #3\fi
+			}%
+		\fi
+	\fi
 	% ---- inter-problem separator: first problem on a page gets no rule -------
 	\pbank@lua{pbank_first_on_page = true}%
 	\let\@problems@saved@newpage\newpage
@@ -598,12 +632,17 @@
 	\renewcommand{\newpage}{\pbank@lua{pbank_collect_break()}}%
 	\pbank@lua{pbank_begin_collect()}%
 	% ---- auto "Part N — Label" heading (user label overrides the default) -----
-	\if 1#4%
-		\def\@texlib@ulbl{#3}%
-		\texlib@partheading{%
-			Part~\Roman{texlibpartno}\space\textemdash\space
-			\ifx\@texlib@ulbl\@empty #2\else #3\fi
-		}%
+	%   Normal builds emit it INSIDE the list (texlib-sectionhang aligns it via
+	%   the -\@totalleftmargin hang). Accessible builds already emitted it above,
+	%   hoisted out of the list, so skip here to avoid a duplicate.
+	\ifdefined\TeXLibAccessibleMode\else
+		\if 1#4%
+			\def\@texlib@ulbl{#3}%
+			\texlib@partheading{%
+				Part~\Roman{texlibpartno}\space\textemdash\space
+				\ifx\@texlib@ulbl\@empty #2\else #3\fi
+			}%
+		\fi
 	\fi
 }
 \newcommand{\@texlib@psection@end}{%
@@ -636,7 +675,20 @@
 		{\@texlib@psection@begin{fr}{Free Response}{#2}{0}}
 		{\@texlib@psection@begin{fr}{Free Response}{#2}{1}}%
 }{\@texlib@psection@end}
+% Multiple choice carries NO grading rubric.  A rubric apportions partial credit
+% and an MC item is all-or-nothing, so there is nothing to apportion: both the
+% \rubric overlay and the {commonerrors} block are suppressed for the section.
+% \rubricfalse is local to the environment's group, so a {problems} section
+% elsewhere in the same document still renders its rubrics normally.
+%
+% Emission happens in \@texlib@psection@end (pbank_emit_section), which runs
+% inside this group, so setting the flag here covers every item in the section.
+%
+% Bank sources keep their MC {commonerrors} blocks: they are useful distractor
+% notes when writing or revising an item, they cost nothing in any build, and
+% deleting the \rubricfalse below is all it takes to print them again.
 \NewDocumentEnvironment{mcproblems}{s O{}}{%
+	\rubricfalse
 	\IfBooleanTF{#1}
 		{\@texlib@psection@begin{mc}{Multiple Choice}{#2}{0}}
 		{\@texlib@psection@begin{mc}{Multiple Choice}{#2}{1}}%
