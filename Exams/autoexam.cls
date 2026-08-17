@@ -679,10 +679,26 @@
 %   problem on each page.  Redefine to change the separator style.
 % Override the default \par\medskip from texlib-problembank.sty with a
 % full-width rule between consecutive problems on the same page.
+% ACCESSIBLE: the rule is emitted BETWEEN \question items, i.e. inside the
+% exam-class {questions} list but inside no item — so its two \par tokens open
+% paragraph structures whose parent is the <L> itself. That is a PDF/UA Table 5
+% "L-P" violation, and under tagpdf 1.0c (TeX Live 2026) it is fatal: the
+% automatic text-unit begin/end hooks go unbalanced and the build dies at
+% \begin{document} with "The number of automatic begin (50) and end (44) ...
+% differ". tagpdf 0.99w (TL2025) never checked the relation, which is why the
+% same document builds cleanly there and why this looks like a toolchain
+% regression rather than a latent defect — it is the latter.
+%
+% Suspending tagging around it is the correct fix rather than a workaround: the
+% rule is decoration with no semantic content, and decoration is exactly what
+% PDF/UA wants kept OUT of the structure tree (an artifact). Visual output is
+% unchanged, and \texlib@acc@tagsuspend/@tagresume are no-ops in a normal build.
 \renewcommand{\autoexam@problem@sep}{%
+	\texlib@acc@tagsuspend
 	\par\vspace{0.25em}%
 	\noindent\hspace*{-\@totalleftmargin}\rule{\textwidth}{0.4pt}%
 	\par\vspace{0.25em}%
+	\texlib@acc@tagresume
 }
 
 % \blankpage — outputs one scratch-work leaf.
