@@ -113,7 +113,7 @@ _NO_WINDOW = 0x08000000 if os.name == "nt" else 0  # CREATE_NO_WINDOW
 
 # Document classes that must be compiled with lualatex.
 # report-card uses \directlua (the gradebook engine), so it belongs here too.
-LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "report-card", "bank"}
+LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "report-card", "bank", "thesis"}
 
 # Document classes whose gradebook.xlsx is auto-converted to a report-view CSV
 # before the build (see _convert_gradebooks). The report-view tab name tried in
