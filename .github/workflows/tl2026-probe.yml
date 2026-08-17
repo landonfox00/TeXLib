@@ -5,9 +5,14 @@ name: tl2026-probe
 # unpinned image the other four workflows were accidentally using) because the
 # failures under investigation do not reproduce on the pinned TeX Live 2025.
 #
-# workflow_dispatch only: nothing about this runs on a push or a schedule.
+# Scoped to probe/** branches: workflow_dispatch alone is unusable here, because
+# GitHub only offers it for workflows already on the default branch, and this
+# one deliberately never lands there. Nothing on main or any feature branch
+# triggers it.
 
 on:
+  push:
+    branches: ["probe/**"]
   workflow_dispatch:
 
 jobs:
