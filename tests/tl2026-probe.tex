@@ -1,0 +1,67 @@
+% Temporary diagnostic for issue #69 -- NOT part of the library.
+%
+% Answers two questions about the TeX Live 2026 tagging stack that cannot be
+% asked from a TeX Live 2025 machine:
+%
+%   1. Do the expl3 tagging suspend/resume commands still exist under the names
+%      texlib-build.sty reaches for? It calls them through \csname, so a rename
+%      degrades to \relax SILENTLY -- the discard boxes would then be walked by
+%      tagpdf, which is exactly the shape of the "automatic begin > end" error.
+%
+%   2. Does enumitem's leftmargin=* survive \setlist under the new block-based
+%      list implementation? pset.cls's accessible branch is the tree's only
+%      accessible-mode use of it, and it is the one document failing with
+%      "Missing number, treated as zero".
+%
+% Run under lualatex. Every answer is \typeout'd with a PROBE: prefix.
+\DocumentMetadata{tagging=on, pdfstandard=ua-2}
+\documentclass{article}
+
+\usepackage{enumitem}
+
+\makeatletter
+\newcommand\probe@show[1]{%
+	\expandafter\ifx\csname #1\endcsname\relax
+		\typeout{PROBE: [MISSING] #1}%
+	\else
+		\typeout{PROBE: [present] #1}%
+	\fi
+}
+\makeatother
+
+\typeout{PROBE: ===== command existence =====}
+\probe@show{tag_suspend:n}
+\probe@show{tag_resume:n}
+\probe@show{tag_suspend:}
+\probe@show{tag_resume:}
+\probe@show{tagsuspend}
+\probe@show{tagresume}
+\probe@show{SuspendTagging}
+\probe@show{ResumeTagging}
+\probe@show{tag_stop:}
+\probe@show{tag_start:}
+
+\typeout{PROBE: ===== package versions =====}
+\makeatletter
+\typeout{PROBE: tagpdf   = \@ifpackageloaded{tagpdf}{loaded}{NOT loaded}}
+\typeout{PROBE: fmtversion = \fmtversion}
+\makeatother
+
+% ---------------------------------------------------------------------------
+% Question 2: leftmargin=* through \setlist, exactly as pset.cls does it.
+% ---------------------------------------------------------------------------
+\newlist{parts}{enumerate}{4}
+\setlist[parts]{label=\textbf{(\alph*)}, leftmargin=*, topsep=2pt, parsep=2pt}
+
+\begin{document}
+
+\typeout{PROBE: ===== about to open a parts list with leftmargin=* =====}
+
+\begin{parts}
+	\item first part
+	\item second part
+\end{parts}
+
+\typeout{PROBE: ===== survived leftmargin=* =====}
+
+\end{document}

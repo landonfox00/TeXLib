@@ -1,0 +1,63 @@
+name: tl2026-probe
+
+# Temporary diagnostic for issue #69 -- delete once the TL2026 tagging
+# incompatibility is fixed. Deliberately runs against texlive-full:LATEST (the
+# unpinned image the other four workflows were accidentally using) because the
+# failures under investigation do not reproduce on the pinned TeX Live 2025.
+#
+# workflow_dispatch only: nothing about this runs on a push or a schedule.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Probe the unpinned (TL2026) tagging stack
+        uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
+        with:
+          docker_image: ghcr.io/xu-cheng/texlive-full:latest
+          run: |
+            set +e   # a fatal build is the DATA here, not a reason to stop
+            apk add --no-cache python3 py3-pip poppler-utils
+            pip install --no-cache-dir --break-system-packages pypdf
+
+            echo "===================== TOOLCHAIN ====================="
+            tex --version | head -1
+            echo "--- tagpdf ---"
+            kpsewhich tagpdf.sty
+            grep -m1 -E "ProvidesExplPackage" "$(kpsewhich tagpdf.sty)" || true
+            echo "--- latex-lab block ---"
+            kpsewhich latex-lab-block.ltx  || echo "(no latex-lab-block.ltx)"
+            kpsewhich latex-lab-testphase-block.sty || echo "(no testphase block sty)"
+
+            echo "===================== PROBE DOC ====================="
+            cd tests
+            lualatex -interaction=nonstopmode -shell-escape tl2026-probe.tex >/dev/null 2>&1
+            echo "--- PROBE lines ---"
+            grep -E "^PROBE:" tl2026-probe.log || echo "(no PROBE lines)"
+            echo "--- errors in probe log ---"
+            grep -nE "^! |Missing number|Package tagpdf Error" tl2026-probe.log | head -20 || true
+            cd ..
+
+            echo "===================== SMOKE (the 3 failures) ====================="
+            python3 smoke_test.py --accessible -v Exams "Problem Sets" 2>&1 | tail -60
+
+            echo "===================== COLLECT LOGS ====================="
+            mkdir -p probe-artifacts
+            cp -r .smoke_logs probe-artifacts/ 2>/dev/null || true
+            cp tests/tl2026-probe.log probe-artifacts/ 2>/dev/null || true
+            ls -la probe-artifacts/ probe-artifacts/.smoke_logs 2>/dev/null || true
+            exit 0
+
+      - name: Upload probe artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tl2026-probe-logs
+          path: probe-artifacts/
+          if-no-files-found: warn
