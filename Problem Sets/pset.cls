@@ -235,8 +235,18 @@
 %      a normal build's output is unchanged. The two branches differ slightly in
 %      labelsep/itemsep, which the \newlist `parts' carries from
 %      basic-utilities and the inline form took from enumerate's defaults.
+%   4. TeX Live 2026 / tagpdf 1.0c: leftmargin=* is fatal here, "Missing number,
+%      treated as zero" with the `*' itself reported as the offending token. It
+%      is enumitem's "compute the margin from the label width" sentinel, not a
+%      dimension, and under the new block-based lists this declaration reaches a
+%      path that reads it as one. It only fires where {parts} nests inside
+%      {problem} -- a flat list takes the value fine, which is why a standalone
+%      reproduction looks healthy. 2em is what * resolved to for a bold "(a)"
+%      (labelwidth ~1.5em + labelsep 0.5em), and matches the explicit margin the
+%      accessible {readings} list in texlib-callouts.sty already uses. The normal
+%      branch below keeps *, so print output is bit-for-bit what it was.
 \ifdefined\TeXLibAccessibleMode
-	\setlist[parts]{label=\textbf{(\alph*)}, leftmargin=*,
+	\setlist[parts]{label=\textbf{(\alph*)}, leftmargin=2em,
 					topsep=2pt, parsep=2pt}
 	\AtBeginEnvironment{parts}{\let\part\item}
 \else
