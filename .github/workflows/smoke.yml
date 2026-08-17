@@ -29,9 +29,12 @@ jobs:
       - name: Run smoke tests in TeX Live container
         # Pinned (the commit v2 resolved to) so the build environment — and thus
         # the visual.yml reference rendering it shares — stays stable over time.
+        # The action SHA alone does NOT pin the toolchain: `scheme: full` used to
+        # resolve to texlive-full:latest, so TeX Live rolled underneath all four
+        # workflows. Pin the image itself; 20260101 is TeX Live 2025.
         uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
-          scheme: full
+          docker_image: ghcr.io/xu-cheng/texlive-full:20260101
           # poppler-utils provides pdftotext for the content checks (substring
           # assertions + non-empty artifact checks). Visual regression is a
           # local-only aid (environment-specific reference images), so

@@ -136,10 +136,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # As in the other three workflows, the action SHA pins the action and not
+      # the toolchain; `scheme: full` tracked texlive-full:latest. 20260101 is
+      # TeX Live 2025.
       - name: Real biber + SyncTeX + shuffle + mode-effect tests in pinned TeX Live
         uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
-          scheme: full
+          docker_image: ghcr.io/xu-cheng/texlive-full:20260101
           run: |
             set -e
             apk add --no-cache python3 py3-pip poppler-utils
