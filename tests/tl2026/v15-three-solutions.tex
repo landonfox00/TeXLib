@@ -1,0 +1,35 @@
+% #69 -- three problems each carrying a DISCARDED {solution}.
+% v12/v13/v14 (count, parts, stretch) were all 0, so the trigger is content the
+% real bank problems carry. A student build discards {solution} into a throwaway
+% vbox that tagpdf still walks -- the documented reason texlib-solutions.sty
+% wraps it in \texlib@acc@tagsuspend. Prime suspect.
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=99, date={Probe}}
+
+\begin{problem}{sol1}[topic=sol1]
+	Solve $2x + 5 = 11$ for $x$.
+	\begin{solution}
+	$x = 3$.
+	\end{solution}
+\end{problem}
+\begin{problem}{sol2}[topic=sol2]
+	Solve $3x - 1 = 8$ for $x$.
+	\begin{solution}
+	$x = 3$.
+	\end{solution}
+\end{problem}
+\begin{problem}{sol3}[topic=sol3]
+	Solve $x/4 = 2$ for $x$.
+	\begin{solution}
+	$x = 8$.
+	\end{solution}
+\end{problem}
+
+\begin{document}
+\begin{problems}
+	\problem{topic=sol1}
+	\problem{topic=sol2}
+	\problem{topic=sol3}
+\end{problems}
+\end{document}
