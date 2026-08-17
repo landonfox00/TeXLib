@@ -1,0 +1,30 @@
+% #69 -- three SIMPLE problems forced across pages.
+% Every synthetic variant so far fits on one page and scores 0; every failing
+% variant spans pages. If forcing the break makes violations appear with
+% otherwise-trivial content, the mechanism is the page break inside the tagged
+% {questions} list, not any markup the problems contain.
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=99, date={Probe}}
+
+\begin{problem}{b1}[topic=b1]
+	Solve $2x + 5 = 11$ for $x$.
+	\vspace{\stretch{1}}
+	\PbankPageBreak
+\end{problem}
+\begin{problem}{b2}[topic=b2]
+	Solve $3x - 1 = 8$ for $x$.
+	\vspace{\stretch{1}}
+	\PbankPageBreak
+\end{problem}
+\begin{problem}{b3}[topic=b3]
+	Solve $x/4 = 2$ for $x$.
+\end{problem}
+
+\begin{document}
+\begin{problems}
+	\problem{topic=b1}
+	\problem{topic=b2}
+	\problem{topic=b3}
+\end{problems}
+\end{document}

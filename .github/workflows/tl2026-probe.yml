@@ -47,7 +47,8 @@ jobs:
                      v6-three-problems v7-three-maketitle v8-template-shape \
                      v9-sep-none v10-sep-vmode \
                      v12-three-simple v13-three-parts-nostretch v14-three-stretch \
-                     v15-three-solutions v16-three-displaymath v17-three-center; do
+                     v15-three-solutions v16-three-displaymath v17-three-center \
+                     v18-forced-pagebreaks; do
               rm -f "$v.log" "$v.pdf"
               lualatex -interaction=nonstopmode -shell-escape -jobname="$v" \
                 "${DOCMETA}\\input{$v.tex}" >/dev/null 2>&1
@@ -55,8 +56,11 @@ jobs:
                 viol=$(grep -c "Relation is not allowed" "$v.log")
                 fatal=$(grep -cE "^! " "$v.log")
                 pdf=$([ -f "$v.pdf" ] && echo yes || echo NO)
+                # Page count, to correlate violations with page breaks: every
+                # clean variant so far fits on one page, every failing one spans.
+                pages=$(grep -oE "Output written on .* \([0-9]+ page" "$v.log" | grep -oE "[0-9]+ page" | grep -oE "[0-9]+" | head -1)
                 echo ""
-                echo "### $v : violations=$viol  errors=$fatal  pdf=$pdf"
+                echo "### $v : violations=$viol  errors=$fatal  pdf=$pdf  pages=${pages:-?}"
                 grep -oE "Parent-Child '[^']+' --> '[^']+'" "$v.log" \
                   | sort | uniq -c | sort -rn | head -6
                 grep -E "^! " "$v.log" | head -3
