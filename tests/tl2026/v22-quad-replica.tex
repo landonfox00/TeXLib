@@ -1,0 +1,30 @@
+% #69 -- full replica of sample_quad_solve (display math + parts with stretch +
+% trailing solution), then another problem. If this violates, the reproduction
+% is finally under my control and no longer needs the real bank.
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=99, date={Probe}}
+
+\begin{problem}{qr1}[topic=qr1]
+	Solve the quadratic equation
+	\[ x^2 - 5x + 6 = 0. \]
+	\begin{parts}
+		\part[4] Find all real solutions.
+			\vspace{\stretch{2}}
+		\part[2] Verify one of your solutions by substitution.
+			\vspace{\stretch{1}}
+	\end{parts}
+	\begin{solution}
+	Factor: $(x-2)(x-3) = 0$.
+	\end{solution}
+\end{problem}
+\begin{problem}{qr2}[topic=qr2]
+	Solve $3x - 1 = 8$ for $x$.
+\end{problem}
+
+\begin{document}
+\begin{problems}
+	\problem{topic=qr1}
+	\problem{topic=qr2}
+\end{problems}
+\end{document}

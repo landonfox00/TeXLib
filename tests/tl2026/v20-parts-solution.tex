@@ -1,0 +1,28 @@
+% #69 -- {parts} FOLLOWED BY a discarded {solution}, then another problem.
+% quad breaks only what comes AFTER it. Synthetic parts alone (v13/v14) and
+% solutions alone (v15) are both 0, so the untested thing is their combination
+% inside one problem. Trailing simple problem is the victim.
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=99, date={Probe}}
+
+\begin{problem}{ps1}[topic=ps1]
+	Solve each.
+	\begin{parts}
+		\part[4] First.
+		\part[2] Second.
+	\end{parts}
+	\begin{solution}
+	Answers.
+	\end{solution}
+\end{problem}
+\begin{problem}{ps2}[topic=ps2]
+	Solve $3x - 1 = 8$ for $x$.
+\end{problem}
+
+\begin{document}
+\begin{problems}
+	\problem{topic=ps1}
+	\problem{topic=ps2}
+\end{problems}
+\end{document}

@@ -49,7 +49,8 @@ jobs:
                      v12-three-simple v13-three-parts-nostretch v14-three-stretch \
                      v15-three-solutions v16-three-displaymath v17-three-center \
                      v18-forced-pagebreaks \
-                     v19-pair-quad-ratineq v19-pair-quad-graph v19-pair-ratineq-graph; do
+                     v19-pair-quad-ratineq v19-pair-quad-graph v19-pair-ratineq-graph \
+                     v20-parts-solution v21-math-parts v22-quad-replica; do
               rm -f "$v.log" "$v.pdf"
               lualatex -interaction=nonstopmode -shell-escape -jobname="$v" \
                 "${DOCMETA}\\input{$v.tex}" >/dev/null 2>&1

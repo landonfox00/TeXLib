@@ -1,0 +1,23 @@
+% #69 -- DISPLAY MATH before {parts}, then another problem.
+\documentclass{autoexam}
+\versions{A}
+\examsetup{number=99, date={Probe}}
+
+\begin{problem}{mp1}[topic=mp1]
+	Solve the quadratic equation
+	\[ x^2 - 5x + 6 = 0. \]
+	\begin{parts}
+		\part[4] First.
+		\part[2] Second.
+	\end{parts}
+\end{problem}
+\begin{problem}{mp2}[topic=mp2]
+	Solve $3x - 1 = 8$ for $x$.
+\end{problem}
+
+\begin{document}
+\begin{problems}
+	\problem{topic=mp1}
+	\problem{topic=mp2}
+\end{problems}
+\end{document}
