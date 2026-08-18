@@ -1460,12 +1460,40 @@ local function pbank_catalog_emit(n, id)
 		" get_problem(" .. pbank_lua_quote(id) .. ")}")
 end
 
-function pbank_print_catalog()
+-- filter_str: nil/empty = every loaded problem; otherwise comma-separated
+-- key=value meta filters with AND logic, exactly the syntax and semantics
+-- \problem{topic=quad} already uses (parse_meta + the same match loop as
+-- get_problem). A production bank runs to hundreds of problems, so cataloging
+-- one topic at a time is the difference between a browsing tool and a dump.
+function pbank_print_catalog(filter_str)
+	local filtering = filter_str ~= nil and filter_str:find("=") ~= nil
 	local ids = {}
-	for id in pairs(problem_db) do table.insert(ids, id) end
+	if filtering then
+		local filters = parse_meta(filter_str)
+		for id, p in pairs(problem_db) do
+			local ok = true
+			for k, v in pairs(filters) do
+				if p.meta[k] ~= v then ok = false; break end
+			end
+			if ok then table.insert(ids, id) end
+		end
+	else
+		for id in pairs(problem_db) do table.insert(ids, id) end
+	end
 	if #ids == 0 then
-		tex.print("\\textbf{[TeXLib: no problems loaded --- call " ..
-			"\\string\\loadbank\\space before \\string\\printbankcatalog]}")
+		-- Distinguish "nothing loaded" from "filter matched nothing": they have
+		-- completely different fixes, and reporting the first for the second
+		-- sends you hunting a \loadbank that is working fine.
+		if filtering then
+			-- \string\begin{problem} would render as "\beginproblem": TeX eats
+			-- the braces as grouping, so they have to be escaped literals.
+			tex.print("\\textbf{[TeXLib: no problem matches " ..
+				filter_str:gsub("([%%#&_$])", "\\%1") ..
+				" --- check the meta keys on your \\string\\begin\\{problem\\}]}")
+		else
+			tex.print("\\textbf{[TeXLib: no problems loaded --- call " ..
+				"\\string\\loadbank\\space before \\string\\printbankcatalog]}")
+		end
 		return
 	end
 

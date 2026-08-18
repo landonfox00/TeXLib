@@ -21,6 +21,14 @@ import sublime_plugin
 PROBLEM_RE = re.compile(r"\\begin\{problem\}\{([^}]+)\}(?:\s*\[([^\]]*)\])?")
 LOADBANK_RE = re.compile(r"\\loadbank\{([^}]+)\}")
 IMPORT_RE = re.compile(r"\\importproblem\{([^}]+)\}")
+
+# Sibling bank fragments a document auto-loads, in probe order. This list is
+# repeated in bank_parser.py and, as a TeX-side probe, in
+# texlib-problembank.sty's \pbank@load@coursebank -- three copies that must
+# agree. The plugin host cannot import the repo-root modules, which is why the
+# duplication exists; test_texlib_bank.py asserts the order so a change to one
+# copy that misses another fails loudly.
+SIBLING_BANK_NAMES = ("problem-bank.tex", "bank.tex")
 ROOT_RE = re.compile(r"(?im)^%\s*!\s*T[Ee]X\s+root\s*=\s*(.+?)\s*$")
 
 # coursemeta wiring (autoexam/quiz autoload a bank via the coursemeta bank-path,
@@ -167,7 +175,11 @@ def problem_sources(doc_path, doc_text):
                 hit = resolve(m.group(1), base)
                 if hit:
                     visit(hit)
-        visit(os.path.normpath(os.path.join(base, "bank.tex")))
+        # problem-bank.tex first, bank.tex second -- the same probe order the
+        # class-side resolver (texlib-problembank.sty) and bank_parser.py use.
+        # The library's samples are problem-bank.tex; course folders use bank.tex.
+        for sibling in SIBLING_BANK_NAMES:
+            visit(os.path.normpath(os.path.join(base, sibling)))
     return files
 
 

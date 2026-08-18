@@ -459,11 +459,21 @@
 			}%
 		\fi
 	}%
-	% Sibling bank.tex, probed through the same helper as every branch above --
-	% it used to be a second raw \directlua, and being OUTSIDE the GetBankPath
+	% Sibling bank fragment, probed through the same helper as every branch above
+	% -- it used to be a second raw \directlua, and being OUTSIDE the GetBankPath
 	% guard it ran for every document, so it fataled under pdflatex even when no
 	% bank-path was configured at all.
-	\pbank@iffilelocal{bank.tex}{\loadbank{bank.tex}}{}%
+	%
+	% problem-bank.tex FIRST, bank.tex second. The library's own sample fragments
+	% were called bank.tex, and a bare "Bank/bank.tex" could match the library's
+	% sample ahead of the course's own bank -- the shadowing this resolver's lfs
+	% probes were written to guard against. The samples are now problem-bank.tex,
+	% which removes the collision at its source and gives new courses a name that
+	% says what the file is. bank.tex stays supported and unambiguous, because
+	% every existing course folder uses it; there is no migration to do.
+	\pbank@iffilelocal{problem-bank.tex}{\loadbank{problem-bank.tex}}{%
+		\pbank@iffilelocal{bank.tex}{\loadbank{bank.tex}}{}%
+	}%
 	\fi
 }
 
@@ -491,15 +501,23 @@
 %   output. Problems are listed in bank source order (file, then
 %   \begin{problem} line) so the catalog mirrors how the bank itself reads.
 %   Typically the whole content of a small dedicated root document, e.g.:
-%     \documentclass{quiz}
+%     \documentclass{bank}
 %     \begin{document}
-%       \loadbank{bank.tex}
+%       \loadbank{problem-bank.tex}
 %       \printbankcatalog
 %     \end{document}
-\NewDocumentCommand{\printbankcatalog}{}{%
+%
+%   \printbankcatalog[topic=quad, section=sample] restricts the listing to the
+%   problems matching those meta filters -- the same comma-separated key=value
+%   syntax and AND semantics \problem{topic=quad} uses, resolved by the same
+%   parse_meta + match loop in the engine (no second matcher). A production bank
+%   runs to hundreds of problems, so cataloging one topic at a time is what
+%   makes this a browsing tool rather than a print-everything tool. Omit the
+%   argument for the full catalog.
+\NewDocumentCommand{\printbankcatalog}{O{}}{%
 	\begingroup
 	\solutionstrue
-	\pbank@lua{pbank_print_catalog()}%
+	\pbank@lua{pbank_print_catalog('\luaescapestring{#1}')}%
 	\endgroup
 }
 

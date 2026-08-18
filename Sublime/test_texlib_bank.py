@@ -88,4 +88,25 @@ with tempfile.TemporaryDirectory() as tmp2:
                 == os.path.join(tmp2, "coursemeta.tex"),
                 "coursemeta: find_coursemeta walks up to the governing file")
 
+# ---------------------------------------------------------------------------
+# Sibling bank-fragment names are declared in THREE places that must agree:
+# texlib_bank.py (the plugin), bank_parser.py (the CLI tooling) and, as a TeX
+# probe, texlib-problembank.sty's \pbank@load@coursebank. The plugin host cannot
+# import the repo-root modules, so the duplication is structural -- assert it
+# instead, or a rename lands in one copy and silently not the others.
+# ---------------------------------------------------------------------------
+EXPECTED_SIBLINGS = ("problem-bank.tex", "bank.tex")
+REPO = os.path.dirname(HERE)
+
+ok &= check(texlib_bank.SIBLING_BANK_NAMES == EXPECTED_SIBLINGS,
+            "sibling names: plugin copy is problem-bank.tex then bank.tex")
+
+_parser_src = open(os.path.join(REPO, "bank_parser.py"), encoding="utf-8").read()
+ok &= check('SIBLING_BANK_NAMES = ("problem-bank.tex", "bank.tex")' in _parser_src,
+            "sibling names: bank_parser.py copy agrees")
+
+_sty = open(os.path.join(REPO, "texlib-problembank.sty"), encoding="utf-8").read()
+ok &= check(_sty.find("problem-bank.tex") < _sty.find(r"\pbank@iffilelocal{bank.tex}"),
+            "sibling names: the .sty probes problem-bank.tex BEFORE bank.tex")
+
 report(ok)
