@@ -1568,6 +1568,53 @@ def main():
         os.rmdir(d)
     os.rmdir(tmpc)
 
+    # -----------------------------------------------------------------------
+    # Build spec is single-sourced.
+    #
+    # LUALATEX_CLASSES / ACCESSIBLE_DOCMETA / ACCESSIBLE_MACRO were literals in
+    # BOTH texlib_build.py and smoke_test.py and had drifted: bingo was in the
+    # harness copy and not the builder's. A class missing from the builder's set
+    # silently gets pdflatex, and every lua class fatals under it -- that is the
+    # failure that cost a session when thesis was missing from both. They now
+    # live once in texlib_buildspec.py; assert no copy creeps back.
+    # -----------------------------------------------------------------------
+    _repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _spec_path = os.path.join(_repo, "Sublime", "texlib", "texlib_buildspec.py")
+    check("buildspec: the single source exists", os.path.isfile(_spec_path))
+
+    _redefiners = []
+    for _dirpath, _dirnames, _filenames in os.walk(_repo):
+        if any(part in _dirpath for part in (os.sep + ".git", os.sep + ".claude")):
+            continue
+        for _fn in _filenames:
+            if not _fn.endswith(".py") or _fn == "texlib_buildspec.py":
+                continue
+            _p = os.path.join(_dirpath, _fn)
+            try:
+                _txt = open(_p, encoding="utf-8", errors="replace").read()
+            except OSError:
+                continue
+            # Markers assembled at runtime: spelled out literally, this file
+            # would match itself and the check would fail on its own source.
+            for _marker in ("LUALATEX_CLASSES = " + "{",
+                            "ACCESSIBLE_DOCMETA = " + "(",
+                            "ACCESSIBLE_MACRO = " + "ACCESSIBLE_DOCMETA"):
+                if _marker in _txt:
+                    _redefiners.append(os.path.relpath(_p, _repo) + " :: " + _marker)
+    check("buildspec: no module redefines the shared constants",
+          not _redefiners, "; ".join(_redefiners))
+
+    # Every lua class must actually be one -- bingo and schedule \directlua at
+    # class load, thesis loads fontspec; pdflatex cannot compile any of them.
+    sys.path.insert(0, os.path.join(_repo, "Sublime", "texlib"))
+    import texlib_buildspec as _bs  # noqa: E402
+    check("buildspec: bingo is in LUALATEX_CLASSES",
+          "bingo" in _bs.LUALATEX_CLASSES)
+    check("buildspec: thesis is in LUALATEX_CLASSES",
+          "thesis" in _bs.LUALATEX_CLASSES)
+    check("buildspec: accessible macro carries both MathML methods",
+          "mathml-AF" in _bs.ACCESSIBLE_MACRO and "mathml-SE" in _bs.ACCESSIBLE_MACRO)
+
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL
 

@@ -64,6 +64,18 @@ import time
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TEXLIB_ROOT = SCRIPT_DIR  # script lives at TeXLib root
 
+# The build facts this harness shares with the Sublime builder live in
+# Sublime/texlib/texlib_buildspec.py, declared once. They sit inside the plugin
+# package because THAT is the consumer with the hard constraint -- Sublime's
+# plugin host cannot reach repo-root modules, while this harness can reach down.
+# They were literals in both files and had already drifted (bingo was here and
+# not in the builder), which silently selects pdflatex for a class that fatals
+# under it.
+sys.path.insert(0, os.path.join(TEXLIB_ROOT, "Sublime", "texlib"))
+import texlib_buildspec as _spec  # noqa: E402
+
+LUALATEX_CLASSES = _spec.LUALATEX_CLASSES
+
 # External tools for content/visual checks. All optional: when a tool is
 # missing the corresponding check is skipped (with a warning) rather than
 # failing, so a bare `lualatex`/`pdflatex` install can still run build-only.
@@ -76,17 +88,13 @@ MAGICK = shutil.which("magick")
 COMPARE = shutil.which("compare")  # ImageMagick 6 standalone
 VERAPDF = shutil.which("verapdf") or shutil.which("verapdf.bat")
 
-# Accessible (tagged PDF/UA) build. Must stay in lock-step with the Sublime
-# builder's ACCESSIBLE_MACRO (Sublime/texlib/texlib_build.py): the same
-# \DocumentMetadata prefix is injected ahead of \input so tagging is switched on
-# before \documentclass. --accessible forces lualatex, builds the tagged
-# variant, and (when veraPDF is present) validates PDF/UA-2 conformance.
-ACCESSIBLE_DOCMETA = (
-    r"\DocumentMetadata{lang=en,tagging=on,"
-    r"tagging-setup={math/setup={mathml-AF,mathml-SE},table/header-rows=1},"
-    r"pdfstandard={ua-2,a-4f}}"
-)
-ACCESSIBLE_MACRO = ACCESSIBLE_DOCMETA + r"\def\TeXLibAccessibleMode{}"
+# Accessible (tagged PDF/UA) build. The prefix is injected ahead of \input so
+# tagging is switched on before \documentclass; --accessible forces lualatex,
+# builds the tagged variant, and (when veraPDF is present) validates PDF/UA-2
+# conformance. It no longer has to be kept "in lock-step" with the Sublime
+# builder by hand -- both import it from texlib_buildspec.
+ACCESSIBLE_DOCMETA = _spec.ACCESSIBLE_DOCMETA
+ACCESSIBLE_MACRO = _spec.ACCESSIBLE_MACRO
 
 # Committed reference images for visual regression (--visual). Generated with
 # --update-refs; environment-specific (font rendering differs across TeX Live
@@ -164,9 +172,7 @@ MODULES = [
     ("examples/Math181-Fall2026", "schedule.tex"),
 ]
 
-# Classes that require lualatex (use \directlua, luaotfload, or sibling .lua
-# files; report-card's \gradebook reads its CSV via lualatex).
-LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "bingo", "report-card", "bank", "thesis"}
+# LUALATEX_CLASSES is imported from texlib_buildspec above -- see the note there.
 
 # Maps a \documentclass to the module dir shipping its .cls and default include
 # files (instructions, title). Used to give a build whose source lives OUTSIDE

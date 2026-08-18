@@ -111,9 +111,16 @@ _NO_WINDOW = 0x08000000 if os.name == "nt" else 0  # CREATE_NO_WINDOW
 
 # --- Configuration ----------------------------------------------------------
 
-# Document classes that must be compiled with lualatex.
-# report-card uses \directlua (the gradebook engine), so it belongs here too.
-LUALATEX_CLASSES = {"autoexam", "quiz", "schedule", "report-card", "bank", "thesis"}
+# LUALATEX_CLASSES, ACCESSIBLE_DOCMETA and ACCESSIBLE_MACRO are declared ONCE in
+# texlib_buildspec.py and imported here and by smoke_test.py. They were literals
+# in both, and had already drifted (bingo was in the harness copy and not this
+# one). Same in-package import shape texlib.py uses for texlib_build itself.
+try:
+    from TeXLib import texlib_buildspec as _spec
+except ImportError:  # plain import outside the Sublime package (tests, CLI)
+    import texlib_buildspec as _spec
+
+LUALATEX_CLASSES = _spec.LUALATEX_CLASSES
 
 # Document classes whose gradebook.xlsx is auto-converted to a report-view CSV
 # before the build (see _convert_gradebooks). The report-view tab name tried in
@@ -176,18 +183,14 @@ ACCESSIBLE_ENGINE = "lualatex"
 # Ally/UDOIT-style checker reports, but it does so by replacing the MathML with
 # flat alt text that hides the real markup from screen readers -- a better
 # number for worse accessibility. See CHANGELOG 0.6.0.
-ACCESSIBLE_DOCMETA = (
-    r"\DocumentMetadata{lang=en,tagging=on,"
-    r"tagging-setup={math/setup={mathml-AF,mathml-SE},table/header-rows=1},"
-    r"pdfstandard={ua-2,a-4f}}"
-)
+ACCESSIBLE_DOCMETA = _spec.ACCESSIBLE_DOCMETA
 
 # --- Sliced copies ----------------------------------------------------------
 # How the version slicer names an instructor copy (texlib_pdfpost.slice_from_vmap
 # appends it, and the .spl split's <base>_Solutions.pdf matches case-insensitively).
 # preferred_pdf_path tells the two kinds of copy apart by this and nothing else.
 SOLUTION_COPY_SUFFIX = "_solutions.pdf"
-ACCESSIBLE_MACRO = ACCESSIBLE_DOCMETA + r"\def\TeXLibAccessibleMode{}"
+ACCESSIBLE_MACRO = _spec.ACCESSIBLE_MACRO
 
 # A pseudo-mode: a single engine pass with no biber and no rerun loop, for fast
 # preview while writing. Cross-references / citations may be stale; a normal
