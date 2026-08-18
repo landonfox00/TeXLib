@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Real-build tests for course-metadata.sty's coursemeta.tex resolution — the two
-behaviors the metadata fixture (tests/fixtures/Metadata) only exercises at
+behaviors the metadata fixture (examples/fixtures/Metadata) only exercises at
 depth 0 and never at all:
 
   A1  DIRECTORY-WALK DEPTH. The engine walks `.`, `..`, `../..`, `../../..`
@@ -22,7 +22,7 @@ depth 0 and never at all:
       precedence and the coursemeta value leaks back.
 
 Self-contained: the fixtures are written into a scratch tree (never touches
-tests/fixtures/), and the shared .sty/.cls are COPIED into a comma-free _lib
+examples/fixtures/), and the shared .sty/.cls are COPIED into a comma-free _lib
 dir there. That copy is deliberate — kpathsea cannot search a TEXINPUTS entry
 containing a comma (the repo's OneDrive path has one), and the C:\\_texlibjunc
 junction points at the LIVE checkout, not necessarily this one, so pointing

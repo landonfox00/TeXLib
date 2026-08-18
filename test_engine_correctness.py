@@ -4,7 +4,7 @@
 This targets the "renders the wrong number / wrong answer key" class of silent
 failure -- a substituted variable value, a \\calcvar result, or a multiple-choice
 answer letter coming out WRONG -- which had essentially no rendered coverage.
-tests/fixtures/Exams/fix-test.tex proves the \\problem{id}[a=1,...] override
+examples/fixtures/Exams/fix-test.tex proves the \\problem{id}[a=1,...] override
 SYNTAX parses, but never that the substituted VALUES reach the page, and
 \\calcvar had no buildable fixture at all.
 
@@ -48,7 +48,7 @@ import sys
 import tempfile
 
 TEXLIB_ROOT = os.path.dirname(os.path.abspath(__file__))
-FIXTURES = os.path.join(TEXLIB_ROOT, "tests", "fixtures", "Exams")
+FIXTURES = os.path.join(TEXLIB_ROOT, "examples", "fixtures", "Exams")
 
 
 # --- Toolchain routing / detection (mirrors test_synctex_integration.py) ------

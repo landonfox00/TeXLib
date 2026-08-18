@@ -1615,6 +1615,44 @@ def main():
     check("buildspec: accessible macro carries both MathML methods",
           "mathml-AF" in _bs.ACCESSIBLE_MACRO and "mathml-SE" in _bs.ACCESSIBLE_MACRO)
 
+    # -----------------------------------------------------------------------
+    # The example corpus is declared once, and every declared file exists.
+    #
+    # A manifest that lists a path which is not there fails silently in the
+    # worst way: the example never runs, and a green suite reports nothing.
+    # -----------------------------------------------------------------------
+    sys.path.insert(0, os.path.join(_repo, "examples"))
+    import manifest as _mf  # noqa: E402
+
+    _missing = []
+    for _e in _mf.EXAMPLES:
+        _p = os.path.join(_repo, _e.module.replace("/", os.sep), _e.template)
+        if not os.path.isfile(_p):
+            _missing.append(os.path.relpath(_p, _repo))
+    check("manifest: every declared example file exists", not _missing,
+          "; ".join(_missing))
+
+    check("manifest: smoke corpus is non-empty", len(_mf.modules("smoke")) > 0)
+    check("manifest: showcase corpus is non-empty", len(_mf.showcase()) > 0)
+
+    # Visual diffing only makes sense for deterministic output. autoexam and
+    # quiz shuffle versions and pull random bank problems, so a pixel diff of
+    # them is pure noise -- if either is ever tagged visual, that is a mistake.
+    _nondet = {"Exams", "Quizzes"} & _mf.visual_modules()
+    check("manifest: randomized modules are not tagged visual", not _nondet,
+          str(sorted(_nondet)))
+
+    # Every scenario area must map to a module, or its scenarios stage without
+    # the class assets they need and fail for a reason that looks unrelated.
+    _areas = set()
+    _sc = os.path.join(_repo, "examples", "scenarios")
+    if os.path.isdir(_sc):
+        _areas = {d for d in os.listdir(_sc)
+                  if os.path.isdir(os.path.join(_sc, d))}
+    _unmapped = _areas - set(_mf.SCENARIO_AREA_MODULE)
+    check("manifest: every scenario area maps to a module", not _unmapped,
+          str(sorted(_unmapped)))
+
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL
 
