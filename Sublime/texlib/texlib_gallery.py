@@ -7,7 +7,7 @@
 #   TeXLib: Rebuild Accessibility Gallery   regenerate a11y_gallery.html, then
 #                                           open it when the build finishes
 #
-# The gallery (a11y_gallery.py) builds every tests/scenarios feature BOTH ways
+# The gallery (a11y_gallery.py) builds every examples/scenarios feature BOTH ways
 # -- normal and accessible (tagged PDF/UA) -- and assembles one self-contained,
 # searchable HTML page: per feature it shows the normal render, the accessible
 # render, the accessible PDF tag tree + veraPDF badge, and a per-page pixel diff.

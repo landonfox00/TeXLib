@@ -1,6 +1,25 @@
 # Examples
 
-End-to-end illustrations of using TeXLib for a real course. Copy a directory and edit, or just use it as a reference for the per-course workflow described in the [root Quickstart](../README.md#quickstart).
+Every TeXLib example lives under this directory, and every one of them is declared exactly once in [`manifest.py`](manifest.py).
+
+## Layout
+
+| Path | What it is | Written to be |
+|---|---|---|
+| `<Course>/` | end-to-end course folders sharing one `coursemeta.tex` | realistic |
+| [`fixtures/`](fixtures/) | regression traps, one specific bug each | deliberately weird |
+| [`scenarios/`](scenarios/) | one-configuration-each feature matrix | deliberately minimal |
+| `../<Module>/<class>-template.tex` | the canonical document you copy to start work | canonical |
+
+The module templates are the one corpus that deliberately does **not** live here: a template is the module's public surface, sits beside the class it instantiates, and is referenced by the installer and every module README. They are declared in the manifest alongside everything else, so nothing is lost by their living elsewhere.
+
+These four are not merged into a single corpus on purpose. A good teaching example makes a poor regression fixture — too much going on to localise a failure — and a good fixture makes a terrible showcase. They are unified by *declaration*, not by file.
+
+## The manifest
+
+`manifest.py` is the single source. Each entry carries its path, what it is for (`smoke` / `accessible` / `visual` / `showcase`), the substrings its rendered PDF must and must not contain, and a note saying why the example exists at all.
+
+`smoke_test.py` derives its registries from it, and the class gallery renders from it — so what you can browse and what CI actually builds cannot drift apart. Adding an example is one edit in one file. Previously it meant remembering which of four registries to touch, and touching the wrong subset failed silently: the example simply never ran, and a green suite said nothing was wrong.
 
 ## What's here
 

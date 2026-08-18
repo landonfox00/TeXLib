@@ -33,7 +33,7 @@ with tempfile.TemporaryDirectory() as root:
     touch(root, "Exams/autoexam-template.tex")
     touch(root, "Report Cards/report-card-template.tex")   # spaced dir, hyphen class
     touch(root, "Syllabi/syllabus-template.tex")
-    touch(root, "tests/scenarios/quiz/standard/template.tex")  # fixture (no -template)
+    touch(root, "examples/scenarios/quiz/standard/template.tex")  # fixture (no -template)
     touch(root, "Quizzes/quiz-01.tex")                     # a real doc, not a template
     touch(root, "Sublime/texlib/texlib.py")               # excluded dir
 

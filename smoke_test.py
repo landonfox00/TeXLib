@@ -27,7 +27,7 @@ Usage:
     python smoke_test.py --scenarios --full     # the ultimate run (all tiers)
     python smoke_test.py --scenarios --update-refs   # regenerate scenario refs
 
-Visual scenario packs live under tests/scenarios/<area>/<name>/ — each a
+Visual scenario packs live under examples/scenarios/<area>/<name>/ — each a
 self-contained template exercising one configuration (orientation, month-pages,
 edge dates, ...). `--scenarios` builds and visually diffs them; tier `core`
 runs by default, `full` only with `--full`. This is a local aid (references are
@@ -76,6 +76,16 @@ import texlib_buildspec as _spec  # noqa: E402
 
 LUALATEX_CLASSES = _spec.LUALATEX_CLASSES
 
+# The example corpus -- module templates, fixtures, course folders and the
+# scenario area map -- is declared once in examples/manifest.py. The registries
+# below are derived views of it, so adding an example is one edit in one file
+# and both CI and the class gallery see it. They used to be four hand-kept
+# registries with four discovery mechanisms, where adding an example to the
+# wrong subset failed silently: it simply never ran, and a green suite said
+# nothing was wrong.
+sys.path.insert(0, os.path.join(TEXLIB_ROOT, "examples"))
+import manifest as _manifest  # noqa: E402
+
 # External tools for content/visual checks. All optional: when a tool is
 # missing the corresponding check is skipped (with a warning) rather than
 # failing, so a bare `lualatex`/`pdflatex` install can still run build-only.
@@ -105,79 +115,24 @@ VISUAL_DPI = 100
 # autoexam/quiz shuffle versions and pull random bank problems, so their pages
 # differ build-to-build — pixel-diffing them is pure noise. Restrict to the
 # fixed-layout modules (the schedule grid is the motivating case).
-VISUAL_MODULES = {"Schedule", "Report Cards", "Syllabi", "Notes"}
+VISUAL_MODULES = _manifest.visual_modules()
+
 # Max fraction of differing pixels (after a small color fuzz) tolerated per page
 # before a page is flagged as a visual regression. Tight, because refs and the
 # build under test come from the same machine in the intended local workflow.
 VISUAL_MAX_DIFF_FRAC = 0.002
 
-# Visual scenario packs (tier 2/3): tests/scenarios/<area>/<name>/template.tex,
+# Visual scenario packs (tier 2/3): examples/scenarios/<area>/<name>/template.tex,
 # each a self-contained doc (metadata inline via \metasetup) exercising ONE
 # configuration. An optional `tags` file (whitespace-separated, e.g. "full")
 # marks the tier; absent => {"core"}. `core` runs by default; `full` only with
 # --full. A scenario's <area> maps to the module whose .cls/.lua it builds on.
-SCENARIOS_DIR = os.path.join(TEXLIB_ROOT, "tests", "scenarios")
-SCENARIO_AREA_MODULE = {
-    "schedule": "Schedule",
-    "report-cards": "Report Cards",
-    "syllabi": "Syllabi",
-    "notes": "Notes",
-    "quiz": "Quizzes",
-    "exam": "Exams",
-}
+SCENARIOS_DIR = os.path.join(TEXLIB_ROOT, "examples", "scenarios")
+SCENARIO_AREA_MODULE = _manifest.SCENARIO_AREA_MODULE
 
 # Modules and their template files. Engine is auto-detected from \documentclass.
-MODULES = [
-    ("Bingo",        "bingo-template.tex"),
-    ("Exams",        "autoexam-template.tex"),
-    ("Notes",        "didactic-template.tex"),
-    ("Quizzes",      "quiz-template.tex"),
-    ("Report Cards", "report-card-template.tex"),
-    ("Schedule",     "schedule-template.tex"),
-    ("Syllabi",      "syllabus-template.tex"),
-    ("Problem Sets", "pset-template.tex"),
-    ("Bank",         "bank-template.tex"),
-    # The thesis/dissertation class. Unlike every other template this one
-    # carries its OWN \DocumentMetadata (a dissertation should be tagged on a
-    # plain build, not only under --accessible), so the default-mode run is
-    # already a tagged build. The accessible run injects a second
-    # \DocumentMetadata on top; LaTeX accepts that, and the injected
-    # mathml-AF/SE + ua-2/a-4f settings are what the gate then validates.
-    ("Thesis",       "thesis-template.tex"),
-    # Feature-test fixtures (live under tests/fixtures/<Module>/). Each is a
-    # self-contained .tex that exercises something the canonical template
-    # doesn't — e.g. the fix-overrides syntax \problem{id}[a=1,b=2]. Treated
-    # like any other module by build_one (it copies siblings + collects root +
-    # module .cls files), so they run on every push alongside the modules.
-    ("tests/fixtures/Exams",   "fix-test.tex"),
-    # course-metadata.sty's catch-all: arbitrary (non-predefined) keys must be
-    # absorbed and mint a working \Get<Key> getter. A regressed catch-all errors
-    # under -halt-on-error; a regressed getter leaves \Get... undefined.
-    ("tests/fixtures/Metadata", "metadata-test.tex"),
-    # didactic's shared-counter, section-based theorem numbering: several
-    # theorem-family boxes across two sections must number 1.1, 1.2, ..., 2.1, ...
-    # (EXPECT_TEXT below). The canonical Notes template only checks the word
-    # "Theorem"; a counter regression would pass it but fail here.
-    ("tests/fixtures/Notes", "theorem-numbering.tex"),
-    # The end-to-end examples (examples/<Course>/) double as build fixtures so
-    # the documented course folder can't silently rot when a class changes.
-    # Build-only (no EXPECT_TEXT key): they share one coursemeta.tex across
-    # several documents, so there's no single per-module text token to assert.
-    # build_one copies each doc's class home-module assets in (CLASS_HOME_MODULE),
-    # so e.g. the {quiz} doc gets quiz-instructions.tex even though it lives here.
-    ("examples/Math181-Fall2026", "lecture-01-limits.tex"),
-    ("examples/Math181-Fall2026", "quiz-01.tex"),
-    ("examples/Math181-Fall2026", "exam-01.tex"),
-    ("examples/Math181-Fall2026", "syllabus.tex"),
-    ("examples/Math181-Fall2026", "schedule.tex"),
-]
+MODULES = _manifest.modules("smoke")
 
-# LUALATEX_CLASSES is imported from texlib_buildspec above -- see the note there.
-
-# Maps a \documentclass to the module dir shipping its .cls and default include
-# files (instructions, title). Used to give a build whose source lives OUTSIDE
-# that module — e.g. an examples/ course folder using {quiz} — the class's
-# library assets in cwd, the comma-safe way (mirrors build_scenario's copy).
 CLASS_HOME_MODULE = {
     "didactic":    "Notes",
     "quiz":        "Quizzes",
@@ -235,63 +190,20 @@ STUB_COURSEMETA = r"""% coursemeta.tex - auto-generated stub for TeXLib smoke te
 # check misses — e.g. the schedule grid that silently rendered zero rows.
 # Keep the strings to durable, content-level tokens (column headers, directive
 # output, instruction boilerplate), NOT layout/font-sensitive details.
-EXPECT_TEXT = {
-    # The bingo template renders math symbols (not text labels) in its cells, so
-    # match the always-present banner title and the how-to-play boilerplate
-    # instead of grid coordinates.
-    "Bingo":        ["Bingo", "Mark the free space"],
-    "Exams":        ["Problem 1", "Problem 2"],
-    "Notes":        ["Introduction", "Theorem"],
-    "Quizzes":      ["Quiz"],
-    "Report Cards": ["Report Card"],
-    "Schedule":     ["MONDAY", "WEEK", "Quiz 1", "Finals Week"],
-    # Syllabi/template.tex carries its own metadata (not the stub), so key on
-    # the template's stable section headings.
-    "Syllabi":      ["Course Description", "Office Hours"],
-    "Problem Sets": ["Problem 1"],
-    # The bank catalog prints its coverage summary + every problem's solution
-    # (always shown). "Bank coverage" == the summary rendered; "Solution" == a
-    # cataloged solution rendered.
-    "Bank":         ["Bank coverage", "Solution"],
-    # Front-matter page, a body chapter, and a theorem head from the
-    # class's own trivlist-free environments. The bibliography is NOT
-    # asserted: smoke does not run biber, so the reference list is empty
-    # by design here and asserting it would fail for the wrong reason.
-    "Thesis":       ["Abstract", "Introduction", "Theorem 1.1"],
-    # MULTILINEHEADEROK is the stem of the mlheader problem, whose [meta] header
-    # wraps lines; its presence proves that problem rendered (paired with the
-    # EXPECT_ABSENT leak token below).
-    "tests/fixtures/Exams":   ["Problem 1", "MULTILINEHEADEROK"],
-    # One marker per auto-vivified getter (coursemeta key, inline-loud, inline-
-    # quiet). All three present == every custom key minted a working getter.
-    # SETCMDMARK == \SetCourseTitle round-tripped through \GetCourseTitle;
-    # METAALIASMARK == the \meta->\metasetup alias still sets (and mints) a key.
-    "tests/fixtures/Metadata": ["CMOFFICEHOURSMARK", "CMLECTHALLMARK", "CMTANAMEMARK",
-                                "SETCMDMARK", "METAALIASMARK"],
-    # Shared master counter, section-based, resetting per \section. All five must
-    # appear IN THIS FORM: per-family counters would renumber Definition to 1.1,
-    # a flat scheme would drop the ".1" suffix, and a missing section reset would
-    # make the section-2 boxes 1.4/1.5 — each failing at least one token.
-    "tests/fixtures/Notes": ["Theorem 1.1", "Definition 1.2", "Lemma 1.3",
-                             "Theorem 2.1", "Definition 2.2"],
-}
+EXPECT_TEXT = _manifest.expect_text()
 
 # Substrings that must NOT appear in a module's rendered PDF (case-insensitive).
 # The negative mirror of EXPECT_TEXT: asserts something was correctly suppressed.
 # MLHEADERLEAK lives only in a wrapped \begin{problem}[meta] header in
 # fix-bank.tex; it renders ONLY if the engine fails to skip the header
 # continuation lines (the multi-line-header leak regression).
-EXPECT_ABSENT = {
-    "tests/fixtures/Exams": ["MLHEADERLEAK"],
-}
+EXPECT_ABSENT = _manifest.expect_absent()
 
 # Generated sidecar files that must exist AND be non-empty after a build. A
 # dependency-free content signal (no pdftotext needed): the schedule's grid
 # file is 0 bytes exactly when render_grid produced no rows — the empty-grid
 # bug. Patterns are globbed inside the build's temp dir.
-EXPECT_ARTIFACT_NONEMPTY = {
-    "Schedule": ["*_schedule_grid.tex"],
-}
+EXPECT_ARTIFACT_NONEMPTY = _manifest.expect_artifact_nonempty()
 
 
 # ---------------------------------------------------------------------------
@@ -302,7 +214,7 @@ DOCCLASS_RE = re.compile(r"\\documentclass(?:\[[^\]]*\])?\{(\w[\w-]*)\}")
 
 
 def safe_name(module: str) -> str:
-    """Filesystem-safe slug for a module name (e.g. 'tests/fixtures/Exams' -> 'tests_fixtures_Exams')."""
+    """Filesystem-safe slug for a module name (e.g. 'examples/fixtures/Exams' -> 'tests_fixtures_Exams')."""
     return re.sub(r"[^\w.-]+", "_", module)
 
 
@@ -844,7 +756,7 @@ def _save_log(tmp_dir: str, log_text, verbose: bool = False, jobname: str = "bui
 
 def discover_scenarios(area_filter: list[str], include_full: bool) -> list[dict]:
     """
-    Find scenario dirs under tests/scenarios/<area>/<name>/ (each holding a
+    Find scenario dirs under examples/scenarios/<area>/<name>/ (each holding a
     template.tex). Returns dicts {area, name, dir, slug, tags}, filtered by
     `area_filter` (empty = all areas) and tier (core always; full only when
     `include_full`). `slug` is "<area>__<name>" — the visual-ref key.
@@ -1047,7 +959,7 @@ def run_scenarios(area_filter: list[str], include_full: bool, update_refs: bool,
     print(f"  found   : {len(scen)} scenario(s)")
     print()
     if not scen:
-        print("No scenarios matched. Add tests/scenarios/<area>/<name>/template.tex.")
+        print("No scenarios matched. Add examples/scenarios/<area>/<name>/template.tex.")
         return 0
 
     results: list[tuple[str, bool, str]] = []
@@ -1140,7 +1052,7 @@ def main() -> int:
     )
     p.add_argument(
         "--scenarios", nargs="*", metavar="AREA", default=None,
-        help="Run visual scenario packs (tests/scenarios/) instead of the module suite. "
+        help="Run visual scenario packs (examples/scenarios/) instead of the module suite. "
              "Optionally limit to AREA(s), e.g. --scenarios schedule. Always visual; "
              "combine with --update-refs to regenerate scenario references.",
     )

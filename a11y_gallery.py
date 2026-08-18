@@ -2,7 +2,7 @@
 """
 a11y_gallery.py — a navigable normal-vs-accessible feature gallery for TeXLib.
 
-Builds every self-contained feature scenario under tests/scenarios/ in BOTH the
+Builds every self-contained feature scenario under examples/scenarios/ in BOTH the
 normal and the accessible (tagged PDF/UA) build modes, renders each to page
 images, validates the accessible copy with veraPDF, and extracts its PDF tag
 tree. It then assembles one self-contained, searchable HTML page — a11y_gallery.html
@@ -62,7 +62,7 @@ MAX_PAGES = 8            # cap page renders per build (a long month-pages schedu
 MAX_TREE_NODES = 240     # cap tag-tree nodes rendered per feature
 COLLAPSE_RUN = 3         # collapse runs of >COLLAPSE_RUN same-role siblings
 
-# Human labels for the scenario "area" keys (tests/scenarios/<area>/...).
+# Human labels for the scenario "area" keys (examples/scenarios/<area>/...).
 AREA_LABEL = {
     "exam": "Exams", "quiz": "Quizzes", "notes": "Notes",
     "report-cards": "Report Cards", "schedule": "Schedule", "syllabi": "Syllabi",
