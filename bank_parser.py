@@ -31,6 +31,12 @@ import re
 PROBLEM_RE = re.compile(r"\\begin\{problem\}\{([^}]+)\}(?:\s*\[([^\]]*)\])?")
 LOADBANK_RE = re.compile(r"\\loadbank\{([^}]+)\}")
 IMPORT_RE = re.compile(r"\\importproblem\{([^}]+)\}")
+
+# Sibling bank fragments a document auto-loads, in probe order. Must match the
+# class-side resolver in texlib-problembank.sty (\pbank@load@coursebank).
+# problem-bank.tex is the name the library's own samples use; bank.tex is what
+# every existing course folder uses and stays supported indefinitely.
+SIBLING_BANK_NAMES = ("problem-bank.tex", "bank.tex")
 ROOT_RE = re.compile(r"%\s*!\s*T[eE]X\s+root\s*=\s*(.+)")
 
 # --- added for TeXam -------------------------------------------------
@@ -193,7 +199,11 @@ def problem_sources(doc_path, doc_text, coursemeta_dir=None, extra_roots=()):
                 hit = resolve(m.group(1), base)
                 if hit:
                     visit(hit)
-        visit(os.path.normpath(os.path.join(base, "bank.tex")))
+        # problem-bank.tex first, bank.tex second -- same order the class-side
+        # resolver uses (texlib-problembank.sty). The library's sample fragments
+        # are problem-bank.tex; every existing course folder still uses bank.tex.
+        for sibling in SIBLING_BANK_NAMES:
+            visit(os.path.normpath(os.path.join(base, sibling)))
 
     return files
 

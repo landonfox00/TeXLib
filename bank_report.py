@@ -67,9 +67,12 @@ def bank_sources(path):
         add(m.group(1).strip())
     for m in IMPORT_RE.finditer(text):
         add(m.group(1).strip())
-    sib = os.path.normpath(os.path.join(d, "bank.tex"))
-    if os.path.isfile(sib) and sib not in files:
-        files.append(sib)
+    # Same probe order as the class-side resolver and bank_parser: the library's
+    # samples are problem-bank.tex, existing course folders use bank.tex.
+    for sibling in ("problem-bank.tex", "bank.tex"):
+        sib = os.path.normpath(os.path.join(d, sibling))
+        if os.path.isfile(sib) and sib not in files:
+            files.append(sib)
     return files
 
 

@@ -49,7 +49,7 @@ Using a bank file `bank.tex` and a coursemeta.tex one level up:
 	ps     = {Good luck!},
 }
 
-\loadbank{bank.tex}
+\loadbank{problem-bank.tex}
 
 \begin{document}
 

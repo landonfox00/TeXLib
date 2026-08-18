@@ -9,10 +9,17 @@ shown for instructor perusal).
 %% !TeX program = lualatex
 \documentclass{bank}
 \begin{document}
-  \loadbank{bank}       % a bare \begin{problem} fragment (the same file exams \loadbank)
-  \printbankcatalog
+  \loadbank{problem-bank}   % a bare \begin{problem} fragment (the same file exams \loadbank)
+  \printbankcatalog         % or \printbankcatalog[topic=limits] to list one topic
 \end{document}
 ```
+
+**Naming:** the library's own sample fragments are `problem-bank.tex`, not
+`bank.tex`. A bare `bank.tex` is still auto-discovered as a sibling — every
+existing course folder uses it and nothing needs migrating — but the generic
+name is what let the library's sample shadow a course's own bank, so new banks
+should prefer `problem-bank.tex`. The classes and the Python tooling probe
+`problem-bank.tex` first, `bank.tex` second.
 
 **Important:** `\documentclass{bank}` goes on the *wrapper*, never on the bank
 data file — a bank file must stay a bare fragment (no `\documentclass`) so
