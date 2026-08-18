@@ -142,6 +142,8 @@ CLASS_HOME_MODULE = {
     "report-card": "Report Cards",
     "bingo":       "Bingo",
     "pset":        "Problem Sets",
+    "bank":        "Bank",
+    "thesis":      "Thesis",
 }
 
 # Build-flag toggles. Each maps a CLI flag to a TeX macro define.
@@ -214,8 +216,19 @@ DOCCLASS_RE = re.compile(r"\\documentclass(?:\[[^\]]*\])?\{(\w[\w-]*)\}")
 
 
 def safe_name(module: str) -> str:
-    """Filesystem-safe slug for a module name (e.g. 'examples/fixtures/Exams' -> 'tests_fixtures_Exams')."""
-    return re.sub(r"[^\w.-]+", "_", module)
+    """Filesystem-safe slug for a module key, used for visual-reference filenames
+    and log names (e.g. 'examples/fixtures/Exams' -> 'examples_fixtures_Exams').
+
+    The 'examples/templates/' prefix is stripped first, so a template's refs are
+    'Schedule-1.png' rather than 'examples_templates_Schedule-1.png'. Reference
+    images are expensive to regenerate (they are rendering-environment-specific
+    and produced on the maintainer's machine), so their names are deliberately
+    tied to the CLASS, not to where the template file currently sits. Moving the
+    templates under examples/ must not invalidate a single committed ref.
+    """
+    key = module[len("examples/templates/"):] \
+        if module.startswith("examples/templates/") else module
+    return re.sub(r"[^\w.-]+", "_", key)
 
 
 def extract_pdf_text(pdf_path: str) -> str | None:
@@ -1075,9 +1088,22 @@ def main() -> int:
                              content_enabled, args.timeout, args.verbose)
 
     if args.modules:
+        # A module may be named by its full registry key
+        # ('examples/templates/Schedule') or by its short name ('Schedule').
+        # The short form is what the docs use and what anyone actually types;
+        # it kept working for free while templates lived in their module
+        # directories, and moving them under examples/ would have silently
+        # broken every documented `python smoke_test.py Notes Exams` invocation.
+        def _aliases(key):
+            short = key.rsplit("/", 1)[-1]
+            return {key, short} if key.startswith("examples/templates/") else {key}
+
         wanted = set(args.modules)
-        targets = [(m, t) for (m, t) in MODULES if m in wanted]
-        missing = wanted - {m for (m, _) in MODULES}
+        targets = [(m, t) for (m, t) in MODULES if _aliases(m) & wanted]
+        matched = set()
+        for m, _ in MODULES:
+            matched |= _aliases(m) & wanted
+        missing = wanted - matched
         if missing:
             print(f"warning: unknown modules ignored: {sorted(missing)}", file=sys.stderr)
     else:
