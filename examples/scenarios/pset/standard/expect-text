@@ -1,0 +1,5 @@
+# Title block, theorem env, plain problem, and both {parts} items all render.
+PSETDEFMARK
+PSETPLAINMARK
+PSETPARTAMARK
+PSETPARTBMARK

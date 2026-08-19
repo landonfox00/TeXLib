@@ -1,0 +1,6 @@
+# Both limits problems are cataloged...
+LIMITSONLYA
+LIMITSONLYB
+# ...and the summary reports the FILTERED count, not the loaded count.
+# (2 problems across 1 topic -- the derivatives entry is excluded entirely.)
+coverage

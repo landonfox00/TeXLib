@@ -1,0 +1,5 @@
+# The card header carries the title, and the how-to-play block prints because
+# show-instructions=true. Cells are math symbols, not text, so there is nothing
+# else stable to key on -- which is exactly why the module template asserts the
+# banner and boilerplate rather than grid contents.
+BINGOTITLEMARK

@@ -1,0 +1,44 @@
+% Scenario: exam / splitpage   (tier: core)
+% \splitpage{...}{...} -- the side-by-side two-column layout, and specifically
+% its part-lettering contract: items in the LEFT column are (a), (b) and the
+% RIGHT column CONTINUES as (c), (d) rather than restarting.
+%
+% That continuation is the whole point of the construct and the easiest thing to
+% regress: it works because global_partno_storage carries the counter across the
+% two internal {parts} calls. A regression that reset the counter would produce
+% a perfectly good-looking exam with two (a) items on the same question, which
+% no build-only check can see -- hence the rendered-label assertions below.
+\documentclass[
+	exam-number = {5},
+	exam-date   = {Smoke Test Date},
+]{autoexam}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	term           = {Fall 2026},
+}
+
+\setexamseed{42}
+
+\begin{problem}{sp-grid}
+	SPLITSTEMMARK: differentiate each function.
+	\splitpage{
+		\part SPLITPARTAMARK: $x^2$.
+		\part SPLITPARTBMARK: $\sin x$.
+	}{
+		\part SPLITPARTCMARK: $e^x$.
+		\part SPLITPARTDMARK: $\ln x$.
+	}
+\end{problem}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem[8]{sp-grid}
+\end{problems}
+\end{document}

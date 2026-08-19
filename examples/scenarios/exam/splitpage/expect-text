@@ -1,0 +1,13 @@
+# All four parts render across the two columns.
+SPLITSTEMMARK
+SPLITPARTAMARK
+SPLITPARTBMARK
+SPLITPARTCMARK
+SPLITPARTDMARK
+# And the lettering CONTINUES across the split rather than restarting: the
+# left column is 1a/1b and the right column carries on as 1c/1d. If
+# global_partno_storage stopped carrying the counter across the two internal
+# {parts} calls, the question would show two 1a items and still build cleanly.
+# (Labels are problem-prefixed -- "1c.", not "(c)".)
+1c.
+1d.

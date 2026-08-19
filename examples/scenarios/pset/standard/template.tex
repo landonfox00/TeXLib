@@ -1,0 +1,40 @@
+% Scenario: pset / standard   (tier: core)
+% A representative problem set: the title block, an embedded theorem-family
+% environment, a plain problem, and a {parts} problem. pset is a pdflatex class,
+% so this is also the coverage that keeps the non-lua path honest.
+\documentclass[
+	pset-number = 3,
+	pset-due    = {Friday, May 15, 2026},
+]{pset}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	term           = {Fall 2026},
+}
+
+\begin{document}
+\maketitle
+
+\begin{definition}[Continuity]
+	PSETDEFMARK: a function $f$ is continuous at $a$ if
+	$\lim_{x \to a} f(x) = f(a)$.
+\end{definition}
+
+\begin{problem}[10]
+	PSETPLAINMARK: determine whether $f(x) = x^2$ is continuous at $x = 1$.
+\end{problem}
+
+\begin{problem}[10]
+	Determine whether each function is continuous at the given point.
+	\begin{parts}
+		\part PSETPARTAMARK: $f(x) = x^2$ at $a = 1$.
+		\part PSETPARTBMARK: $g(x) = 1/x$ at $a = 0$.
+	\end{parts}
+\end{problem}
+
+\end{document}

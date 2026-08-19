@@ -1,0 +1,43 @@
+% Scenario: bingo / standard   (tier: core)
+% One hand-authored card plus one randomized deal from the pool. bingo.cls calls
+% \directlua UNGUARDED at class load, so this scenario is also the cheapest
+% possible proof that engine selection put it on lualatex -- under pdflatex it
+% does not fail a content check, it fatals immediately at \documentclass.
+%
+% The deal is fixed across builds (the randomiser is seeded, not time-based), so
+% the render is reproducible. The pool holds more than 25 entries so the
+% selection is real rather than "use everything", and \free pins the free space.
+\documentclass[
+	course-subject    = Math,
+	course-number     = 101,
+	course-title      = {Smoke Test Course},
+	institution       = {Smoke Test University},
+	bingo-title       = {BINGOTITLEMARK},
+	show-instructions = true,
+]{bingo}
+
+\bingobank{
+	x^2, x^3, \pi, \alpha, \beta, \gamma, \delta, \epsilon,
+	\sin x, \cos x, \tan x, \ln x, e^x, \sqrt{x}, \free,
+	\int, \sum, \prod, \infty, \forall, \exists, \neq, \pm,
+	\frac{1}{x}, \frac{d}{dx}, \mathbb{R}, \Omega, \Delta,
+	\theta, \sigma, \mu
+}
+
+\begin{document}
+
+% A one-off card: entries placed by hand in a 5x5 grid.
+\begin{bingocard}
+	\beta & \pm & \Omega & \mu & \mathbb{R} \\
+	\to & \int & \neq & \notin & \psi \\
+	\exists & \forall & \free & \frac{d}{dx} & \sqrt{x} \\
+	\theta & \circ & \pi & \prod & \gamma \\
+	\alpha & \infty & \sigma & \sum & \Delta \\
+\end{bingocard}
+
+\newpage
+
+% A randomized deal from the pool, seeded so it is stable build-to-build.
+\bingocards[copies=2, randomize, seed=42]
+
+\end{document}

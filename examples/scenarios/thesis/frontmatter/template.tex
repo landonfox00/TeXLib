@@ -1,0 +1,65 @@
+% Scenario: thesis / frontmatter   (tier: core)
+% The UNR front-matter sequence and its pagination rule, which is the part of
+% thesis.cls the Graduate School actually checks: title page, copyright page and
+% committee approval page carry NO page number; the prefatory matter that
+% follows is lowercase Roman starting at i; the body restarts at Arabic 1.
+%
+% Also covers the class's own trivlist-free theorem environments. Those exist
+% because amsthm builds theorems on \trivlist, which tags as a list <L> with the
+% body nested inside it -- a PDF/UA structure violation. They are plain headed
+% paragraphs instead, chapter-numbered, so a regression that reintroduced
+% \trivlist would still LOOK right here while breaking the tagged build.
+\DocumentMetadata{
+	lang          = en,
+	tagging       = on,
+	tagging-setup = { math/setup={mathml-AF,mathml-SE}, table/header-rows=1 },
+	pdfstandard   = { ua-2, a-4f },
+}
+\documentclass{thesis}
+
+\title{THESISTITLEMARK: An Accessible Approach}
+\author{Ada N. Student}
+\doctype{thesis}
+\gradprogram{Mathematics}
+\gradadvisor{Pat D. Advisor, Ph.D.}
+\graddate{May, 2027}
+\committeemember{Pat D. Advisor, Ph.D.}{Advisor}
+\committeemember{Sam K. Reader, Ph.D.}{Committee Member}
+\committeemember{Lee Q. Faculty, Ph.D.}{Graduate School Representative}
+
+\begin{document}
+
+\makeUNRtitlepage
+\makecopyrightpage
+\committeeapprovalpage
+
+\frontmatter
+
+\begin{frontmatterpage}{Abstract}
+THESISABSTRACTMARK: this scenario exercises the front-matter sequence and the
+class's trivlist-free theorem environments.
+\end{frontmatterpage}
+
+\begin{frontmatterpage}{Acknowledgements}
+THESISACKMARK: with thanks to the veraPDF validator.
+\end{frontmatterpage}
+
+\tableofcontents
+
+\mainmatter
+
+\chapter{THESISCHAPTERMARK}
+
+\begin{definition}[Admissible]
+THESISDEFMARK: a point $x$ is admissible if $x > 0$.
+\end{definition}
+
+\begin{theorem}[Main result]\label{thm:scenario}
+THESISTHMMARK: for every admissible $x$, $\int_0^x t \, dt = \tfrac{1}{2}x^2$.
+\end{theorem}
+
+\begin{proof}
+THESISPROOFMARK: integrate directly.
+\end{proof}
+
+\end{document}

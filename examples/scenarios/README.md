@@ -10,12 +10,13 @@ dates, …) without bloating the fast path.
 ## Layout
 
 ```
-tests/scenarios/
+examples/scenarios/
   <area>/                     # maps to a module (see SCENARIO_AREA_MODULE)
     <name>/
       template.tex            # required — metadata inline via \metasetup
       coursemeta.tex          # optional — ship one to exercise coursemeta keys
       expect-text             # optional — PDF substrings to assert (text scenario)
+      expect-absent           # optional — PDF substrings that must NOT appear
       tags                    # optional — whitespace-separated tier tags
 ```
 
@@ -35,6 +36,14 @@ tests/scenarios/
   text renders* (e.g. that a `coursemeta.tex` key resolved to the right file),
   not layout. If it also has refs, both the text check and the diff run. Use
   single-token markers (no spaces/hyphens) so `pdftotext` can't split them.
+- **`expect-absent`** is the negative mirror: substrings that must NOT appear.
+  It is what turns "builds fine" into a real assertion for anything whose
+  whole purpose is to REMOVE content -- a student-copy build that leaks a
+  solution, or a catalog filter that silently no-ops, produces a perfectly good
+  PDF and passes every positive check ever written.
+- Every file in a scenario directory is staged into the build, so a scenario can
+  ship whatever it needs beside its template -- a `problem-bank.tex` fragment to
+  exercise sibling auto-discovery, an image, a `.bib`.
 - A scenario may ship its own **`coursemeta.tex`** — the harness auto-loads it
   (it does *not* drop the smoke-test stub for scenarios), so you can exercise
   course-metadata keys like `quiz-instructions-file` or `bank-path`.

@@ -1,0 +1,42 @@
+% Scenario: exam / multi-version   (tier: core)
+% \versions{A,B} -- the multi-version path, which is ONE compile emitting every
+% copy into a single PDF plus a .vmap sidecar (the Sublime builder slices that
+% into per-version files afterwards). Nothing else in the scenario corpus
+% exercises it, and it is the most autoexam-specific behaviour there is.
+%
+% \setexamseed pins the per-version selection and shuffle, so the render is
+% reproducible; without it each build would deal different problems and no
+% assertion could hold. Both version labels must appear in the one PDF.
+\documentclass[
+	exam-number = {2},
+	exam-date   = {Smoke Test Date},
+]{autoexam}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	term           = {Fall 2026},
+}
+
+\setexamseed{42}
+\versions{A, B}
+
+\begin{problem}{mv-one}[topic=algebra]
+	MVPROBLEMONE: solve $2x + 5 = 11$ for $x$.
+\end{problem}
+
+\begin{problem}{mv-two}[topic=algebra]
+	MVPROBLEMTWO: solve $3x - 1 = 8$ for $x$.
+\end{problem}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem[5]{topic=algebra}
+	\problem[5]{topic=algebra}
+\end{problems}
+\end{document}

@@ -1,0 +1,4 @@
+# The whole point of the filter: a problem outside the selected topic must not
+# be cataloged at all. Without the filter this marker renders, so this single
+# line is what separates "filtering works" from "filtering silently no-ops".
+DERIVEXCLUDED

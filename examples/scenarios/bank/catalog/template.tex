@@ -1,0 +1,30 @@
+% Scenario: bank / catalog   (tier: core)
+% The unfiltered \printbankcatalog: every loaded problem listed, with the
+% coverage summary and each problem's solution shown regardless of the
+% document's own build mode (the catalog is an instructor perusal tool).
+% Self-contained -- the problems are defined inline, so no bank file is needed
+% and the sibling-bank auto-discovery is deliberately NOT exercised here.
+\documentclass{bank}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	term           = {Fall 2026},
+}
+
+\begin{problem}{cat-limits}[topic=limits, difficulty=easy]
+	Evaluate $\lim_{x \to 3} (2x + 1)$.
+	\begin{solution} CATLIMITSOLUTION: the limit is $7$. \end{solution}
+\end{problem}
+
+\begin{problem}{cat-deriv}[topic=derivatives, difficulty=medium]
+	Differentiate $f(x) = x^3$.
+	\begin{solution} CATDERIVSOLUTION: $f'(x) = 3x^2$. \end{solution}
+\end{problem}
+
+\begin{document}
+\printbankcatalog
+\end{document}

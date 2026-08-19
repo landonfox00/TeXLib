@@ -1,0 +1,44 @@
+% Scenario: pset / parts-solutions   (tier: core)
+% {parts} nested inside {problem}, each part carrying a {solution}, built as the
+% ANSWER KEY (source-level \keys) so the solution boxes render.
+%
+% This is the configuration that broke under TeX Live 2026: pset's accessible
+% branch declared the parts list with enumitem's leftmargin=* sentinel, which
+% the newer block-based lists read as a dimension ("Missing number, treated as
+% zero", fatal) -- and it only fired when {parts} was nested inside {problem},
+% never in a flat list. Keeping that exact nesting under test here is what makes
+% the regression reproducible rather than a story.
+\documentclass[
+	pset-number = 4,
+	pset-due    = {Friday, May 22, 2026},
+]{pset}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	term           = {Fall 2026},
+}
+
+\keys   % answer key: the solution content is shown
+
+\begin{document}
+\maketitle
+
+\begin{problem}[12]
+	Evaluate each limit.
+	\begin{parts}
+		\part $\lim_{x \to 2} (3x - 1)$.
+		\part $\lim_{x \to 0} \dfrac{x^2}{x}$.
+	\end{parts}
+\end{problem}
+
+\begin{solution}
+	PSETSOLAMARK: the first limit is $5$.
+	PSETSOLBMARK: the second simplifies to $x$, so the limit is $0$.
+\end{solution}
+
+\end{document}
