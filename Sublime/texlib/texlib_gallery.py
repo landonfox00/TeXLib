@@ -59,20 +59,23 @@ def _repo_root(settings):
     return root
 
 
-def resolve_paths(settings):
-    """Return (generator_script, output_html).
+def resolve_paths(settings, stem="a11y_gallery"):
+    """Return (generator_script, output_html) for a gallery generator.
 
-    An explicit `a11y_gallery_path` (the a11y_gallery.py file or its containing
-    directory) wins; otherwise both resolve next to the repo scripts. The output
-    HTML sits beside the generator (a11y_gallery.py writes ./a11y_gallery.html by
-    default)."""
-    override = settings.get("a11y_gallery_path") if settings else None
+    `stem` selects which one: "a11y_gallery" (normal vs tagged, with pixel
+    diffs, tag trees and veraPDF) or "class_gallery" (what every class actually
+    produces). Both generators write <stem>.html beside themselves, so a single
+    resolver serves both.
+
+    An explicit `<stem>_path` setting -- the .py file or its containing
+    directory -- wins; otherwise it resolves next to the repo scripts."""
+    override = settings.get(stem + "_path") if settings else None
     if override:
         script = override if override.lower().endswith(".py") \
-            else os.path.join(override, "a11y_gallery.py")
+            else os.path.join(override, stem + ".py")
     else:
-        script = os.path.join(_repo_root(settings), "a11y_gallery.py")
-    html = os.path.join(os.path.dirname(script), "a11y_gallery.html")
+        script = os.path.join(_repo_root(settings), stem + ".py")
+    html = os.path.join(os.path.dirname(script), stem + ".html")
     return script, html
 
 
@@ -181,5 +184,76 @@ class TexlibBuildA11yGalleryCommand(sublime_plugin.WindowCommand):
         return True
 
 
+# ---------------------------------------------------------------------------
+# Class gallery: what every class actually produces
+# ---------------------------------------------------------------------------
+# The sibling of the accessibility gallery. That one answers "how does the
+# tagged build differ from the normal one"; this one answers "what does a report
+# card look like, and what does exam-days = F do to a schedule" -- the question
+# that previously meant finding a template, remembering the TEXINPUTS
+# incantation and building it by hand.
+#
+# Same two commands, same resolver, same background-build machinery; only the
+# stem differs. It is cheaper to build than the a11y gallery (one build per
+# document instead of two or three, no veraPDF, no pixel diffing), but still
+# minutes rather than seconds, so it runs through the same non-blocking path.
+
+
+class TexlibOpenClassGalleryCommand(sublime_plugin.WindowCommand):
+    """Open the class gallery (offer to build it if it is not there yet)."""
+
+    def run(self):
+        settings = sublime.load_settings("TeXLib.sublime-settings")
+        script, html = resolve_paths(settings, "class_gallery")
+        if os.path.isfile(html):
+            _open_html(html)
+            sublime.status_message("TeXLib: opening the class gallery.")
+            return
+        if not os.path.isfile(script):
+            sublime.error_message(
+                "TeXLib: class_gallery.py not found at\n%s\n\n"
+                "Set \"class_gallery_path\" in TeXLib.sublime-settings, or point "
+                "\"class_source\" at the TeXLib repo root." % script)
+            return
+        if sublime.ok_cancel_dialog(
+                "The class gallery has not been built yet.\n\n"
+                "Build it now? It renders every declared example and takes a "
+                "few minutes.", "Build"):
+            self.window.run_command("texlib_build_class_gallery")
+
+
+class TexlibBuildClassGalleryCommand(sublime_plugin.WindowCommand):
+    """Regenerate class_gallery.html, then open it when the build finishes."""
+
+    def run(self):
+        settings = sublime.load_settings("TeXLib.sublime-settings")
+        script, html = resolve_paths(settings, "class_gallery")
+        if not os.path.isfile(script):
+            sublime.error_message(
+                "TeXLib: class_gallery.py not found at\n%s\n\n"
+                "Set \"class_gallery_path\" in TeXLib.sublime-settings, or point "
+                "\"class_source\" at the TeXLib repo root." % script)
+            return
+        if _python() is None:
+            sublime.error_message("TeXLib: no python found on PATH to run it.")
+            return
+        if _building.locked():
+            sublime.status_message("TeXLib: a gallery is already building.")
+            return
+        sublime.status_message(
+            "TeXLib: building the class gallery (a few minutes) -- it opens "
+            "when done; log: %s" % _BUILD_LOG)
+
+        def done(ok):
+            if ok:
+                _open_html(html)
+                sublime.status_message("TeXLib: class gallery ready.")
+            else:
+                sublime.error_message(
+                    "TeXLib: the class-gallery build failed.\nSee the log:\n%s"
+                    % _BUILD_LOG)
+        _run_build(script, html, done)
+
+
 def plugin_loaded():
-    print("TeXLib accessibility-gallery commands loaded.")
+    print("TeXLib gallery commands loaded (accessibility + class).")

@@ -22,6 +22,8 @@
     { "caption": "TeXLib: Open TeXam", "command": "texlib_open_texam" },
     { "caption": "TeXLib: Open Accessibility Gallery", "command": "texlib_open_a11y_gallery" },
     { "caption": "TeXLib: Rebuild Accessibility Gallery", "command": "texlib_build_a11y_gallery" },
+    { "caption": "TeXLib: Open Class Gallery", "command": "texlib_open_class_gallery" },
+    { "caption": "TeXLib: Rebuild Class Gallery", "command": "texlib_build_class_gallery" },
     { "caption": "TeXLib: Insert Problem by Topic", "command": "texlib_insert_by_topic" },
     { "caption": "TeXLib: Bank Report (coverage)", "command": "texlib_bank_report" },
     { "caption": "TeXLib: Bank Preview (catalog PDF)", "command": "texlib_bank_preview" },
