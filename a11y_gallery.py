@@ -55,6 +55,48 @@ import tempfile
 import time
 
 import smoke_test as S
+import gallery_harness as H
+
+# Staging, building, rasterising and image embedding now live in
+# gallery_harness.py, shared with class_gallery.py -- there is one answer to
+# "how is an example built for a gallery" rather than two that drift. The
+# accessibility-specific half (pixel diff, tag tree, veraPDF) stays here.
+#
+# Aliased rather than renamed at every call site: this file's job is the a11y
+# comparison, and churning fifty call sites to prove a refactor happened would
+# bury that in noise.
+_render = H.render
+_uri = H.uri
+_wh = H.wh
+
+
+def _scen_item(scen: dict) -> H.Item | None:
+    """Scenario dict -> gallery Item. The harness is deliberately looser than a
+    scenario (class_gallery also renders module templates, which have neither an
+    `area` nor a fixed filename), so scenarios adapt onto it here."""
+    module = S.SCENARIO_AREA_MODULE.get(scen["area"])
+    if not module:
+        return None
+    return H.Item(src_dir=scen["dir"], template="template.tex", module=module,
+                  slug=scen["slug"], label=module, kind="scenario")
+
+
+def _stage(scen: dict, dest: str) -> str | None:
+    item = _scen_item(scen)
+    if item is None:
+        return None
+    return item.module if H.stage(item.src_dir, item.module, dest) else None
+
+
+def _build(scen: dict, work: str, mode: str, timeout: int):
+    item = _scen_item(scen)
+    if item is None:
+        return None, f"no module mapping for area '{scen['area']}'"
+    return H.build(item, work, mode, timeout)
+
+
+def _describe(sdir: str) -> tuple[str, str]:
+    return H.describe(os.path.join(sdir, "template.tex"))
 
 DEFAULT_OUT = os.path.join(S.TEXLIB_ROOT, "a11y_gallery.html")
 DEFAULT_DPI = 100
@@ -73,110 +115,13 @@ AREA_LABEL = {
 # Build (both modes) — mirrors smoke_test.build_scenario staging, but keeps the
 # PDFs and builds the accessible variant too.
 # ---------------------------------------------------------------------------
-def _stage(scen: dict, dest: str) -> str | None:
-    """Stage a scenario's files + its module's .cls/.lua + shared root files into
-    dest (scenario files win name clashes). Returns the module, or None."""
-    module = S.SCENARIO_AREA_MODULE.get(scen["area"])
-    if not module:
-        return None
-    sdir = scen["dir"]
-    module_dir = os.path.join(S.TEXLIB_ROOT, module)
-    for entry in os.listdir(sdir):
-        src = os.path.join(sdir, entry)
-        if os.path.isfile(src):
-            shutil.copy2(src, dest)
-    for entry in os.listdir(module_dir):
-        src = os.path.join(module_dir, entry)
-        if os.path.isfile(src) and not os.path.exists(os.path.join(dest, entry)):
-            shutil.copy2(src, dest)
-    S._copy_shared_into(dest)
-    return module
-
-
-def _build(scen: dict, work: str, mode: str, timeout: int):
-    """Build one scenario in its own dir. `mode` is one of:
-        "normal"     — the class's own engine, no tagging (what ships).
-        "accessible" — lualatex + the \\DocumentMetadata tagging prefix.
-        "lua"        — lualatex, NO tagging: a same-engine baseline that isolates
-                       accessibility-induced changes from pdflatex->lualatex drift.
-    Returns (pdf_path|None, err_str)."""
-    dest = os.path.join(work, S.safe_name(scen["slug"]), mode)
-    os.makedirs(dest, exist_ok=True)
-    if _stage(scen, dest) is None:
-        return None, f"no module mapping for area '{scen['area']}'"
-
-    template = "template.tex"
-    accessible = (mode == "accessible")
-    engine = "lualatex" if mode in ("accessible", "lua") else S.detect_engine(
-        os.path.join(dest, template))
-    env = os.environ.copy()
-    sep = ";" if os.name == "nt" else ":"
-    env["TEXINPUTS"] = f".{sep}{S.TEXLIB_ROOT}//{sep}{env.get('TEXINPUTS', '')}"
-
-    jobname = "template"
-    cmd = [engine, "-interaction=nonstopmode", "-halt-on-error"]
-    if engine == "lualatex":
-        cmd.append("-shell-escape")
-    if accessible:
-        cmd.append(f"--jobname={jobname}")
-        cmd.append(f"{S.ACCESSIBLE_MACRO}\\input{{{template}}}")
-    else:
-        cmd.append(template)
-
-    pdf = os.path.join(dest, jobname + ".pdf")
-    try:
-        rc, log_text, stdout_text, _elapsed, _passes = S._run_with_reruns(
-            cmd, dest, env, timeout, jobname)
-    except subprocess.TimeoutExpired:
-        return None, f"timeout after {timeout}s"
-    if rc != 0 or not os.path.exists(pdf):
-        return None, S.extract_tex_errors(log_text or stdout_text) or f"exit={rc}, no pdf"
-    return pdf, ""
-
-
 # ---------------------------------------------------------------------------
 # Render pages -> data URIs
 # ---------------------------------------------------------------------------
-def _render(pdf: str, work: str, prefix: str, dpi: int) -> list[str]:
-    """Render pdf pages to PNGs; return a sorted list of PNG file PATHS (kept on
-    disk so they can be pixel-diffed). Uses -png (universally compiled into
-    pdftoppm; some Windows poppler builds omit JPEG support)."""
-    if not S.PDFTOPPM or not pdf:
-        return []
-    outbase = os.path.join(work, prefix)
-    try:
-        subprocess.run(
-            [S.PDFTOPPM, "-png", "-r", str(dpi), "-l", str(MAX_PAGES), pdf, outbase],
-            check=True, capture_output=True, timeout=120)
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
-        return []
-    return [os.path.join(work, name) for name in sorted(os.listdir(work))
-            if name.startswith(prefix + "-") and name.lower().endswith(".png")]
-
-
-def _uri(path: str) -> str:
-    """base64 data URI for a PNG file path ('' if unreadable)."""
-    try:
-        with open(path, "rb") as f:
-            return "data:image/png;base64," + base64.b64encode(f.read()).decode()
-    except OSError:
-        return ""
-
-
 # ---------------------------------------------------------------------------
 # Pixel diff: normal page i vs accessible page i
 # ---------------------------------------------------------------------------
 _AE_RE = re.compile(r"^\s*(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)(?:\s*\([^)]*\))?\s*$")
-
-
-def _wh(path: str) -> tuple[int, int] | None:
-    try:
-        r = subprocess.run([S.MAGICK, "identify", "-format", "%w %h", path],
-                           capture_output=True, text=True, timeout=30)
-        w, h = r.stdout.split()[:2]
-        return int(w), int(h)
-    except Exception:
-        return None
 
 
 def _compare_write(norm: str, acc: str, out: str) -> tuple[int | None, str]:
@@ -381,30 +326,6 @@ def _tag_tree_html(pdf: str) -> str:
 # ---------------------------------------------------------------------------
 # Scenario description (leading comment block of template.tex)
 # ---------------------------------------------------------------------------
-def _describe(sdir: str) -> tuple[str, str]:
-    """(title, description) from the template's leading `%` comment block."""
-    path = os.path.join(sdir, "template.tex")
-    lines = []
-    try:
-        with open(path, encoding="utf-8") as f:
-            for ln in f:
-                s = ln.rstrip("\n")
-                if s.startswith("%"):
-                    lines.append(s.lstrip("%").strip())
-                elif s.strip() == "":
-                    if lines:
-                        break
-                else:
-                    break
-    except OSError:
-        return "", ""
-    title = ""
-    if lines and lines[0].lower().startswith("scenario:"):
-        title = lines.pop(0).split(":", 1)[1].strip()
-    desc = " ".join(l for l in lines if l)
-    return title, desc
-
-
 # ---------------------------------------------------------------------------
 # HTML assembly
 # ---------------------------------------------------------------------------

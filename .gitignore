@@ -14,6 +14,9 @@ course-metadata_old.sty
 # Generated accessibility feature gallery (a11y_gallery.py output; multi-MB,
 # environment-specific renders — regenerate locally, don't commit)
 /a11y_gallery.html
+# Generated gallery: ~9 MB of base64-embedded page renders, rebuilt from
+# the manifest on demand. Never committed.
+/class_gallery.html
 
 # LaTeX build artifacts
 *.aux

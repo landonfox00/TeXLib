@@ -80,8 +80,16 @@ class Example:
         self.note = note
 
 
+# Built by CI and shown in the class gallery.
 _SMOKE = ("smoke", "accessible", "showcase")
 _SMOKE_VISUAL = _SMOKE + ("visual",)
+
+# Built by CI but NOT shown in the gallery. Fixtures are regression traps
+# written to be deliberately weird -- a bare \documentclass{article} probing
+# a metadata catch-all, a bank whose header wraps lines. They make excellent
+# tests and terrible showcases, and putting them in the gallery would file
+# them under class headings ("Metadata") that are not classes at all.
+_FIXTURE = ("smoke", "accessible")
 
 
 EXAMPLES = [
@@ -125,7 +133,7 @@ EXAMPLES = [
                  "asserting it would fail for the wrong reason."),
 
     # -- Fixtures: regression traps, one bug each ------------------------------
-    Example("examples/fixtures/Exams", "fix-test.tex", "fixture", _SMOKE,
+    Example("examples/fixtures/Exams", "fix-test.tex", "fixture", _FIXTURE,
             expect=["Problem 1", "MULTILINEHEADEROK"],
             absent=["MLHEADERLEAK"],
             note="Exercises \\problem{id}[a=1,b=2] fix-overrides. The two "
@@ -133,14 +141,14 @@ EXAMPLES = [
                  "\\begin{problem}[meta] header rendered its stem, MLHEADERLEAK "
                  "proves the header continuation lines were skipped rather "
                  "than leaked into it."),
-    Example("examples/fixtures/Metadata", "metadata-test.tex", "fixture", _SMOKE,
+    Example("examples/fixtures/Metadata", "metadata-test.tex", "fixture", _FIXTURE,
             expect=["CMOFFICEHOURSMARK", "CMLECTHALLMARK", "CMTANAMEMARK",
                     "SETCMDMARK", "METAALIASMARK"],
             note="course-metadata.sty's catch-all: one marker per auto-vivified "
                  "getter (coursemeta key, inline-loud, inline-quiet), plus "
                  "\\SetCourseTitle round-tripping and the \\meta->\\metasetup "
                  "alias still minting a key."),
-    Example("examples/fixtures/Notes", "theorem-numbering.tex", "fixture", _SMOKE,
+    Example("examples/fixtures/Notes", "theorem-numbering.tex", "fixture", _FIXTURE,
             expect=["Theorem 1.1", "Definition 1.2", "Lemma 1.3",
                     "Theorem 2.1", "Definition 2.2"],
             note="Shared master counter, section-based, resetting per "
