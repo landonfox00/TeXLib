@@ -1,0 +1,15 @@
+# Front matter, in order, then the body and the theorem family.
+THESISTITLEMARK
+THESISABSTRACTMARK
+THESISACKMARK
+THESISCHAPTERMARK
+THESISDEFMARK
+THESISTHMMARK
+THESISPROOFMARK
+# Numbering is chapter-based and PER-ENVIRONMENT, not shared: thesis.cls gives
+# each environment its own counter precisely so \cref/\Cref can name a reference
+# correctly ("Theorem 1.1", "Definition 1.1") -- with one shared counter every
+# type but one would print "??". So the first definition AND the first theorem
+# are both 1.1; a shared-counter regression would renumber the theorem to 1.2.
+Definition 1.1
+Theorem 1.1

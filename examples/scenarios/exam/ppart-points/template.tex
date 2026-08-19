@@ -1,0 +1,41 @@
+% Scenario: exam / ppart-points   (tier: core)
+% \ppart with DISTRIBUTED point values: \problem[3,4,5]{id} hands each \ppart
+% call its own annotation through the Lua part-index state, rather than
+% annotating the question as a whole.
+%
+% That distribution is invisible in a build-only check -- a regression that
+% dropped it, or misaligned the values against the parts, still produces a
+% perfectly good PDF. The assertions below pin the actual rendered point labels,
+% which is the only way to catch it.
+\documentclass[
+	exam-number = {3},
+	exam-date   = {Smoke Test Date},
+]{autoexam}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	term           = {Fall 2026},
+}
+
+\setexamseed{42}
+
+\begin{problem}{pp-parts}
+	PPARTSTEMMARK: evaluate each derivative.
+	\begin{parts}
+		\ppart $\dfrac{d}{dx}\left[x^2\right]$.
+		\ppart $\dfrac{d}{dx}\left[\sin x\right]$.
+		\ppart $\dfrac{d}{dx}\left[e^x\right]$.
+	\end{parts}
+\end{problem}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem[3,4,5]{pp-parts}
+\end{problems}
+\end{document}

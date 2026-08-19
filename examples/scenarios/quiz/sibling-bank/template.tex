@@ -1,0 +1,36 @@
+% Scenario: quiz / sibling-bank   (tier: core)
+% The sibling-bank auto-discovery contract: a quiz with NO \loadbank at all
+% picks up a bank fragment sitting beside it (quiz.cls calls
+% \pbank@load@coursebank from its \AtBeginDocument).
+%
+% This is a naming convention as much as a mechanism. The library's own samples
+% are problem-bank.tex; every existing course folder uses bank.tex. Both are
+% supported, probed in that order, by THREE resolvers that cannot import one
+% another -- the class-side lfs probe exercised here, bank_parser.py, and the
+% Sublime plugin's texlib_bank.py. test_texlib_bank.py pins the two Python
+% copies against each other; this pins the TeX one, which no unit test can reach.
+%
+% Note the class matters: bank.cls deliberately does NOT auto-load (a catalog
+% wrapper loads the bank it wants explicitly, or it would list unrelated
+% problems). quiz and autoexam are the classes that do.
+\documentclass{quiz}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	term           = {Fall 2026},
+}
+\meta{ quiz-number = 1 }
+\setexamseed{42}
+
+\begin{document}
+\maketitle
+% No \loadbank: the sibling problem-bank.tex is auto-discovered.
+\begin{problems}
+	\problem{sibling-one}
+\end{problems}
+\end{document}

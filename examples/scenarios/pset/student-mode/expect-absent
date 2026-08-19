@@ -1,0 +1,3 @@
+# The one that matters: no solution text reaches the student copy.
+# A leak here builds cleanly, looks right, and hands the class every answer.
+LEAKEDSOLUTIONMARK

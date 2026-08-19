@@ -1,0 +1,6 @@
+# Both problems appear, and the catalog shows solutions unconditionally.
+# Single-token markers so pdftotext cannot split them across lines.
+CATLIMITSOLUTION
+CATDERIVSOLUTION
+# The coverage summary rendered (the "N problems across M topics" line).
+coverage

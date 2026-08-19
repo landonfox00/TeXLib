@@ -1,0 +1,4 @@
+# The sibling fragment was found and its problem rendered, with no \loadbank
+# anywhere in the document. This is the problem-bank.tex half of the probe
+# order; course folders exercise the bank.tex half in real use.
+SIBLINGAUTOLOADMARK

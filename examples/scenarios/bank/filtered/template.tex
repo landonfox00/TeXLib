@@ -1,0 +1,36 @@
+% Scenario: bank / filtered   (tier: core)
+% \printbankcatalog[topic=...] -- the meta filter that makes the catalog a
+% browsing tool rather than a print-everything dump. Three problems are loaded
+% across two topics and only ONE topic is cataloged, so the assertion is as much
+% about what does NOT render as what does: LIMITSONLY must appear and both
+% DERIVEXCLUDED markers must not.
+%
+% The filter reuses the engine's parse_meta + match loop -- the same
+% comma-separated key=value AND semantics \problem{topic=quad} uses -- so a
+% regression here is a regression in problem selection generally.
+\documentclass{bank}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	term           = {Fall 2026},
+}
+
+\begin{problem}{f-limit-a}[topic=limits, difficulty=easy]
+	LIMITSONLYA: evaluate $\lim_{x \to 1} (x + 4)$.
+\end{problem}
+
+\begin{problem}{f-limit-b}[topic=limits, difficulty=medium]
+	LIMITSONLYB: evaluate $\lim_{x \to 0} \dfrac{\sin x}{x}$.
+\end{problem}
+
+\begin{problem}{f-deriv}[topic=derivatives, difficulty=easy]
+	DERIVEXCLUDED: differentiate $f(x) = x^5$.
+\end{problem}
+
+\begin{document}
+\printbankcatalog[topic=limits]
+\end{document}

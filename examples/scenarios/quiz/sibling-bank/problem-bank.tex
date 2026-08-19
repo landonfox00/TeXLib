@@ -1,0 +1,9 @@
+% Sibling bank fragment for the quiz/sibling-bank scenario.
+%
+% A bank fragment is BARE -- no \documentclass, ever. That is what lets the same
+% file be \input by \loadbank into a quiz or exam; a nested \documentclass would
+% break every consumer. The document beside this file is what carries the class.
+\begin{problem}{sibling-one}[topic=limits, difficulty=easy]
+	SIBLINGAUTOLOADMARK: evaluate $\lim_{x \to 2} (x + 3)$.
+	\begin{solution} The limit is $5$. \end{solution}
+\end{problem}
