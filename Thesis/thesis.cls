@@ -46,11 +46,18 @@
 \RequirePackage{setspace}
 % (@ is already a letter inside a .cls -- no \makeatletter needed here, and a
 %  \makeatother would wrongly disable it for the rest of the class.)
-\if@twoside
-	\geometry{letterpaper, inner=1.25in, outer=1in, top=1in, bottom=1in, includefoot}
-\else
-	\geometry{letterpaper, left=1in, right=1in, top=1in, bottom=1in, includefoot}
-\fi
+% UNR requires 1.0in on ALL FOUR sides, with no exception for binding -- tables
+% and appendices included. The manuscript is filed electronically ("no hard
+% copies will be produced"), so the wider inner margin a bound copy would want
+% is not something the filed document may have: an inner=1.25in twoside build
+% is 0.25in out of spec on every odd page and would be caught by the Graduate
+% School's margin check.
+%
+% twoside is therefore a LAYOUT option only -- it still governs where headers
+% and the \cleardoublepage blanks fall -- and no longer changes the margins.
+% Anyone who wants a binding offset for a personal printed copy should add it at
+% print time, not in the filed PDF.
+\geometry{letterpaper, left=1in, right=1in, top=1in, bottom=1in, includefoot}
 \savegeometry{normal}
 % A no-footer geometry for the unnumbered front-matter pages, so the frame/
 % content can use the full text height.
@@ -63,10 +70,20 @@
 % ---------------------------------------------------------------------------
 % 2. Fonts + math  (accessible math needs the Unicode-engine stack)
 % ---------------------------------------------------------------------------
-% New Computer Modern (via fontsetup) is a WCAG-friendly, well-covered face and
-% the recommended default in the tagging project. unicode-math (loaded AFTER the
-% other math packages) drives MathML math tagging. TeX Gyre Termes gives the
-% committee page its required Times-like face.
+% The main face is Latin Modern -- fontspec's default, since nothing overrides
+% it. (An earlier version of this comment claimed New Computer Modern "via
+% fontsetup"; fontsetup is not loaded and never was. Verified with pdffonts on a
+% real build: LMRoman throughout, TeX Gyre Termes only on the committee page.)
+%
+% Latin Modern satisfies UNR's "Times New Roman, Arial, or a similarly clear
+% font" and every face is embedded, which the Graduate School requires. If you
+% would rather file in a literally Times-like face, the class already loads TeX
+% Gyre Termes for the committee page -- add \setmainfont{TeX Gyre Termes} after
+% \documentclass. That is a typographic choice, not a conformance one, so the
+% class does not make it for you.
+%
+% unicode-math (loaded AFTER the other math packages) drives MathML math
+% tagging. TeX Gyre Termes gives the committee page its required Times-like face.
 \RequirePackage{amsmath}
 \RequirePackage{amsthm}
 \RequirePackage[no-math]{fontspec}
@@ -81,6 +98,11 @@
 \RequirePackage{tikzpagenodes}   % current page text area — committee-page frame
 \RequirePackage{xcolor}
 \RequirePackage{caption}
+% booktabs: this section is called "tables" and shipped none. A thesis has
+% tables, UNR requires a List of Tables when it does, and \hline rules are the
+% classic giveaway of an unstyled LaTeX table. Also tags cleanly -- the rules are
+% spacing, not content, so they add nothing to the structure tree.
+\RequirePackage{booktabs}
 \RequirePackage[title]{appendix}
 \RequirePackage[hidelinks, linktoc=page, pdfusetitle]{hyperref}
 % cleveref direct, NOT texlib-crossref: that package exists because

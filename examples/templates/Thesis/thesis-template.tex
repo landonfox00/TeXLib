@@ -42,7 +42,12 @@ $T(x) = \ThesisMathIntent{inverse-sine}{\sin^{-1}}(x)$ for all admissible $x$.
 I thank my advisor, my committee, and the veraPDF validator.
 \end{frontmatterpage}
 
+% UNR fixes this order: Table of Contents, then List of Tables, then List of
+% Figures. Omit either list if the manuscript has none of that float -- an empty
+% list is worse than an absent one -- but if you have tables, the List of Tables
+% goes here, before the figures.
 \tableofcontents
+\listoftables
 \listoffigures
 
 \mainmatter
@@ -70,6 +75,30 @@ following the classic treatment~\autocite{rudin1976}.
 \begin{example}
 Take $x = 2$: then $\int_0^2 t\,dt = 2$, and indeed $\tfrac{1}{2}(2)^2 = 2$.
 \end{example}
+
+% A table, so the List of Tables above has something to list. Note the caption
+% sits ABOVE the tabular: UNR wants table captions above and figure captions
+% below, and `\caption` before the content is what produces that.
+%
+% Captions are single-spaced by exception -- the Graduate School requires
+% double spacing throughout EXCEPT captions, footnotes, long quotations,
+% multi-line bibliography entries, and material inside tables and appendices.
+\begin{table}[htbp]
+	\centering
+	\caption{Values of $\int_0^x t\,dt$ for small $x$.}
+	\label{tab:values}
+	\begin{tabular}{cc}
+		\toprule
+		$x$ & $\int_0^x t\,dt$ \\
+		\midrule
+		1 & $\tfrac{1}{2}$ \\
+		2 & $2$ \\
+		3 & $\tfrac{9}{2}$ \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\Cref{tab:values} tabulates the identity for the first few integers.
 
 \makereferences
 

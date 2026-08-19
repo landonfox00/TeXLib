@@ -127,10 +127,15 @@ EXAMPLES = [
                  "proves a cataloged solution rendered (the catalog always "
                  "shows solutions -- it is an instructor tool)."),
     Example("examples/templates/Thesis", "thesis-template.tex", "template", _SMOKE,
-            expect=["Abstract", "Introduction", "Theorem 1.1"],
-            note="The bibliography is deliberately NOT asserted: smoke does "
-                 "not run biber, so the reference list is empty by design and "
-                 "asserting it would fail for the wrong reason."),
+            expect=["Abstract", "Introduction", "Theorem 1.1",
+                    "List of Tables", "Rudin"],
+            note="Front matter in UNR's required order (Abstract i, then "
+                 "Contents, List of Tables, List of Figures), a body chapter, "
+                 "and a theorem head. 'Rudin' asserts the BIBLIOGRAPHY "
+                 "rendered: smoke now runs biber between passes, and without "
+                 "it \printbibliography emits an empty list while the build "
+                 "still reports success -- exactly the silent failure this "
+                 "corpus exists to catch."),
 
     # -- Fixtures: regression traps, one bug each ------------------------------
     Example("examples/fixtures/Exams", "fix-test.tex", "fixture", _FIXTURE,
