@@ -97,6 +97,10 @@ PDFTOPPM = shutil.which("pdftoppm")
 MAGICK = shutil.which("magick")
 COMPARE = shutil.which("compare")  # ImageMagick 6 standalone
 VERAPDF = shutil.which("verapdf") or shutil.which("verapdf.bat")
+# biber: biblatex documents need it between passes or the bibliography is
+# empty. Optional like the rest -- absent, the build still succeeds and the
+# reference list is simply blank.
+BIBER = shutil.which("biber")
 
 # Accessible (tagged PDF/UA) build. The prefix is injected ahead of \input so
 # tagging is switched on before \documentclass; --accessible forces lualatex,
@@ -586,6 +590,26 @@ def _run_with_reruns(cmd: list[str], tmp: str, env: dict, timeout: int,
                     log_text = f.read()
             except OSError:
                 pass
+
+        # biblatex writes a .bcf on the first pass and needs biber run against
+        # it before the next one, or \printbibliography renders an empty list.
+        # Only the thesis class uses biblatex today, and without this its
+        # bibliography was never exercised by any gate: the document built
+        # green, the references section came out blank, and nothing noticed.
+        # Skipped silently when biber is absent, matching every other optional
+        # tool here (a bare TeX install still runs the suite).
+        bcf = os.path.join(tmp, jobname + ".bcf")
+        if returncode == 0 and BIBER and os.path.exists(bcf) \
+                and not os.path.exists(os.path.join(tmp, jobname + ".bbl")):
+            try:
+                subprocess.run([BIBER, jobname], cwd=tmp, env=env,
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                               text=True, encoding="utf-8", errors="replace",
+                               timeout=timeout)
+            except (subprocess.TimeoutExpired, OSError):
+                pass  # a failed biber leaves the empty-bibliography build
+            else:
+                continue  # rerun so the freshly written .bbl is read in
         # Stop on a fatal error (a rerun won't fix it) or once no rerun is asked.
         if returncode != 0 or i + 1 >= max_passes \
                 or not RERUN_RE.search(log_text or stdout or ""):
