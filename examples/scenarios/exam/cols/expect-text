@@ -1,0 +1,9 @@
+# All four parts render inside the columns. The silent failure this guards
+# against is {cols} used without an inner {parts}, which drops every item and
+# still produces a clean PDF -- so asserting the part text is the only way to
+# tell a working two-column layout from an empty one.
+COLSSTEMMARK
+COLSPARTAMARK
+COLSPARTBMARK
+COLSPARTCMARK
+COLSPARTDMARK

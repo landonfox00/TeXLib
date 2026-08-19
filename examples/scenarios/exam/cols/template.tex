@@ -1,0 +1,60 @@
+% Scenario: exam / cols   (tier: core)
+% The {cols} multi-column layout, in the nesting order that actually works:
+% {cols} on the OUTSIDE, {parts} INSIDE it.
+%
+%     \begin{cols}
+%         \begin{parts}
+%             \part ...
+%         \end{parts}
+%     \end{cols}
+%
+% That order matters and is easy to get backwards. {cols} keys on \ifinparts:
+% entered from OUTSIDE a parts list (the case here) it opens multicols and
+% nothing else, leaving the document's own {parts} to fill the columns. Entered
+% from INSIDE one it instead opens a nested sub-list. Inverting the nesting --
+% {parts} outside, {cols} in -- fatals with "missing \item", and using {cols}
+% with bare \ppart and no {parts} at all silently drops every item and still
+% produces a clean PDF.
+%
+% The construct had ZERO in-repo coverage while being used 22 times across the
+% production Math 126EE bank, so nothing here defended it.
+%
+% ACCESSIBLE: multicol cannot be tagged (its column balancing rebuilds the
+% galley below the structure layer), so an accessible build drops to a single
+% column and keeps the part labelling. The text assertions below hold either
+% way -- what differs between the two builds is layout, not content.
+\documentclass[
+	exam-number = {6},
+	exam-date   = {Smoke Test Date},
+]{autoexam}
+
+\metasetup{
+	institution    = {Smoke Test University},
+	instructor     = {Test Instructor},
+	course-subject = Math,
+	course-number  = 101,
+	course-title   = {Smoke Test Course},
+	course-section = 1,
+	term           = {Fall 2026},
+}
+
+\setexamseed{42}
+
+\begin{problem}{cols-graphs}
+	COLSSTEMMARK: state the derivative of each function.
+	\begin{cols}
+		\begin{parts}
+			\part[2] COLSPARTAMARK: $x^2$.
+			\part[2] COLSPARTBMARK: $\sin x$.
+			\part[2] COLSPARTCMARK: $e^x$.
+			\part[2] COLSPARTDMARK: $\ln x$.
+		\end{parts}
+	\end{cols}
+\end{problem}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem[8]{cols-graphs}
+\end{problems}
+\end{document}
