@@ -16,8 +16,14 @@
 % with bare \ppart and no {parts} at all silently drops every item and still
 % produces a clean PDF.
 %
-% The construct had ZERO in-repo coverage while being used 22 times across the
-% production Math 126EE bank, so nothing here defended it.
+% The construct had ZERO in-repo coverage while being used across the production
+% Math 126EE bank, so nothing here defended it.
+%
+% NOTE the problem is defined in the EXAM DOCUMENT, not in a shared bank
+% fragment -- deliberately. cols is defined by autoexam.cls only; quiz.cls
+% does not have it, and a bank fragment is drawn by both. A bank problem using
+% cols builds fine in an exam and explodes the moment a quiz draws it, which is
+% why the Math 126 course bans it in bank problems outright. See Bank/README.md.
 %
 % ACCESSIBLE: multicol cannot be tagged (its column balancing rebuilds the
 % galley below the structure layer), so an accessible build drops to a single

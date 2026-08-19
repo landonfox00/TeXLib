@@ -281,6 +281,13 @@ the PDF still builds clean. In an accessible build `{cols}` drops to a single
 column (multicol cannot be tagged); the parts and their labels survive, only
 the two-up layout is lost.
 
+> **Never use `{cols}` in a problem that lives in a shared bank.** `cols` is
+> defined by `autoexam.cls` **only** — `quiz.cls` does not have it. A bank
+> fragment is loaded by both classes, so a problem using `{cols}` works in an
+> exam and explodes the moment a quiz draws it. Use plain `{parts}` in bank
+> problems; every bank problem has to work from both classes. `{cols}` is for
+> problems written directly in an exam document.
+
 `\qsep`
 Insert a problem separator between problems (auto-emitted; rarely
 called directly).
