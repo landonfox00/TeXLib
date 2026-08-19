@@ -257,7 +257,36 @@ Group problems with smart two-column / full-width layout based on
 per-problem `width=` metadata.
 
 `\splitpage{left content}{right content}`
-Two-column layout for a single page.
+Two-column layout for a single page. Part lettering continues across the
+split — the left column is (a), (b) and the right carries on as (c), (d).
+Question-level: do not nest it inside an existing `{parts}`.
+
+`\begin{cols}[n] ... \end{cols}`
+Set a problem's parts in `n` columns (default 2), inside a problem body.
+**`{cols}` goes on the OUTSIDE and `{parts}` inside it:**
+
+```latex
+\begin{cols}
+    \begin{parts}
+        \part[2] ...
+        \part[2] ...
+    \end{parts}
+\end{cols}
+```
+
+The nesting order matters and the failures are quiet. Inverted — `{parts}`
+outside, `{cols}` in — the build dies with "missing `\item`". Used with bare
+`\ppart` and no inner `{parts}` at all, every item is silently dropped and
+the PDF still builds clean. In an accessible build `{cols}` drops to a single
+column (multicol cannot be tagged); the parts and their labels survive, only
+the two-up layout is lost.
+
+> **Never use `{cols}` in a problem that lives in a shared bank.** `cols` is
+> defined by `autoexam.cls` **only** — `quiz.cls` does not have it. A bank
+> fragment is loaded by both classes, so a problem using `{cols}` works in an
+> exam and explodes the moment a quiz draws it. Use plain `{parts}` in bank
+> problems; every bank problem has to work from both classes. `{cols}` is for
+> problems written directly in an exam document.
 
 `\qsep`
 Insert a problem separator between problems (auto-emitted; rarely
