@@ -15,18 +15,25 @@ you can browse and what CI actually builds cannot drift apart.
 
 WHAT LIVES WHERE
 
-    <Module>/<class>-template.tex   the canonical document a user copies to
-                                    start work. Deliberately NOT under
-                                    examples/ — it is the module's public
-                                    surface, sits beside the class it
-                                    instantiates, and is referenced by the
-                                    installer and every module README.
+    examples/templates/<Module>/    the canonical document a user copies to
+                                    start work, plus the data that document
+                                    needs (its bank, gradebook, coursemeta,
+                                    .bib). The class, its engine .lua and the
+                                    library defaults it resolves by name (the
+                                    *-instructions.tex files, Syllabi's policy
+                                    statements) stay in <Module>/ — those are
+                                    library assets, not example data.
     examples/fixtures/<Module>/     regression traps for one specific bug.
                                     Deliberately weird; a bad showcase.
     examples/scenarios/<area>/      one-configuration-each feature matrix.
                                     Deliberately minimal.
     examples/<Course>/              end-to-end course folders sharing one
                                     coursemeta.tex. Realistic, multi-document.
+
+A template builds from outside its module directory the same way a course
+folder does: smoke_test's CLASS_HOME_MODULE stages the class's library assets
+into the build cwd. That mechanism already existed for examples/<Course>/, which
+is why the move needed no new machinery.
 
 Those four are not merged into one corpus on purpose: a good teaching example is
 a poor regression fixture (too much going on to localise a failure), and a good
@@ -79,39 +86,39 @@ _SMOKE_VISUAL = _SMOKE + ("visual",)
 
 EXAMPLES = [
     # -- Module templates: the canonical copy-me documents --------------------
-    Example("Bingo", "bingo-template.tex", "template", _SMOKE,
+    Example("examples/templates/Bingo", "bingo-template.tex", "template", _SMOKE,
             expect=["Bingo", "Mark the free space"],
             note="The cells render math symbols, not text labels, so the "
                  "assertions key on the banner and how-to-play boilerplate "
                  "rather than grid coordinates."),
-    Example("Exams", "autoexam-template.tex", "template", _SMOKE,
+    Example("examples/templates/Exams", "autoexam-template.tex", "template", _SMOKE,
             expect=["Problem 1", "Problem 2"],
             note="Multi-version randomized exam; output is NOT deterministic, "
                  "so it is deliberately not tagged visual."),
-    Example("Notes", "didactic-template.tex", "template", _SMOKE_VISUAL,
+    Example("examples/templates/Notes", "didactic-template.tex", "template", _SMOKE_VISUAL,
             expect=["Introduction", "Theorem"]),
-    Example("Quizzes", "quiz-template.tex", "template", _SMOKE,
+    Example("examples/templates/Quizzes", "quiz-template.tex", "template", _SMOKE,
             expect=["Quiz"]),
-    Example("Report Cards", "report-card-template.tex", "template", _SMOKE_VISUAL,
+    Example("examples/templates/Report Cards", "report-card-template.tex", "template", _SMOKE_VISUAL,
             expect=["Report Card"]),
-    Example("Schedule", "schedule-template.tex", "template", _SMOKE_VISUAL,
+    Example("examples/templates/Schedule", "schedule-template.tex", "template", _SMOKE_VISUAL,
             expect=["MONDAY", "WEEK", "Quiz 1", "Finals Week"],
             artifact=["*_schedule_grid.tex"],
             note="The grid artifact is a dependency-free content signal: it is "
                  "0 bytes exactly when render_grid produced no rows, which is "
                  "the empty-grid bug pdftotext alone would not catch."),
-    Example("Syllabi", "syllabus-template.tex", "template", _SMOKE_VISUAL,
+    Example("examples/templates/Syllabi", "syllabus-template.tex", "template", _SMOKE_VISUAL,
             expect=["Course Description", "Office Hours"],
             note="Carries its own metadata rather than the stub, so the "
                  "assertions key on stable section headings."),
-    Example("Problem Sets", "pset-template.tex", "template", _SMOKE,
+    Example("examples/templates/Problem Sets", "pset-template.tex", "template", _SMOKE,
             expect=["Problem 1"]),
-    Example("Bank", "bank-template.tex", "template", _SMOKE,
+    Example("examples/templates/Bank", "bank-template.tex", "template", _SMOKE,
             expect=["Bank coverage", "Solution"],
             note="'Bank coverage' proves the summary rendered; 'Solution' "
                  "proves a cataloged solution rendered (the catalog always "
                  "shows solutions -- it is an instructor tool)."),
-    Example("Thesis", "thesis-template.tex", "template", _SMOKE,
+    Example("examples/templates/Thesis", "thesis-template.tex", "template", _SMOKE,
             expect=["Abstract", "Introduction", "Theorem 1.1"],
             note="The bibliography is deliberately NOT asserted: smoke does "
                  "not run biber, so the reference list is empty by design and "

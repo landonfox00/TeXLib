@@ -6,12 +6,14 @@ Every TeXLib example lives under this directory, and every one of them is declar
 
 | Path | What it is | Written to be |
 |---|---|---|
+| [`templates/`](templates/) | the canonical document you copy to start work, one per class | canonical |
 | `<Course>/` | end-to-end course folders sharing one `coursemeta.tex` | realistic |
 | [`fixtures/`](fixtures/) | regression traps, one specific bug each | deliberately weird |
 | [`scenarios/`](scenarios/) | one-configuration-each feature matrix | deliberately minimal |
-| `../<Module>/<class>-template.tex` | the canonical document you copy to start work | canonical |
 
-The module templates are the one corpus that deliberately does **not** live here: a template is the module's public surface, sits beside the class it instantiates, and is referenced by the installer and every module README. They are declared in the manifest alongside everything else, so nothing is lost by their living elsewhere.
+Each `templates/<Module>/` folder carries the template **and the data that document needs** — its problem bank, gradebook, `coursemeta.tex`, `.bib`. What stays behind in `../<Module>/` is the class itself, its engine `.lua`, and the library defaults it resolves by name (the `*-instructions.tex` files, Syllabi's policy statements). Those are library assets, not example data.
+
+A template builds from outside its module directory exactly the way a course folder does — `CLASS_HOME_MODULE` stages the class's assets into the build directory. That machinery already existed for `<Course>/`, which is why this needed no new plumbing.
 
 These four are not merged into a single corpus on purpose. A good teaching example makes a poor regression fixture — too much going on to localise a failure — and a good fixture makes a terrible showcase. They are unified by *declaration*, not by file.
 
