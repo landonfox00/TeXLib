@@ -347,6 +347,21 @@ def scenario_bank_solutions_mode():
                   basename_matches(r["input"], "bank.tex"), r["raw"][:300])
             check(f"...at the correct source line ({BANK_SOLUTION_LINE})",
                   r["line"] == BANK_SOLUTION_LINE, f"got line {r['line']!r}")
+            # Full-line clickability (SYNCTEX.md recommendation 2): a click at
+            # the box's left edge on the solution's line -- left of every
+            # glyph, where only the stamped containers can answer -- must
+            # resolve to the solution source. Before container stamping the
+            # whole strip left of the text was dead (tag-0 wrappers); measured:
+            # x >= 72 (the text margin / box edge) resolves, and this pins it.
+            # Residual, documented in SYNCTEX.md: the 6pt visual bleed LEFT of
+            # the box edge, the "Solution." header line and the pad bands still
+            # answer tag-0 emission-side wrappers (\parbox/\rlap built after
+            # the stamp runs) -- cosmetic slivers, deliberately not gated.
+            rp = synctex_edit(pdf, pos[0], 74.0, pos[2])
+            check("click in the box's left padding resolves to bank.tex",
+                  basename_matches(rp["input"], "bank.tex"), rp["raw"][:300])
+            check(f"...at the solution's source line ({BANK_SOLUTION_LINE})",
+                  rp["line"] == BANK_SOLUTION_LINE, f"got line {rp['line']!r}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -635,16 +650,12 @@ def scenario_mc_bank_problem():
     source line to redirect to (not asserted here); the stem and solution
     both should.
 
-    KNOWN ISSUE (mc-key-inverse-search, not fixed in this change): the solution's
-    raw SyncTeX record DOES carry the correct source line (verified via bulk
-    inspection of the raw .synctex stream -- 9 records on the solution's
-    bank-file line, identical shape to the stem's), but the record's own
-    (h,v) position is ~200pt away from where the text actually renders, so
-    no click in that region resolves at all. Working theory: emit_mc_tail's
-    \\@mcframe@* side-by-side layout does its own box measurement on top of
-    the already-fixed {solution} environment, displacing the position. The
-    stem is unaffected (its own separate assertion below is a hard failure,
-    not a known-issue, since it's not expected to have this problem)."""
+    HISTORY (mc-key-inverse-search, CLOSED): the solution's raw records always
+    carried the correct source line; what failed was resolution -- the parser
+    picks a click's answer by a container contest over boxes, and the boxes
+    around the solution carried tag 0 / library tags (SYNCTEX.md has the full
+    dissection). Container stamping in texlib_synctex.lua fixed both the
+    side-by-side and stacked layouts; the checks below are hard now."""
     print("\n=== Scenario 6: MC bank problem, Solutions mode ===")
     tmp = tempfile.mkdtemp(prefix="texlib_synctex_it_mc_")
     try:
@@ -671,19 +682,18 @@ def scenario_mc_bank_problem():
         check("found the MC solution needle in the PDF", pos2 is not None)
         if pos2:
             r2 = synctex_edit(pdf, *pos2)
-            # TRADE-OFF (mc-key-inverse-search): the DEFAULT side-by-side MC key sets the
-            # solution in a minipage whose box orphans it for SyncTeX reverse search,
-            # so the MC solution is not inverse-searchable in that (compact "four keys
-            # per page") layout. This is now a deliberate trade-off, not an open bug:
-            # the \TeXLibMCKeyStacked opt-in renders the solution stacked and IS
-            # searchable (proven with hard checks below). These two stay `known` so
-            # the compact default's non-searchability is documented, not a silent fail.
+            # FIXED (mc-key-inverse-search, closed by container stamping): the
+            # side-by-side minipage layout orphaned the solution because the
+            # BOXES around the correctly-attributed glyphs carried tag 0 or a
+            # library tag, and the viewer's parser resolves clicks by a
+            # container contest over boxes (SYNCTEX.md). texlib_synctex.lua now
+            # harvests the solution's own (tag,line) from its body glyphs and
+            # stamps every container/rule in the finished box, so BOTH layouts
+            # inverse-search. Hard checks: a regression fails loud.
             check("click on the MC solution resolves to mcbank.tex",
-                  basename_matches(r2["input"], "mcbank.tex"), r2["raw"][:300],
-                  known_issue="mc-key-inverse-search")
+                  basename_matches(r2["input"], "mcbank.tex"), r2["raw"][:300])
             check(f"...at the correct source line ({MC_SOLUTION_LINE})",
-                  r2["line"] == MC_SOLUTION_LINE, f"got line {r2['line']!r}",
-                  known_issue="mc-key-inverse-search")
+                  r2["line"] == MC_SOLUTION_LINE, f"got line {r2['line']!r}")
 
         # FIXED via opt-in: the side-by-side layout above is a deliberate trade-off
         # (the compact "four keys per page" packing) whose minipage box orphans the

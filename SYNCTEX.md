@@ -166,27 +166,36 @@ where the same stem can appear in multiple copies, it is structurally wrong.
 re-derive ConTeXt's solution with none of its maturity. Neither is worth
 pursuing here given 4a exists.
 
-## 5. Recommendations for TeXLib, ranked
+## 5. Recommendations for TeXLib — status
 
-1. **Keep the geometric discipline and gate it.** PR #81's rule — decoration
-   flush to the content box — plus the probe's numeric check (click at glyph
-   centre must resolve; band offset ≈ 0) is cheap and now understood. The
-   probe deserves promotion from scratchpad to the test suite as a scenario
-   check so a future box redesign fails a gate instead of a user.
-2. **Stamp the containers, not just the glyphs.** The two `KNOWN`
-   mc-key-inverse-search failures and the tag-0 container problem are the
-   same disease. One `node.set_synctex_fields` pass over the solution
-   wrapper's boxes and rules — stamping them with the *solution's own*
-   tag/line, reachable from the existing Lua layer — would turn the whole
-   green box into a correct click target instead of a hazard. This composes
-   with, rather than replaces, `texlib_synctex.lua`. Prototype before
-   trusting: the container contest means results must be measured (§3's
-   anomaly).
-3. **Do not rewrite emission.** ConTeXt proves a full replacement is
-   possible and also what it costs (its own resolver, per-viewer cheats,
-   maintained forever). TeXLib's native+redirect emission works; the failures
-   have all been parser-interaction bugs, which recommendations 1–2 address
-   at a fraction of the surface.
+1. **Gate the geometry.** DONE. The integration suite holds hard checks on
+   solution-text clicks (free-response and both MC layouts) and on a
+   left-edge click of the solution line, where only stamped containers can
+   answer. 66 checks, no `known` markers left.
+2. **Stamp the containers, not just the glyphs.** DONE.
+   `texlib_synctex_read_target` harvests (tag, line) from the body-only box's
+   glyphs; `texlib_synctex_stamp_box` stamps every hlist/vlist/rule in the
+   finished box via `node.direct.set_synctex_fields`. Hooked into `{solution}`
+   and `{partsolution}` in `texlib-solutions.sty`. This closed **both**
+   mc-key-inverse-search known-failures — the side-by-side minipage layout
+   inverse-searches now, so `\TeXLibMCKeyStacked` is a pure layout choice.
+   Verified write-through by dissection: the vtop chain appears in the file
+   as `[261,5`/`(261,5` records.
+
+   *Residual, measured and accepted:* the emission-side wrappers built
+   **after** the stamp runs (`\parbox`, the `\rlap` fill hboxes) are
+   themselves tag-0, and they still own three slivers — the 6pt visual bleed
+   left of the box edge, the "Solution." header line, and the blank pad
+   bands. Dissection shows six-plus overlapping wrapper boxes at the header
+   coordinate, several tag-0; which one wins the container contest there is
+   parser-internal. Users click solution *text*, which resolves everywhere;
+   these slivers are deliberately not gated. If they ever matter, the same
+   stamp applied from a later hook (after the parbox is built) is the tool.
+3. **Do not rewrite emission.** Standing decision. ConTeXt proves a full
+   replacement is possible and also what it costs (its own resolver,
+   per-viewer cheats, maintained forever). Every TeXLib failure so far has
+   been a parser-interaction bug; 1–2 addressed them at a fraction of that
+   surface.
 
 ## Sources
 
