@@ -360,13 +360,21 @@
 					% \box'd nodes reachable. +6pt pad each side, matching the old
 					% \colorbox{}'s \fboxsep=6pt.
 					% The fill spans EXACTLY \ht+\dp of the box it backs -- no
-					% overhang. That is load-bearing for inverse search, not
-					% cosmetics: a rule extending past the box displaces the
-					% SyncTeX records of everything inside it, measured at
-					% +6.2pt, and a double-click on solution text then lands in
-					% dead space and resolves to nothing. The 6pt bottom pad now
-					% lives inside the box (the \vskip above) so the fill can be
-					% flush. Do not reintroduce padding by growing the rule.
+					% overhang. Load-bearing for inverse search, not cosmetics.
+					% Mechanism (SYNCTEX.md at the repo root has the full story):
+					% the records never move -- the viewer's parser GROWS each
+					% hbox's "visible" box to contain its children, rules
+					% included, and resolves a click through a smallest-then-
+					% deepest container contest over those grown boxes. A rule
+					% overhanging this box made the smashed wrapper the deepest
+					% container for clicks on the solution text, and its nodes
+					% answer with no usable source -- so the click resolved to
+					% nothing (measured: the dead band's edge tracked the fill's
+					% overhang exactly, 159.1pt vs 153.1pt flush). \smash /
+					% zero-declared sizes cannot help; TeX's dimensions are not
+					% what the parser measures. Do not reintroduce padding by
+					% growing the rule; re-measure any change with sol_probe
+					% (recreatable from SYNCTEX.md) rather than reasoning.
 					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsoltint}{%
 						\rule[-\dp\@sol@vtop]%
 							{\dimexpr\textwidth\relax}%
