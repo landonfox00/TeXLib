@@ -189,6 +189,94 @@ local function orf_handler(filename)
 	}
 end
 
+-- ===========================================================================
+-- Container stamping (SYNCTEX.md recommendation 2)
+-- ===========================================================================
+-- The redirect above gets the CONTENT nodes (glyphs) attributed to the user's
+-- source, but the BOXES built around them by class/package code carry tag 0
+-- (no file) or a library file's tag. The viewer's parser resolves a click by a
+-- smallest-then-deepest CONTAINER contest over hboxes -- grown to contain
+-- their children, decoration rules included -- and answers with the winner's
+-- children. So untagged containers make whole regions resolve to nothing:
+-- measured on the solution box, and the mechanism behind mc-key-inverse-search
+-- (see SYNCTEX.md for the full dissection).
+--
+-- These two helpers close that gap surgically, per box register:
+--
+--   texlib_synctex_read_target(boxnum)
+--       Harvest (tag, line) from the first properly-attributed glyph in the
+--       box, depth-first (kern/glue as fallback). Call it on the BODY-ONLY box
+--       (\@sol@box), never on a box that already contains package-typeset
+--       furniture like the "Solution." header -- the header's glyphs carry the
+--       .sty's tag and would poison the target.
+--
+--   texlib_synctex_stamp_box(boxnum)
+--       Stamp the harvested target onto the box node itself and every hlist /
+--       vlist / rule inside, recursively. Glyphs, kerns and glue are left
+--       untouched: their per-word attribution is already correct and finer-
+--       grained than the box-level stamp. No harvested target => no-op (a
+--       rubric-only or empty solution stays as it was).
+--
+-- Result: a click ANYWHERE in the stamped box -- fill padding, header, rules --
+-- resolves to the solution's own source line, instead of dying on a tag-0
+-- wrapper. Uses node.direct.set_synctex_fields (LuaTeX manual: settable on
+-- glue, kern, hlist, vlist, rule, math).
+local D_hlist = node.id("hlist")
+local D_vlist = node.id("vlist")
+local D_rule  = node.id("rule")
+local D_glyph = node.id("glyph")
+local D_kern  = node.id("kern")
+local D_glue  = node.id("glue")
+
+local stamp_target = nil   -- {tag, line} harvested by read_target
+
+local function harvest(head, want_glyph)
+	local ND = node.direct
+	for n, id in ND.traverse(head) do
+		if (want_glyph and id == D_glyph)
+				or (not want_glyph and (id == D_kern or id == D_glue)) then
+			local t, l = ND.get_synctex_fields(n)
+			if t and t > 0 and l and l > 0 then return t, l end
+		elseif id == D_hlist or id == D_vlist then
+			local t, l = harvest(ND.getlist(n), want_glyph)
+			if t then return t, l end
+		end
+	end
+	return nil
+end
+
+function texlib_synctex_read_target(boxnum)
+	stamp_target = nil
+	local ND = node.direct
+	local b = ND.getbox(boxnum)
+	if not b then return end
+	local t, l = harvest(ND.getlist(b), true)
+	if not t then t, l = harvest(ND.getlist(b), false) end
+	if t then stamp_target = { t, l } end
+end
+
+local function stamp(head, t, l)
+	local ND = node.direct
+	for n, id in ND.traverse(head) do
+		if id == D_hlist or id == D_vlist then
+			ND.set_synctex_fields(n, t, l)
+			stamp(ND.getlist(n), t, l)
+		elseif id == D_rule then
+			ND.set_synctex_fields(n, t, l)
+		end
+	end
+end
+
+function texlib_synctex_stamp_box(boxnum)
+	if not stamp_target then return end
+	local ND = node.direct
+	local b = ND.getbox(boxnum)
+	if not b then return end
+	local t, l = stamp_target[1], stamp_target[2]
+	ND.set_synctex_fields(b, t, l)
+	stamp(ND.getlist(b), t, l)
+end
+
 function texlib_synctex_setup()
 	if active then return true end
 

@@ -313,6 +313,14 @@
 			\ifrubric \@emit@sol@footer \fi
 		\egroup
 		\@in@solutionfalse
+		% Harvest the inverse-search target from the BODY-ONLY box, before the
+		% vtop below mixes in the "Solution." header (whose glyphs carry this
+		% .sty's tag and would poison the target). See texlib_synctex.lua and
+		% SYNCTEX.md: content glyphs are attributed correctly, the boxes built
+		% around them are not, and the viewer resolves clicks by container.
+		\ifdefined\directlua
+			\directlua{texlib_synctex_read_target(\number\@sol@box)}%
+		\fi
 		\par\vspace{\@sol@outervsep}%
 		\setlength{\fboxsep}{6pt}%
 		% Collect the "Solution." header (+ any \rubric overlay) and the pre-\box'd
@@ -333,7 +341,20 @@
 			\fi
 			\par\vskip2pt
 			\box\@sol@box
+			% The 6pt bottom pad lives INSIDE the box, not as rule overhang. The
+			% fill used to be drawn 6pt past \dp\@sol@vtop, and that overhang is
+			% what displaced the SyncTeX records for everything in the box --
+			% measured at +6.2pt, which is why clicking a solution resolved to
+			% nothing while clicking below the line worked. Same ink either way;
+			% the difference is whether the rule extends beyond the box it fills.
+			\vskip6pt
 		}%
+		% Stamp every container and rule in the finished box with the harvested
+		% solution source, so a click anywhere in the green box -- padding,
+		% header, fill -- resolves there instead of dying on a tag-0 wrapper.
+		\ifdefined\directlua
+			\directlua{texlib_synctex_stamp_box(\number\@sol@vtop)}%
+		\fi
 		% Full-bleed to the true text margins.  {solution} renders inside the
 		% exam-class {questions} list body, whose left indent (\@totalleftmargin)
 		% \noindent does NOT remove; without this the full-\textwidth box is shifted
@@ -352,13 +373,38 @@
 					% mc-key-inverse-search); the \rlap inside the parbox keeps the
 					% \box'd nodes reachable. +6pt pad each side, matching the old
 					% \colorbox{}'s \fboxsep=6pt.
+					% The fill spans EXACTLY \ht+\dp of the box it backs -- no
+					% overhang. Load-bearing for inverse search, not cosmetics.
+					% Mechanism (SYNCTEX.md at the repo root has the full story):
+					% the records never move -- the viewer's parser GROWS each
+					% hbox's "visible" box to contain its children, rules
+					% included, and resolves a click through a smallest-then-
+					% deepest container contest over those grown boxes. A rule
+					% overhanging this box made the smashed wrapper the deepest
+					% container for clicks on the solution text, and its nodes
+					% answer with no usable source -- so the click resolved to
+					% nothing (measured: the dead band's edge tracked the fill's
+					% overhang exactly, 159.1pt vs 153.1pt flush). \smash /
+					% zero-declared sizes cannot help; TeX's dimensions are not
+					% what the parser measures. Do not reintroduce padding by
+					% growing the rule; re-measure any change with sol_probe
+					% (recreatable from SYNCTEX.md) rather than reasoning.
 					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsoltint}{%
-						\rule[-\dimexpr\dp\@sol@vtop+6pt\relax]%
+						\rule[-\dp\@sol@vtop]%
 							{\dimexpr\textwidth\relax}%
-							{\dimexpr\ht\@sol@vtop+\dp\@sol@vtop+12pt\relax}}}}%
+							{\dimexpr\ht\@sol@vtop+\dp\@sol@vtop\relax}}}}%
 					% Left accent, top/bottom flush with the green fill (the same 6pt
 					% pad), reading as a full-height left border like pset/didactic's
 					% tcolorbox borderline west. \smash'd so it adds no height/depth.
+					% The accent KEEPS its 6pt overhang, and that is not an
+					% oversight. Measured: fill-flush + accent-overhanging
+					% resolves at the glyph centre (offset 0.0pt), while
+					% fill-flush + accent-flush regresses to +6.2pt. The two
+					% rules are not independent -- what SyncTeX records is
+					% governed by the line's overall extent, not by each rule
+					% separately -- so this pairing is empirical, and any change
+					% to either rule must be re-measured with sol_probe.py
+					% rather than reasoned about.
 					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsolrulecolor}{%
 						\vrule width 1.5pt
 							height \dimexpr\ht\@sol@vtop+6pt\relax
@@ -396,6 +442,14 @@
 	\ifsolutions
 		\egroup
 		\@in@partsolutionfalse
+		% Same container-stamping as {solution}: harvest from the body box and
+		% stamp it BEFORE \unvbox splices its content into the page list (the
+		% spliced nodes keep their stamped fields; after the splice there is no
+		% register left to walk).
+		\ifdefined\directlua
+			\directlua{texlib_synctex_read_target(\number\@partsol@box)
+				texlib_synctex_stamp_box(\number\@partsol@box)}%
+		\fi
 		\noindent\texlibsolheader%
 		\par
 		{\color{green!40!black}\unvbox\@partsol@box}%
@@ -529,12 +583,14 @@
 \newlength{\@mc@solw}     \setlength{\@mc@solw}{0.54\linewidth}
 % MC-key layout: side-by-side (default -- choices | solution columns, compact so
 % four keys pack to a page) vs STACKED (solution full-width below the choices).
-% Side-by-side is more compact, but it sets the {solution} in a minipage whose box
-% orphans the content for SyncTeX reverse search, so the MC solution is not
-% inverse-searchable there (mc-key-inverse-search). \TeXLibMCKeyStacked opts into the
-% stacked layout, which keeps the solution in the vertical list -- so clicking an
-% MC solution in the key inverse-searches to the bank -- at the cost of the
-% four-per-page packing.
+% Both layouts inverse-search now. Side-by-side used to orphan the solution
+% (mc-key-inverse-search): the minipage's boxes carried tag 0 / library tags,
+% and the viewer resolves clicks by a container contest over boxes, so clicks
+% on the correctly-attributed glyphs died on their wrappers. Container stamping
+% in texlib_synctex.lua closed that (see SYNCTEX.md), and the integration suite
+% asserts both layouts with hard checks. \TeXLibMCKeyStacked remains as a pure
+% LAYOUT choice -- full-width solution below the choices vs the compact
+% four-keys-per-page packing -- no longer a searchability workaround.
 \newif\if@mc@keystacked  \@mc@keystackedfalse
 \newcommand{\TeXLibMCKeyStacked}{\@mc@keystackedtrue}
 \renewcommand{\@mcframe@begin}[1]{%
