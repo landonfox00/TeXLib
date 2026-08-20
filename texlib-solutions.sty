@@ -333,6 +333,13 @@
 			\fi
 			\par\vskip2pt
 			\box\@sol@box
+			% The 6pt bottom pad lives INSIDE the box, not as rule overhang. The
+			% fill used to be drawn 6pt past \dp\@sol@vtop, and that overhang is
+			% what displaced the SyncTeX records for everything in the box --
+			% measured at +6.2pt, which is why clicking a solution resolved to
+			% nothing while clicking below the line worked. Same ink either way;
+			% the difference is whether the rule extends beyond the box it fills.
+			\vskip6pt
 		}%
 		% Full-bleed to the true text margins.  {solution} renders inside the
 		% exam-class {questions} list body, whose left indent (\@totalleftmargin)
@@ -352,13 +359,30 @@
 					% mc-key-inverse-search); the \rlap inside the parbox keeps the
 					% \box'd nodes reachable. +6pt pad each side, matching the old
 					% \colorbox{}'s \fboxsep=6pt.
+					% The fill spans EXACTLY \ht+\dp of the box it backs -- no
+					% overhang. That is load-bearing for inverse search, not
+					% cosmetics: a rule extending past the box displaces the
+					% SyncTeX records of everything inside it, measured at
+					% +6.2pt, and a double-click on solution text then lands in
+					% dead space and resolves to nothing. The 6pt bottom pad now
+					% lives inside the box (the \vskip above) so the fill can be
+					% flush. Do not reintroduce padding by growing the rule.
 					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsoltint}{%
-						\rule[-\dimexpr\dp\@sol@vtop+6pt\relax]%
+						\rule[-\dp\@sol@vtop]%
 							{\dimexpr\textwidth\relax}%
-							{\dimexpr\ht\@sol@vtop+\dp\@sol@vtop+12pt\relax}}}}%
+							{\dimexpr\ht\@sol@vtop+\dp\@sol@vtop\relax}}}}%
 					% Left accent, top/bottom flush with the green fill (the same 6pt
 					% pad), reading as a full-height left border like pset/didactic's
 					% tcolorbox borderline west. \smash'd so it adds no height/depth.
+					% The accent KEEPS its 6pt overhang, and that is not an
+					% oversight. Measured: fill-flush + accent-overhanging
+					% resolves at the glyph centre (offset 0.0pt), while
+					% fill-flush + accent-flush regresses to +6.2pt. The two
+					% rules are not independent -- what SyncTeX records is
+					% governed by the line's overall extent, not by each rule
+					% separately -- so this pairing is empirical, and any change
+					% to either rule must be re-measured with sol_probe.py
+					% rather than reasoned about.
 					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsolrulecolor}{%
 						\vrule width 1.5pt
 							height \dimexpr\ht\@sol@vtop+6pt\relax
