@@ -4,6 +4,15 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-08-20
+
+The pre-semester release: everything since v0.6.1 in one tag, so the installer
+can ship it to coworkers before classes start. Headlines: inverse search on
+solutions (whole-box, both MC layouts, mechanism documented in SYNCTEX.md),
+TeX Live 2026 compatibility for all classes, the UNR-conformant thesis class
+gated in CI, `examples/` consolidated under one manifest, 21→33 scenarios, the
+class gallery, and `\printbankcatalog` filtering.
+
 ### Removed
 
 - **The dead alias `\shufflepages`.** A pre-release sweep of the repo AND every live course folder under `Teaching\` found **zero** uses -- unlike the other deprecated aliases (`	heExamNumber`, `\examversions`, `\overview`, ...), which carry 40-80 live uses each and stay until the planned cross-course migration. An alias nobody uses is pure surface area, and the sweep is what makes this removal safe rather than hopeful. Every doc-comment that still advertised it now names `\shuffle`.
