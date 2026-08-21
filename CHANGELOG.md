@@ -4,7 +4,14 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Removed
+
+- **The dead alias `\shufflepages`.** A pre-release sweep of the repo AND every live course folder under `Teaching\` found **zero** uses -- unlike the other deprecated aliases (`	heExamNumber`, `\examversions`, `\overview`, ...), which carry 40-80 live uses each and stay until the planned cross-course migration. An alias nobody uses is pure surface area, and the sweep is what makes this removal safe rather than hopeful. Every doc-comment that still advertised it now names `\shuffle`.
+
 ### Fixed
+
+- **`syllabi__long` failed the `--full` scenario tier against its own committed reference.** The scenario's header states its purpose plainly: *"a content-heavy syllabus that **spills onto a second page** -- exercises the running header/footer and multi-page flow."* The committed reference was ONE page -- it contradicted the scenario's documented intent, most likely baked in during a period when spacing compression squeezed the content onto one page, and the later spacing fixes (`a0b1ecf`, `59b9f2d`) restored the intended spill. References regenerated (now two pages, so the page-2 running header is actually pixel-guarded for the first time); full tier is 33/33.
+
 
 - **The discarded solution box opened mid-paragraph, and everything typeset after it became a child of the enclosing list.** This is the whole of the autoexam half of the TeX Live 2026 tagging failure (#69), and it was never really about autoexam. `{solution}`'s `\ifsolutions` branch makes `\par` its very first action; the discard branch never did. So a source writing `\begin{solution}` with no blank line before it — which the sample bank does, straight after `\end{parts}` — opened the throwaway `\vbox` while the stem's paragraph was still live, and the phantom structure nested inside the enclosing `<L>` instead of landing as a sibling. Everything after it then inherited that parent: the next `\question` tagged as `LI` inside `LI`, following stems as `P` inside `L`. Suspending tagging around the box was never sufficient on its own — the box also has to **start in vertical mode**, which the render branch got for free from its `\par`. `{partsolution}` carried the identical asymmetry (`\par\smallskip` on one side, nothing on the other) and is fixed the same way. Gated on accessible builds, so normal output is untouched.
 
