@@ -335,7 +335,7 @@
 % handled by the engine's pbank_suppress_redirect flag, set by
 % autoexam_run_versions before the version loop iterates.
 
-% \shuffle (deprecated alias \shufflepages) is provided by texlib-problembank.sty
+% \shuffle is provided by texlib-problembank.sty
 % (shared with quiz).  The autoexam version loop reads its flag to reorder
 % problems per version; the engine also shuffles each MC problem's options.
 
@@ -346,9 +346,9 @@
 % \byversion{A content}{B content}{C content}
 %   Three-version convenience: typesets the argument matching the current
 %   \theExamVersion (A/B/C).  Versioning is NOT limited to three — the version
-%   loop, \shufflepages, and seeding all handle any number of versions.  This
+%   loop, \shuffle, and seeding all handle any number of versions.  This
 %   command is just the 3-arg shorthand; for a version beyond C it falls back to
-%   the A argument (its question ORDER still varies via \shufflepages).  For
+%   the A argument (its question ORDER still varies via \shuffle).  For
 %   version-specific content at any number of versions, use \vercase.
 \long\def\@byv@A#1#2#3{#1}
 \long\def\@byv@B#1#2#3{#2}

@@ -201,7 +201,7 @@ randomly picks one matching problem (per version, deterministically).
 
 `\importproblem{file}{id}` — load a single problem from a file.
 
-`\shuffle` (alias `\shufflepages`) / `\byversion{A}{B}{C}` — control
+`\shuffle` / `\byversion{A}{B}{C}` — control
 per-version shuffling (problem order + each MC problem's options) and
 version-specific content.
 

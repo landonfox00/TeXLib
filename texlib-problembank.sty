@@ -125,7 +125,7 @@
 % docs. Example: \setversionseed{A}{7} nudges version A after a bad draw.
 \newcommand{\setversionseed}[2]{\pbank@lua{version_seed_override['#1'] = #2}}
 
-% \shuffle  — turn on per-version shuffling (deprecated alias: \shufflepages).
+% \shuffle  — turn on per-version shuffling.
 % Shared by both assessment classes so the toggle (and its default-off behaviour)
 % lives in one place.  autoexam: reorders problems within each {problems} /
 % {mcproblems} section per version (the version loop's source pre-pass) AND
@@ -136,7 +136,11 @@
 % options (subset selection is part of the shuffle).  \begin{choices}[fixed]
 % keeps a block in authored order even under \shuffle.
 \newcommand{\shuffle}{\pbank@lua{set_autoexam_shuffle_pages()}}
-\let\shufflepages\shuffle   % deprecated alias
+% \shufflepages (the deprecated alias of \shuffle) is REMOVED, not kept: a
+% pre-release sweep of the repo AND every live course folder under Teaching\
+% found zero uses -- unlike the other deprecated aliases (\theExamNumber,
+% \examversions, ...), which carry 40-80 live uses each and stay until the
+% cross-course migration. An alias nobody uses is pure surface area.
 
 % \calcvar{name}{lua-expr}  — compute an expression using stored vars
 \newcommand{\calcvar}[2]{\pbank@lua{calc_var('#1', '#2')}}

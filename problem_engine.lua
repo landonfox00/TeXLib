@@ -260,7 +260,7 @@ local function pbank_texify(s)
 	return (tostring(s):gsub('[_%%#&%$]', '\\%0'))
 end
 
-autoexam_shuffle_pages = false  -- set true by \shufflepages in the preamble
+autoexam_shuffle_pages = false  -- set true by \shuffle in the preamble
 pbank_first_on_page = true   -- reset by \begin{problems} and patched \newpage;
 								-- read by pbank_problem_item to decide separator
 -- Render mode of the active problem-section: 'mc' inside {mcproblems}, 'fr'
@@ -1877,7 +1877,7 @@ end
 -- engine (resolve_mc_order / emit_mc_tail), where the bank content is available.
 
 -- set_autoexam_shuffle_pages()
---   Called by \shufflepages in the preamble.
+--   Called by \shuffle in the preamble.
 function set_autoexam_shuffle_pages()
 	autoexam_shuffle_pages = true
 end
