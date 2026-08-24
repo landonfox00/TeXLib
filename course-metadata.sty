@@ -76,7 +76,8 @@
 \meta_create_var:nn { gradebook-path } { GradebookPath }
 \meta_create_var:nn { preamble-file }  { PreambleFile }
 % Optional override for the builder's shareable-copy basename (see the publish
-% sidecar below). Unset by default -> the builder derives <course>.<section>_<term>.
+% sidecar below). Unset by default -> the builder derives the department
+% submission name <SUBJECT> <number>.<section>_<term>_<LastName>.
 \meta_create_var:nn { publish-name }   { PublishName }
 % Per-class instructions-file keys. They live here (not in each class) so a
 % course can point every quiz/exam/card-set/pset at one file course-wide from
@@ -257,20 +258,46 @@
 % ------------------------------------------------------------------------------
 % \MetaHumanMonthDay{<value>} -- render a numeric "M-D" date (the form final-date
 % must take so the schedule's date math can parse it) as a human-readable
-% "<Mon> <D>, <year>", matching the free-form exam<N>-date keys. The syllabus
-% \examdatetable and the autoexam Final-exam cover use it so a schedule-parseable
-% final-date still displays like the other exam dates, single-sourcing the month
-% names. Fully expandable. A value that expands EMPTY yields nothing; the value
-% is otherwise assumed to be "M-D" (final-date always is).
+% "<Weekday>, <Month> <D>, <year>", matching the free-form exam<N>-date keys
+% (courses transcribe those from the schedule as e.g. "Friday, December 4,
+% 2026"). The syllabus \examdatetable and the autoexam Final-exam cover use it
+% so a schedule-parseable final-date still displays like the other exam dates,
+% single-sourcing the month names. Fully expandable. A value that expands EMPTY
+% yields nothing; the value is otherwise assumed to be "M-D" (final-date always
+% is).
 % ------------------------------------------------------------------------------
-\cs_new:Npn \__meta_month_abbr:n #1 {
+\cs_new:Npn \__meta_month_name:n #1 {
 	\str_case:nnF {#1}
-		{ {1}{Jan} {2}{Feb} {3}{Mar} {4}{Apr}  {5}{May}  {6}{Jun}
-		  {7}{Jul} {8}{Aug} {9}{Sep} {10}{Oct} {11}{Nov} {12}{Dec} }
+		{ {1}{January} {2}{February} {3}{March}     {4}{April}
+		  {5}{May}     {6}{June}     {7}{July}      {8}{August}
+		  {9}{September} {10}{October} {11}{November} {12}{December} }
 		{#1}
 }
+% Zeller's congruence (Gregorian): weekday from Y/M/D with no date package and
+% no \directlua, so it works in every class's engine. January and February
+% count as months 13 and 14 of the PREVIOUS year -- both the month term and the
+% year terms below make that shift.
+\cs_new:Npn \__meta_weekday_name:nnn #1#2#3 {
+	\int_case:nn {
+		\int_mod:nn {
+			#3
+			+ \int_div_truncate:nn
+				{ 13 * ( \int_compare:nNnTF {#2} < {3} { #2 + 12 } { #2 } + 1 ) } { 5 }
+			+ \int_mod:nn { \__meta_zyear:nn {#1} {#2} } { 100 }
+			+ \int_div_truncate:nn { \int_mod:nn { \__meta_zyear:nn {#1} {#2} } { 100 } } { 4 }
+			+ \int_div_truncate:nn { \int_div_truncate:nn { \__meta_zyear:nn {#1} {#2} } { 100 } } { 4 }
+			+ 5 * \int_div_truncate:nn { \__meta_zyear:nn {#1} {#2} } { 100 }
+		} { 7 }
+	}
+	{ {0}{Saturday} {1}{Sunday}   {2}{Monday} {3}{Tuesday}
+	  {4}{Wednesday} {5}{Thursday} {6}{Friday} }
+}
+\cs_new:Npn \__meta_zyear:nn #1#2 {
+	\int_eval:n { \int_compare:nNnTF {#2} < {3} { #1 - 1 } { #1 } }
+}
 \cs_new:Npn \__meta_md_split:w #1-#2\q_stop {
-	\__meta_month_abbr:n {#1}~#2,~\GetYear
+	\__meta_weekday_name:nnn {\GetYear} {#1} {#2} ,~
+	\__meta_month_name:n {#1}~#2,~\GetYear
 }
 % Humanize an "M-D" date (8-12 -> "Aug 12, 2026"). A value with NO "-" is already
 % human-readable (e.g. "August 12, 2026") and is returned unchanged, so a course
@@ -318,25 +345,37 @@
 % ==============================================================================
 % A class that produces a shareable, course-identified PDF (syllabus, schedule)
 % registers itself with
-%   \TeXLibDeclarePublishable{<kind>}{<generic-name>}{<shortcut-noun>}
+%   \TeXLibDeclarePublishable[<coded-suffix>]{<kind>}{<generic-name>}{<noun>}
 % in its preamble.  At \AtEndDocument we drop a <jobname>.pubmeta sidecar
-% recording the RESOLVED course / section / term — coursemeta defaults, class-
-% option overrides and the derived \GetTerm all folded in, none of which a build
-% tool can reconstruct by scraping coursemeta.tex.  The TeXLib Sublime builder
-% reads it to clone the PDF to <course>.<section>_<term>.pdf + <generic>.pdf and
-% drop a "<course> <term> <noun>" desktop shortcut.  Every other build path just
+% recording the RESOLVED course / section / term / instructor — coursemeta
+% defaults, class-option overrides and the derived \GetTerm all folded in, none
+% of which a build tool can reconstruct by scraping coursemeta.tex.  The TeXLib
+% Sublime builder reads it to clone the PDF to the department's submission name
+% "<SUBJECT> <number>.<section>_<term>_<LastName>.pdf" + <generic>.pdf and drop a
+% "<course> <term> <noun>" desktop shortcut.  Every other build path just
 % ignores the file (it is \openout-written, so kpathsea routes it to the aux dir
 % like .vmap, and the builder deletes it), so this is inert for plain CLI /
 % installer builds.  An undeclared class writes nothing.
+%
+% The optional <coded-suffix> is appended to that coded name (as "_<suffix>").
+% It exists because the coded name is course-identified but NOT kind-identified:
+% every publishable class in one course would otherwise clone to the same
+% filename, last build silently winning.  The syllabus declares no suffix — its
+% coded name has to match the Math & Stat Office convention verbatim, since that
+% is the file mailed to math@unr.edu — so every OTHER publishable class must
+% declare one.  publish-name cannot serve here: it is a course-wide key, so it
+% would rename every class's copy to the same thing all over again.
 \newif\ifTeXLib@pub@declared
 \newcommand{\TeXLib@pub@kind}{}
 \newcommand{\TeXLib@pub@generic}{}
 \newcommand{\TeXLib@pub@noun}{}
-\newcommand{\TeXLibDeclarePublishable}[3]{%
+\newcommand{\TeXLib@pub@suffix}{}
+\NewDocumentCommand{\TeXLibDeclarePublishable}{ O{} m m m }{%
 	\TeXLib@pub@declaredtrue
-	\renewcommand{\TeXLib@pub@kind}{#1}%
-	\renewcommand{\TeXLib@pub@generic}{#2}%
-	\renewcommand{\TeXLib@pub@noun}{#3}%
+	\renewcommand{\TeXLib@pub@kind}{#2}%
+	\renewcommand{\TeXLib@pub@generic}{#3}%
+	\renewcommand{\TeXLib@pub@noun}{#4}%
+	\renewcommand{\TeXLib@pub@suffix}{#1}%
 }
 \newwrite\TeXLib@pub@stream
 \AtEndDocument{%
@@ -345,9 +384,11 @@
 		\immediate\write\TeXLib@pub@stream{kind=\TeXLib@pub@kind}%
 		\immediate\write\TeXLib@pub@stream{generic=\TeXLib@pub@generic}%
 		\immediate\write\TeXLib@pub@stream{noun=\TeXLib@pub@noun}%
+		\immediate\write\TeXLib@pub@stream{coded-suffix=\TeXLib@pub@suffix}%
 		\immediate\write\TeXLib@pub@stream{course=\GetCourseShort}%
 		\immediate\write\TeXLib@pub@stream{section=\GetCourseSection}%
 		\immediate\write\TeXLib@pub@stream{term=\GetTerm}%
+		\immediate\write\TeXLib@pub@stream{instructor=\GetInstructor}%
 		\immediate\write\TeXLib@pub@stream{publish-name=\GetPublishName}%
 		\immediate\closeout\TeXLib@pub@stream
 	\fi

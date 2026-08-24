@@ -44,7 +44,7 @@ if "sublime" in sys.modules:  # only true inside Sublime's plugin host
 from _testkit import install_native_builder  # noqa: E402
 TexlibBuilder = install_native_builder()
 from texlib_build import (  # noqa: E402  (native core)
-    GRADEBOOK_SHEETS, MAX_RERUNS, STATE_ONLY_RERUNS, TexlibBuildCore,
+    GRADEBOOK_SHEETS, MAX_RERUNS, STATE_ONLY_RERUNS, TexlibBuildCore, _surname,
 )
 
 
@@ -1362,16 +1362,41 @@ def main():
     #     class (syllabus, schedule). Shortcut/clipboard are stubbed so tests
     #     never touch the real desktop or clipboard.
     # ====================================================================== #
-    # _coded_basename derivation.
-    check("coded: section present -> Course.Section_Term",
-          TexlibBuilder._coded_basename("Math 181", "1001", "Fall 2026")
-          == "Math181.1001_Fall2026")
-    check("coded: no section -> Course_Term (no stray dot)",
-          TexlibBuilder._coded_basename("Math 181", "", "Fall 2026")
-          == "Math181_Fall2026")
-    check("coded: filename-illegal chars stripped",
-          TexlibBuilder._coded_basename("Math/181", "10:01", "Fall 2026")
-          == "Math181.1001_Fall2026")
+    # _coded_basename derivation -- the Math & Stat Office submission convention
+    # "MATH XXX.YYYY_Fall 2026_InstructorLastName" (department mail of 2026-08-20,
+    # in force since August 2025). Spaces are part of the convention and are kept.
+    check("coded: department convention (subject upper, spaces kept, surname)",
+          TexlibBuilder._coded_basename("Math 181", "1001", "Fall 2026",
+                                        "Landon Fox")
+          == "MATH 181.1001_Fall 2026_Fox")
+    check("coded: STAT courses take the same shape",
+          TexlibBuilder._coded_basename("Stat 152", "1002", "Fall 2026",
+                                        "Landon Fox")
+          == "STAT 152.1002_Fall 2026_Fox")
+    check("coded: lettered course number stays upper ('126EE')",
+          TexlibBuilder._coded_basename("Math 126EE", "1001", "Spring 2026",
+                                        "Landon Fox")
+          == "MATH 126EE.1001_Spring 2026_Fox")
+    check("coded: no section -> no stray dot",
+          TexlibBuilder._coded_basename("Math 181", "", "Fall 2026",
+                                        "Landon Fox")
+          == "MATH 181_Fall 2026_Fox")
+    check("coded: no instructor -> no trailing underscore",
+          TexlibBuilder._coded_basename("Math 181", "1001", "Fall 2026", "")
+          == "MATH 181.1001_Fall 2026")
+    check("coded: filename-illegal chars stripped, legal spaces kept",
+          TexlibBuilder._coded_basename("Math 18/1", "10:01", "Fall 2026",
+                                        "Landon Fox")
+          == "MATH 181.1001_Fall 2026_Fox")
+
+    # _surname: the free-text `instructor` field, reduced to the last name the
+    # department convention wants.
+    for raw, want in (("Landon Fox", "Fox"), ("Dr. Landon Fox", "Fox"),
+                      ("Fox, Landon", "Fox"), ("Landon Fox, Ph.D.", "Fox"),
+                      ("Landon Fox Jr.", "Fox"), ("  Landon   Fox  ", "Fox"),
+                      ("Fox", "Fox"), ("", "")):
+        check("surname: %r -> %r" % (raw, want),
+              _surname(raw) == want, _surname(raw))
 
     # _read_pubmeta: parse + consume, checked in the aux dir first.
     tmpp = tempfile.mkdtemp(prefix="texlib_pub_")
@@ -1391,7 +1416,8 @@ def main():
 
     def _publish_case(base, kind, generic, noun, course, section, term,
                       settings=None, publish_name="",
-                      accessible_build=False, tagged_present=False):
+                      accessible_build=False, tagged_present=False,
+                      instructor="Landon Fox", coded_suffix=""):
         d = tempfile.mkdtemp(prefix="texlib_pub_")
         with open(os.path.join(d, base + ".pdf"), "wb") as fh:
             fh.write(b"%PDF-1.5 normal")
@@ -1403,7 +1429,9 @@ def main():
                 fh.write(b"%PDF-1.5 tagged")
         with open(os.path.join(d, base + ".pubmeta"), "w", encoding="utf-8") as fh:
             fh.write(f"kind={kind}\ngeneric={generic}\nnoun={noun}\n"
+                     f"coded-suffix={coded_suffix}\n"
                      f"course={course}\nsection={section}\nterm={term}\n"
+                     f"instructor={instructor}\n"
                      f"publish-name={publish_name}\n")
         b = TexlibBuilder(); b.tex_dir = d; b.base_name = base
         b._aux_target = None
@@ -1421,17 +1449,35 @@ def main():
     # Distinct source/generic names -> both copies + shortcut + clipboard.
     d, pdfs, shortcuts, clips, disp = _publish_case(
         "schedule", "schedule", "Tentative Schedule", "Schedule",
-        "Math 181", "1001", "Fall 2026")
+        "Math 181", "1001", "Fall 2026", coded_suffix="Schedule")
     check("publish: coded + generic copies made (source name distinct)",
-          "Math181.1001_Fall2026.pdf" in pdfs
+          "MATH 181.1001_Fall 2026_Fox_Schedule.pdf" in pdfs
           and "Tentative Schedule.pdf" in pdfs and "schedule.pdf" in pdfs, pdfs)
     check("publish: shortcut label is '<course> <term> <noun>' -> coded copy",
           shortcuts == [("Math 181 Fall 2026 Schedule",
-                         "Math181.1001_Fall2026.pdf")], shortcuts)
+                         "MATH 181.1001_Fall 2026_Fox_Schedule.pdf")], shortcuts)
     check("publish: shareable path put on the clipboard",
-          clips == ["Math181.1001_Fall2026.pdf"], clips)
+          clips == ["MATH 181.1001_Fall 2026_Fox_Schedule.pdf"], clips)
     check("publish: sidecar consumed", not os.path.exists(
         os.path.join(d, "schedule.pubmeta")))
+
+    # The coded name is course-identified but not kind-identified, so every
+    # publishable class BUT the syllabus declares a coded-suffix. Without it the
+    # syllabus and schedule of one course clone to a single filename and the
+    # later build silently wins -- and the loser is what gets mailed to the
+    # department. Pin that they differ, and that the syllabus keeps the bare
+    # convention name.
+    _, syl_pdfs, _, _, _ = _publish_case(
+        "syllabus-doc", "syllabus", "Syllabus", "Syllabus",
+        "Math 181", "1001", "Fall 2026")
+    _, sch_pdfs, _, _, _ = _publish_case(
+        "schedule-doc", "schedule", "Tentative Schedule", "Schedule",
+        "Math 181", "1001", "Fall 2026", coded_suffix="Schedule")
+    check("publish: syllabus coded name is the bare department convention",
+          "MATH 181.1001_Fall 2026_Fox.pdf" in syl_pdfs, syl_pdfs)
+    check("publish: schedule coded name does not collide with the syllabus",
+          "MATH 181.1001_Fall 2026_Fox.pdf" not in sch_pdfs
+          and "MATH 181.1001_Fall 2026_Fox_Schedule.pdf" in sch_pdfs, sch_pdfs)
 
     # Case-only collision (source syllabus.pdf vs generic Syllabus.pdf): the
     # source must survive and the coded copy must still be made. (On a case-
@@ -1443,7 +1489,7 @@ def main():
     check("publish: source PDF preserved on case-only generic collision",
           "syllabus.pdf" in pdfs, pdfs)
     check("publish: coded copy still made alongside the collision",
-          "Math181.1001_Fall2026.pdf" in pdfs, pdfs)
+          "MATH 181.1001_Fall 2026_Fox.pdf" in pdfs, pdfs)
     check("publish: no spurious 'could not write' on collision",
           "could not write" not in disp, disp)
 
@@ -1460,6 +1506,15 @@ def main():
         "Fall 2026", publish_name="M181-Syllabus-F26")
     check("publish: publish-name overrides the coded basename",
           "M181-Syllabus-F26.pdf" in pdfs, pdfs)
+
+    # publish-name is course-wide, so the kind-discriminating suffix has to ride
+    # on the override too -- otherwise setting the key re-collides every
+    # publishable class in the course onto one filename.
+    d, pdfs, shortcuts, clips, disp = _publish_case(
+        "doc", "schedule", "Tentative Schedule", "Schedule", "Math 181", "1001",
+        "Fall 2026", publish_name="M181-F26", coded_suffix="Schedule")
+    check("publish: coded-suffix still applies over a publish-name override",
+          "M181-F26_Schedule.pdf" in pdfs, pdfs)
 
     # Disabled via builder_settings -> sidecar still consumed, no copies made.
     d, pdfs, shortcuts, clips, disp = _publish_case(
@@ -1478,14 +1533,15 @@ def main():
 
     d, pdfs, _, _, disp = _publish_case(
         "schedule", "schedule", "Tentative Schedule", "Schedule",
-        "Math 181", "1001", "Fall 2026",
+        "Math 181", "1001", "Fall 2026", coded_suffix="Schedule",
         accessible_build=True, tagged_present=True)
     check("publish (accessible): generic copy carries the TAGGED bytes",
           _published_bytes(d, "Tentative Schedule.pdf") == b"%PDF-1.5 tagged",
           _published_bytes(d, "Tentative Schedule.pdf"))
     check("publish (accessible): coded copy carries the TAGGED bytes",
-          _published_bytes(d, "Math181.1001_Fall2026.pdf") == b"%PDF-1.5 tagged",
-          _published_bytes(d, "Math181.1001_Fall2026.pdf"))
+          _published_bytes(d, "MATH 181.1001_Fall 2026_Fox_Schedule.pdf")
+          == b"%PDF-1.5 tagged",
+          _published_bytes(d, "MATH 181.1001_Fall 2026_Fox_Schedule.pdf"))
     check("publish (accessible): both halves survive next to the source",
           "schedule.pdf" in pdfs and "schedule_accessible.pdf" in pdfs, pdfs)
     check("publish (accessible): says so", "tagged PDF" in disp, repr(disp))

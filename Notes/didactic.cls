@@ -356,7 +356,7 @@
 		% ACCESSIBLE: suspend tagging over the discarded body, or its phantom
 		% structure nests inside the live surrounding paragraph (Table 5 P-Part /
 		% P-P). Resumed below BEFORE the blank write-space box, which is real
-		% output and must still be tagged.
+		% output and must still be tagged -- see the \tagpdfparaOff there.
 		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }{%
@@ -364,7 +364,23 @@
 		\end{@sol@shown}%
 	\else
 		\egroup\texlib@acc@tagresume
+		% ACCESSIBLE: the write-in space is \@sol@blankfill's stack of zero-width
+		% rules, one \par each -- 38 of them for a 7in box. Tagged, they enter the
+		% structure tree as that many empty <text-unit>s, and the count does not
+		% come out even: a gated body containing a {center} leaves one text-unit
+		% end here without a matching begin, and \end{document} dies with "The
+		% number of automatic begin (N) and end (N+1) text-unit para hooks differ"
+		% -- one per such solution (Math 126 Unit 1: ten, across all six sections).
+		% Suspending tagging over the discarded body is not enough; the leak lands
+		% in the blank box, not in the box that was dropped.
+		%
+		% Untagging the blank space is the right answer independently of the bug:
+		% it is decorative write-in room with no content, so empty paragraphs in
+		% the structure tree are noise a screen reader has to walk past. Scoped to
+		% \begingroup so nothing after the solution is affected.
+		\begingroup\ifdefined\TeXLibAccessibleMode\tagpdfparaOff\fi
 		\begin{@sol@blank}\@sol@blankfill{#2}\end{@sol@blank}%
+		\endgroup
 	\fi
 }
 

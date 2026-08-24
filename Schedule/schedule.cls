@@ -75,6 +75,19 @@
 % ==============================================================================
 \RequirePackage{texlib-build}
 
+% Publishable: the builder clones the built PDF to the coded
+% "<SUBJECT> <number>.<section>_<term>_<LastName>_Schedule.pdf" and to
+% "Tentative Schedule.pdf", and drops a "<course> <term> Schedule" desktop
+% shortcut. See the publish sidecar in course-metadata.sty. The generic name
+% matches the document title declared above, and is one of the two names
+% package_for_lms.py bundles.
+%
+% The [Schedule] coded-suffix is required, not decorative: the unsuffixed coded
+% name is reserved for the syllabus, which must match the Math & Stat Office
+% submission convention verbatim. Without it both classes in a course clone to
+% one filename and the later build wins.
+\TeXLibDeclarePublishable[Schedule]{schedule}{Tentative Schedule}{Schedule}
+
 
 % ==============================================================================
 % 3. PAGE LAYOUT
