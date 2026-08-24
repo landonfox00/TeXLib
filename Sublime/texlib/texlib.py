@@ -54,6 +54,12 @@ MODES = [
     ("draft", "Draft", "Injects \\def\\ShowDraft{}."),
     ("quick", "Quick (single pass)", "One pass, no biber, no reruns."),
     ("full", "Full (2-pass)", "Force the settling 2-pass build even when default_build_mode is quick."),
+    # Paired build, not a flag injection: the brain typesets twice and keeps
+    # <base>.pdf AND <base>_accessible.pdf. It is listed last because it is the
+    # slowest mode by a wide margin -- two full builds, the second under
+    # lualatex regardless of the class's own engine.
+    ("accessible", "Accessible (normal + tagged pair)",
+     "Two builds: the normal PDF plus a tagged PDF/UA twin, <base>_accessible.pdf."),
 ]
 MODE_TOKENS = {m[0] for m in MODES}
 
