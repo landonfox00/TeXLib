@@ -239,7 +239,8 @@ STATE_NOISE_RE = re.compile(r"^\\abx@aux@read@bbl")
 # --- Publish step -----------------------------------------------------------
 # A class that calls \TeXLibDeclarePublishable (syllabus, schedule) drops a
 # <base>.pubmeta sidecar; _postprocess then clones the built PDF to shareable
-# names (<course>.<section>_<term>.pdf + a generic <kind>.pdf) and, on Windows,
+# names (the department's <SUBJECT> <number>.<section>_<term>_<LastName>.pdf +
+# a generic <kind>.pdf) and, on Windows,
 # a desktop shortcut. Enabled by default; toggle via builder_settings in
 # LaTeXTools.sublime-settings or the env override (0/false/no/off = disabled).
 PUBLISH_SETTING      = "publish_shareable_copies"
@@ -249,6 +250,40 @@ PUBLISH_CLIP_ENV     = "TEXLIB_PUBLISH_CLIPBOARD"
 # Desktop subfolder the shortcuts land in, so they don't pile up loose on the
 # desktop as terms accumulate.
 PUBLISH_SHORTCUT_DIR = "Course Materials"
+
+# Name suffixes that must not be mistaken for a surname when the coded basename
+# takes the last token of `instructor` (see _surname).
+NAME_SUFFIXES = frozenset(
+    ("jr", "sr", "ii", "iii", "iv", "v", "phd", "ph.d", "md", "m.d", "edd", "ed.d")
+)
+
+
+def _collapse_ws(text):
+    """Squeeze internal whitespace runs to one space and trim the ends. Unlike
+    the old strip-every-space rule this KEEPS the single spaces the department's
+    filename convention is written with ("MATH 181", "Fall 2026")."""
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _surname(instructor):
+    """Best-effort surname from a free-text `instructor` field, for the trailing
+    "_InstructorLastName" segment of the coded name.
+
+      "Landon Fox"        -> "Fox"     "Dr. Landon Fox"     -> "Fox"
+      "Fox, Landon"       -> "Fox"     "Landon Fox, Ph.D."  -> "Fox"
+
+    Everything from the first comma on is dropped (that comma is either the
+    "Last, First" separator -- in which case the surname is already all that is
+    left -- or a degree/suffix tail), then trailing generational and degree
+    tokens go, then the last remaining token wins. A multi-token surname
+    ("van der Meer") is beyond this and needs the `publish-name` override; the
+    field is free text with no structure to lean on, and guessing at particles
+    would silently mangle names it guessed wrong about. Empty in, empty out."""
+    head = _collapse_ws(instructor.split(",", 1)[0])
+    tokens = head.split()
+    while tokens and tokens[-1].rstrip(".").lower() in NAME_SUFFIXES:
+        tokens.pop()
+    return tokens[-1] if tokens else ""
 
 # Regexes over the root document / engine output.
 DOCCLASS_RE = re.compile(r"\\documentclass(?:\[[^\]]*\])?\{(\w[\w-]*)\}")
@@ -1812,8 +1847,11 @@ class TexlibBuildCore:
         + the derived term -- none reconstructable from coursemeta.tex by a build
         tool) name the copies made next to the source:
 
-          * <course>.<section>_<term>.pdf   (or <publish-name>.pdf if that key is
-            set), the section segment dropped when the course has none
+          * <SUBJECT> <number>.<section>_<term>_<LastName>.pdf -- the Math & Stat
+            Office submission name (or <publish-name>.pdf if that key is set),
+            each segment dropped when its source field is unset, plus the
+            declaring class's coded-suffix so two publishable classes in one
+            course cannot clone to the same filename
           * <generic>.pdf                   (Syllabus.pdf / Tentative Schedule.pdf)
 
         and a "<course> <term> <noun>" shortcut in the desktop's Course Materials
@@ -1837,8 +1875,10 @@ class TexlibBuildCore:
         term     = meta.get("term", "").strip()
         generic  = meta.get("generic", "").strip()
         noun     = meta.get("noun", "").strip()
+        instr    = meta.get("instructor", "").strip()
+        suffix   = meta.get("coded-suffix", "").strip()
         override = meta.get("publish-name", "").strip()
-        # Sanity guard: never emit a "Math181__.pdf"-style name from a document
+        # Sanity guard: never emit a "MATH 181__.pdf"-style name from a document
         # whose coursemeta is missing the identifying pieces. The PDF built fine;
         # only the shareable clones are skipped.
         if not course or not term:
@@ -1848,9 +1888,14 @@ class TexlibBuildCore:
                 "explicit term). The PDF built normally.\n"
             )
             return
-        coded = override or self._coded_basename(course, section, term)
+        coded = override or self._coded_basename(course, section, term, instr)
         if override:
             coded = self._sanitize_filename(coded)
+        # The kind-discriminating suffix rides on the override too: publish-name
+        # is course-wide, so without this every publishable class in the course
+        # would clone to the one overridden name again.
+        if suffix:
+            coded = self._sanitize_filename(coded + "_" + suffix)
         made = []
         coded_pdf = os.path.join(tex_dir, coded + ".pdf")
         if self._copy_pdf(pdf, coded_pdf):
@@ -1925,18 +1970,38 @@ class TexlibBuildCore:
         return meta
 
     @staticmethod
-    def _coded_basename(course, section, term):
-        """Build "<Course>.<Section>_<Term>" with whitespace stripped from each
-        token; the ".<Section>" segment is dropped when the course has no section.
+    def _coded_basename(course, section, term, instructor=""):
+        """Build the Math & Stat Office submission name for a shareable PDF:
 
-          ("Math 181", "1001", "Fall 2026") -> "Math181.1001_Fall2026"
-          ("Math 181", "",     "Fall 2026") -> "Math181_Fall2026"
-        """
-        c = re.sub(r"\s+", "", course)
-        s = re.sub(r"\s+", "", section)
-        t = re.sub(r"\s+", "", term)
-        core = f"{c}.{s}" if s else c
-        name = f"{core}_{t}" if t else core
+          "<SUBJECT> <number>.<section>_<term>_<LastName>"
+
+        matching the convention the department has asked for since August 2025
+        ("MATH XXX.YYYY_Fall 2026_InstructorLastName"), so the published syllabus
+        can be mailed to math@unr.edu as-is with no manual rename.
+
+          ("Math 181", "1001", "Fall 2026", "Landon Fox") -> "MATH 181.1001_Fall 2026_Fox"
+          ("Stat 152", "1002", "Fall 2026", "Landon Fox") -> "STAT 152.1002_Fall 2026_Fox"
+          ("Math 181", "",     "Fall 2026", "Landon Fox") -> "MATH 181_Fall 2026_Fox"
+          ("Math 181", "1001", "Fall 2026", "")           -> "MATH 181.1001_Fall 2026"
+
+        Spaces are PRESERVED (only runs collapsed and the ends trimmed) -- the
+        convention is written with them, and they are legal in a filename on
+        every platform TeXLib builds on. The course is upper-cased whole: the
+        subject is the only alphabetic part, and a number suffix that carries
+        letters ("126EE") is already upper-case.
+
+        A segment whose source field is unset drops out rather than leaving an
+        empty "__" gap. Set the course-wide `publish-name` key to override the
+        whole basename when a course needs a name this cannot express (an
+        instructor whose surname is not the last token of `instructor`, say)."""
+        c = _collapse_ws(course).upper()
+        s = _collapse_ws(section)
+        t = _collapse_ws(term)
+        last = _surname(instructor)
+        name = f"{c}.{s}" if s else c
+        for part in (t, last):
+            if part:
+                name += "_" + part
         return TexlibBuildCore._sanitize_filename(name)
 
     @staticmethod

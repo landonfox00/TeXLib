@@ -141,10 +141,13 @@ An optional argument overrides the title (`\academicintegrity[Academic Honesty]`
 | `\grading` | Grading | `\academicsupport` | Academic Support |
 | `\courseschedule` | Course Schedule | `\wellness` | Student Wellness |
 | `\examschedule` | Exam Schedule | `\inclusivity` | Inclusivity |
-| `\officehours` | Office Hours | `\technology` | Technology Requirements |
-| `\communication` | Communication | `\titleix` | Title IX |
+| `\recitation` | Recitation | `\technology` | Technology Requirements |
+| `\officehours` | Office Hours | `\titleix` | Title IX |
+| `\communication` | Communication | | |
 
-`\communications` is an alias for `\communication`.
+`\communications` is an alias for `\communication`, and `\recitations` for
+`\recitation`. For a course whose meeting goes by another name, override the
+title: `\recitation[Discussion Section]`, `\recitation[Lab]`.
 
 `\gradecategories{rows}`
 Render a `Category | Total Grade` table. Pass tabular rows separated

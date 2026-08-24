@@ -42,6 +42,7 @@
 \RequirePackage{expl3}
 \RequirePackage{etoolbox}
 \RequirePackage{xstring}
+\RequirePackage{xspace}   % section shortcuts: restore the gobbled inter-word space
 \RequirePackage{graphicx}
 \RequirePackage{fancyhdr, lastpage, enumitem, makecell, qrcode}
 \RequirePackage{xcolor}
@@ -63,9 +64,15 @@
 % ==============================================================================
 \RequirePackage{texlib-build}
 
-% Publishable: the builder clones the built PDF to <course>.<section>_<term>.pdf
-% and Syllabus.pdf and drops a "<course> <term> Syllabus" desktop shortcut. See
-% the publish sidecar in course-metadata.sty.
+% Publishable: the builder clones the built PDF to
+% "<SUBJECT> <number>.<section>_<term>_<LastName>.pdf" and Syllabus.pdf and drops
+% a "<course> <term> Syllabus" desktop shortcut. See the publish sidecar in
+% course-metadata.sty.
+%
+% NO coded-suffix here, deliberately: that coded name is the file mailed to
+% math@unr.edu, and the Math & Stat Office asks for exactly
+% "MATH XXX.YYYY_Fall 2026_InstructorLastName". The syllabus therefore owns the
+% unsuffixed name and every other publishable class declares a suffix.
 \TeXLibDeclarePublishable{syllabus}{Syllabus}{Syllabus}
 
 % PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty for why
@@ -345,8 +352,22 @@
 % \syllabussection{<standard title>}, so body prose follows exactly as with
 % \syllabussection; an optional argument overrides the title, e.g.
 % \academicintegrity[Academic Honesty]. \texlib@syllsec{\cmd}{Title} mints one.
+%
+% The trailing \xspace is load-bearing. In the bare form the shortcut is a
+% control word with no mandatory argument, so TeX skips the newline after it and
+% NO space token survives -- "\officehours" on its own line ran straight into the
+% prose as "Office Hours.Walk-in office hours...". The braced \syllabussection{X}
+% never had the fault (its closing brace lets the newline become a space), which
+% is why it went unnoticed: the template uses the braced form throughout and only
+% examples/Math181-Fall2026/syllabus.tex uses the shortcuts.
+%
+% \xspace and not a bare \space, because the [title] form ALREADY emits the
+% space -- xparse leaves the newline after "]" in the input -- and the following
+% token is often not a word at all. \xspace's default exception list covers every
+% such case: a space token (\@sptoken), \par for a following blank line, and
+% punctuation. So the space appears before prose and nowhere else.
 \newcommand{\texlib@syllsec}[2]{%
-	\NewDocumentCommand{#1}{o}{\syllabussection{\IfValueTF{##1}{##1}{#2}}}%
+	\NewDocumentCommand{#1}{o}{\syllabussection{\IfValueTF{##1}{##1}{#2}}\xspace}%
 }
 \texlib@syllsec{\coursedescription} {Course Description}
 \texlib@syllsec{\prerequisites}     {Prerequisites}
@@ -355,6 +376,7 @@
 \texlib@syllsec{\grading}           {Grading}
 \texlib@syllsec{\courseschedule}    {Course Schedule}
 \texlib@syllsec{\examschedule}      {Exam Schedule}
+\texlib@syllsec{\recitation}        {Recitation}
 \texlib@syllsec{\officehours}       {Office Hours}
 \texlib@syllsec{\communication}     {Communication}
 \texlib@syllsec{\attendancepolicy}  {Attendance Policy}
@@ -367,6 +389,10 @@
 \texlib@syllsec{\technology}        {Technology Requirements}
 \texlib@syllsec{\titleix}           {Title IX}
 \let\communications\communication   % plural alias for \communication
+% Plural alias: a course with several recitation sections normally heads the
+% block "Recitations". \recitation[Discussion Section] covers the other common
+% local names for the same meeting.
+\let\recitations\recitation
 
 % ==============================================================================
 % 8. GRADE TABLES
@@ -461,10 +487,28 @@
 		}
 	}
 	% final-date is stored as M-D for the schedule; render it human-readable so it
-	% matches the free-form exam<N>-date rows above (e.g. "Dec 15, 2026").
+	% matches the free-form exam<N>-date rows above (e.g. "Tuesday, December 15,
+	% 2026"). When final-time is set it is stacked UNDER the date in the same
+	% cell: UAM 3,517 pins the final to its Final Week slot, which is generally
+	% neither the course's meeting time nor a time students can infer from the
+	% meeting pattern, so it belongs on the syllabus -- and \makecell keeps the
+	% Date column from stretching to fit a date and a time side by side, since no
+	% unit-exam row has a time to put beside it. Unset final-time -> date alone,
+	% exactly as before.
 	\tl_if_empty:cF { g__meta_final-date_tl } {
-		\tl_put_right:Nn \l__syll_examrows_tl
-			{ Final~Exam & \MetaHumanMonthDay{\GetFinalDate} \\ \hline }
+		\tl_if_empty:cTF { g__meta_final-time_tl }
+			{
+				\tl_put_right:Nn \l__syll_examrows_tl
+					{ Final~Exam & \MetaHumanMonthDay{\GetFinalDate} \\ \hline }
+			}
+			{
+				\tl_put_right:Nn \l__syll_examrows_tl
+					{
+						Final~Exam &
+						\makecell{ \MetaHumanMonthDay{\GetFinalDate} \\ \GetFinalTime }
+						\\ \hline
+					}
+			}
 	}
 	\tl_if_empty:NF \l__syll_examrows_tl {
 		\begin { tabular } { | c | c | }
