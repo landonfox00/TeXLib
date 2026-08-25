@@ -256,55 +256,79 @@
 %
 % Layout model: each row is ONE \hbox placed in the main vertical list with
 % \offinterlineskip active, so fixed-height framed cells butt with no gap and a
-% row is atomic across page breaks (TeX never breaks inside an \hbox).  Every
-% row component (week label, the doubled divider, day cells) shares a top-heavy
-% baseline (outer minipage [t]); mixing a bottom-baseline rule with top-baseline
-% cells in one \hbox would balloon the row to ~2x height.  Adjacent cells kern
-% back by \fboxrule so shared borders draw once.
+% row is atomic across page breaks (TeX never breaks inside an \hbox).  The
+% components must NOT meet that \hbox on their raw minipage baselines: a
+% [t][h][*] minipage's baseline sits at its first line, so a cell whose date is
+% \fbox'd (month starts) rode ~\fboxsep higher than its neighbours, the
+% [c]-centred week label rode lower than both, and every row's bounding box
+% absorbed the spread as dead space between rows.  \sched@topalign therefore
+% re-baselines every framed component to one uniform profile — height = the
+% full frame, depth = 0 — so content differences cannot move a frame: tops
+% align, bottoms align, and a row's bounding box is exactly its frames.
+% Adjacent cells kern back by \fboxrule so shared vertical borders draw once;
+% the Lua emitter kerns the same amount vertically between rows.
 \newlength{\schedcellw}
 \newlength{\schedlabelw}
 \newlength{\schedrowh}
 \newlength{\schedpad}
-\setlength{\schedlabelw}{3.2em}   % WEEK column width
+\newlength{\schedheadh}
+\newlength{\scheddividergap}
+\setlength{\schedlabelw}{3.7em}   % WEEK column width (fits the bold WEEK header
+                                  % word, which sizes the xltabular `c` column too)
 \setlength{\schedrowh}{4.75em}    % fixed cell/row height (matches the historical
                                   % xltabular week-label \parbox[t][4.75em] size)
 \setlength{\schedpad}{5pt}        % inner horizontal cell padding (~\tabcolsep)
+\setlength{\schedheadh}{1.9em}    % header-row inner height (framed total tracks
+                                  % the xltabular header's 2.65em strut)
+\setlength{\scheddividergap}{1.5pt}% white gap inside the WEEK||days double rule
 
-% \SchedSetCols{n}: compute \schedcellw for n equal day columns, given the
-% current \textwidth, the WEEK column, the 1pt divider gap, and border rules.
-% Called by render_grid before emitting rows (the active-column count is only
-% known to the Lua engine).
+% \sched@topalign{inner-height}{framed material}: the re-baseliner described
+% above.  The frame's total height is fixed by construction (#1 + fboxsep/rule
+% padding), so raising the box by (total - \ht) pins its TOP at that total
+% above the baseline and its bottom exactly on it: ht = total, dp = 0 for
+% every component, regardless of what the first line inside happens to be.
+\newsavebox{\sched@box}
+\newcommand{\sched@topalign}[2]{%
+	\sbox{\sched@box}{#2}%
+	\raisebox{\dimexpr#1+2\fboxsep+2\fboxrule-\ht\sched@box\relax}{\usebox{\sched@box}}}
+
+% \SchedSetCols{n}: compute \schedcellw for n equal day columns.  Each framed
+% component is 2(\fboxsep+\fboxrule) wider than its minipage, the divider gap
+% adds \scheddividergap, and the n-1 inter-cell kerns give back \fboxrule each;
+% collecting terms leaves the constants below.  Called by render_grid before
+% emitting rows (the active-column count is only known to the Lua engine).
 \newcommand{\SchedSetCols}[1]{%
-	\setlength{\schedcellw}{%
-		\dimexpr(\textwidth-\schedlabelw-1pt-#1\fboxrule-\fboxrule)/#1\relax}%
+	\setlength{\schedcellw}{\dimexpr(\textwidth-\schedlabelw-\scheddividergap
+		-2\fboxsep-3\fboxrule
+		-#1\dimexpr2\fboxsep+\fboxrule\relax)/#1\relax}%
 }
 
 % \schedcell{color}{content}: a fixed-height, full-bleed-colored, framed day
 % cell.  content is set \footnotesize in a top-aligned padded minipage.
 \newcommand{\schedcell}[2]{%
-	\fcolorbox{black}{#1}{\hspace{\schedpad}%
+	\sched@topalign{\schedrowh}{\fcolorbox{black}{#1}{\hspace{\schedpad}%
 		\begin{minipage}[t][\schedrowh][t]{\dimexpr\schedcellw-2\schedpad\relax}%
 			\footnotesize #2%
 		\end{minipage}%
-		\hspace{\schedpad}}}
+		\hspace{\schedpad}}}}
 
 % \schedlabel{n}: the WEEK-column cell (week number, vertically centered).
-% Outer [t] keeps its box baseline at the top to match \schedcell.
 \newcommand{\schedlabel}[1]{%
-	\fcolorbox{black}{white}{%
-		\begin{minipage}[t][\schedrowh][c]{\schedlabelw}\centering\textbf{#1}\end{minipage}}}
+	\sched@topalign{\schedrowh}{\fcolorbox{black}{white}{%
+		\begin{minipage}[t][\schedrowh][c]{\schedlabelw}\centering\textbf{#1}\end{minipage}}}}
 
 % \scheddivider: the doubled vertical rule between the WEEK column and the days
-% (mirrors xltabular's `c ||`).  A 1pt-wide framed strut whose frame supplies
-% the second rule; the first is \schedlabel's right border overlapped below.
-\newcommand{\scheddivider}{%
-	\fcolorbox{black}{white}{%
-		\begin{minipage}[t][\schedrowh][c]{1pt}\mbox{}\end{minipage}}}
+% (mirrors xltabular's `c ||`).  The two rules are the label's right border and
+% the first day cell's left border with \scheddividergap of white between — no
+% box of its own (the old framed-strut divider carried \fboxsep of padding and
+% read as a fat white channel).  The emitter follows it with \kern-\fboxrule
+% (the standard border-overlap kern), compensated here.
+\newcommand{\scheddivider}{\kern\dimexpr\scheddividergap+\fboxrule\relax}
 
 % \schedheadcell{width}{text}: a short (single-line) header cell.
 \newcommand{\schedheadcell}[2]{%
-	\fcolorbox{black}{white}{%
-		\begin{minipage}[t][2.4ex][c]{#1}\centering\textbf{#2}\end{minipage}}}
+	\sched@topalign{\schedheadh}{\fcolorbox{black}{white}{%
+		\begin{minipage}[t][\schedheadh][c]{#1}\centering\textbf{#2}\end{minipage}}}}
 
 % ==============================================================================
 % 7. SCHEDULE ENVIRONMENT

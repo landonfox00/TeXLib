@@ -1111,7 +1111,7 @@ function render_grid(month_pages, box_grid)
 		-- eagerly (per-cell SyncTeX) and rows are atomic across page breaks.
 		-- Structure per row, one cell PER LINE so SyncTeX records each cell on
 		-- its own grid_line (the whole point):
-		--     \hbox{\schedlabel{N}\scheddivider
+		--     \kern-\fboxrule\hbox{\schedlabel{N}\scheddivider
 		--     \schedcell{color}{<cell 1>}\kern-\fboxrule
 		--     \schedcell{color}{<cell 2>}\kern-\fboxrule
 		--     ...
@@ -1119,13 +1119,17 @@ function render_grid(month_pages, box_grid)
 		-- The \kern-\fboxrule between cells overlaps shared vertical borders.
 		-- Header/boilerplate carry no source line (nobody inverse-searches them).
 		local ncols = #active_indices
-		local box_header = "\\hbox{\\schedheadcell{\\schedlabelw}{\\footnotesize WEEK}\\kern-\\fboxrule"
-			.. "\\fcolorbox{black}{white}{\\rule{0pt}{2.4ex}\\hspace{1pt}}\\kern-\\fboxrule"
+		-- The header row mirrors a body row: WEEK cell, \scheddivider, day cells.
+		-- The trailing vertical kern reproduces the xltabular header separator
+		-- (\hline\noalign{\vskip2pt}\hline): 2pt of white between the header's
+		-- bottom border and the first row's top border, with \fboxrule added to
+		-- cancel the border-overlap kern every row line leads with.
+		local box_header = "\\hbox{\\schedheadcell{\\schedlabelw}{WEEK}\\scheddivider\\kern-\\fboxrule"
 		for ci, idx in ipairs(active_indices) do
 			box_header = box_header .. "\\schedheadcell{\\schedcellw}{" .. day_names[idx] .. "}"
 			if ci < ncols then box_header = box_header .. "\\kern-\\fboxrule" end
 		end
-		box_header = box_header .. "}"
+		box_header = box_header .. "}\\kern\\dimexpr2pt+\\fboxrule\\relax"
 
 		-- Trailing `%` on every line that continues the row \hbox: inside an
 		-- \hbox a bare newline is a space, and a space after \kern-\fboxrule (or
@@ -1143,8 +1147,15 @@ function render_grid(month_pages, box_grid)
 			emit(group_open)
 			emit(box_header)
 			for _, row in ipairs(group) do
-				-- Open the row \hbox with the week label + doubled divider.
-				emit("\\hbox{\\schedlabel{" .. row.week_num .. "}\\scheddivider\\kern-\\fboxrule%",
+				-- Open the row \hbox with the week label + doubled divider.  The
+				-- leading vertical \kern overlaps this row's top border with the
+				-- previous row's bottom border, so shared horizontal rules draw
+				-- once — the vertical twin of the inter-cell \kern-\fboxrule.
+				-- (A page break lands on the \lineskip glue that follows the
+				-- kern and discards it, so a row opening a page keeps its full
+				-- border.)  Same line as the \hbox so grid-line numbering, and
+				-- with it the .schedmap contract, is unchanged.
+				emit("\\kern-\\fboxrule\\hbox{\\schedlabel{" .. row.week_num .. "}\\scheddivider\\kern-\\fboxrule%",
 					row.row_attr)
 				local k = #row.cells
 				for ci, c in ipairs(row.cells) do
