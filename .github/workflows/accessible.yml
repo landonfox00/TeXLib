@@ -39,25 +39,40 @@ jobs:
       # TeX Live 2026 the newer tagpdf broke three documents (Exams,
       # examples/exam-01, Problem Sets) -- this gate was red from its first run
       # for that reason alone. `texlive_version: 2025` does NOT help: at this
-      # action SHA it maps back to "latest". 20260101 is the last monthly
-      # snapshot before the TL2026 rollover, i.e. TeX Live 2025, matching the
-      # local toolchain the visual refs are generated on. See issue on the
-      # TL2026 tagging incompatibility before bumping this.
+      # action SHA it maps back to "latest". 20260701 is a TeX Live 2026
+      # snapshot: the tagpdf 1.0c incompatibilities that kept this gate on
+      # TL2025 were fixed (34/34 on both TL2025 and TL2026 -- closed issue #69,
+      # 0.7.0 changelog), and the pin moved forward on 2026-08-25. Visual refs
+      # are regenerated in this same container line (visual.yml's update_refs
+      # dispatch), so the two gates share one toolchain.
+      #
+      # The apk versions below are pinned too: the image pin does NOT freeze
+      # apk -- `apk add` resolves against Alpine's live v3.24 index. A dropped
+      # version fails loudly at `apk add`; bump it deliberately.
       - name: PDF/UA-2 conformance in pinned TeX Live
         uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
-          docker_image: ghcr.io/xu-cheng/texlive-full:20260101
+          docker_image: ghcr.io/xu-cheng/texlive-full:20260701
           run: |
             set -e
-            apk add --no-cache python3 py3-pip poppler-utils openjdk17-jre curl unzip
+            apk add --no-cache python3 py3-pip poppler-utils=25.12.0-r1 openjdk17-jre curl unzip
 
             # Record what actually ran. The image used to float, and nothing in
             # the log said which TeX Live produced a result -- which is what made
             # the first failure here expensive to diagnose.
-            tex --version | head -1
+            # No `cmd | head`: the action shell runs with pipefail, and a writer
+            # that outlives head's early close dies of SIGPIPE (141). This line
+            # had only been surviving by winning that race.
+            tex --version > /tmp/tool-version.txt 2>&1 || true
+            head -1 /tmp/tool-version.txt
 
             # veraPDF ships as an IzPack installer; drive it headlessly.
-            curl -sSL -o /tmp/verapdf.zip https://software.verapdf.org/releases/verapdf-installer.zip
+            # Pinned + hash-verified: veraPDF is the conformance authority for
+            # this gate, and the bare /releases/verapdf-installer.zip URL is a
+            # rolling "latest" -- a veraPDF release would otherwise change
+            # pass/fail here with no commit in this repo.
+            curl -sSL -o /tmp/verapdf.zip https://software.verapdf.org/releases/1.30/verapdf-greenfield-1.30.2-installer.zip
+            echo "6cc6341cb1af644044054b81f00a6590a7918abb18f762243de115258bcad838  /tmp/verapdf.zip" | sha256sum -c -
             unzip -q /tmp/verapdf.zip -d /tmp/verapdf-installer
             INSTALLER="$(find /tmp/verapdf-installer -name 'verapdf-izpack-installer-*.jar' | head -1)"
             [ -n "$INSTALLER" ] || { echo "veraPDF installer jar not found in the release zip"; exit 1; }
@@ -90,6 +105,8 @@ jobs:
             command -v verapdf >/dev/null 2>&1 \
               || { echo "veraPDF CLI not on PATH after install"; exit 1; }
             verapdf --version
+            verapdf --version | grep -qF "1.30.2" \
+              || { echo "veraPDF on PATH is not the pinned 1.30.2"; exit 1; }
 
             # pypdf is the OTHER soft-skip on this path, and it was missing: the
             # first runs of this gate logged "accessible/PDF-UA [pypdf MISSING ->
@@ -97,7 +114,7 @@ jobs:
             # veraPDF guard above was written to stop exactly that vacuous green
             # and then left the second half of the check unguarded. Alpine's
             # python is externally managed (PEP 668), hence the flag.
-            pip install --no-cache-dir --break-system-packages pypdf
+            pip install --no-cache-dir --break-system-packages pypdf==6.16.2
             python3 -c 'import pypdf' \
               || { echo "pypdf not importable; PDF/UA checks would soft-skip"; exit 1; }
 

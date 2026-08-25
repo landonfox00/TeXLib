@@ -9,15 +9,16 @@ Two naming schemes share this directory:
   templates, compared by `--visual`.
 - `<area>__<scenario>-<page>.png` (e.g. `schedule__month-pages-1.png`) — the
   visual scenario packs, compared by `--scenarios`. See
-  [../scenarios/README.md](../scenarios/README.md).
+  [../../examples/scenarios/README.md](../../examples/scenarios/README.md).
 
 ## Scope
 
 Only deterministic modules are covered at the **bare-template** level
-(`VISUAL_MODULES` in `smoke_test.py`: Schedule, Report Cards, Syllabi, Notes).
-`autoexam`/`quiz` shuffle versions and pull random bank problems, so their bare
-templates differ build-to-build. They're instead covered by **seed-pinned
-scenario packs** (`tests/scenarios/exam`, `tests/scenarios/quiz`), where a fixed
+(`VISUAL_MODULES`, derived in `smoke_test.py` from `examples/manifest.py`:
+Schedule, Report Cards, Syllabi, Notes). `autoexam`/`quiz` shuffle versions and
+pull random bank problems, so their bare templates differ build-to-build.
+They're instead covered by **seed-pinned scenario packs**
+(`examples/scenarios/exam`, `examples/scenarios/quiz`), where a fixed
 `\setexamseed` + a single version makes the render reproducible and comparable.
 
 ## Regenerating
@@ -40,10 +41,13 @@ when either is missing the check soft-skips.
 ## CI gate
 
 `.github/workflows/visual.yml` diffs against these refs inside a **pinned** TeX
-Live container (`xu-cheng/texlive-action@f886de8`) on PRs + nightly, non-required
-(it reports regressions without blocking merges). The pin keeps rendering stable
-so the committed refs stay valid — they currently match that container
-byte-for-byte. If the refs ever drift, regenerate them **in the container**: run
+Live container on PRs + nightly, non-required (it reports regressions without
+blocking merges). The real pin is the `docker_image` tag
+(`ghcr.io/xu-cheng/texlive-full:20260701`, TeX Live 2026) plus the apk version
+pins in the workflow — the action SHA alone pins only the action, not the
+toolchain. The pin keeps rendering stable so the committed refs stay valid —
+they match that container byte-for-byte. If the refs ever drift, regenerate
+them **in the container**: run
 the `visual` workflow manually with `update_refs=true` (Actions ▸ visual ▸ Run
 workflow), download the `visual-refs` artifact, and commit `tests/visual_refs/`.
 A plain local `--update-refs` only stays green in CI if your toolchain renders
