@@ -1120,16 +1120,19 @@ function render_grid(month_pages, box_grid)
 		-- Header/boilerplate carry no source line (nobody inverse-searches them).
 		local ncols = #active_indices
 		-- The header row mirrors a body row: WEEK cell, \scheddivider, day cells.
+		-- `band` is the bare cell sequence: it doubles as the in-flow page-1
+		-- header (wrapped in the \hbox below) and, for a continuous grid, as
+		-- the material \SchedContHeaderSetup freezes for continuation pages.
 		-- The trailing vertical kern reproduces the xltabular header separator
 		-- (\hline\noalign{\vskip2pt}\hline): 2pt of white between the header's
 		-- bottom border and the first row's top border, with \fboxrule added to
 		-- cancel the border-overlap kern every row line leads with.
-		local box_header = "\\hbox{\\schedheadcell{\\schedlabelw}{WEEK}\\scheddivider\\kern-\\fboxrule"
+		local band = "\\schedheadcell{\\schedlabelw}{WEEK}\\scheddivider\\kern-\\fboxrule"
 		for ci, idx in ipairs(active_indices) do
-			box_header = box_header .. "\\schedheadcell{\\schedcellw}{" .. day_names[idx] .. "}"
-			if ci < ncols then box_header = box_header .. "\\kern-\\fboxrule" end
+			band = band .. "\\schedheadcell{\\schedcellw}{" .. day_names[idx] .. "}"
+			if ci < ncols then band = band .. "\\kern-\\fboxrule" end
 		end
-		box_header = box_header .. "}\\kern\\dimexpr2pt+\\fboxrule\\relax"
+		local box_header = "\\hbox{" .. band .. "}\\kern\\dimexpr2pt+\\fboxrule\\relax"
 
 		-- Trailing `%` on every line that continues the row \hbox: inside an
 		-- \hbox a bare newline is a space, and a space after \kern-\fboxrule (or
@@ -1141,21 +1144,39 @@ function render_grid(month_pages, box_grid)
 		-- every group: the column width must be re-established after each
 		-- \endgroup restores it, or later month-pages groups collapse to a stale
 		-- width.  \offinterlineskip is likewise group-local.
-		local group_open = "\\begingroup\\offinterlineskip\\SchedSetCols{" .. ncols .. "}"
+		-- The \kern18pt reproduces longtblr's above-table skip, so the grid's
+		-- first rule lands at the same height as the tabularray renderer's
+		-- (measured: 18.1pt on a 100dpi overlay; see the calibration note by
+		-- the length definitions in schedule.cls).
+		local group_open = "\\begingroup\\offinterlineskip\\SchedSetCols{" .. ncols .. "}\\kern18pt"
+		-- Continuous grid (one group): arm the continuation-page header. The
+		-- setup line runs OUTSIDE the \begingroup — its \fancyhead hook and
+		-- \topskip must survive to the LAST page's shipout, which happens after
+		-- \endgroup — so it re-establishes the column widths itself. Rows then
+		-- lead with \SchedRowBreak (the reserve sandwich; see schedule.cls)
+		-- instead of the bare border-overlap kern, which is what makes the
+		-- page capacity match the tabularray renderer's head-reserving splits.
+		-- Month-pages groups keep the plain kern: they re-emit a real header
+		-- per month page, so neither the reserve nor the artifact band applies.
+		local continuous = (#groups == 1)
+		if continuous then
+			emit("\\SchedSetCols{" .. ncols .. "}\\SchedContHeaderSetup{" .. band .. "}")
+		end
+		local row_lead = continuous and "\\SchedRowBreak" or "\\kern-\\fboxrule"
 		for gi, group in ipairs(groups) do
 			if gi > 1 then emit("\\endgroup\\newpage") end
 			emit(group_open)
 			emit(box_header)
 			for _, row in ipairs(group) do
 				-- Open the row \hbox with the week label + doubled divider.  The
-				-- leading vertical \kern overlaps this row's top border with the
-				-- previous row's bottom border, so shared horizontal rules draw
-				-- once — the vertical twin of the inter-cell \kern-\fboxrule.
-				-- (A page break lands on the \lineskip glue that follows the
-				-- kern and discards it, so a row opening a page keeps its full
-				-- border.)  Same line as the \hbox so grid-line numbering, and
-				-- with it the .schedmap contract, is unchanged.
-				emit("\\kern-\\fboxrule\\hbox{\\schedlabel{" .. row.week_num .. "}\\scheddivider\\kern-\\fboxrule%",
+				-- row lead overlaps this row's top border with the previous
+				-- row's bottom border (single shared rule — the vertical twin
+				-- of the inter-cell \kern-\fboxrule); in a continuous grid it
+				-- also carries the page-break reserve (\SchedRowBreak).
+				-- Discardables after the break vanish, so a row opening a page
+				-- keeps its full border.  Same line as the \hbox so grid-line
+				-- numbering, and with it the .schedmap contract, is unchanged.
+				emit(row_lead .. "\\hbox{\\schedlabel{" .. row.week_num .. "}\\scheddivider\\kern-\\fboxrule%",
 					row.row_attr)
 				local k = #row.cells
 				for ci, c in ipairs(row.cells) do
