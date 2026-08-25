@@ -1,5 +1,5 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{autoexam}[2026/08/25 v0.7.3 AutoExam Class (Merged)]
+\ProvidesClass{autoexam}[2026/08/25 v0.7.4 AutoExam Class (Merged)]
 
 % Per-document metadata may be passed in the class option list, e.g.
 %   \documentclass[exam-number=5, exam-date={May 2, 2026}]{autoexam}

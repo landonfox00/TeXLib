@@ -23,7 +23,7 @@
 % ENGINE: lualatex (loads texlib-problembank -> \directlua problem_engine.lua).
 % =============================================================================
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{bank}[2026/08/25 v0.7.3 TeXLib problem-bank catalog/preview]
+\ProvidesClass{bank}[2026/08/25 v0.7.4 TeXLib problem-bank catalog/preview]
 
 % Forward every class option to exam (bank carries no options of its own).
 \DeclareOption*{\PassOptionsToClass{\CurrentOption}{exam}}
