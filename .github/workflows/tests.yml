@@ -21,6 +21,14 @@ jobs:
         run: python -m pip install --quiet pypdf==6.16.2
       - name: Builder logic + orchestration tests
         run: python Sublime/test_texlib_builder.py
+      - name: Version contract (manifest == CHANGELOG == every Provides == plugin probe)
+        # texlib-manifest.json is the machine-readable mirror of the release
+        # tag. This asserts it agrees with the newest released CHANGELOG
+        # heading, that every \ProvidesClass/\ProvidesPackage line carries the
+        # same version (they drifted independently for 18 months before the
+        # manifest existed), and that the core-file triple matches the probe
+        # in Sublime/texlib/texlib.py that the installer and Doctor share.
+        run: python bump_version.py --check
       - name: Native runner (fake Popen; async driver + post-build delegation)
         run: python Sublime/test_texlib_runner.py
       - name: Derived TEXINPUTS default (how builds find the classes)
