@@ -1009,9 +1009,14 @@ def main():
         # only cover the in-process branch.
         # ================================================================== #
         import subprocess as _sp
+        # The one copy lives inside the plugin package (texlib_build.py locates
+        # it as dirname(__file__)/texlib_pdfpost.py). A sibling copy used to sit
+        # next to the legacy builder for the LaTeXTools-era shell-out; that
+        # usage died in the Phase 2 native cutover and the byte-identical
+        # duplicate is gone.
         pdfpost = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "texlib_pdfpost.py")
-        check("pdfpost: helper module deployed next to the builder",
+            os.path.dirname(os.path.abspath(__file__)), "texlib", "texlib_pdfpost.py")
+        check("pdfpost: helper module ships inside the plugin package",
               os.path.exists(pdfpost), pdfpost)
 
         # _external_python() must find a pypdf-capable interpreter (the one
