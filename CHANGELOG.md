@@ -4,6 +4,13 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.7.3] — 2026-08-25
+
+The v1-readiness release, cut for the installer's 1.0: CI validates on TeX
+Live 2026 with every outcome-deciding tool pinned, the library carries a
+version contract the installer can read, and the docs describe the repo that
+actually exists.
+
 ### Added
 
 - **The library has a version now — one version.** It never declared one: releases were tags, and the 28 `\ProvidesClass`/`\ProvidesPackage` lines each carried an independent date+version that had drifted for eighteen months (`course-metadata` at v8.2, most packages at v1.0, `autoexam` with **no version at all** under a 2025 date on a file modified this month). `texlib-manifest.json` is the new machine-readable mirror of the release tag: the version plus the core-file triple (`course-metadata.sty`, `texlib-build.sty`, `basic-utilities.sty`) that the installer and Doctor probe for — previously duplicated across two repos with nothing asserting agreement. `bump_version.py` stamps the manifest and every `\Provides` line in one command at release time (`quiver.sty`, vendored, is never touched), and its `--check` mode runs in `tests.yml` on every push: manifest version == newest released CHANGELOG heading == every `\Provides` line, and manifest core files == the plugin's probe. All 27 `\Provides` lines are normalized to `v0.7.2`.
