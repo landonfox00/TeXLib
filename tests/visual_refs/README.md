@@ -52,3 +52,12 @@ the `visual` workflow manually with `update_refs=true` (Actions ▸ visual ▸ R
 workflow), download the `visual-refs` artifact, and commit `tests/visual_refs/`.
 A plain local `--update-refs` only stays green in CI if your toolchain renders
 identically to the pinned container.
+
+Before trusting a downloaded artifact, read its `.regen-manifest`: the
+artifact uploads even when the run fails (so a broken later phase can't
+withhold refs an earlier phase regenerated), which means a run that died
+*before* regenerating uploads the plain checkout — byte-identical to "no
+rendering change". The manifest is written only by a real regeneration and
+each phase appends `modules=regenerated` / `scenarios=regenerated` only
+after it completes. No manifest, or a missing phase line, means those refs
+are not regenerated output. Don't commit the manifest; it's gitignored.

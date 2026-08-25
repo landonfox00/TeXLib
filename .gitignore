@@ -88,3 +88,7 @@ Thumbs.db
 desktop.ini
 *~
 .#*
+
+# CI-run metadata written by visual.yml's update_refs dispatch into the
+# artifact; never commit state (see the workflow comment).
+tests/visual_refs/.regen-manifest
