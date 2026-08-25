@@ -4,6 +4,10 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- **The library has a version now — one version.** It never declared one: releases were tags, and the 28 `\ProvidesClass`/`\ProvidesPackage` lines each carried an independent date+version that had drifted for eighteen months (`course-metadata` at v8.2, most packages at v1.0, `autoexam` with **no version at all** under a 2025 date on a file modified this month). `texlib-manifest.json` is the new machine-readable mirror of the release tag: the version plus the core-file triple (`course-metadata.sty`, `texlib-build.sty`, `basic-utilities.sty`) that the installer and Doctor probe for — previously duplicated across two repos with nothing asserting agreement. `bump_version.py` stamps the manifest and every `\Provides` line in one command at release time (`quiver.sty`, vendored, is never touched), and its `--check` mode runs in `tests.yml` on every push: manifest version == newest released CHANGELOG heading == every `\Provides` line, and manifest core files == the plugin's probe. All 27 `\Provides` lines are normalized to `v0.7.2`.
+
 ### Changed
 
 - **CI validates against TeX Live 2026 at last.** Issue #69 closed on 2026-08-17 with both tagpdf 1.0c incompatibilities fixed and the accessible suite green on TL2025 *and* TL2026 — but its second done-when clause, moving the container pin forward, never happened. All four workflows kept `texlive-full:20260101` (TeX Live 2025), so every accessible build merged since was being validated against last year's tagging engine, and the workflow comments still warned "do not bump" about an incompatibility that no longer exists. The pin is now `texlive-full:20260701` (TeX Live 2026) in `tests.yml`, `smoke.yml`, `visual.yml`, and `accessible.yml`; the stale warnings are rewritten; and the visual reference images are regenerated inside the new container via the `update_refs` dispatch, so refs and checks share one toolchain again.
