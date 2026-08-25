@@ -33,17 +33,26 @@ python Sublime/test_texlib_builder.py  # builder logic (no toolchain needed)
 python Sublime/test_biber_integration.py   # real biber cache (needs biber)
 ```
 
-Visual regression (optional; needs `pdftoppm` + ImageMagick) compares rendered
-pages to local references — these are environment-specific and not committed:
+Visual regression (needs `pdftoppm` + ImageMagick) compares rendered pages to
+the reference images in `tests/visual_refs/`. The refs **are committed** and
+CI-gated; they are canonical for the pinned CI container, so regenerate them
+*in that container* (run the `visual` workflow manually with `update_refs=true`,
+download the `visual-refs` artifact, commit) rather than locally — a local
+`--update-refs` only stays green in CI if your toolchain renders identically
+to the pin. See `tests/visual_refs/README.md`.
 
 ```bash
 python smoke_test.py --visual            # compare to tests/visual_refs/
-python smoke_test.py --scenarios         # scenario packs (tests/scenarios/)
-python smoke_test.py --update-refs       # regenerate refs after an intended change
+python smoke_test.py --scenarios         # scenario packs (examples/scenarios/)
+python smoke_test.py --update-refs       # local regen (see the caveat above)
 ```
 
-CI (`.github/workflows/`) runs the smoke build and the no-toolchain logic tests
-on push/PR. A green PR should pass `smoke_test.py` locally first.
+CI (`.github/workflows/`) runs four workflows: `tests.yml` (logic suites +
+real-toolchain integration, every push/PR), `smoke.yml` (full module smoke
+build, push/PR to `main`), `visual.yml` (pixel diff against the committed
+refs, PR to `main` + nightly), and `accessible.yml` (PDF/UA-2 conformance via
+veraPDF, PR to `main` + nightly). A green PR should pass `smoke_test.py`
+locally first.
 
 ## Adding bank problems
 
@@ -57,6 +66,10 @@ in a bank file and pull with `\getproblem{id}` (anywhere) or `\problem{filter}`
 
 ## Releasing (maintainer)
 
-Bump the relevant version, finalize the `CHANGELOG.md` section, then
-`git tag vX.Y.Z && git push --tags`. The installer bundles a TeXLib snapshot
-at its own release time (see the [TeXLib-Installer](https://github.com/landonfox00/TeXLib-Installer) repo).
+The library releases by git tag: close the `## [Unreleased]` section of
+`CHANGELOG.md` into a `## [X.Y.Z] — date` heading, then
+`git tag vX.Y.Z && git push --tags`. The
+[TeXLib-Installer](https://github.com/landonfox00/TeXLib-Installer) pins a tag,
+downloads its archive at install time, and verifies it against a recorded
+SHA-256 — it does not bundle a snapshot — so after tagging, bump the installer's
+pin in its own repo.

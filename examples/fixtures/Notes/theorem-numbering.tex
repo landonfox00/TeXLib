@@ -5,8 +5,9 @@
 % \section and prints as <section>.<n>. The canonical template only proves the
 % word "Theorem" renders; this pins the actual sequence, which a counter
 % regression (per-family counters, a missing [section] reset, a flat scheme)
-% would silently break while the pixel refs still pass. Asserted by
-% EXPECT_TEXT["tests/fixtures/Notes"] in smoke_test.py.
+% would silently break while the pixel refs still pass. Asserted by this
+% entry's expect= tokens in examples/manifest.py (smoke_test.py derives
+% EXPECT_TEXT from the manifest).
 %
 % No \maketitle / unit-number, so the section counter starts at 0 and the first
 % \section is 1 (a unit-number would offset it — out of scope here).

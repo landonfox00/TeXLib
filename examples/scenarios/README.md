@@ -91,7 +91,7 @@ randomized `autoexam`/`quiz` classes are made deterministic here with a fixed
 
 ## Adding a scenario
 
-Drop a new `tests/scenarios/<area>/<name>/template.tex` (self-contained), add a
+Drop a new `examples/scenarios/<area>/<name>/template.tex` (self-contained), add a
 `tags` file if it's `full`-only, then `python smoke_test.py --scenarios <area>
 --full --update-refs` to mint its reference and commit the PNG(s).
 

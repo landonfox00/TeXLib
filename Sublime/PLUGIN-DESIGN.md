@@ -375,7 +375,11 @@ spell-check words — those stay machine-local.
 - [ ] Package folder name / where domain commands live.
 - [ ] Keep the LaTeXTools builder as a fallback through Phases 0–2? (recommended:
       yes.)
-- [ ] Distribution channel: installer bundle vs. Package Control custom repo.
+- [x] Distribution channel: **installer** (2026-08-25). The installer already
+      junctions `Packages/TeXLib` into the deployed library and pins Sublime,
+      LaTeXTools, and the `regex` wheel as one tested set; a Package Control
+      custom repo would ship the plugin outside that pin set and reopen the
+      version-skew problem the installer exists to close.
 
 ## 14. Future features / backlog
 

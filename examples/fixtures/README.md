@@ -9,7 +9,7 @@ expected text via `EXPECT_TEXT`.
 ## Layout
 
 ```
-tests/fixtures/
+examples/fixtures/
   <Module>/                 # capitalized like the module it builds on
     <entry>.tex             # the file named in MODULES
     coursemeta.tex          # optional — ship one to control metadata
@@ -30,8 +30,8 @@ sibling or use any module's class.
 
 ## Adding a fixture
 
-Drop `tests/fixtures/<Module>/<entry>.tex` (self-contained, with any siblings it
-needs), then add an entry to `MODULES` in `smoke_test.py` — and, if it should
-assert rendered text, a matching `EXPECT_TEXT["tests/fixtures/<Module>"]` list
-of single-token markers. Run `python smoke_test.py tests/fixtures/<Module>` to
-check it.
+Drop `examples/fixtures/<Module>/<entry>.tex` (self-contained, with any siblings
+it needs), then add an entry to `EXAMPLES` in `examples/manifest.py` — with
+`expect=` single-token markers if it should assert rendered text
+(`smoke_test.py` derives its module list and `EXPECT_TEXT` from the manifest).
+Run `python smoke_test.py examples/fixtures/<Module>` to check it.
