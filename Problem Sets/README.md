@@ -1,4 +1,4 @@
-# `pset` — Problem-Set / Homework Assignments
+# `pset` — problem-set / homework assignments
 
 A LaTeX class for assignment sheets. Sits between `autoexam` (heavy:
 randomized, versioned, problem-bank-driven) and `didactic` (lecture
@@ -15,7 +15,7 @@ answer key.
 - A `parts` environment for sub-parts labeled `(a)`, `(b)`, `(c)`.
 - Boxed `theorem`, `definition`, `corollary`, `proposition`, `lemma`,
 	`example`, `remark`, `note`, `recall` — same look as `didactic`.
-- A `solution` environment with three behaviours:
+- A `solution` environment with three behaviors:
 	- **Default** — body discarded entirely (clean assignment sheet).
 	- **`\StudentMode`** — blank watermarked box of configurable height
 	for handwriting.
@@ -98,7 +98,7 @@ Options pass through to `article`. Default base size is 11pt.
 
 | Key                  | Effect                                                    |
 |----------------------|-----------------------------------------------------------|
-| `pset-number`        | Used in the title (e.g. "Problem Set 3")                  |
+| `pset-number`        | Used in the title (for example, "Problem Set 3")          |
 | `pset-title`         | Override the title (defaults to `Problem Set <number>`)   |
 | `pset-due`           | Due-date string shown under the title                     |
 | `pset-instructions`  | Inline instructions text (boxed); overrides the default file |
@@ -177,9 +177,7 @@ mode (default 3cm). Visibility:
 | `\StudentMode`            | Blank box of `<height>`, "Show your work here" watermark |
 | `\ShowKey` / `\ShowSolutions` | Body visible, blue-tinted box           |
 
-Implementation note: in default mode the env is overridden by
-`\excludecomment{solution}` (from the `comment` package) so the body
-is never typeset — no spacing artefacts on the page.
+Note: in default mode, `\excludecomment{solution}` (from the `comment` package) overrides the environment so the body is never typeset — no spacing artifacts on the page.
 
 #### `hint` — always-visible nudge
 
@@ -194,10 +192,7 @@ for problems that need a nudge without giving away the solution.
 
 #### Theorem-likes (boxed via tcolorbox)
 
-`theorem`, `definition`, `corollary`, `proposition`, `lemma` (sharp
-black frames); `example`, `remark`, `note`, `recall` (no frame, left
-rule only). All share a single counter, numbered `Theorem 1`,
-`Definition 2`, etc.
+`theorem`, `definition`, `corollary`, `proposition`, `lemma` (sharp black frames); `example`, `remark`, `note`, `recall` (no frame, left rule only). All share a single counter, numbered `Theorem 1`, `Definition 2`, and so on.
 
 #### `\solution` inside an `example`
 
@@ -214,12 +209,7 @@ with `\solution`:
 Everything after `\solution` renders with an italic **"Solution."** lead-in
 (matching the `\answer` command) and is **always visible** in every build mode —
 a worked example's solution is part of the exposition, not a gated answer
-(unlike the standalone `solution` box, which
-is discarded outside answer-key/student mode). The hook is shared — it lives in
-`texlib-thmenv.sty`, so every class with an `example` environment gets it — and
-is scoped to the example environment, so the standalone `\begin{solution}` box
-keeps `\solution` everywhere else; just don't nest a `\begin{solution}` box
-*inside* an example.
+(unlike the standalone `solution` box, which is discarded outside answer-key/student mode). The hook is shared — it lives in `texlib-thmenv.sty`, so every class with an `example` environment gets it — and is scoped to the example environment, so the standalone `\begin{solution}` box keeps `\solution` everywhere else; don't nest a `\begin{solution}` box *inside* an example.
 
 ### Math utilities
 
@@ -242,9 +232,7 @@ keeps `\solution` everywhere else; just don't nest a `\begin{solution}` box
 
 ## Tips
 
-- **Three-PDF workflow:** I keep one source `.tex` per problem set and
-	build three PDFs from it (hand-out, student worksheet, instructor
-	key). The `\StudentMode` and `\ShowKey` flags pick the variant.
+- **Three-PDF workflow:** keep one source `.tex` per problem set and build three PDFs from it (hand-out, student worksheet, and instructor key). The `\StudentMode` and `\ShowKey` flags pick the variant.
 - **Heights for blank boxes:** The optional `[<height>]` argument on
 	`solution` only matters in student mode. Tune it per-problem so the
 	blank box is roomy enough for handwriting but doesn't waste paper

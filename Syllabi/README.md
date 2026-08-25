@@ -1,4 +1,4 @@
-# `syllabus` — UNR Course Syllabus
+# `syllabus` — UNR course syllabus
 
 A LaTeX class for typesetting course syllabi. The title block, page
 header, and contact-info table are all driven by `coursemeta.tex` and
@@ -89,10 +89,7 @@ Plus all standard `course-metadata` keys: `course-title`, `course-section`,
 
 ### Build flags (TeXLib unified CLI)
 
-`\ifsolutions`, `\ifkey`, `\ifrubric`, `\ifdraft`, `\ifstudent`,
-`\ifinstructor` and the matching `\ShowSolutions`/`\StudentMode`/
-etc. compile-time toggles are defined for consistency. Source toggles:
-`\drafts`.
+`\ifsolutions`, `\ifkey`, `\ifrubric`, `\ifdraft`, `\ifstudent`, `\ifinstructor` and the matching compile-time toggles (`\ShowSolutions`, `\StudentMode`, and the rest) are defined for consistency. Source toggles: `\drafts`.
 
 ### Commands
 
@@ -117,20 +114,13 @@ the default, so **omitting `\setsyllabusinfo` reproduces today's table**:
 }
 ```
 
-An entry whose value expands to empty (e.g.\ an unset `\Get…` field) is
-**dropped**, and the remaining entries reflow to fill the grid — so
-unused fields never leave a blank cell. If *every* value is empty, the
-entire block (table, minipage, and both rules) is suppressed. Use any
-expandable getter as a value; robust markup such as the `mailto:` link
-is fine (the default `Email` value carries it).
+An entry whose value expands to empty (for example, an unset `\Get…` field) is **dropped**, and the remaining entries reflow to fill the grid — so unused fields never leave a blank cell. If *every* value is empty, the entire block (table, minipage, and both rules) is suppressed. Use any expandable getter as a value; robust markup such as the `mailto:` link is fine (the default `Email` value carries it).
 
 `\syllabussection{Title}`
 Bold-titled paragraph break for a policy or info block. Title is
 followed by a period.
 
-**Section shortcuts** — one-word commands for common headings, each emitting
-`\syllabussection{<title>}` so body prose follows just like `\syllabussection`.
-An optional argument overrides the title (`\academicintegrity[Academic Honesty]`).
+**Section shortcuts** — one-word commands for common headings, each emitting `\syllabussection{<title>}` so body prose follows exactly as with `\syllabussection`. An optional argument overrides the title (`\academicintegrity[Academic Honesty]`).
 
 | Command | Heading | Command | Heading |
 |---------|---------|---------|---------|
@@ -176,8 +166,7 @@ underscored variable name (`class_time`, `office_hours`, …).
 
 - Headers use `fancyplain`: left = `\GetShortTitle`, right =
 	`\GetTerm`.
-- Footer: left = `\GetCourse` (full name, e.g. "Math 181 Calculus I"),
-	center = `<page> of <total>`, right = `\GetInstitution`.
+- Footer: left = `\GetCourse` (full name, for example "Math 181 Calculus I"), center = `<page> of <total>`, right = `\GetInstitution`.
 - Footnotes use the `\fnsymbol` series.
 
 ---
@@ -190,8 +179,7 @@ underscored variable name (`class_time`, `office_hours`, …).
 	`class-time`, `organizer`, `course-room`. This is driven by
 	`\setsyllabusinfo` (see Reference); each value is expansion-tested for
 	emptiness.
-- **Two-line class times:** use `class-time-alt` for the continuation,
-	e.g. `class-time = MWF 9:00am`, `class-time-alt = TTh 9:00--10:15am`.
+- **Two-line class times:** use `class-time-alt` for the continuation, for example `class-time = MWF 9:00am`, `class-time-alt = TTh 9:00--10:15am`.
 - **Hyperref colors:** the class loads hyperref with `urlcolor=darkblue`,
 	`linkcolor=darkred`. Override in your preamble after `\documentclass`
 	if you need different colors.
@@ -202,5 +190,4 @@ underscored variable name (`class_time`, `office_hours`, …).
 ## Related
 
 - `course-metadata.md` — for `course-title`, `course-section`, `term`.
-- The class is style-independent of `didactic` and `quiz`, so a
-	syllabus does not pull in tcolorbox, exam.cls, etc.
+- The class is style-independent of `didactic` and `quiz`, so a syllabus does not pull in tcolorbox, exam.cls, or their other dependencies.

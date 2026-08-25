@@ -5,10 +5,10 @@ to catch **layout** regressions that the text/content checks can't see — the
 motivating case was a stray vertical-rule stub under the schedule's last row.
 Two naming schemes share this directory:
 
-- `<module>-<page>.png` (e.g. `Schedule-1.png`) — the canonical per-module
-  templates, compared by `--visual`.
-- `<area>__<scenario>-<page>.png` (e.g. `schedule__month-pages-1.png`) — the
-  visual scenario packs, compared by `--scenarios`. See
+- `<module>-<page>.png` (for example, `Schedule-1.png`) — the canonical
+  per-module templates, compared by `--visual`.
+- `<area>__<scenario>-<page>.png` (for example, `schedule__month-pages-1.png`) —
+  the visual scenario packs, compared by `--scenarios`. See
   [../../examples/scenarios/README.md](../../examples/scenarios/README.md).
 
 ## Scope
@@ -41,8 +41,8 @@ when either is missing the check soft-skips.
 ## CI gate
 
 `.github/workflows/visual.yml` diffs against these refs inside a **pinned** TeX
-Live container on PRs + nightly, non-required (it reports regressions without
-blocking merges). The real pin is the `docker_image` tag
+Live container on PRs + nightly; it is a required check under `main`'s branch
+protection (promoted 2026-08-25). The real pin is the `docker_image` tag
 (`ghcr.io/xu-cheng/texlive-full:20260701`, TeX Live 2026) plus the apk version
 pins in the workflow — the action SHA alone pins only the action, not the
 toolchain. The pin keeps rendering stable so the committed refs stay valid —

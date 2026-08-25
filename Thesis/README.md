@@ -21,7 +21,7 @@ Checked against the [Graduate School filing guidelines](https://www.unr.edu/grad
 | Page order: title, copyright, committee, abstract, ... | conforms |
 | No page number on the first three pages | conforms |
 | Abstract begins lowercase Roman at `i` | conforms |
-| Body restarts at Arabic `1`, bottom-centre, no running header | conforms |
+| Body restarts at Arabic `1`, bottom-center, no running header | conforms |
 | Table of Contents, **List of Tables**, List of Figures, in that order | conforms |
 | Fonts embedded, 10-12pt | conforms (12pt; all faces embedded) |
 | Committee page wording and layout | **needs the Graduate School's answer -- see below** |
@@ -30,7 +30,7 @@ Checked against the [Graduate School filing guidelines](https://www.unr.edu/grad
 sides with no binding exception, and the manuscript is filed electronically
 ("no hard copies will be produced"), so a 1.25in inner margin was 0.25in out of
 spec on every odd page. `twoside` remains available for headers and blank-page
-behaviour; add a binding offset at print time for a personal copy, not in the
+behavior; add a binding offset at print time for a personal copy, not in the
 filed PDF.
 
 ## Compiling
@@ -86,7 +86,7 @@ Accessible theorem environments (`theorem`, `lemma`, `corollary`, `proposition`,
 `definition`, `example`, `remark`) render as plain headed paragraphs rather than
 amsthm's `\trivlist`, which tags as a list and breaks PDF/UA. `\cref` names them
 correctly. `\ThesisMathIntent{intent}{math}` attaches screen-reader alt-text to a
-single ambiguous symbol (e.g. `\sin^{-1}`).
+single ambiguous symbol (for example, `\sin^{-1}`).
 
 ## Not yet done (contributions welcome)
 

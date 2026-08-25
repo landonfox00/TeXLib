@@ -5,7 +5,7 @@ The native "complement, not replace" plugin from
 TeXLib-domain commands, while **delegating editor smarts** (PDF viewer, forward
 sync, word count, TOC, jump-to-ref) to LaTeXTools by stable command name — never
 by importing its internals. Nothing here needs LaTeXTools to *build*; it's a
-companion we call.
+companion the plugin calls.
 
 ## Commands
 

@@ -3,8 +3,8 @@ name: visual
 # Visual-regression gate. The reference images in tests/visual_refs/ are
 # environment-specific (font rendering differs across TeX Live builds), so this
 # job pins the SAME TeX Live container the refs were generated in and diffs
-# freshly rendered pages against them. Non-required by design: it reports a
-# regression without blocking merges.
+# freshly rendered pages against them. A required check under main's branch
+# protection (promoted 2026-08-25).
 #
 # Regenerating the refs: run this workflow manually
 # (Actions > visual > Run workflow) with "update_refs" = true. It rebuilds the

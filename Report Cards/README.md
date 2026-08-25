@@ -1,4 +1,4 @@
-# `report-card` — Per-Student Report Cards
+# `report-card` — per-student report cards
 
 A LaTeX class for generating end-of-term grade reports — one
 per-student section per page, all collated into a single PDF you can
@@ -29,10 +29,7 @@ defaults to UNR navy but is overridable.
 
 ## Gradebook-driven workflow (recommended)
 
-Keep **one `gradebook.xlsx` per course-semester** (e.g. inside a
-`Math 181 Spring 2026/` directory) as your single source of truth.
-Build it in Google Sheets, do all the grade math there with formulas,
-and let the build turn it into report cards.
+Keep **one `gradebook.xlsx` per course-semester** (for example, inside a `Math 181 Spring 2026/` directory) as your single source of truth. Build it in Google Sheets, do all the grade math there with formulas, and let the build turn it into report cards.
 
 ### The two tabs
 
@@ -55,13 +52,13 @@ Columns are matched **by name** (order defines the breakdown row order):
 | Column header            | Meaning                                            |
 |--------------------------|----------------------------------------------------|
 | `Name`                   | Student name (the cover + section)                  |
-| `<Category> Weight`      | Category weight, e.g. `Homework Avg. Weight` → 15  |
+| `<Category> Weight`      | Category weight, for example `Homework Avg. Weight` → 15 |
 | `<Category> Score`       | The student's % in that category                   |
 | `<Category> Points`      | Points earned (weight × score / 100)               |
 | `---`                    | A column literally named `---` inserts a `\midrule` |
 | `Current Total`          | Running percentage (boxed in the total row)        |
 | `Current Points`         | Running points earned                              |
-| `Weight Summary`         | Left cell of the total row, e.g. `75% (+15% E.C.)` |
+| `Weight Summary`         | Left cell of the total row, for example `75% (+15% E.C.)` |
 | `Need <letter>`          | Scenario cell: `22.0%`, `Already secured`, …        |
 
 Each `<Category>` contributes one breakdown row from its
@@ -111,12 +108,7 @@ Resolution order, mirroring the problem bank's `\loadbank`:
 	literally first, then relative to the coursemeta directory.
 3. else a sibling `gradebook.csv`.
 
-> Requires LuaLaTeX (the engine reads the CSV via `\directlua`). The
-> TeXLib builder forces lualatex for `report-card` automatically, but put
-> **`% !TeX program = lualatex`** as the first line of every report-card
-> document so any editor (or a non-redeployed builder) picks the right
-> engine — otherwise a pdflatex build dies with
-> "`\gradebook` requires LuaLaTeX". The template ships with this line.
+> **Note:** Requires LuaLaTeX (the engine reads the CSV via `\directlua`). The TeXLib builder forces lualatex for `report-card` automatically, but put **`% !TeX program = lualatex`** as the first line of every report-card document so any editor (or a non-redeployed builder) picks the right engine — otherwise a pdflatex build dies with "`\gradebook` requires LuaLaTeX". The template ships with this line.
 
 ---
 
@@ -233,11 +225,7 @@ as `totals` (three cells matching the last three columns —
 the "Current Total" label is added for you).
 
 `\standingbar{earned}{D}{C}{B}{A}`
-Draw the progress bar. Coordinates are 0..12.5 representing
-0..100%. `earned` is the user's current points (e.g. 5.564 for 44.5
-points out of 75% completed = 44.5 × 12.5 / 100). `D`, `C`, `B`, `A`
-are the threshold x-coordinates (typically 7.5, 8.75, 10, 11.25 for
-60/70/80/90%).
+Draw the progress bar. Coordinates are 0..12.5 representing 0..100%. `earned` is the student's current points (for example, 5.564 for 44.5 points out of 75% completed = 44.5 × 12.5 / 100). `D`, `C`, `B`, `A` are the threshold x-coordinates (typically 7.5, 8.75, 10, 11.25 for 60/70/80/90%).
 
 `\scenarios{rows}`
 Render the three-column "Outcome | Required Letter Grade | Required
@@ -264,10 +252,7 @@ suppressed, footer kept) so the cover sits cleanly at the top.
 
 ### Color setup
 
-The brand and accent colors are defined at `\AtBeginDocument` time
-from the metadata (so users can override them via `\meta{brand-color
-= ...}` after `\documentclass`). Internal name: `rc@brand` and
-`rc@accent`. Use `rc@brand!10` for a 10% tint, etc.
+The class defines the brand and accent colors at `\AtBeginDocument` time from the metadata, so you can override them via `\meta{brand-color = ...}` after `\documentclass`. Internal names: `rc@brand` and `rc@accent`. Use `rc@brand!10` for a 10% tint.
 
 ---
 
@@ -283,9 +268,7 @@ from the metadata (so users can override them via `\meta{brand-color
 - **Bar coordinates:** 12.5 = 100%, so multiply percent by 0.125. For
 	44.5 points out of a possible 75 (pre-final), that's 44.5 × 12.5 /
 	75 = ~7.42.
-- **Splitting the PDF:** use `pdftk` or `qpdf` to split the resulting
-	multi-student PDF into per-student files keyed by name (the title
-	page has the student name in plain text, easy to extract).
+- **Splitting the PDF:** use `pdftk` or `qpdf` to split the resulting multi-student PDF into per-student files keyed by name (the title page has the student name in plain text, so you can extract it from the text layer).
 
 ## Related
 

@@ -22,7 +22,7 @@ are welcome — bug reports, new bank problems, class fixes, and tooling.
   (`.lua`, `.py`, internal helpers) use **underscores**: `problem_engine.lua`,
   `texlib_synctex.lua`, `smoke_test.py`.
 
-## Testing (please run before opening a PR)
+## Testing (run before opening a PR)
 
 You need TeX Live (lualatex/pdflatex, + biber for bibliographies) on `PATH`.
 
@@ -47,12 +47,7 @@ python smoke_test.py --scenarios         # scenario packs (examples/scenarios/)
 python smoke_test.py --update-refs       # local regen (see the caveat above)
 ```
 
-CI (`.github/workflows/`) runs four workflows: `tests.yml` (logic suites +
-real-toolchain integration, every push/PR), `smoke.yml` (full module smoke
-build, push/PR to `main`), `visual.yml` (pixel diff against the committed
-refs, PR to `main` + nightly), and `accessible.yml` (PDF/UA-2 conformance via
-veraPDF, PR to `main` + nightly). A green PR should pass `smoke_test.py`
-locally first.
+CI (`.github/workflows/`) runs four workflows: `tests.yml` (logic suites + real-toolchain integration, every push/PR), `smoke.yml` (full module smoke build, push/PR to `main`), `visual.yml` (pixel diff against the committed refs, PR to `main` + nightly), and `accessible.yml` (PDF/UA-2 conformance via veraPDF, PR to `main` + nightly). Before you open a PR, run `smoke_test.py` locally so the PR arrives green.
 
 ## Adding bank problems
 

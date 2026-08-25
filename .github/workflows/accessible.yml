@@ -13,8 +13,8 @@ name: accessible
 # packs are covered locally by a11y_gallery.py, which is far too expensive for
 # CI (it builds every scenario two-to-three ways and renders per-page diffs).
 #
-# Non-required by design, matching visual.yml: it reports a regression without
-# blocking merges until it has proven itself over a few runs.
+# A required check under main's branch protection (promoted 2026-08-25),
+# matching visual.yml.
 
 on:
   pull_request:

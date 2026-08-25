@@ -1,4 +1,4 @@
-# `quiz` — UNR In-Class Quiz
+# `quiz` — UNR in-class quiz
 
 A subclass of `exam.cls` for in-class, pencil-and-paper quizzes.
 Header, footer, and title are all driven by `coursemeta.tex` plus a
@@ -58,7 +58,7 @@ Options pass through to `exam.cls`. Default base size is 11pt.
 
 | Key                       | Effect                                          |
 |---------------------------|-------------------------------------------------|
-| `quiz-number`             | Used in the title block (e.g. "Quiz 1")         |
+| `quiz-number`             | Used in the title block (for example, "Quiz 1") |
 | `quiz-title`              | Override the title (defaults to `Quiz <number>`) |
 | `quiz-instructions`       | Override the boxed instructions paragraph (inline) |
 | `quiz-instructions-file`  | `\input` the named file instead of the boxed default. Filename without `.tex`. Resolved as-is first (relative to the quiz folder), then relative to `coursemeta.tex` — so it can be set **course-wide in `coursemeta.tex`** to point every quiz at one local file (see below). Precedence: per-quiz `\meta` file > coursemeta file > inline `quiz-instructions` > default `quiz-instructions.tex`. |
@@ -168,8 +168,7 @@ the exam.cls defaults).
 Tiny utility: places a circled letter, useful for multiple-choice.
 
 `\extracredit[<points>]{<text>}`
-Add an extra-credit question. Without a points argument, just labels
-"Extra Credit"; with one, includes the points.
+Add an extra-credit question. Without a points argument, it labels only "Extra Credit"; with one, it includes the points.
 
 `\fig[<options>]{<filename>}`
 Wraps `\includegraphics` with sensible defaults (50% width, keep

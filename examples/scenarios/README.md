@@ -33,8 +33,8 @@ examples/scenarios/
   list substrings (one per line; blank lines and `#` comments ignored) that must
   appear in the rendered PDF. A scenario that ships `expect-text` and has *no*
   reference PNGs skips the pixel diff — ideal when what's under test is *which
-  text renders* (e.g. that a `coursemeta.tex` key resolved to the right file),
-  not layout. If it also has refs, both the text check and the diff run. Use
+  text renders* (for example, that a `coursemeta.tex` key resolved to the right
+  file), not layout. If it also has refs, both the text check and the diff run. Use
   single-token markers (no spaces/hyphens) so `pdftotext` can't split them.
 - **`expect-absent`** is the negative mirror: substrings that must NOT appear.
   It is what turns "builds fine" into a real assertion for anything whose
@@ -64,8 +64,9 @@ Each scenario runs the area's content checks (grid non-empty + text tokens) plus
 a per-page visual diff. References are **rendering-environment-specific**, so
 they must be regenerated after an intentional layout change or a TeX Live bump.
 The `visual.yml` workflow runs `--scenarios` inside a **pinned** TeX Live
-container, so these are gated in CI (non-required); locally, comparison needs
-`pdftoppm` (poppler) and `magick` (ImageMagick) — missing tools soft-skip. The
+container, so these are gated in CI (a required check since 2026-08-25); locally,
+comparison needs `pdftoppm` (poppler) and `magick` (ImageMagick) — missing tools
+soft-skip. The
 randomized `autoexam`/`quiz` classes are made deterministic here with a fixed
 `\setexamseed` + single version, bringing them into visual scope.
 
@@ -84,7 +85,7 @@ randomized `autoexam`/`quiz` classes are made deterministic here with a fixed
 | report-cards | `multi-student` | full | two students in one file → multi-page / per-card reset |
 | syllabi | `standard`           | core | title block, sections, two-column grade tables |
 | syllabi | `long`               | full | content-heavy syllabus that spills onto page 2 |
-| notes | `theorem-custom`       | core | `\texlibtheoremsetup` — tint off + recoloured theorem/definition rules |
+| notes | `theorem-custom`       | core | `\texlibtheoremsetup` — tint off + recolored theorem/definition rules |
 | quiz | `coursemeta-instructions` | core | `quiz-instructions-file` set in `coursemeta.tex` resolves to a course-local instructions file (text-assertion scenario, no PNG ref) |
 | exam | `standard`               | core | deterministic seed-pinned exam: cover + MC answer-key frame + free-response (instructor copy) |
 | quiz | `standard`               | core | deterministic seed-pinned quiz: title + free-response + multiple-choice (student copy) |

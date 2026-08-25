@@ -7,11 +7,11 @@ A personal LaTeX library for math teaching at the University of Nevada, Reno: sh
 
 ## Quickstart
 
-Setting up TeXLib on a new machine or for a new course.
+Set up TeXLib on a new machine or for a new course.
 
 ### One-time setup (per machine)
 
-1. **Install a recent TeX Live** (2023 or later — needs `lualatex`, `expl3`, `tcolorbox`, `pgfplots`, `siunitx`, `mathrsfs`, `tikz-cd`, `spath3`). On Windows the easiest path is TeX Live full; on macOS use MacTeX; on Linux `texlive-full` from your package manager.
+1. **Install a recent TeX Live** (2023 or later — needs `lualatex`, `expl3`, `tcolorbox`, `pgfplots`, `siunitx`, `mathrsfs`, `tikz-cd`, `spath3`). On Windows, install TeX Live full; on macOS, use MacTeX; on Linux, install `texlive-full` from your package manager.
 2. **Clone this repo:**
    ```
    git clone https://github.com/landonfox00/TeXLib.git
@@ -24,7 +24,7 @@ Setting up TeXLib on a new machine or for a new course.
    # PowerShell
    $env:TEXINPUTS = ".;C:\path\to\TeXLib;$env:TEXINPUTS"
    ```
-   Make the change permanent in your shell rc / Windows environment variables. **Watch out for commas** in any path component — `kpathsea` cannot resolve `TEXINPUTS` entries containing commas. On Windows that means OneDrive paths like `OneDrive - University of Nevada, Reno` need a junction (e.g. `OneDriveUNR`); see [Sublime/README.md](Sublime/README.md) for the workaround used in the Sublime build system.
+   Make the change permanent in your shell rc / Windows environment variables. **Warning:** `kpathsea` cannot resolve `TEXINPUTS` entries that contain commas, so watch for commas in any path component. On Windows that means OneDrive paths like `OneDrive - University of Nevada, Reno` need a junction (for example, `OneDriveUNR`); see [Sublime/README.md](Sublime/README.md) for the workaround used in the Sublime build system.
 4. **(Optional) Run the smoke test** to confirm everything builds:
    ```
    python smoke_test.py
@@ -33,7 +33,7 @@ Setting up TeXLib on a new machine or for a new course.
 
 ### Per-course setup
 
-1. **Make a course directory** anywhere on disk (it doesn't need to be inside TeXLib). E.g.:
+1. **Make a course directory** anywhere on disk (it doesn't need to be inside TeXLib). For example:
    ```
    ~/Courses/Math181-Fall2026/
    ```
