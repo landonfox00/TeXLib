@@ -60,7 +60,11 @@ jobs:
             # Record what actually ran. The image used to float, and nothing in
             # the log said which TeX Live produced a result -- which is what made
             # the first failure here expensive to diagnose.
-            tex --version | head -1
+            # No `cmd | head`: the action shell runs with pipefail, and a writer
+            # that outlives head's early close dies of SIGPIPE (141). This line
+            # had only been surviving by winning that race.
+            tex --version > /tmp/tool-version.txt 2>&1 || true
+            head -1 /tmp/tool-version.txt
 
             # veraPDF ships as an IzPack installer; drive it headlessly.
             # Pinned + hash-verified: veraPDF is the conformance authority for
