@@ -165,7 +165,7 @@ sectioning command.
 ```latex
 \begin{solution}[<student-blank-height>]
 	Answer body, written in the source regardless of mode.
-\end{solution>
+\end{solution}
 ```
 
 Optional argument is the height of the blank box used in student
