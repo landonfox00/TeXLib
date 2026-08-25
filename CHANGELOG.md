@@ -4,6 +4,12 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- **CI validates against TeX Live 2026 at last.** Issue #69 closed on 2026-08-17 with both tagpdf 1.0c incompatibilities fixed and the accessible suite green on TL2025 *and* TL2026 — but its second done-when clause, moving the container pin forward, never happened. All four workflows kept `texlive-full:20260101` (TeX Live 2025), so every accessible build merged since was being validated against last year's tagging engine, and the workflow comments still warned "do not bump" about an incompatibility that no longer exists. The pin is now `texlive-full:20260701` (TeX Live 2026) in `tests.yml`, `smoke.yml`, `visual.yml`, and `accessible.yml`; the stale warnings are rewritten; and the visual reference images are regenerated inside the new container via the `update_refs` dispatch, so refs and checks share one toolchain again.
+
+- **Everything that decides a gate's outcome is now version-pinned, not just the container.** The image pin never froze the tools layered on top of it: `apk add` resolves against Alpine's *live* v3.24 index (which is exactly how ImageMagick rolled to the 7.1.2.27 Beta under a pinned image on 2026-07-29 and cost the visual gate its fuzz tolerance), the veraPDF install pulled `/releases/verapdf-installer.zip` — a rolling "latest" whose upgrade would change PDF/UA conformance verdicts with no commit here — and pypdf floated on PyPI. Now: `imagemagick=7.1.2.27-r0` and `poppler-utils=25.12.0-r1` are pinned wherever they're installed (a version Alpine drops fails loudly at `apk add` instead of drifting silently); veraPDF is the versioned 1.30.2 installer, SHA-256-verified before it runs and version-asserted after it installs; and `pypdf==6.16.2` everywhere. The visual gate additionally logs `magick --version` and `pdftoppm -v` per run, the accessible.yml convention, so a disputed diff starts from a known renderer.
+
 ## [0.7.2] — 2026-08-25
 
 A one-fix release: the accessible schedule no longer looks like a draft. The

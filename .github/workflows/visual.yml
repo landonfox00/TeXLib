@@ -38,23 +38,32 @@ jobs:
       # Pinned to the commit v2 resolved to, so rendering stays byte-stable over
       # time (a silent TeX Live bump would otherwise invalidate every ref).
       # That silent bump DID happen: the action SHA pinned only the action, while
-      # `scheme: full` tracked texlive-full:latest. Pinning the image also pins
-      # the Alpine base, and with it the apk ImageMagick whose version decides
-      # whether a stale ref reads as a diff or as "AE metric unreliable".
-      # 20260101 is TeX Live 2025 — the toolchain refs are generated on locally.
+      # `scheme: full` tracked texlive-full:latest. Pinning the image does NOT
+      # pin the apk packages either: `apk add` resolves against Alpine's LIVE
+      # v3.24 index, which is how ImageMagick rolled to the 7.1.2.27 Beta under
+      # a pinned image on 2026-07-29 and cost this gate its fuzz tolerance. The
+      # outcome-deciding apk packages are therefore version-pinned below; when
+      # Alpine drops a pinned version this fails loudly at `apk add`, and the
+      # bump (plus a ref regen if rendering shifts) happens deliberately.
+      # 20260701 is TeX Live 2026; the refs are regenerated in this same
+      # container (update_refs dispatch), so refs and checks share a toolchain.
       - name: Visual regression in pinned TeX Live
         uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
-          docker_image: ghcr.io/xu-cheng/texlive-full:20260101
+          docker_image: ghcr.io/xu-cheng/texlive-full:20260701
           # poppler-utils -> pdftoppm (PDF->PNG); imagemagick -> magick compare.
           run: |
             set -e
-            apk add --no-cache python3 poppler-utils imagemagick
+            apk add --no-cache python3 poppler-utils=25.12.0-r1 imagemagick=7.1.2.27-r0
             # Fail loudly if the compare tool is missing: smoke_test soft-skips
             # visual checks when ImageMagick is absent, which would make this
             # gate pass vacuously.
             command -v magick >/dev/null 2>&1 || command -v compare >/dev/null 2>&1 \
               || { echo "ImageMagick (magick/compare) not available"; exit 1; }
+            # Record what actually ran (the accessible.yml convention): a diff
+            # dispute starts with knowing which renderer + differ produced it.
+            magick --version | head -1
+            pdftoppm -v 2>&1 | head -1
             if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
                && [ "${{ github.event.inputs.update_refs }}" = "true" ]; then
               echo "Regenerating reference images..."

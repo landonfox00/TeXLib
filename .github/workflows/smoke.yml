@@ -31,17 +31,19 @@ jobs:
         # the visual.yml reference rendering it shares — stays stable over time.
         # The action SHA alone does NOT pin the toolchain: `scheme: full` used to
         # resolve to texlive-full:latest, so TeX Live rolled underneath all four
-        # workflows. Pin the image itself; 20260101 is TeX Live 2025.
+        # workflows. Pin the image itself; 20260701 is TeX Live 2026. The apk
+        # package below is version-pinned too — the image pin does not freeze
+        # apk, which resolves against Alpine's live v3.24 index.
         uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
-          docker_image: ghcr.io/xu-cheng/texlive-full:20260101
+          docker_image: ghcr.io/xu-cheng/texlive-full:20260701
           # poppler-utils provides pdftotext for the content checks (substring
           # assertions + non-empty artifact checks). Visual regression is a
           # local-only aid (environment-specific reference images), so
           # ImageMagick is intentionally not installed here.
           run: |
             set -e
-            apk add --no-cache python3 poppler-utils
+            apk add --no-cache python3 poppler-utils=25.12.0-r1
             texlua Schedule/test_schedule_synctex.lua
             texlua Schedule/test_schedule_quiz_exam.lua
             python3 Sublime/test_texlib_builder.py
