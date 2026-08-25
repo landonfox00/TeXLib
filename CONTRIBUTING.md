@@ -66,9 +66,13 @@ in a bank file and pull with `\getproblem{id}` (anywhere) or `\problem{filter}`
 
 ## Releasing (maintainer)
 
-The library releases by git tag: close the `## [Unreleased]` section of
-`CHANGELOG.md` into a `## [X.Y.Z] — date` heading, then
-`git tag vX.Y.Z && git push --tags`. The
+The library releases by git tag: run `python bump_version.py X.Y.Z` (stamps
+`texlib-manifest.json` and every `\Provides` line in one pass), close the
+`## [Unreleased]` section of `CHANGELOG.md` into a `## [X.Y.Z] — date`
+heading, then `git tag vX.Y.Z && git push --tags`. CI's version-contract
+check fails the release branch until the manifest, the newest released
+heading, and every `\Provides` line agree — `python bump_version.py --check`
+runs it locally. The
 [TeXLib-Installer](https://github.com/landonfox00/TeXLib-Installer) pins a tag,
 downloads its archive at install time, and verifies it against a recorded
 SHA-256 — it does not bundle a snapshot — so after tagging, bump the installer's

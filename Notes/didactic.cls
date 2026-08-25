@@ -1,7 +1,7 @@
 % didactic.cls
 % UNR Lecture Notes Class -- TeXLib unified style
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{didactic}[2026/08/25 v0.7.2 UNR Lecture Notes (TeXLib)]
+\ProvidesClass{didactic}[2026/08/25 v0.7.3 UNR Lecture Notes (TeXLib)]
 
 % ==============================================================================
 % 0. OPTIONS
