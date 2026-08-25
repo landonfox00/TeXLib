@@ -4,6 +4,10 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- **A failed ref regeneration can't impersonate "no rendering change" anymore.** The `update_refs` dispatch uploads its artifact on `always()` — deliberately, so a broken later phase can't withhold refs an earlier phase regenerated — but that meant a run that died *before* regenerating uploaded the plain checkout, byte-identical to a regeneration that changed nothing. (It fooled the TL2026 pin bump's first dispatch for several minutes.) The regen path now writes `tests/visual_refs/.regen-manifest` — run id, container image, ImageMagick and pdftoppm versions — and each phase appends its `…=regenerated` line only after completing, so the artifact discloses exactly what was regenerated and by what. Gitignored; documented in the refs README. Also: `TODO.md` caught up with reality (the seed-pinning half of its last open item shipped with the scenario packs; the stale `tests/scenarios/` path is fixed).
+
 ## [0.7.4] — 2026-08-25
 
 The visual-parity release: the tagged (accessible) PDF is no longer the

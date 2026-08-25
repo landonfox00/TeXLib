@@ -65,15 +65,31 @@ jobs:
             # No `cmd | head` here: the action shell runs with pipefail, and a
             # writer that outlives head's early close dies of SIGPIPE (141) --
             # that exact race killed this step's first run under 20260701.
-            magick --version > /tmp/tool-version.txt 2>&1 || true
-            head -1 /tmp/tool-version.txt
-            pdftoppm -v > /tmp/tool-version.txt 2>&1 || true
-            head -1 /tmp/tool-version.txt
+            magick --version > /tmp/magick-version.txt 2>&1 || true
+            head -1 /tmp/magick-version.txt
+            pdftoppm -v > /tmp/pdftoppm-version.txt 2>&1 || true
+            head -1 /tmp/pdftoppm-version.txt
             if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
                && [ "${{ github.event.inputs.update_refs }}" = "true" ]; then
               echo "Regenerating reference images..."
+              # The artifact below uploads on always() -- a failing later phase
+              # must not withhold refs an earlier phase regenerated. The cost
+              # of that choice: a run that dies BEFORE regenerating uploads the
+              # plain checkout, byte-identical to "no rendering change". This
+              # manifest is the tell. Absent = nothing was regenerated; each
+              # phase appends its line only after it completes. Read it before
+              # trusting the artifact. Gitignored: it describes one CI run,
+              # never a commit.
+              {
+                echo "run_id=${{ github.run_id }}"
+                echo "image=ghcr.io/xu-cheng/texlive-full:20260701"
+                head -1 /tmp/magick-version.txt
+                head -1 /tmp/pdftoppm-version.txt
+              } > tests/visual_refs/.regen-manifest
               python3 smoke_test.py --update-refs
+              echo "modules=regenerated" >> tests/visual_refs/.regen-manifest
               python3 smoke_test.py --scenarios --update-refs
+              echo "scenarios=regenerated" >> tests/visual_refs/.regen-manifest
             else
               echo "Checking against committed reference images..."
               python3 smoke_test.py --visual

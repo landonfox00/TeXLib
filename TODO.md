@@ -88,7 +88,7 @@ _(open)_
   `schedule/month-pages` visual scenario (`--scenarios`).
 - Grow the visual scenario packs beyond Schedule (Report Cards multi-section,
   Notes theorem taxonomy, syllabus variants). Infrastructure is in place — just
-  drop `tests/scenarios/<area>/<name>/template.tex` folders.
+  drop `examples/scenarios/<area>/<name>/template.tex` folders.
 - ~~**`recitation-days` meta key is documented but unimplemented.**~~ **Done** —
   registered in `schedule.cls`'s `meta` family (mirrors `quiz-days`:
   `\clist_gset` + an expandable `\GetRecitationDays`); the `recitations` scenario
@@ -99,8 +99,9 @@ _(open)_
   `visual.yml` pins the container (`xu-cheng/texlive-action@f886de8`) and runs
   `--visual` + `--scenarios` on PRs + nightly, non-required; refs are regenerated
   in-container via the workflow's `update_refs` dispatch (the committed refs
-  already match the pinned container byte-for-byte). **Still open:** parallelize
-  builds + seed-pin autoexam/quiz to bring the randomized modules into visual scope.
+  already match the pinned container byte-for-byte). Seed-pinning autoexam/quiz
+  is also done — the `exam/standard` and `quiz/standard` scenario packs pin
+  `\setexamseed` and carry committed refs. **Still open:** parallelize builds.
 - ~~**Delete orphaned `Quizzes/preamble.tex`**~~ **Done** — the file was already
   removed in `b7b0ba5` (2026-06-05, superseded by `quiz.cls`); the stale README
   layout reference to it is now fixed too.
