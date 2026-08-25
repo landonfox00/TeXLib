@@ -85,6 +85,22 @@
 % ==============================================================================
 % (Link colours darkblue/darkred/darkgreen are defined above, before hyperref.)
 \setlist{noitemsep, topsep=2pt, parsep=0pt, partopsep=0pt}
+% ACCESSIBLE: a tagged build routes every list through latex-lab's block
+% templates, which take their vertical spacing from the CLASSIC per-level list
+% hooks (\@listi/\@listii/\@listiii) and ignore enumitem's spacing keys -- the
+% \setlist above visibly loosens (an extra ~28pt around a three-item list), and
+% everything below the first bulleted block shifts against the print PDF.
+% Mirror the same four values into the level hooks, so both builds space lists
+% identically. Label and margin keys are unaffected (block honours those), and
+% a normal build never reads the hooks differently, so this is gated anyway to
+% keep the print path byte-identical.
+\ifdefined\TeXLibAccessibleMode
+	\def\@listi{\leftmargin\leftmargini
+		\topsep 2\p@ \parsep\z@ \itemsep\z@ \partopsep\z@}
+	\let\@listI\@listi
+	\g@addto@macro\@listii{\topsep 2\p@ \parsep\z@ \itemsep\z@ \partopsep\z@}
+	\g@addto@macro\@listiii{\topsep 2\p@ \parsep\z@ \itemsep\z@ \partopsep\z@}
+\fi
 
 % ==============================================================================
 % 4. CLASS-LOCAL METADATA KEYS

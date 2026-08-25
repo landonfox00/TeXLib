@@ -98,6 +98,12 @@
 	\renewcommand{\headrulewidth}{0pt}
 	\setlength{\headwidth}{\textwidth}
 	\cfoot{\thepage\ of \pageref{LastPage}}
+	% Continuation-page day-name band (see section 6a): installed on every
+	% build but inert until \SchedContHeaderSetup arms it, so month-pages and
+	% tabularray schedules render exactly as before. Installed HERE, not from
+	% the setup call, because the setup runs inside the schedule environment's
+	% group and a local \fancyhead would revert before the last page ships.
+	\fancyhead[L]{\sched@drawconthead}
 }
 
 % ==============================================================================
@@ -273,14 +279,25 @@
 \newlength{\schedpad}
 \newlength{\schedheadh}
 \newlength{\scheddividergap}
-\setlength{\schedlabelw}{3.7em}   % WEEK column width (fits the bold WEEK header
-                                  % word, which sizes the xltabular `c` column too)
-\setlength{\schedrowh}{4.75em}    % fixed cell/row height (matches the historical
-                                  % xltabular week-label \parbox[t][4.75em] size)
-\setlength{\schedpad}{5pt}        % inner horizontal cell padding (~\tabcolsep)
-\setlength{\schedheadh}{1.9em}    % header-row inner height (framed total tracks
-                                  % the xltabular header's 2.65em strut)
-\setlength{\scheddividergap}{1.5pt}% white gap inside the WEEK||days double rule
+% The five dimensions below are CALIBRATED against the tabularray renderer, by
+% overlaying 100dpi renders of the same scenario and matching rule positions
+% (WEEK column outer width 52pt, row pitch 4.75em+0.4pt, header band 21pt).
+% The goal is that the two renderers are pixel-interchangeable: an accessible
+% build (which forces box-grid) then paginates and aligns like the normal
+% tabularray PDF.  Each value states the tabularray quantity it reproduces;
+% re-measure against a tabularray render before changing any of them.
+\setlength{\schedlabelw}{4.5em}   % WEEK column: outer = 4.5em+2(fboxsep+rule)
+                                  % = 51.8pt, matching the `c` column's 52pt
+\setlength{\schedrowh}{\dimexpr4.75em-6pt\relax}
+                                  % cell minipage height: row PITCH (frame +
+                                  % 2fboxsep+2rules - overlap) = 4.75em+0.4pt,
+                                  % the xltabular 4.75em week-parbox + hline
+\setlength{\schedpad}{3pt}        % inner horizontal cell padding: with fboxsep
+                                  % (3pt) totals tabularray's 6pt colsep
+\setlength{\schedheadh}{1.4em}    % header-row inner height: framed total 20.8pt
+                                  % tracks the xltabular header band's 21pt
+\setlength{\scheddividergap}{2.5pt}% white gap inside the WEEK||days double rule
+                                  % (rule centres 2.9pt apart, as tabularray's)
 
 % \sched@topalign{inner-height}{framed material}: the re-baseliner described
 % above.  The frame's total height is fixed by construction (#1 + fboxsep/rule
@@ -304,11 +321,17 @@
 }
 
 % \schedcell{color}{content}: a fixed-height, full-bleed-colored, framed day
-% cell.  content is set \footnotesize in a top-aligned padded minipage.
+% cell.  content is set \footnotesize in a top-aligned padded minipage.  The
+% \schedcellinset drop matches where the tabularray cells' first ink starts
+% (4.3pt below the row rule; fboxsep+fboxrule alone leave it at 2.8pt) — same
+% calibration method as the length block above.
+\newlength{\schedcellinset}
+\setlength{\schedcellinset}{1.6pt}
 \newcommand{\schedcell}[2]{%
 	\sched@topalign{\schedrowh}{\fcolorbox{black}{#1}{\hspace{\schedpad}%
 		\begin{minipage}[t][\schedrowh][t]{\dimexpr\schedcellw-2\schedpad\relax}%
-			\footnotesize #2%
+			\vspace*{\schedcellinset}%
+			#2%
 		\end{minipage}%
 		\hspace{\schedpad}}}}
 
@@ -329,6 +352,91 @@
 \newcommand{\schedheadcell}[2]{%
 	\sched@topalign{\schedheadh}{\fcolorbox{black}{white}{%
 		\begin{minipage}[t][\schedheadh][c]{#1}\centering\textbf{#2}\end{minipage}}}}
+
+% ------------------------------------------------------------------------------
+% Continuation-page header (continuous box grid only)
+% ------------------------------------------------------------------------------
+% A continuous box grid used to show the day-name header only on its first page
+% — the documented tradeoff against the tabularray renderer, whose rowhead
+% repeats atop every page. Repeating a header from plain stacked \hboxes needs
+% no output-routine surgery once the problem is split in two:
+%
+%   1. RESERVE. tabularray withholds its repeated-head height from every
+%      page-capacity decision (\l__tblr_row_head_foot_dim in its splitter), so
+%      it breaks one row "early" whenever the head wouldn't also fit. The Lua
+%      emitter reproduces that with a \nobreak\vskip\sched@ctreserve\penalty0
+%      \vskip-\sched@ctreserve sandwich at every inter-row breakpoint: mid-page
+%      the two glues cancel; at a page break TeX keeps the +reserve above the
+%      break (the same bottom margin tabularray leaves) and discards the rest.
+%      The \nobreak plus glue-after-discardable rules make the \penalty0 the
+%      ONLY legal breakpoint between rows, so the reserve cannot be sidestepped.
+%   2. DRAW. \topskip is raised to reserve + row height, so every continuation
+%      page's first row starts exactly one header band below the text top —
+%      where tabularray's repeated head ends — and the band itself is painted
+%      into that gap by the page style (\sched@drawconthead below). A repeated
+%      running header is PAGINATION DECORATION, so drawing it from the page
+%      style is also the semantically right tagging: page-style material is
+%      artifact under an accessible build, exactly how PDF/UA wants repeated
+%      headers marked, while the page-1 header stays real, tagged content.
+%
+% \SchedContHeaderSetup{<band material>} is emitted by render_grid ahead of a
+% continuous grid's rows (never in month-pages mode, whose groups re-emit real
+% headers per page). It freezes the band into a box (column widths are known
+% at that point), records the page the grid starts on, raises \topskip, and
+% arms the always-installed page-style hook for LATER pages. EVERY assignment
+% here is \global (or \xdef): the grid file is \input inside \end{schedule},
+% i.e. inside the environment's group, and the last page ships long after that
+% group closes — a local assignment would silently revert before shipout,
+% which is exactly how the first cut of this lost its band.
+\newsavebox{\sched@contheadbox}
+\newlength{\sched@ctreserve}
+\newcommand{\sched@gridstartpage}{0}
+\newif\ifsched@ctarmed
+\newcommand{\SchedContHeaderSetup}[1]{%
+	\global\setbox\sched@contheadbox\hbox{#1}%
+	\global\sched@ctreserve=\dimexpr\ht\sched@contheadbox+2pt+\fboxrule\relax
+	\xdef\sched@gridstartpage{\the\value{page}}%
+	% +0.6pt: measured residual against longtblr's continuation-page rowhead
+	% (its first row rule sits at 59.9pt from the paper top; the reserve+row
+	% sum alone lands ours at 59.3pt).
+	\global\topskip=\dimexpr\sched@ctreserve
+		+\schedrowh+2\fboxsep+2\fboxrule+0.6pt\relax
+	\global\sched@ctarmedtrue
+}
+% Painted from fancyhdr's left head slot (installed unconditionally in the
+% \AtBeginDocument block below; inert until armed): drop from the head
+% baseline into the text block so the band's top edge lands on the text top
+% (\headsep spans the head-to-body gap). Zero-sized so the head keeps its
+% metrics.
+% \sched@ctbanddrop: extra drop past the \headsep+band-height anchor,
+% calibrated (100/600dpi overlays again) so the band's top edge lands 1.1pt
+% below the text top — where longtblr's repeated rowhead puts its own.
+\newlength{\sched@ctbanddrop}
+\setlength{\sched@ctbanddrop}{4.6pt}
+\newcommand{\sched@drawconthead}{%
+	\ifsched@ctarmed
+		\ifnum\value{page}>\sched@gridstartpage\relax
+			\raisebox{\dimexpr-\headsep-\ht\sched@contheadbox
+					-\sched@ctbanddrop\relax}[0pt][0pt]{%
+				\usebox{\sched@contheadbox}}%
+		\fi
+	\fi}
+
+% \SchedRowBreak: the inter-row breakpoint of a continuous grid — the reserve
+% sandwich plus the standard border-overlap kern (grid-file-facing name: the
+% grid is \input with @ at its ordinary catcode, so rows cannot reference the
+% @-named reserve directly). Legality bookkeeping: after the \nobreak, the +R
+% glue is preceded by a discardable and cannot break; \penalty0 can; the -R
+% glue, the kern and the \offinterlineskip \lineskip glue that follows are all
+% glue-after-discardable, so the \penalty0 is the ONLY breakpoint between rows.
+% A break there keeps +R above it (tabularray's reserved bottom margin) and
+% discards everything after up to the next row's box.
+\newcommand{\SchedRowBreak}{%
+	\nobreak
+	\vskip\sched@ctreserve
+	\penalty0
+	\vskip-\sched@ctreserve
+	\kern-\fboxrule}
 
 % ==============================================================================
 % 7. SCHEDULE ENVIRONMENT

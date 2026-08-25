@@ -327,15 +327,23 @@
 % ------------------------------------------------------------------------------
 % Per-environment declaration
 % ------------------------------------------------------------------------------
-% Accessible (tagged PDF/UA) build: SKIP the tcolorbox wrap. tcolorbox's inner
-% list breaks under tagging=on ("Something's wrong--perhaps a missing \item"),
-% so theorems fall back to their plain amsthm rendering, which tags cleanly. The
-% colour/box is lost in the tagged variant only (the normal PDF keeps it), and a
-% screen reader never conveyed the colour anyway. Keyed on \TeXLibAccessibleMode
-% (the builder \def's it before \documentclass), so it is reliably visible here
-% at package-load time regardless of when texlib-build.sty runs.
+% Accessible (tagged PDF/UA) build: theorems now keep their amsthm + tcolorbox
+% rendering. The plain-text fallback below dates from when tcolorbox's inner
+% list broke under tagging=on ("Something's wrong--perhaps a missing \item");
+% on current toolchains that combination tags cleanly — and BETTER than the
+% fallback did: amsthm under latex-lab tagging produces real <theorem-like>
+% structure elements with a <Caption>/<Lbl> head, where the fallback emitted
+% anonymous paragraphs. veraPDF passes PDF/UA-2 on every theorem-bearing
+% template and scenario with the boxes in place (verified on TeX Live 2025
+% locally; accessible.yml gates it on the pinned TL2026 container), so the
+% tagged PDF now matches the print PDF visually at no structural cost.
+%
+% The fallback machinery (\texlib@acc@* below, and the accessible branch of
+% \__texlib_thm_declare:n) is kept but DORMANT: if a future toolchain bump
+% regresses tcolorbox tagging, re-enabling the \bool_gset below restores the
+% old behaviour in one line.
 \bool_new:N \g__texlib_thm_accessible_bool
-\ifdefined\TeXLibAccessibleMode \bool_gset_true:N \g__texlib_thm_accessible_bool \fi
+% \ifdefined\TeXLibAccessibleMode \bool_gset_true:N \g__texlib_thm_accessible_bool \fi
 
 % Declares one environment from the catalog: amsthm \newtheorem (master counter
 % the first time, sharing it thereafter), its unnumbered `<name>*` twin, and the
@@ -380,8 +388,15 @@
 					[ \l__texlib_thm_master_tl ] { \l__texlib_thm_label_tl } }
 			}
 			% Unnumbered twin (same style; no \theoremstyle change in between).
-			\use:x { \exp_not:N \newtheorem * { \exp_not:n {#1} * }
-				{ \l__texlib_thm_label_tl } }
+			% Guarded: under tagging on TeX Live 2026, the latex-lab amsthm
+			% support auto-defines the `<name>*` twin when \newtheorem declares
+			% <name>, and declaring it again is "\theorem* already defined",
+			% fatal. Untagged builds (and TL2025 tagged ones) create no auto
+			% twin, so the declaration still runs there.
+			\cs_if_exist:cF { #1 * } {
+				\use:x { \exp_not:N \newtheorem * { \exp_not:n {#1} * }
+					{ \l__texlib_thm_label_tl } }
+			}
 			\str_if_eq:VnF \l__texlib_thm_box_tl { none } {
 				\use:x { \exp_not:N \tcolorboxenvironment { \exp_not:n {#1} }
 					{ \l__texlib_thm_box_tl } }

@@ -458,14 +458,14 @@
 	\endoldparts\inpartsfalse
 }
 
-% ACCESSIBLE: multicol cannot be tagged (its column balancing rebuilds the
-% galley below the structure layer, so tagpdf cannot bracket the columns) --
-% \begin{multicols} fatals or produces an untaggable tree under PDF/UA. In an
-% accessible build we therefore drop to a SINGLE column: the {parts} nesting and
-% part-labelling still work, only the visual two-up layout is lost. This is the
-% documented accessible/normal tradeoff (an accessible copy is not page-for-page
-% identical to the print copy anyway, since lualatex reflows the metrics). The
-% guard keys on \TeXLibAccessibleMode so normal builds keep the multicols.
+% {cols} keeps its multicols in EVERY build. An accessible build used to drop
+% to a single column ("multicol cannot be tagged"), but multicol now carries
+% latex-lab tagging support: the columns tag as ordinary text-units and
+% veraPDF passes PDF/UA-2 with the two-up layout in place (verified on TeX
+% Live 2025 locally; accessible.yml gates it on the pinned TL2026 container),
+% so the tagged exam now matches the print layout. If a toolchain bump ever
+% regresses this, the old guard was: \ifdefined\TeXLibAccessibleMode skip the
+% two \begin/\end{multicols}.
 \DeclareDocumentEnvironment{cols}{O{2}}{%
 	\par
 	\setlength{\columnseprule}{0pt}
@@ -473,7 +473,7 @@
 	\ifinparts
 		\setcounter{global_partno_storage}{\value{partno}}%
 	\fi
-	\ifdefined\TeXLibAccessibleMode\else\begin{multicols}{#1}\fi
+	\begin{multicols}{#1}
 		\ifinparts
 			\renewcommand{\partshook}{%
 				\setlength{\leftmargin}{0.0em}%
@@ -488,7 +488,7 @@
 			\end{parts}
 		\else
 		\fi
-	\ifdefined\TeXLibAccessibleMode\else\end{multicols}\fi
+	\end{multicols}
 }
 
 % \splitpage{col1}{col2}
