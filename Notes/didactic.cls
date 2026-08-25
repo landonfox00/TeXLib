@@ -357,6 +357,13 @@
 		% structure nests inside the live surrounding paragraph (Table 5 P-Part /
 		% P-P). Resumed below BEFORE the blank write-space box, which is real
 		% output and must still be tagged -- see the \tagpdfparaOff there.
+		% The \par first closes any OPEN surrounding paragraph while the para
+		% hooks are still live: its auto text-unit end must fire NOW, because
+		% the paragraph would otherwise end inside the \tagpdfparaOff group
+		% below and leave the hook count off by one -- "The number of automatic
+		% begin (N) and end (N-1) text-unit para hooks differ" at \end{document}.
+		% Same guard texlib-solutions.sty puts before ITS discard box.
+		\ifdefined\TeXLibAccessibleMode\par\fi
 		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }{%
