@@ -19,7 +19,7 @@
 % and any current UNR wording should be checked against the Graduate School
 % filing guidelines before a real submission.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{thesis}[2026/08/25 v0.7.3 UNR accessible thesis/dissertation (TeXLib)]
+\ProvidesClass{thesis}[2026/08/25 v0.7.4 UNR accessible thesis/dissertation (TeXLib)]
 
 % ---------------------------------------------------------------------------
 % 0. Options: oneside (default, per grad-school submission) / twoside (binding)

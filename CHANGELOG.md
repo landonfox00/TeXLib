@@ -4,6 +4,16 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.7.4] — 2026-08-25
+
+The visual-parity release: the tagged (accessible) PDF is no longer the
+visually poorer twin. Fallbacks the tagging toolchain has outgrown are retired
+— theorem boxes, exam multicols, syllabus list spacing — the box-grid schedule
+is pixel-calibrated to the tabularray calendar and repeats its header past
+page 1, and an accessible-build fatal found by the measurement harness is
+fixed. Conformance is untouched: veraPDF passes PDF/UA-2 on every template and
+scenario, on the TL2026 container as well as locally.
+
 ### Changed
 
 - **Accessible builds now look like the print builds.** The tagged PDF has always been the visually poorer twin — deliberate fallbacks stripped what the tagging toolchain of the time could not structure. Measured across all 33 scenario packs (same-engine pixel diff, so pdflatex→lualatex font drift is excluded), the worst classes sat at 3–12% of page pixels differing; after this change every class measures at or under ~3%, most under 0.1%, and what remains is sub-pixel glyph-edge noise rather than layout. Three fallbacks turned out to be obsolete — the current latex-lab/tagpdf stack tags what they were dodging, verified by veraPDF on every affected template and scenario: **theorem boxes are back** in tagged Notes/pset documents (amsthm + tcolorbox now tags as real `<theorem-like>` elements with a `<Caption>`/`<Lbl>` head — richer structure than the plain-paragraph fallback it replaces, not just prettier); **`{cols}` keeps its multicols** in tagged exams instead of collapsing to one column; and the **syllabus's list spacing matches print** (the block templates ignore enumitem's spacing keys but honour the classic `\@listi`/`\@listii`/`\@listiii` hooks, so the class now mirrors its `\setlist` values there under tagging — this was the "extra ~28pt around every bulleted list" that shifted everything below the course description). Each retired fallback's machinery stays in place but dormant, one line from re-enablement if a future toolchain regresses.

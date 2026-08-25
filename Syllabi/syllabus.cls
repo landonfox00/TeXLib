@@ -1,7 +1,7 @@
 % syllabus.cls
 % UNR Course Syllabus Class — TeXLib unified style
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{syllabus}[2026/08/25 v0.7.3 UNR Course Syllabus (TeXLib)]
+\ProvidesClass{syllabus}[2026/08/25 v0.7.4 UNR Course Syllabus (TeXLib)]
 
 % ==============================================================================
 % 0. OPTIONS
