@@ -15,13 +15,13 @@ Each `templates/<Module>/` folder carries the template **and the data that docum
 
 A template builds from outside its module directory exactly the way a course folder does — `CLASS_HOME_MODULE` stages the class's assets into the build directory. That machinery already existed for `<Course>/`, which is why this needed no new plumbing.
 
-These four are not merged into a single corpus on purpose. A good teaching example makes a poor regression fixture — too much going on to localise a failure — and a good fixture makes a terrible showcase. They are unified by *declaration*, not by file.
+These four are not merged into a single corpus on purpose. A good teaching example makes a poor regression fixture — too much going on to localize a failure — and a good fixture makes a terrible showcase. They are unified by *declaration*, not by file.
 
 ## The manifest
 
 `manifest.py` is the single source. Each entry carries its path, what it is for (`smoke` / `accessible` / `visual` / `showcase`), the substrings its rendered PDF must and must not contain, and a note saying why the example exists at all.
 
-`smoke_test.py` derives its registries from it, and the class gallery renders from it — so what you can browse and what CI actually builds cannot drift apart. Adding an example is one edit in one file. Previously it meant remembering which of four registries to touch, and touching the wrong subset failed silently: the example simply never ran, and a green suite said nothing was wrong.
+`smoke_test.py` derives its registries from it, and the class gallery renders from it — so what you can browse and what CI actually builds cannot drift apart. Adding an example is one edit in one file. Previously it meant remembering which of four registries to touch, and touching the wrong subset failed silently: the example never ran, and a green suite said nothing was wrong.
 
 ## What's here
 

@@ -1,4 +1,4 @@
-# `schedule` — UNR Course Schedule
+# `schedule` — UNR course schedule
 
 Generates a one-page (or landscape multi-row) tentative-schedule grid
 for a course. The grid is computed at compile time from your start/end
@@ -83,8 +83,8 @@ Class-local keys (in addition to all standard `course-metadata` keys):
 | `landscape`     | `true`/`false`. Switches geometry to landscape, 0.5in margins |
 | `portrait`      | `true` to force portrait                                |
 | `lecture-caps`  | Per-day weight caps, comma list matching `lecture-days` |
-| `quiz-days`     | Days of the week for quizzes (e.g. `T`, `Th`)           |
-| `recitation-days` | Days of the week for recitations (e.g. `R`); adds a capacity-0 column. Default: none. |
+| `quiz-days`     | Days of the week for quizzes (for example, `T`, `Th`)   |
+| `recitation-days` | Days of the week for recitations (for example, `R`); adds a capacity-0 column. Default: none. |
 | `month-pages`   | `true` to put each calendar month on its own page (see below). Default `false`: one continuous table. |
 | `box-grid`      | `true` to render the calendar as stacked box rows instead of an `xltabular`, enabling per-cell SyncTeX inverse search (see below). Default `false`. |
 
@@ -142,12 +142,7 @@ behaves identically to other TeXLib documents in your build pipeline.
 
 ### Title block
 
-`\maketitle` (or `\scheduletitle`) emits the standard banner
-("Math 126EE Precalculus I Tentative Schedule — Spring 2026 / Section
-1008"). Call it explicitly in the document body (the canonical place is
-right after `\begin{document}`, before `\begin{schedule}`); the
-`schedule` environment does **not** emit the banner itself, so a
-document can run the grid title-less by simply omitting the call.
+`\maketitle` (or `\scheduletitle`) emits the standard banner ("Math 126EE Precalculus I Tentative Schedule — Spring 2026 / Section 1008"). Call it explicitly in the document body (the canonical place is right after `\begin{document}`, before `\begin{schedule}`); the `schedule` environment does **not** emit the banner itself, so a document can run the grid title-less by omitting the call.
 
 ### `schedule` environment
 
@@ -212,11 +207,7 @@ through the TeXLib Sublime builder:
 	on `\begin{schedule}`; clicks on the week-number column inherit the
 	source line of the first directive in that week.
 
-Requires the canonical `texlib_builder.py` to be deployed to
-`Packages/User/` (see `Sublime/README.md`).  Command-line builds skip
-the SyncTeX rewrite step, in which case inverse search falls back to
-landing in the generated `<base>_schedule_grid.tex` file at the
-corresponding cell line.
+This requires the canonical `texlib_builder.py` deployed to `Packages/User/` (see `Sublime/README.md`). Command-line builds skip the SyncTeX rewrite step, in which case inverse search falls back to landing in the generated `<base>_schedule_grid.tex` file at the corresponding cell line.
 
 ## Related
 

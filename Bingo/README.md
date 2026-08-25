@@ -1,4 +1,4 @@
-# `bingo` — Math Bingo Cards
+# `bingo` — math bingo cards
 
 A LuaLaTeX class for printing math bingo cards. You write one 5×5 grid of cell
 contents; the class draws the grid, scales each cell to fit, and (optionally)
@@ -37,11 +37,7 @@ shuffles the entries into a reproducible set of randomized cards.
 \end{document}
 ```
 
-Each cell is typeset in math mode automatically — write `\frac{d}{dx}`, not
-`$\frac{d}{dx}$` (a `$...$` wrapper is allowed and stripped, e.g. to keep a
-linter quiet). `\free` is the free space — an ordinary entry, shuffled and
-placed like any other (there is no reserved center cell). A blank cell renders
-empty. Cards are centered vertically on the page.
+Each cell is typeset in math mode automatically — write `\frac{d}{dx}`, not `$\frac{d}{dx}$` (a `$...$` wrapper is allowed and stripped, for example to keep a linter quiet). `\free` is the free space — an ordinary entry, shuffled and placed like any other (there is no reserved center cell). A blank cell renders empty. Cards are centered vertically on the page.
 
 ### Randomized exam-review cards (declare a pool, stamp out cards)
 
@@ -120,10 +116,7 @@ options as `\bingocards`.
 | `seed=K`    | `0`       | Reshuffle salt. Randomization is fixed across builds; change `seed` to deal a new (still build-stable) set from the same pool. |
 | `bank=name` | `default` | (`\bingocards` only) which declared pool to use.             |
 
-> **Free-space note.** With `keepfree` (the default), `\free` is always among the
-> placed 25, at a random cell. Set `keepfree=false` to treat `\free` as an
-> ordinary pool entry, in which case a pool larger than 25 may by chance place
-> zero or two free spaces on a card.
+> **Note:** With `keepfree` (the default), `\free` is always among the placed 25, at a random cell. Set `keepfree=false` to treat `\free` as an ordinary pool entry, in which case a pool larger than 25 may by chance place zero or two free spaces on a card.
 
 ### Cell scaling
 
@@ -134,8 +127,7 @@ the bank, or raise `cell-size`.
 
 ### Class options (`\documentclass[...]{bingo}`)
 
-Set as comma-separated key-values in the class option list, e.g.
-`\documentclass[bingo-title={Exam 3 Bingo}, show-instructions=true]{bingo}`.
+Set as comma-separated key-values in the class option list, for example `\documentclass[bingo-title={Exam 3 Bingo}, show-instructions=true]{bingo}`.
 
 | Key            | Default | Effect                                      |
 |----------------|---------|---------------------------------------------|
@@ -144,7 +136,7 @@ Set as comma-separated key-values in the class option list, e.g.
 | `show-headers` | `true`  | Show the B-I-N-G-O letters above the grid.  |
 | `show-title`   | `false` | Render `\bingotitle` above each card.       |
 | `show-instructions` | `false` | Print the instructions block on every card. |
-| `bingo-title`  | `Bingo` | Running-header title (e.g. `Exam 3 Bingo`). |
+| `bingo-title`  | `Bingo` | Running-header title (for example, `Exam 3 Bingo`). |
 | `bingo-instructions` | — | Inline how-to-play text (boxed).            |
 | `bingo-instructions-file` | — | A file `\input` (unboxed) for the instructions instead. |
 

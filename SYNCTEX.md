@@ -26,9 +26,9 @@ Inverse search is three separate systems that only agree by convention:
    positions only.
 3. **The viewer's parser.** `synctex_parser.c` (Jérôme Laurens). SumatraPDF
    vendors it verbatim (`ext/synctex/` in its repo — verified), so the
-   `synctex edit` CLI used by our test suite exercises the same lineage of
+   `synctex edit` CLI used by the test suite exercises the same lineage of
    code as Landon's actual viewer. It does **not** trust the recorded
-   geometry; it reconstructs its own. That reconstruction is where our bug
+   geometry; it reconstructs its own. That reconstruction is where the bug
    lived.
 
 ## 2. What the parser really does with a click
@@ -40,7 +40,7 @@ From `synctex_parser.c` (fetched from jlaurens/synctex master and read):
   (`_synctex_setup_visible_hbox`), then *grown — never shrunk — to contain
   every child* (`_synctex_make_hbox_contain_point/box`). The stated rationale
   in the source: "some box have 0 width but do contain text material." This
-  exists to compensate for `\smash`-style lies, and it is exactly what our
+  exists to compensate for `\smash`-style lies, and it is exactly what the
   decoration exploited in reverse: a 0-size smashed wrapper containing a
   page-wide, box-tall rule acquires a visible box the size of the rule.
 - **Edit query** (`synctex_iterator_new_edit`): walk all hboxes of the sheet;
@@ -61,16 +61,16 @@ Consequences worth internalizing:
   from the decoration's nodes, not the text's.
 - A point *outside* every visible hbox can resolve *better* than a point
   inside the wrong one, via the nearest-box fallback. That is precisely the
-  "click below the line works, click on the text doesn't" behaviour users
+  "click below the line works, click on the text doesn't" behavior users
   called flaky.
 
-## 3. The measured mechanism of our bug
+## 3. The measured mechanism of the bug
 
 Dissection of the real Scenario-2 build (solutions mode), baseline vs fixed:
 
 - The solution's glyph records (`x<tag>,5`) sit on the line baseline
   (y = 151.4pt) inside a line hbox whose *recorded* box (143.9–153.5pt)
-  covers the glyphs. The records were never displaced — my PR #81 framing
+  covers the glyphs. The records were never displaced — the PR #81 framing
   ("the rule displaces the records") was behaviorally right and mechanically
   wrong. What moves is the *resolvable region*, on the parser side.
 - Baseline: the dead band ended at **159.1pt = the fill rule's overhanging
@@ -152,8 +152,8 @@ The parser heuristics exist in at least three independent codebases:
 Laurens' C library (SumatraPDF, Skim, Okular, the TeX Live CLI), VS Code
 LaTeX-Workshop's TypeScript reimplementation (`synctexjs`, toggleable against
 an external `synctex` binary), and ConTeXt's `mtx-synctex`. Any TeXLib change
-that leans on parser behaviour should be tested against the CLI (done — our
-suite) and ideally spot-checked in Sumatra, but Sumatra vendoring the C
+that leans on parser behavior should be tested against the CLI (done — this
+repo's suite) and ideally spot-checked in Sumatra, but Sumatra vendoring the C
 library means the CLI is a faithful proxy.
 
 ### 4d. Non-SyncTeX fallbacks (for completeness)
@@ -172,7 +172,7 @@ pursuing here given 4a exists.
    solution-text clicks (free-response and both MC layouts) and on a
    left-edge click of the solution line, where only stamped containers can
    answer. 66 checks, no `known` markers left.
-2. **Stamp the containers, not just the glyphs.** DONE.
+2. **Stamp the containers, not only the glyphs.** DONE.
    `texlib_synctex_read_target` harvests (tag, line) from the body-only box's
    glyphs; `texlib_synctex_stamp_box` stamps every hlist/vlist/rule in the
    finished box via `node.direct.set_synctex_fields`. Hooked into `{solution}`

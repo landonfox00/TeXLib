@@ -20,13 +20,7 @@ machine paths, two overlapping build scripts, and `__pycache__` junk).
 | `test_texlib_builder.py` | — (not deployed) | Standalone logic test for the builder. Run with `python test_texlib_builder.py`. |
 | `README.md` | — | This file. Not deployed. |
 
-**Important about the LaTeXTools settings filename.** If Sublime ever closes
-with unsaved edits to `LaTeXTools.sublime-settings`, it leaves a recovery copy
-named `LaTeXTools-<hash>.sublime-settings`. Always deploy as the bare name
-`LaTeXTools.sublime-settings` — anything with a hash suffix is auto-recovery
-junk, not the canonical file. If you find one in your `Packages/User/`, the
-real config is whichever name Sublime is actually reading; check by editing
-one and seeing whether the build behavior changes.
+**Important:** if Sublime ever closes with unsaved edits to `LaTeXTools.sublime-settings`, it leaves a recovery copy named `LaTeXTools-<hash>.sublime-settings`. Always deploy as the bare name `LaTeXTools.sublime-settings` — anything with a hash suffix is auto-recovery junk, not the canonical file. If you find one in your `Packages/User/`, the real config is whichever name Sublime is actually reading; check by editing one and seeing whether the build behavior changes.
 
 ## Deploy
 
@@ -36,9 +30,7 @@ one and seeing whether the build behavior changes.
 3. **Tools → Build System → TeXLib**.
 4. Restart Sublime (so the builder plugin loads).
 
-That's it on each machine. The files live here in the (OneDrive-synced) TeXLib
-folder so they travel with the library; deploying is just the copy step above.
-If you'd rather not copy by hand, ask and we'll add a small deploy script.
+That's the whole setup on each machine. The files live here in the (OneDrive-synced) TeXLib folder so they travel with the library; deploying is the copy step above. If you'd rather not copy by hand, ask for a small deploy script to be added.
 
 ## Using it
 
@@ -67,7 +59,7 @@ command line, exactly the way `smoke_test.py` does.
 ## What the builder does
 
 - **Engine selection.** Honors the `%!TeX program = …` magic comment (LaTeXTools
-  resolves that for us). On top of that, it forces `lualatex` for
+  resolves that). On top of that, it forces `lualatex` for
   `\documentclass{autoexam|quiz|schedule}`, which require it — so a document
   that forgot the magic comment still builds correctly. Plain `pdflatex`
   documents are untouched.
@@ -109,7 +101,7 @@ The builder has three layers of automated tests (none deployed to Sublime):
 |--------|-----------|--------|
 | `test_texlib_builder.py` | No | Decision logic + **full multi-pass orchestration** (biber-skip cache, rerun detection, the state-fingerprint veto / silent-log settling pass / oscillation + `MAX_RERUNS` stops, per-version biber, aux routing, hidden-file recovery, schedmap rewrite, per-version/solutions `.vmap` PDF slicing). Drives `commands()` with a scripted side-effect timeline — per-pass output *and* the aux files each pass writes — so the biber/rerun branches actually execute. |
 | `test_biber_integration.py` | Yes (`pdflatex`/`lualatex` + `biber`) | Real end-to-end: drives the actual builder coroutine against the real toolchain on a biblatex fixture. Proves a fresh build settles with no undefined refs, an unchanged rebuild **skips biber** in one pass, and editing the `.bib` re-runs biber. Soft-skips if the tools are absent. |
-| `test_synctex_integration.py` | Yes (`lualatex` + poppler's `pdftotext` + `synctex`) | Real end-to-end **inverse search**: drives the real builder against a real build, then uses TeX Live's own `synctex edit -o page:x:y:pdf` CLI to simulate a Sumatra double-click and check where it actually lands — the fabricated-data unit tests above can't catch a real engine/table-package quirk (e.g. xltabular deferring shipout) that only shows up against genuine output. Soft-skips if the tools (or a poppler-flavored `pdftotext` specifically — an xpdf build earlier on `PATH` silently lacks `-bbox`) are absent. |
+| `test_synctex_integration.py` | Yes (`lualatex` + poppler's `pdftotext` + `synctex`) | Real end-to-end **inverse search**: drives the real builder against a real build, then uses TeX Live's own `synctex edit -o page:x:y:pdf` CLI to simulate a Sumatra double-click and check where it actually lands — the fabricated-data unit tests above can't catch a real engine/table-package quirk (for example, xltabular deferring shipout) that only shows up against genuine output. Soft-skips if the tools (or a poppler-flavored `pdftotext` specifically — an xpdf build earlier on `PATH` silently lacks `-bbox`) are absent. |
 | `smoke_test.py` (repo root) | Yes (`lualatex`) | Builds every module template; content/visual regression for shared `.sty`/`.cls` refactors. |
 
 Run them directly:

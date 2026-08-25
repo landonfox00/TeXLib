@@ -1,12 +1,6 @@
-# `autoexam` — UNR Free-Response Exams
+# `autoexam` — UNR free-response exams
 
-The largest TeXLib class. Builds randomized, multi-version exams from
-a problem bank, with synchronized answer keys, optional rubrics, and
-per-problem inline-Lua randomization. Handles single-version edits
-("just typeset version A", via `\def\Version{A}`) and full
-multi-version builds (A, B, C, …) collated into one PDF — which the
-Sublime builder then automatically slices into one PDF per version
-(and per solutions-state).
+The largest TeXLib class. Builds randomized, multi-version exams from a problem bank, with synchronized answer keys, optional rubrics, and per-problem inline-Lua randomization. Handles single-version edits (typeset only version A, via `\def\Version{A}`) and full multi-version builds (A, B, C, …) collated into one PDF — which the Sublime builder then automatically slices into one PDF per version (and per solutions-state).
 
 ## What it gives you
 
@@ -36,7 +30,7 @@ for edge cases.
 
 ## Tutorial: a five-minute exam
 
-Using a bank file `bank.tex` and a coursemeta.tex one level up:
+Using a bank file `bank.tex` and a `coursemeta.tex` one level up:
 
 ```latex
 \documentclass{autoexam}
@@ -116,12 +110,7 @@ backward-compat alias (it forwards to `\meta` internally).
 | `exam-instructions`      | —                     | Inline instructions text (boxed); overrides the default file |
 | `exam-instructions-file` | `instructions-file`   | Filename (no `.tex`) for instructions, `\input` unboxed and overriding inline; default file `autoexam-instructions`. Settable course-wide in `coursemeta.tex`. |
 
-**Exam date from coursemeta.** If `exam-date` is not set on the document,
-`autoexam` falls back to the coursemeta `exam<N>-date` key whose number matches
-`exam-number` (e.g. `exam-number=3` → `exam3-date`). An explicit local
-`exam-date` always wins; with neither, the date shows the `\todo` placeholder.
-Set `exam1-date`..`exam5-date` (and `final-date`) once in `coursemeta.tex` to
-share them with the syllabus `\examdatetable` — a reschedule is then one edit.
+**Exam date from coursemeta.** If `exam-date` is not set on the document, `autoexam` falls back to the coursemeta `exam<N>-date` key whose number matches `exam-number` (for example, `exam-number=3` → `exam3-date`). An explicit local `exam-date` always wins; with neither, the date shows the `\todo` placeholder. Set `exam1-date`..`exam5-date` (and `final-date`) once in `coursemeta.tex` to share them with the syllabus `\examdatetable` — a reschedule is then one edit.
 
 **Point-total check.** At `\begin{document}`, `autoexam` sums the
 explicitly-annotated `\problem[pts]` points and warns if they don't match
@@ -343,10 +332,7 @@ Reserved blank space for student work.
 	`<jobname>_A.pdf`, `<jobname>_B.pdf`, ... afterward. Passing
 	`\def\Version{X}` externally (or on a raw command line) forces only
 	that one version to build.
-- **Filenames the builder produces:** `<jobname>_A.sco`,
-	`<jobname>_autoexam_body_A.tex`, `<jobname>.srcmap`,
-	`<jobname>.vmap`, etc. — these are intermediate artifacts you can
-	ignore between rebuilds.
+- **Filenames the builder produces:** `<jobname>_A.sco`, `<jobname>_autoexam_body_A.tex`, `<jobname>.srcmap`, `<jobname>.vmap`, and similar — these are intermediate artifacts you can ignore between rebuilds.
 
 ## Related
 

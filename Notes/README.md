@@ -1,4 +1,4 @@
-# `didactic` — UNR Lecture Notes
+# `didactic` — UNR lecture notes
 
 A LaTeX class for math lecture notes. Builds either an instructor copy
 (solutions visible) or a student copy (solutions blanked out, replaced
@@ -7,7 +7,7 @@ with watermarked space) from the same source file.
 ## What it gives you
 
 - A consistent header/footer driven by your `coursemeta.tex`.
-- Boxed theorem/definition/example/etc. environments via tcolorbox.
+- Boxed theorem, definition, example, and other environments via tcolorbox.
 - A `solution` environment that adapts to student vs. instructor mode.
 - The unified TeXLib build-flag CLI (`\ifsolutions`, `\ifstudent`,
 	`\ShowSolutions`, …).
@@ -87,7 +87,7 @@ Options are passed through to `article`.
 
 | Key             | Effect                                           |
 |-----------------|--------------------------------------------------|
-| `unit`          | Type label, e.g. "Lecture", "Unit", "Section"    |
+| `unit`          | Type label, for example "Lecture", "Unit", "Section" |
 | `unit-number`   | Unit/lecture number                              |
 | `unit-title`    | Title of this document                           |
 | `unit-overview` | Optional abstract; rendered after `\maketitle`   |
@@ -130,8 +130,7 @@ Source-level toggles (place in preamble): `\solutions`, `\drafts`,
 `\maketitle` — typesets the title block (unit title + course + term).
 If `overview` is set, an abstract follows.
 
-`\GetUnitTitle` — expands to "Lecture 1: Real Numbers" or just the
-title if `number` is empty.
+`\GetUnitTitle` — expands to "Lecture 1: Real Numbers" or only the title if `number` is empty.
 
 `\GetUnitType` / `\GetUnitNumber` / `\GetOverview` — direct getters.
 
@@ -192,11 +191,7 @@ statement stays a bare prompt for students but carries its worked solution in
 your instructor build. Turn the gating off globally with `\gateworkedfalse`
 (then all four envs are always-visible).
 
-The always-visible half of the hook is shared (it lives in `texlib-thmenv.sty`,
-so every class with these environments gets it); the challenge/exercise gating
-is added by `didactic.cls`. Each lead-in is scoped to its environment, so the
-standalone `\begin{solution}` box keeps `\solution` everywhere else — just don't
-nest a `\begin{solution}` box *inside* one of these environments.
+The always-visible half of the hook is shared (it lives in `texlib-thmenv.sty`, so every class with these environments gets it); `didactic.cls` adds the challenge/exercise gating. Each lead-in is scoped to its environment, so the standalone `\begin{solution}` box keeps `\solution` everywhere else — don't nest a `\begin{solution}` box *inside* one of these environments.
 
 #### `{answer}` — the solution box, relabelled
 
@@ -251,15 +246,7 @@ The class predefines: `\mbb`, `\mrm`, `\mcal`, `\msf`, `\mf`, `\mscr`,
 - **Section TOC width:** the class sets `\cftsecnumwidth=3em` to keep
 	long section labels (like "R.10") from colliding with their titles in
 	the auto-generated TOC.
-- **Loading enumitem:** `enumitem` is loaded with `[shortlabels]` so
-	you can write `\begin{enumerate}[(a)]` without extra setup — but **not
-	in a document you intend to build accessible.** Under
-	`\DocumentMetadata{tagging=on}` the kernel's `block` code takes over
-	the optional argument and rejects enumitem's keys outright ("Some keys
-	specified on the enumerate environment are unknown"), fatally, and on
-	*any* key rather than some particular one. Declare the list in the
-	preamble instead — `\setlist[enumerate]{label=(\alph*)}` — which is
-	honoured in both builds.
+- **Loading enumitem:** the class loads `enumitem` with `[shortlabels]` so you can write `\begin{enumerate}[(a)]` without extra setup — but **not in a document you intend to build accessible.** Under `\DocumentMetadata{tagging=on}` the kernel's `block` code takes over the optional argument and rejects enumitem's keys outright ("Some keys specified on the enumerate environment are unknown"), fatally, and on *any* key rather than some particular one. Declare the list in the preamble instead — `\setlist[enumerate]{label=(\alph*)}` — which is honored in both builds.
 
 ## Related
 
