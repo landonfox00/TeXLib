@@ -4,6 +4,12 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-08-25
+
+A one-fix release: the accessible schedule no longer looks like a draft. The
+box-grid renderer that every tagged schedule build rides on now reproduces the
+tabularray calendar's geometry instead of approximating it.
+
 ### Fixed
 
 - **The box-grid schedule finally looks like the schedule.** The box-grid renderer — the one every accessible schedule build is forced onto, since the tabularray calendar cannot be tagged — promised "the same visual grid" and never delivered it: rows floated apart with dead space between them, a cell whose date is `\fbox`'d (month starts) rode ~3.4pt above its neighbours, the `[c]`-centred week label sat below both, a divider stub poked above the header row, and every row overran `\textwidth` by ~20pt because the column-width formula ignored `\fboxsep`. All of it was one mistake: row components met the row `\hbox` on raw minipage baselines, and a `[t][h][*]` minipage's baseline sits at its *first line*, so any first-line difference moved the whole frame. Every component now passes through `\sched@topalign`, which re-baselines its frame to a uniform profile (height = the full frame, depth = 0) so content cannot move it; `\SchedSetCols` accounts for the `\fcolorbox` padding it had ignored; the framed-strut divider (a fat white channel — `\fboxsep` padding around a 1pt rule) is replaced by a bare `\scheddividergap` kern, so the WEEK‖days double rule is the label's right border and the first cell's left border; rows overlap their horizontal borders by `\fboxrule` (the vertical twin of the inter-cell kern, emitted on the row's own grid line so the `.schedmap` contract is untouched); and the header row gained the xltabular double-rule separator and a full-size WEEK (the label column widened 3.2em → 3.7em to fit it). Math 126's accessible schedule drops from 3 pages back to the normal build's 2 and still passes veraPDF ua-2; the five `schedule__box-grid-*.png` refs are regenerated, and every other scenario passes unchanged against its committed refs. The one remaining visible difference from the tabularray render is the documented tradeoff: a continuous grid still shows the day-name header only on its first page.
