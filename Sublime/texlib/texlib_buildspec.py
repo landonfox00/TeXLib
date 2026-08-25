@@ -63,3 +63,30 @@ ACCESSIBLE_DOCMETA = (
 # The marker the classes gate their accessible branches on (\ifdefined
 # \TeXLibAccessibleMode). Defined on the command line, never in the source.
 ACCESSIBLE_MACRO = ACCESSIBLE_DOCMETA + r"\def\TeXLibAccessibleMode{}"
+
+# The marker alone, for documents that carry their own \DocumentMetadata.
+ACCESSIBLE_MARKER_ONLY = r"\def\TeXLibAccessibleMode{}"
+
+
+def accessible_macro_for(tex_path):
+    """The accessible-build prefix appropriate for one document.
+
+    The TeX Live 2026 kernel makes a second \\DocumentMetadata declaration a
+    fatal error ("Two \\DocumentMetadata declarations"), where 2025 quietly
+    tolerated the duplicate. A document that opens with its OWN declaration --
+    the thesis template's documented layout, since the PDF/A + PDF/UA choices
+    there are the author's to make -- keeps it, and receives only the
+    \\TeXLibAccessibleMode marker. Everything else gets the full injected
+    metadata as before. An unreadable file gets the full prefix: the build
+    itself will fail loudly on the missing file either way.
+    """
+    try:
+        with open(tex_path, "r", encoding="utf-8", errors="ignore") as f:
+            source = f.read()
+    except OSError:
+        return ACCESSIBLE_MACRO
+    for line in source.splitlines():
+        head = line.split("%", 1)[0]
+        if "\\DocumentMetadata" in head:
+            return ACCESSIBLE_MARKER_ONLY
+    return ACCESSIBLE_MACRO

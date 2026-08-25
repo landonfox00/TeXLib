@@ -191,6 +191,7 @@ ACCESSIBLE_DOCMETA = _spec.ACCESSIBLE_DOCMETA
 # preferred_pdf_path tells the two kinds of copy apart by this and nothing else.
 SOLUTION_COPY_SUFFIX = "_solutions.pdf"
 ACCESSIBLE_MACRO = _spec.ACCESSIBLE_MACRO
+accessible_macro_for = _spec.accessible_macro_for
 
 # A pseudo-mode: a single engine pass with no biber and no rerun loop, for fast
 # preview while writing. Cross-references / citations may be stale; a normal
@@ -745,7 +746,8 @@ class TexlibBuildCore:
         cmd = [c for c in tagged_base
                if not str(c).startswith("-output-directory=")]
         cmd += [f"-output-directory={out_dir}", f"--jobname={self.base_name}",
-                ACCESSIBLE_MACRO + f"\\input{{{self.tex_name}}}"]
+                accessible_macro_for(os.path.join(tex_dir, self.tex_name))
+                + f"\\input{{{self.tex_name}}}"]
         yield (cmd, f"{ACCESSIBLE_ENGINE} [accessible] run 1...")
         yield (cmd, f"{ACCESSIBLE_ENGINE} [accessible] run 2 (settle)...")
 

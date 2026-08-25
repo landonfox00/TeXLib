@@ -121,7 +121,8 @@ def build(item: Item, work: str, mode: str, timeout: int):
         cmd.append("-shell-escape")
     if accessible:
         cmd.append(f"--jobname={jobname}")
-        cmd.append(f"{S.ACCESSIBLE_MACRO}\\input{{{item.template}}}")
+        cmd.append(f"{S.accessible_macro_for(os.path.join(dest, item.template))}"
+                   f"\\input{{{item.template}}}")
     else:
         cmd.append(item.template)
 

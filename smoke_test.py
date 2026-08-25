@@ -109,6 +109,7 @@ BIBER = shutil.which("biber")
 # builder by hand -- both import it from texlib_buildspec.
 ACCESSIBLE_DOCMETA = _spec.ACCESSIBLE_DOCMETA
 ACCESSIBLE_MACRO = _spec.ACCESSIBLE_MACRO
+accessible_macro_for = _spec.accessible_macro_for
 
 # Committed reference images for visual regression (--visual). Generated with
 # --update-refs; environment-specific (font rendering differs across TeX Live
@@ -712,7 +713,8 @@ def build_one(
         # document's \documentclass. \DocumentMetadata opens a support file before
         # the \input runs, so the jobname must be pinned explicitly -- otherwise
         # LuaTeX names the output after that support file, not the template.
-        prefix = (ACCESSIBLE_MACRO if accessible else "") + (mode_macro or "")
+        prefix = (accessible_macro_for(os.path.join(tmp, template))
+                  if accessible else "") + (mode_macro or "")
         if accessible:
             cmd.append(f"--jobname={jobname}")
         if prefix:

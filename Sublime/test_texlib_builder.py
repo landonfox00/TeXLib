@@ -1671,6 +1671,30 @@ def main():
     check("buildspec: accessible macro carries both MathML methods",
           "mathml-AF" in _bs.ACCESSIBLE_MACRO and "mathml-SE" in _bs.ACCESSIBLE_MACRO)
 
+    # accessible_macro_for: a document with its OWN \DocumentMetadata (the
+    # thesis template's layout) must get the marker only -- the TL2026 kernel
+    # fatals on a second declaration -- while everything else keeps the full
+    # injected prefix, and a commented-out declaration does not count.
+    with tempfile.TemporaryDirectory() as _amd:
+        _own = os.path.join(_amd, "own.tex")
+        with open(_own, "w", encoding="utf-8") as f:
+            f.write("\\DocumentMetadata{tagging=on}\n\\documentclass{thesis}\n")
+        _plain = os.path.join(_amd, "plain.tex")
+        with open(_plain, "w", encoding="utf-8") as f:
+            f.write("\\documentclass{didactic}\n")
+        _commented = os.path.join(_amd, "commented.tex")
+        with open(_commented, "w", encoding="utf-8") as f:
+            f.write("% \\DocumentMetadata{tagging=on}\n\\documentclass{pset}\n")
+        check("buildspec: own \\DocumentMetadata -> marker only, no second declaration",
+              _bs.accessible_macro_for(_own) == _bs.ACCESSIBLE_MARKER_ONLY)
+        check("buildspec: no declaration -> full accessible prefix",
+              _bs.accessible_macro_for(_plain) == _bs.ACCESSIBLE_MACRO)
+        check("buildspec: commented-out declaration still gets the full prefix",
+              _bs.accessible_macro_for(_commented) == _bs.ACCESSIBLE_MACRO)
+        check("buildspec: unreadable path falls back to the full prefix",
+              _bs.accessible_macro_for(os.path.join(_amd, "missing.tex"))
+              == _bs.ACCESSIBLE_MACRO)
+
     # -----------------------------------------------------------------------
     # The example corpus is declared once, and every declared file exists.
     #
