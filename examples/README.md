@@ -33,7 +33,7 @@ These four are not merged into a single corpus on purpose. A good teaching examp
   - `quiz-01.tex` — a short `quiz` mixing inline problems and bank-backed `\getproblem` retrieval.
   - `exam-01.tex` + `bank.tex` — a randomized **multi-version** `autoexam` (`\versions{A,B,C}` + `\shuffle`) that retrieves problems from a small course bank by topic. Build it as a collated PDF, a single version, or an answer key (see the header of `exam-01.tex`).
 
-The folder deliberately covers the *everyday* course documents. The remaining classes — `pset` (problem sets), `report-card`, and `bingo` — aren't shown here; for those, copy the canonical template from the module directory ([`Problem Sets/pset-template.tex`](../Problem%20Sets/pset-template.tex), [`Report Cards/report-card-template.tex`](../Report%20Cards/report-card-template.tex), [`Bingo/bingo-template.tex`](../Bingo/bingo-template.tex)). Each module's `README.md` documents its options.
+The folder deliberately covers the *everyday* course documents. The remaining classes — `pset` (problem sets), `report-card`, `bingo`, `bank`, and `thesis` — aren't shown here; for those, copy the canonical template from [`templates/`](templates/) ([`templates/Problem Sets/pset-template.tex`](templates/Problem%20Sets/pset-template.tex), [`templates/Report Cards/report-card-template.tex`](templates/Report%20Cards/report-card-template.tex), [`templates/Bingo/bingo-template.tex`](templates/Bingo/bingo-template.tex), ...). Each module's `README.md` documents its options.
 
 ## Building an example
 

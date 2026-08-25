@@ -3,7 +3,7 @@
 [![smoke](https://github.com/landonfox00/TeXLib/actions/workflows/smoke.yml/badge.svg)](https://github.com/landonfox00/TeXLib/actions/workflows/smoke.yml)
 [![tests](https://github.com/landonfox00/TeXLib/actions/workflows/tests.yml/badge.svg)](https://github.com/landonfox00/TeXLib/actions/workflows/tests.yml)
 
-A personal LaTeX library for math teaching at the University of Nevada, Reno: shared `.sty` packages, a set of document-class modules (exams, quizzes, lecture notes, problem sets, schedules, syllabi, report cards, bingo cards), a LuaLaTeX engine for randomized exams, a Sublime Text build system, and a smoke-test harness that builds every module after refactors.
+A personal LaTeX library for math teaching at the University of Nevada, Reno: shared `.sty` packages, a set of document-class modules (exams, quizzes, lecture notes, problem sets, schedules, syllabi, report cards, bingo cards, problem-bank catalogs, and a thesis class), a LuaLaTeX engine for randomized exams, a Sublime Text build system, and a smoke-test harness that builds every module after refactors.
 
 ## Quickstart
 
@@ -37,20 +37,22 @@ Setting up TeXLib on a new machine or for a new course.
    ```
    ~/Courses/Math181-Fall2026/
    ```
-2. **Drop in a `coursemeta.tex`** with the institution / instructor / course / term values. Copy [`coursemeta.example.tex`](coursemeta.example.tex) and edit, or look at [`examples/Math181-Fall2026/`](examples/Math181-Fall2026/) for a working end-to-end course folder. `course-metadata.sty` auto-discovers this file from the document directory or any of three ancestors, so a single `coursemeta.tex` at the course root applies to every document underneath it.
+2. **Drop in a `coursemeta.tex`** with the institution / instructor / course / term values. Copy [`coursemeta.example.tex`](coursemeta.example.tex) and edit, or look at [`examples/Math181-Fall2026/`](examples/Math181-Fall2026/) for a working end-to-end course folder. `course-metadata.sty` auto-discovers this file from the document directory or any of five ancestors, so a single `coursemeta.tex` at the course root applies to every document underneath it.
 3. **Pick a document class** from the [Modules](#modules) table below and start a new `.tex`:
    ```latex
    \documentclass{didactic}        % lecture notes
-   % or {pset}, {quiz}, {autoexam}, {schedule}, {syllabus}, {report-card}, {bingo}
+   % or {pset}, {quiz}, {autoexam}, {schedule}, {syllabus}, {report-card},
+   %    {bingo}, {bank}, {thesis}
    \begin{document}
      ...
    \end{document}
    ```
-4. **Build.** From Sublime Text (with the build system from `Sublime/` installed) it's `Ctrl+B`. From the command line:
+4. **Build.** From Sublime Text (with the build system from `Sublime/` installed) it's `Ctrl+B` — the builder picks the right engine per class. From the command line the engine matters:
    ```
-   lualatex yourfile.tex          # for autoexam / quiz / schedule
-   pdflatex yourfile.tex          # for everything else
+   lualatex yourfile.tex          # autoexam / quiz / schedule / bingo / report-card / bank / thesis
+   pdflatex yourfile.tex          # didactic / pset / syllabus
    ```
+   The split is defined in one place, `LUALATEX_CLASSES` in [`Sublime/texlib/texlib_buildspec.py`](Sublime/texlib/texlib_buildspec.py). Getting it wrong is not a soft failure: `bingo.cls` and `schedule.cls` call `\directlua` at class load, so under `pdflatex` they fatal immediately.
    To switch build modes (solutions, answer key, rubric, draft, student-vs-instructor copy) see [Build modes](#build-modes) below.
 
 ## What's in here
@@ -60,7 +62,7 @@ Setting up TeXLib on a new machine or for a new course.
 | File | Purpose |
 |---|---|
 | [`basic-utilities.sty`](basic-utilities.sty) | Kitchen-sink utility: pulls in math/tikz/enumitem, sets up `tasks` defaults, defines a `parts` enumerate list, an `\AutoLabel` helper, and a `\fig` wrapper. |
-| [`course-metadata.sty`](course-metadata.sty) | Layered metadata engine. Define `\metasetup{ institution=..., instructor=..., course-subject=..., ... }` and downstream `\Get…` commands appear. Auto-loads `coursemeta.tex` if found one to three directories up. |
+| [`course-metadata.sty`](course-metadata.sty) | Layered metadata engine. Define `\metasetup{ institution=..., instructor=..., course-subject=..., ... }` and downstream `\Get…` commands appear. Auto-loads `coursemeta.tex` from the document directory or up to five directories up. |
 | [`texlib-build.sty`](texlib-build.sty) | Unified build flags. Exposes `\ifsolutions`, `\ifkey`, `\ifrubric`, `\ifdraft`, `\ifstudent`, `\ifinstructor`. Toggled either compile-time (`-jobname=… "\def\ShowSolutions{}\input{file}"`) or source-level (`\solutions`, `\keys`, `\rubrics`, `\drafts`, `\studentmode`, `\instructormode`). |
 | [`texlib-footer.sty`](texlib-footer.sty) | Shared `fancyhdr` footer: `[Course] [page X of Y] [Institution]`. Headers stay class-specific. |
 | [`texlib-mathutils.sty`](texlib-mathutils.sty) | Math macros: `\mbb`/`\mrm`/`\mcal`/`\msf`/`\mf`/`\mscr`, auto-sizing `\abs`/`\lrp`/`\lrb`/`\lrcb`, `\dd`/`\deriv`/`\inte`, bold-red `\todo`. |
@@ -87,10 +89,11 @@ Setting up TeXLib on a new machine or for a new course.
 
 ### Modules
 
-Each module is a document class plus a canonical `<module>-template.tex` and a README. `smoke_test.py` builds every module's template to catch regressions in the shared `.sty` files.
+Each module is a document class plus a README; the canonical `<module>-template.tex` files live under [`examples/templates/`](examples/templates/). `smoke_test.py` builds every module's template to catch regressions in the shared `.sty` files.
 
 | Module | Class | Purpose |
 |---|---|---|
+| [`Bank/`](Bank/) | `bank.cls` | Problem-bank catalog / preview class. A thin wrapper that `\loadbank`s a bare-fragment problem bank and renders a browsable `\printbankcatalog` (number, id, attrs, stem, solution) for instructor perusal. |
 | [`Bingo/`](Bingo/) | `bingo.cls` | 5×5 math-symbol bingo cards. Supports a standard layout (math expression per cell) and a labeled layout with separate `\bingolegend{...}` table, used for exam-review bingo. |
 | [`Exams/`](Exams/) | `autoexam.cls` | Randomized-exam class. Paired with [`problem_engine.lua`](problem_engine.lua) and a problem `bank.tex`; emits multiple shuffled versions per build. |
 | [`Notes/`](Notes/) | `didactic.cls` | Lecture-notes class with section-numbered theorems and a large theorem taxonomy (theorem, lemma, corollary, proposition, definition, procedure, example, question, note, ...). |
@@ -99,6 +102,9 @@ Each module is a document class plus a canonical `<module>-template.tex` and a R
 | [`Report Cards/`](Report%20Cards/) | `report-card.cls` | Per-section report-card class for end-of-term grade summaries. |
 | [`Schedule/`](Schedule/) | `schedule.cls` | Course-schedule / calendar class. Uses `calendar.lua`, `date.lua`, and `schedule.lua` for date math. |
 | [`Syllabi/`](Syllabi/) | `syllabus.cls` | Course-syllabus class. `syllabus-template.tex` is a complete example syllabus — course info, learning outcomes, grading, and policy statements. |
+| [`Thesis/`](Thesis/) | `thesis.cls` | **Prototype.** Accessible UNR thesis/dissertation class: tagged, PDF/UA-2 + PDF/A-4f conformant, following the Graduate School filing guidelines. CI-gated, but see [`Thesis/README.md`](Thesis/README.md) for what's not yet done before treating it as final. |
+
+Autoexam retains a set of **deprecated aliases** (`\theExamNumber`, `\theExamDate`, `\thePS`, `\examsetup`, `\examversions`, `\overview`) with no removal date: each still has dozens of live uses across existing course material, and they stay until a cross-course migration retires them (see `texlib-problembank.sty` for the removal precedent). Don't use them in new documents.
 
 ## Build modes
 
@@ -122,17 +128,19 @@ The Sublime build system surfaces these as palette entries; `smoke_test.py` inje
 ├── *.sty                  # shared packages
 ├── problem_engine.lua     # LuaLaTeX engine shared by autoexam + quiz
 ├── smoke_test.py          # build-everything safety net
-├── Bingo/                 # bingo.cls + template
-├── Exams/                 # autoexam.cls + bank + template
-├── Notes/                 # didactic.cls + template
-├── Problem Sets/          # pset.cls + template
-├── Quizzes/               # quiz.cls + template
-├── Report Cards/          # report-card.cls + template
-├── Schedule/              # schedule.cls + lua helpers + template
-├── Syllabi/               # syllabus.cls + template
+├── Bank/                  # bank.cls (problem-bank catalog)
+├── Bingo/                 # bingo.cls
+├── Exams/                 # autoexam.cls + bank
+├── Notes/                 # didactic.cls
+├── Problem Sets/          # pset.cls
+├── Quizzes/               # quiz.cls
+├── Report Cards/          # report-card.cls
+├── Schedule/              # schedule.cls + lua helpers
+├── Syllabi/               # syllabus.cls
+├── Thesis/                # thesis.cls (prototype)
 ├── Sublime/               # editor build system + settings
-├── examples/              # end-to-end course examples (Math181-Fall2026, ...), smoke-built
-├── tests/                 # smoke-test assets: fixtures/ (fast path) + scenarios/ & visual_refs/ (visual)
+├── examples/              # templates/ + fixtures/ + scenarios/ + end-to-end course examples, smoke-built
+├── tests/                 # visual_refs/ — committed reference renders the visual CI gate diffs against
 ├── coursemeta.example.tex # copy-paste starter for per-course metadata
 ├── CHANGELOG.md
 ├── TODO.md
