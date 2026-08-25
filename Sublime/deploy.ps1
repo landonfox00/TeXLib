@@ -28,7 +28,6 @@ if (-not $dest) {
 # Dev-only files (README.md, test_texlib_builder.py, this script) are NOT copied.
 $files = @(
     'texlib_builder.py',
-    'texlib_pdfpost.py',
     'TeXLib.sublime-build',
     'LaTeXTools.sublime-settings',
     'LaTeX.sublime-settings',
@@ -39,7 +38,10 @@ $files = @(
 )
 
 # --- safety: syntax-check the Python files before copying a broken one --------
-$pyfiles = @('texlib_builder.py', 'texlib_pdfpost.py')
+# texlib_pdfpost.py is NOT deployed here: the legacy builder stopped shelling
+# out to it at the Phase 2 native cutover, and the live copy ships inside the
+# plugin package (Sublime/texlib/), which reaches Sublime via its junction.
+$pyfiles = @('texlib_builder.py')
 $py = Get-Command python -ErrorAction SilentlyContinue
 if (-not $py) { $py = Get-Command py -ErrorAction SilentlyContinue }
 if ($py) {
