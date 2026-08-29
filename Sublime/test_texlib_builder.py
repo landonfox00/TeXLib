@@ -46,6 +46,7 @@ TexlibBuilder = install_native_builder()
 from texlib_build import (  # noqa: E402  (native core)
     GRADEBOOK_SHEETS, MAX_RERUNS, STATE_ONLY_RERUNS, TexlibBuildCore, _surname,
 )
+import texlib_build as _tb  # noqa: E402  (module handle: stubbing in case (y))
 
 
 # --- 2. Harness ------------------------------------------------------------
@@ -60,6 +61,13 @@ def run_builder(doc_src, options=None, engine="pdflatex", aux_files=None):
     `aux_files` (optional) maps filename -> contents to pre-create in the tex
     dir before building -- used to exercise the biber change-detection path
     (e.g. a doc.bcf / doc.bbl / doc.bcf.texlibhash trio).
+
+    With no `options`, the mode is `base', NOT `default'. Every case that
+    passes none is about the single-compile path -- engine selection, the
+    biber cache, the rerun loop -- and `default' now fans out into a whole
+    variant set, which would drown those assertions in unrelated commands.
+    The fan-out has its own cases below (see the variant-plan section); do not
+    "fix" a fan-out test by relying on this helper's default.
     """
     tmp = tempfile.mkdtemp(prefix="texlib_bt_")
     tex_path = os.path.join(tmp, "doc.tex")
@@ -75,7 +83,10 @@ def run_builder(doc_src, options=None, engine="pdflatex", aux_files=None):
     b.base_name = "doc"
     b.tex_dir = tmp
     b.engine = engine
-    b.options = list(options or [])
+    # `base', not `default': these harnesses exercise the single-compile path
+    # and `default' now fans out into a variant set. See run_builder's docstring.
+    b.options = list(options if options is not None
+                     else ["--texlib-mode=base"])
     b.out = ""  # empty -> rerun loop never fires
 
     cmds = []
@@ -128,7 +139,10 @@ def drive_builder(doc_src, options=None, engine="pdflatex",
     b.base_name = "doc"
     b.tex_dir = tmp
     b.engine = engine
-    b.options = list(options or [])
+    # `base', not `default': these harnesses exercise the single-compile path
+    # and `default' now fans out into a variant set. See run_builder's docstring.
+    b.options = list(options if options is not None
+                     else ["--texlib-mode=base"])
     b.out = ""
 
     steps = steps or []
@@ -260,6 +274,77 @@ def main():
     check("unknown mode -> no macro injected (plain filename)",
           bool(cmds) and cmds[0][0][-1] == "doc.tex", cmds)
     check("unknown mode -> warning shown", "unknown build mode" in disp, repr(disp))
+
+    # (j1b) The variant fan-out. `default' is no longer one compile: it builds
+    # the base, reads the .buildmeta sidecar the base just wrote, and dispatches
+    # one compile per planned variant plus a tagged twin of each. These cases
+    # replace the incidental coverage the base-mode repoint above removed.
+    PSET = r"\documentclass{pset}\begin{document}x\end{document}"
+
+    def _args(cmds):
+        return [c[0][-1] for c in cmds]
+
+    # No sidecar (a class that loads no TeXLib build package, or a build that
+    # died before \end{document}): plan nothing, say so, still pair the tagged
+    # twin -- that pairing predates the fan-out and is what `accessible' did.
+    cmds, disp = run_builder(PSET, options=["--texlib-mode=default"])
+    check("fan-out/no sidecar -> base + its tagged twin only",
+          len(cmds) == 3, f"{len(cmds)} builds: {_args(cmds)}")
+    check("fan-out/no sidecar -> says why it planned nothing",
+          "no .buildmeta sidecar" in disp, repr(disp[:300]))
+
+    # A sidecar declaring all three, with solution content present.
+    FULL_META = ("variants=student,solutions,instructor\n"
+                 "has-solutions=1\nhas-rubric=1\n"
+                 "has-commonerrors=0\nhas-partsolution=0\n")
+    cmds, disp = run_builder(PSET, options=["--texlib-mode=default"],
+                             aux_files={"doc.buildmeta": FULL_META})
+    args = " ".join(_args(cmds))
+    check("fan-out -> student variant compiled",
+          r"\def\StudentMode{}" in args, args[:400])
+    check("fan-out -> solutions variant is the STUDENT key (\\ShowKey)",
+          r"\def\ShowKey{}" in args, args[:400])
+    check("fan-out -> instructor variant carries rubric + \\InstructorMode",
+          r"\def\ShowRubric{}" in args and r"\def\InstructorMode{}" in args,
+          args[:400])
+    # Count output DIRECTORIES, not commands: every variant is a fixed 2-pass
+    # build, so counting commands double-counts each one.
+    a11y_dirs = {c for cmd in cmds for c in cmd[0]
+                 if str(c).startswith("-output-directory=")
+                 and str(c).endswith("-a11y")}
+    check("fan-out -> tagged twin for the base and each variant",
+          len(a11y_dirs) == 4, sorted(a11y_dirs))
+
+    # Same declaration, but the document turns out to hold no solutions: the
+    # answer-bearing variants would be byte-identical to the base.
+    BARE_META = ("variants=student,solutions,instructor\n"
+                 "has-solutions=0\nhas-rubric=0\n"
+                 "has-commonerrors=0\nhas-partsolution=0\n")
+    cmds, disp = run_builder(PSET, options=["--texlib-mode=default"],
+                             aux_files={"doc.buildmeta": BARE_META})
+    args = " ".join(_args(cmds))
+    check("prune -> no solutions content means no \\ShowKey compile",
+          r"\def\ShowKey{}" not in args, args[:400])
+    check("prune -> student variant still built (it does not need solutions)",
+          r"\def\StudentMode{}" in args, args[:400])
+    check("prune -> the omission is REPORTED, not silent",
+          "no solution content" in disp, repr(disp[:400]))
+
+    # `full' is the same plan with the content gate switched off -- that is the
+    # entire difference between the two modes.
+    cmds, _ = run_builder(PSET, options=["--texlib-mode=full"],
+                          aux_files={"doc.buildmeta": BARE_META})
+    check("full -> builds answer variants even with no solutions detected",
+          r"\def\ShowKey{}" in " ".join(_args(cmds)), _args(cmds))
+
+    # A retired token must remap LOUDLY: `key' became `solutions', and
+    # `solutions' still exists meaning something else, so a silent fallback
+    # would hand back an instructor copy to someone who asked for a key.
+    cmds, disp = run_builder(PSET, options=["--texlib-mode=key"])
+    check("renamed mode: key -> solutions macro",
+          bool(cmds) and r"\def\ShowKey{}" in cmds[0][0][-1], _args(cmds))
+    check("renamed mode: the rename is announced",
+          "renamed to 'solutions'" in disp, repr(disp[:300]))
 
     # (j2) quick mode -> exactly one engine pass, plain filename, no biber even
     # when a .bcf is present, no mode macro.
@@ -1737,6 +1822,121 @@ def main():
     _unmapped = _areas - set(_mf.SCENARIO_AREA_MODULE)
     check("manifest: every scenario area maps to a module", not _unmapped,
           str(sorted(_unmapped)))
+
+    # -----------------------------------------------------------------------
+    # (y) Accessibility report. The accessible build writes veraPDF's
+    # conformance report beside <base>_accessible.pdf. veraPDF is NOT required
+    # to run these: the binary and the subprocess are both stubbed, because this
+    # suite is the builder's logic harness and must stay runnable on a machine
+    # with no JRE. smoke_test --accessible is what exercises the real tool.
+    # -----------------------------------------------------------------------
+    def _report_case(returncode, settings=None, exe="VP", stdout=b"<html/>"):
+        d = tempfile.mkdtemp(prefix="texlib_a11y_")
+        pdf = os.path.join(d, "doc_accessible.pdf")
+        with open(pdf, "wb") as fh:
+            fh.write(b"%PDF-1.7 tagged")
+        calls = []
+
+        class _Proc:
+            def __init__(self):
+                self.returncode = returncode
+                self.stdout = stdout
+                self.stderr = b"boom"
+
+        def _fake_run(cmd, **kw):
+            calls.append(cmd)
+            return _Proc()
+
+        b = TexlibBuilder(); b.tex_dir = d; b.base_name = "doc"
+        if settings is not None:
+            b.builder_settings = settings
+        _old_find, _old_run = _tb.find_verapdf, _tb.subprocess.run
+        _tb.find_verapdf = lambda: exe
+        _tb.subprocess.run = _fake_run
+        try:
+            b._write_accessible_report(d, pdf)
+        finally:
+            _tb.find_verapdf, _tb.subprocess.run = _old_find, _old_run
+        files = sorted(os.listdir(d))
+        return files, calls, "".join(b._displayed)
+
+    files, calls, disp = _report_case(0)
+    check("a11y report: written beside the tagged PDF, on by default",
+          "doc_accessible-report.html" in files, files)
+    check("a11y report: a conforming file is reported PASSED",
+          "PASSED" in disp and "FAILED" not in disp, repr(disp))
+    check("a11y report: validated as PDF/UA-2",
+          calls and "ua2" in calls[0], calls)
+    check("a11y report: lean by default (no --success)",
+          calls and "--success" not in calls[0], calls)
+    check("a11y report: points at the itemized form",
+          "accessible_report_full" in disp, repr(disp))
+
+    # The report matters MOST when it fails, so exit 1 -- veraPDF's
+    # "non-conformant" status, not an error -- must still write the file.
+    files, calls, disp = _report_case(1)
+    check("a11y report: a NON-conforming file still gets its report",
+          "doc_accessible-report.html" in files, files)
+    check("a11y report: non-conformance is reported FAILED",
+          "FAILED" in disp, repr(disp))
+
+    # Exit >1 is veraPDF itself failing; there is no report to write.
+    files, calls, disp = _report_case(2)
+    check("a11y report: a veraPDF tool error writes no report",
+          "doc_accessible-report.html" not in files, files)
+    check("a11y report: the tool error names its exit code",
+          "exit 2" in disp, repr(disp))
+
+    files, calls, disp = _report_case(0, settings={"accessible_report_full": True})
+    check("a11y report: accessible_report_full adds --success",
+          calls and "--success" in calls[0], calls)
+
+    files, calls, disp = _report_case(0, settings={"accessible_report": False})
+    check("a11y report: accessible_report off writes nothing",
+          "doc_accessible-report.html" not in files, files)
+    check("a11y report: accessible_report off does not run veraPDF",
+          not calls, calls)
+
+    files, calls, disp = _report_case(0, exe=None)
+    check("a11y report: a missing veraPDF is a soft skip, not a failure",
+          "doc_accessible-report.html" not in files and "veraPDF not found" in disp,
+          repr(disp))
+
+    # The variant fan-out (a plain Ctrl+B) copies its tagged twins out through
+    # _copy_back_variant, NOT _copy_back_accessible -- which finds nothing,
+    # since the variant builds write to <aux>/<variant>-a11y/ and it looks in
+    # <aux>/a11y/. Without a hook there the primary workflow produced tagged
+    # PDFs and no report at all. Base only: one veraPDF run per build.
+    def _variant_case(variant, tagged):
+        d = tempfile.mkdtemp(prefix="texlib_var_")
+        out = os.path.join(d, "out"); os.makedirs(out)
+        with open(os.path.join(out, "doc.pdf"), "wb") as fh:
+            fh.write(b"%PDF-1.7 tagged")
+        b = TexlibBuilder(); b.tex_dir = d; b.base_name = "doc"
+        b._variant_pdfs = []
+        reported = []
+        b._write_accessible_report = lambda td, p: reported.append(
+            os.path.basename(p))
+        b._copy_back_variant(d, variant, tagged, out)
+        return reported, sorted(os.listdir(d))
+
+    reported, files = _variant_case("base", True)
+    check("a11y report: the fan-out's BASE tagged PDF gets a report",
+          reported == ["doc_accessible.pdf"], reported)
+    reported, files = _variant_case("base", False)
+    check("a11y report: the untagged base gets none", not reported, reported)
+    reported, files = _variant_case("solutions", True)
+    check("a11y report: other tagged variants get none (one run per build)",
+          not reported, reported)
+
+    # The finder must not regress to shutil.which: veraPDF's installer does not
+    # put it on PATH, which is what made local conformance checks soft-skip.
+    import texlib_buildspec as _bs
+    check("a11y report: finder probes install roots, not just PATH",
+          any("verapdf" in p for p in _bs._verapdf_candidates()))
+    check("a11y report: report name pairs with the tagged PDF",
+          _bs.VERAPDF_REPORT_SUFFIX.startswith("_accessible"),
+          _bs.VERAPDF_REPORT_SUFFIX)
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL

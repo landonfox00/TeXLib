@@ -44,17 +44,30 @@ _NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 
 # Build modes: (token, caption, blurb). The token rides the options channel as
 # --texlib-mode=<token>, which the brain's _extract_mode maps to the TeXLib flag.
+# The names are the AUDIENCE, not the mechanism (0.8.0). "Solutions" is the
+# copy a student gets after the fact; "Instructor" is the one carrying the
+# rubric and common-error notes. The TeX flags underneath are unchanged.
 MODES = [
-    ("default", "Default", "No \\Show... flag."),
-    ("key", "Answer Key", "Injects \\def\\ShowKey{}."),
-    ("key-inline", "Answer Key (in answer space)", "Injects \\def\\ShowKeyInline{}."),
-    ("solutions", "Solutions + Rubric", "Injects \\def\\ShowSolutions{}\\def\\ShowRubric{}."),
-    ("student", "Student Copy", "Injects \\def\\StudentMode{}."),
+    ("default", "Default (every applicable variant)",
+     "Base PDF, then each variant the document actually supports, each with a "
+     "tagged twin."),
+    ("base", "Base only (one PDF)",
+     "The plain build alone, fully settled. What Ctrl+B did before variants."),
+    ("student", "Student Copy", "Blank answer space. Injects \\def\\StudentMode{}."),
+    ("solutions", "Solutions (student key)",
+     "Answers, no grading apparatus. Injects \\def\\ShowKey{}."),
+    ("solutions-inline", "Solutions (in the answer space)",
+     "Same answers laid into the student's blank, so the page geometry matches. "
+     "Needs {partsolution}. Injects \\def\\ShowKeyInline{}."),
+    ("instructor", "Instructor (solutions + rubric)",
+     "Injects \\def\\ShowSolutions{}\\def\\ShowRubric{}\\def\\InstructorMode{}."),
     # No "rubric" mode: a rubric annotates a worked solution, so rubric-without-
-    # solutions is never wanted. Use "solutions", which now carries both.
+    # solutions is never wanted. Use "instructor", which carries both.
     ("draft", "Draft", "Injects \\def\\ShowDraft{}."),
     ("quick", "Quick (single pass)", "One pass, no biber, no reruns."),
-    ("full", "Full (2-pass)", "Force the settling 2-pass build even when default_build_mode is quick."),
+    ("full", "Full (every variant, no pruning)",
+     "Like Default but skips the content check -- builds the answer variants "
+     "even when no solutions were detected."),
     # Paired build, not a flag injection: the brain typesets twice and keeps
     # <base>.pdf AND <base>_accessible.pdf. It is listed last because it is the
     # slowest mode by a wide margin -- two full builds, the second under

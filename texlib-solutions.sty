@@ -278,6 +278,7 @@
 \let\solution\relax
 \let\endsolution\relax
 \newenvironment{solution}{%
+	\TeXLibNoteSolution
 	\ifsolutions
 		\par
 		\gdef\@sol@rubric{}%
@@ -438,7 +439,10 @@
 % Caveat: nothing bounds the overlay, so a solution taller than its answer space
 % silently overprints the next part.
 \newsavebox{\@partsol@wrap}
+% The assembled frame, held so SyncTeX can stamp it (see \end{partsolution}).
+\newsavebox{\@partsol@outer}
 \newenvironment{partsolution}{%
+	\TeXLibNotePartSolution
 	\ifsolutions
 		\par
 		% The opening \smallskip is real vertical space, so it is suppressed in
@@ -459,12 +463,18 @@
 	\ifsolutions
 		\egroup
 		\@in@partsolutionfalse
-		% Same container-stamping as {solution}: harvest from the body box and
-		% stamp it BEFORE it is spliced into the page list (the spliced nodes keep
-		% their stamped fields; afterwards there is no register left to walk).
+		% Same container-stamping as {solution}, and in the same ORDER, which is
+		% load-bearing: harvest the target from the body-only box (before the
+		% "Solution." header's own glyphs can poison it), then stamp the
+		% ASSEMBLED wrap below. Stamping the body box here instead left the wrap
+		% vtop and the \@partsol@frame parbox carrying their creation-time line
+		% -- and they are created at \end{partsolution}, so a click on the answer
+		% text resolved to the \end line rather than to the answer (measured:
+		% right file, line 8 instead of 7, in both the key and key-inline
+		% layouts; the left padding band, answered by a stamped container, was
+		% already correct). See SYNCTEX.md; re-measure, do not reason.
 		\ifdefined\directlua
-			\directlua{texlib_synctex_read_target(\number\@partsol@box)
-				texlib_synctex_stamp_box(\number\@partsol@box)}%
+			\directlua{texlib_synctex_read_target(\number\@partsol@box)}%
 		\fi
 		% Header, body and any rubric share one vtop so a single fill backs them.
 		\setbox\@partsol@wrap\vtop{%
@@ -478,15 +488,41 @@
 				\fi
 			\fi
 		}%
+		% Stamp the assembled FRAME, not just the wrap inside it. {solution} can
+		% stamp its inner vtop and leave its \parbox/\rlap/rules unstamped --
+		% measured residual, documented in SYNCTEX.md as cosmetic slivers -- but
+		% a part solution sits inside the exam-class {parts} list, one level
+		% deeper, and there the line-8 frame containers WIN the parser's
+		% smallest-then-deepest contest over the line-7 wrap they enclose. Result
+		% before this: a click on the answer text resolved to \end{partsolution}
+		% rather than to the answer. Dissected from the .synctex: the frame
+		% parbox, both \smash\rlap wrappers and both rules all carry the \end
+		% line and nest OUTSIDE the stamped wrap.
+		%
+		% \@partsol@frame consumes \@partsol@wrap, so the frame needs its own
+		% register to be stampable at all -- it cannot be built into the box it
+		% reads. Layout is unaffected: an \hbox around the frame is what
+		% \noindent<parbox> already produced, and the inline branch's \raisebox
+		% is an \hbox to begin with (verified: the answer's PDF bbox is
+		% unchanged, both layouts).
+		\sbox\@partsol@outer{%
+			\ifsolinline
+				\raisebox{-\baselineskip}[\z@][\z@]{\@partsol@frame}%
+			\else
+				\@partsol@frame
+			\fi}%
+		\ifdefined\directlua
+			\directlua{texlib_synctex_stamp_box(\number\@partsol@outer)}%
+		\fi
 		\ifsolinline
 			\begingroup
 				\parskip\z@skip
 				\par\nointerlineskip\noindent
-				\raisebox{-\baselineskip}[\z@][\z@]{\@partsol@frame}%
+				\box\@partsol@outer
 				\par\nointerlineskip
 			\endgroup
 		\else
-			\par\noindent\@partsol@frame\par\smallskip
+			\par\noindent\box\@partsol@outer\par\smallskip
 		\fi
 	\else
 		\egroup\texlib@acc@tagresume
@@ -516,7 +552,12 @@
 % \rubric{pts}{text} — one grading criterion, shown only when \ifrubric.  Appends
 % an \@rubricline to whichever solution accumulator is active.  Resolves at
 % execution time, so it works anywhere before first use.
+% The note sits OUTSIDE \ifrubric: it records that this document HAS a rubric,
+% which is precisely what the builder needs to know from a build that is not
+% rendering one. Inside the guard it would only ever fire in a build that
+% already knew.
 \NewDocumentCommand{\rubric}{mm}{%
+	\TeXLibNoteRubric
 	\ifrubric
 		\if@in@partsolution
 			\expandafter\gdef\expandafter\@partsol@rubric\expandafter{%
@@ -550,6 +591,7 @@
 % Outside a {solution} (a bare block, or one inside {partsolution}) there is no
 % footer to defer to, so it renders where it stands, in the same panel style.
 \NewEnviron{commonerrors}{%
+	\TeXLibNoteCommonErrors   % outside \ifrubric; see \rubric above
 	\ifrubric
 		\if@in@solution
 			\global\let\@sol@cerr\BODY

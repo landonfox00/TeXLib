@@ -61,6 +61,9 @@
 % 2. BUILD FLAGS — UNIFIED TeXLib CLI
 % ==============================================================================
 \RequirePackage{texlib-build}
+% Bingo's only build-flag branch is the \ifkey line in \bingotitle, so the key
+% is the one alternate variant it can produce.
+\TeXLibDeclareVariants{solutions}
 
 % Randomization + cell-list engine (LuaLaTeX only). \directlua loads the
 % sibling bingo.lua via kpathsea so the Lua keeps normal file syntax.

@@ -759,6 +759,86 @@ def scenario_quiz_bank_problem():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# --- Fixture: a \ppart part carrying a {partsolution} -------------------------
+# {partsolution} shipped from 0.7.1 with no call site anywhere in the repo, so
+# nothing here ever built one and its inverse search was never measured. Line
+# numbers are load-bearing.
+PARTSOL_BANK_TEX = (
+    "% partsolution fixture\n"                                  # 1
+    "\\begin{problem}{ppsol}[topic=fr]\n"                       # 2
+    "\tPARTSOLSTEM the stem line.\n"                            # 3
+    "\t\\begin{parts}\n"                                        # 4
+    "\t\t\\ppart PARTSOLPART the first part.\n"                 # 5
+    "\t\t\\begin{partsolution}\n"                               # 6
+    "\t\t\tPARTSOLANSWER is the worked part answer.\n"          # 7
+    "\t\t\\end{partsolution}\n"                                 # 8
+    "\t\\end{parts}\n"                                          # 9
+    "\\end{problem}\n"                                          # 10
+)
+PARTSOL_ANSWER_LINE = 7
+
+PARTSOL_QUIZ_TEX = (
+    "\\documentclass[quiz-number=1]{quiz}\n"
+    "\\loadbank{bank.tex}\n"
+    "\\begin{document}\n"
+    "\\maketitle\n"
+    "\\begin{problems}\n"
+    "\\problem{ppsol}\n"
+    "\\end{problems}\n"
+    "\\end{document}\n"
+)
+
+
+def scenario_partsolution_inverse_search():
+    """A click on a part solution's answer must land on the ANSWER, not on
+    \\end{partsolution}.
+
+    {partsolution} harvested its SyncTeX target from the body box and stamped
+    that same body box. Everything built afterwards -- the wrap vtop carrying
+    the "Solution." header and rubric, and \\@partsol@frame's parbox, its two
+    \\smash\\rlap wrappers and the tint/accent rules -- was created while TeX was
+    reading the \\end line, kept that line, and NESTED OUTSIDE the stamped box.
+    {solution} survives the same shape (its unstamped chrome is a documented
+    cosmetic residual), but a part solution sits one level deeper, inside the
+    exam-class {parts} list, and there the outer line-8 containers win the
+    parser's smallest-then-deepest contest.
+
+    Measured before the fix, in BOTH the key and key-inline layouts: right file,
+    line 8 instead of 7. The left padding band -- answered by the stamped
+    container -- was already correct, which is what made this invisible.
+
+    Fix: harvest from the body box, assemble, then stamp the finished frame.
+    Both layouts are asserted because key-inline routes the frame through a
+    zero-height \\raisebox that the normal layout does not have.
+    """
+    for mode in ("key", "key-inline"):
+        print(f"\n=== Scenario 12: {{partsolution}} inverse search ({mode}) ===")
+        tmp = tempfile.mkdtemp(prefix="texlib_synctex_it_partsol_")
+        try:
+            write(tmp, "bank.tex", PARTSOL_BANK_TEX)
+            write(tmp, "quiz.tex", PARTSOL_QUIZ_TEX)
+            run_build(tmp, "quiz.tex", aux_directory="<<temp>>",
+                      options=[f"--texlib-mode={mode}"])
+
+            pdf = os.path.join(tmp, "quiz.pdf")
+            check(f"PDF was produced ({mode})", os.path.exists(pdf))
+            if not os.path.exists(pdf):
+                continue
+
+            pos = find_word(pdf, "PARTSOLANSWER")
+            check(f"the part solution rendered ({mode})", pos is not None)
+            if not pos:
+                continue
+            r = synctex_edit(pdf, *pos)
+            check(f"click on the part answer resolves to bank.tex ({mode})",
+                  basename_matches(r["input"], "bank.tex"), r["raw"][:300])
+            check(f"...at the answer's line ({PARTSOL_ANSWER_LINE}), not the "
+                  f"\\end line ({mode})",
+                  r["line"] == PARTSOL_ANSWER_LINE, f"got line {r['line']!r}")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 # --- Fixture: didactic (lecture notes), a non-exam class that also loads
 # texlib-problembank so a lecture handout can \getproblem{id} directly in
 # running prose -- never previously built through this suite. ---------------
@@ -965,6 +1045,7 @@ def main():
     scenario_schedule_boxgrid_builder()
     scenario_schedule_boxgrid_plain_cli()
     scenario_sliced_copy_inverse_search()
+    scenario_partsolution_inverse_search()
 
     summary = f"\n{_c.passed} passed, {_c.failed} failed"
     if _c.known:

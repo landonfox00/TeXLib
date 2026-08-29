@@ -26,6 +26,9 @@ this directory to `sys.path`). Sublime does not auto-load `.py` from a package
 subfolder, so adding a module here is import-only and cannot become a plugin.
 """
 
+import os
+import shutil
+
 # Document classes that MUST be compiled with lualatex.
 #
 # The mechanism is class-name selection, which works regardless of whether a
@@ -90,3 +93,75 @@ def accessible_macro_for(tex_path):
         if "\\DocumentMetadata" in head:
             return ACCESSIBLE_MARKER_ONLY
     return ACCESSIBLE_MACRO
+
+
+# --- veraPDF conformance reporting ------------------------------------------
+#
+# The accessible build's conformance is checked by veraPDF, and BOTH consumers
+# need to find the same binary: `smoke_test.py` validates with it, and the
+# builder writes the human-readable report beside `<base>_accessible.pdf`.
+# Declared here for the same reason as everything above -- the harness and the
+# plugin cannot import each other.
+
+# PDF/UA-2. The accessible build declares `pdfstandard={ua-2,a-4f}`, so ua2 is
+# the flavour that actually matches what was asked for; veraPDF's `0`
+# (autodetect) would silently fall back to a weaker profile on a file whose XMP
+# claim is missing -- which is the very defect the check exists to catch.
+VERAPDF_FLAVOUR = "ua2"
+
+# Written beside <base>_accessible.pdf, matching its `_accessible` stem so the
+# pair sorts together in a file listing.
+VERAPDF_REPORT_SUFFIX = "_accessible-report.html"
+
+
+def _verapdf_candidates():
+    """Well-known install locations, in the order they should win.
+
+    veraPDF ships as an IzPack installer that does NOT put itself on PATH, so
+    `shutil.which` alone reports "not installed" on a machine where it plainly
+    is -- the local smoke runs were soft-skipping conformance for exactly this
+    reason while a full veraPDF sat in the user's home directory. `/opt/verapdf`
+    is where `.github/workflows/accessible.yml` installs it.
+    """
+    home = os.path.expanduser("~")
+    roots = [os.path.join(home, "verapdf")]
+    if os.name == "nt":
+        for env in ("LOCALAPPDATA", "PROGRAMFILES", "PROGRAMFILES(X86)"):
+            base = os.environ.get(env)
+            if base:
+                roots.append(os.path.join(base, "verapdf"))
+        names = ("verapdf.bat", "verapdf")
+    else:
+        roots.append("/opt/verapdf")
+        names = ("verapdf",)
+    for root in roots:
+        for name in names:
+            yield os.path.join(root, name)
+
+
+def find_verapdf():
+    """Absolute path to the veraPDF CLI, or None. PATH wins over the guesses."""
+    for name in ("verapdf", "verapdf.bat"):
+        found = shutil.which(name)
+        if found:
+            return found
+    for path in _verapdf_candidates():
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def verapdf_report_cmd(exe, pdf_path, fmt="html", itemize=False):
+    """argv for one veraPDF run over `pdf_path`.
+
+    `itemize` adds --success, which logs every PASSED check rather than only
+    the failures. That is the difference between a 20 KB verdict and a ~1 MB
+    document evidencing all 841 checks a conforming file satisfies -- the
+    latter is what a reviewer asking for proof of conformance wants, and the
+    former is what you want on every build. The file argument goes last.
+    """
+    cmd = [exe, "--flavour", VERAPDF_FLAVOUR, "--format", fmt]
+    if itemize:
+        cmd.append("--success")
+    cmd.append(pdf_path)
+    return cmd

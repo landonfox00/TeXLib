@@ -53,7 +53,7 @@ Set up TeXLib on a new machine or for a new course.
    pdflatex yourfile.tex          # didactic / pset / syllabus
    ```
    The split is defined in one place, `LUALATEX_CLASSES` in [`Sublime/texlib/texlib_buildspec.py`](Sublime/texlib/texlib_buildspec.py). Getting it wrong is not a soft failure: `bingo.cls` and `schedule.cls` call `\directlua` at class load, so under `pdflatex` they fatal immediately.
-   To switch build modes (solutions, answer key, rubric, draft, student-vs-instructor copy) see [Build modes](#build-modes) below.
+   `Ctrl+B` builds every variant the document supports; to build just one (student copy, solutions, instructor copy, draft) see [Build modes and variants](#build-modes-and-variants) below.
 
 ## What's in here
 
@@ -63,7 +63,7 @@ Set up TeXLib on a new machine or for a new course.
 |---|---|
 | [`basic-utilities.sty`](basic-utilities.sty) | Kitchen-sink utility: pulls in math/tikz/enumitem, sets up `tasks` defaults, defines a `parts` enumerate list, an `\AutoLabel` helper, and a `\fig` wrapper. |
 | [`course-metadata.sty`](course-metadata.sty) | Layered metadata engine. Define `\metasetup{ institution=..., instructor=..., course-subject=..., ... }` and downstream `\Get…` commands appear. Auto-loads `coursemeta.tex` from the document directory or up to five directories up. |
-| [`texlib-build.sty`](texlib-build.sty) | Unified build flags. Exposes `\ifsolutions`, `\ifkey`, `\ifrubric`, `\ifdraft`, `\ifstudent`, `\ifinstructor`. Toggled either compile-time (`-jobname=… "\def\ShowSolutions{}\input{file}"`) or source-level (`\solutions`, `\keys`, `\rubrics`, `\drafts`, `\studentmode`, `\instructormode`). |
+| [`texlib-build.sty`](texlib-build.sty) | Unified build flags. Exposes `\ifsolutions`, `\ifkey`, `\ifsolinline`, `\ifrubric`, `\ifdraft`, `\ifstudent`, `\ifinstructor`. Toggled either compile-time (`-jobname=… "\def\ShowSolutions{}\input{file}"`) or source-level (`\solutions`, `\keys`, `\keysinline`, `\rubrics`, `\drafts`, `\studentmode`, `\instructormode`). Also the `\ifdraft` watermark and the `<base>.buildmeta` variant sidecar (`\TeXLibDeclareVariants`, `\TeXLibNoteSolution`) the build planner reads. Loaded by every class except `thesis`. |
 | [`texlib-footer.sty`](texlib-footer.sty) | Shared `fancyhdr` footer: `[Course] [page X of Y] [Institution]`. Headers stay class-specific. |
 | [`texlib-mathutils.sty`](texlib-mathutils.sty) | Math macros: `\mbb`/`\mrm`/`\mcal`/`\msf`/`\mf`/`\mscr`, auto-sizing `\abs`/`\lrp`/`\lrb`/`\lrcb`, `\dd`/`\deriv`/`\inte`, bold-red `\todo`. |
 | [`texlib-theorems.sty`](texlib-theorems.sty) | `tcolorbox` styles for theorem environments: colored thin left-rule + ~2% background tint. Styles: `texlibtheorem` (red), `texlibproposition` (violet), `texlibdefinition` (blue), `texlibprocedure` (teal), `texlibexample` (black), `texlibquestion` (orange), `texlibnote` (gray). Customize with `\texlibtheoremsetup{rule=false, tint=false, theorem-color=…}` — toggle the left rule or tint globally, or recolor any family. |
@@ -80,7 +80,7 @@ Set up TeXLib on a new machine or for a new course.
   ```
   python smoke_test.py                 # all modules, default mode
   python smoke_test.py Notes Exams     # subset
-  python smoke_test.py --modes all     # default + student + key + solutions
+  python smoke_test.py --modes all     # default + student + solutions + instructor + rubric
   ```
 
   Exit code is the number of failed builds.
@@ -106,20 +106,29 @@ Each module is a document class plus a README; the canonical `<module>-template.
 
 Autoexam retains a set of **deprecated aliases** (`\theExamNumber`, `\theExamDate`, `\thePS`, `\examsetup`, `\examversions`, `\overview`) with no removal date: each still has dozens of live uses across existing course material, and they stay until a cross-course migration retires them (see `texlib-problembank.sty` for the removal precedent). Don't use them in new documents.
 
-## Build modes
+## Build modes and variants
 
-Every TeXLib document class loads `texlib-build.sty`, so they all respond to the same flags:
+A **variant** is one rendering of the document: the same source, a different audience. The names say who the PDF is for, not which macro produces it.
 
-| Flag | Source-level | Compile-time |
+| Variant | Who it is for | Compile-time |
 |---|---|---|
-| Show solutions | `\solutions` | `\def\ShowSolutions{}` |
-| Show answer key | `\keys` | `\def\ShowKey{}` |
-| Show rubric | `\rubrics` | `\def\ShowRubric{}` |
-| Draft watermark | `\drafts` | `\def\ShowDraft{}` |
-| Student copy | `\studentmode` | `\def\StudentMode{}` |
-| Instructor copy | `\instructormode` | `\def\InstructorMode{}` |
+| *(base)* | The plain build — `<base>.pdf` | *(none)* |
+| `student` | Blank answer space, name rule | `\def\StudentMode{}` |
+| `solutions` | The **student's** key: answers, no grading apparatus | `\def\ShowKey{}` |
+| `solutions-inline` | The same answers drawn *into* the student's blank, so the page geometry matches. Needs `{partsolution}` | `\def\ShowKeyInline{}` |
+| `instructor` | Answers **plus** the rubric and common-error notes | `\def\ShowSolutions{}\def\ShowRubric{}\def\InstructorMode{}` |
 
-The Sublime build system surfaces these as palette entries; `smoke_test.py` injects them via the same compile-time mechanism.
+`Ctrl+B` (mode `default`) builds the base PDF, then every variant the document actually supports, each with a tagged PDF/UA twin — `<base>_solutions.pdf`, `<base>_solutions_accessible.pdf`, and so on. Which variants those are is decided per document, not guessed: each class declares what it distinguishes (`\TeXLibDeclareVariants`) and each build writes a `<base>.buildmeta` sidecar recording whether the document actually contains solutions, rubrics or common-error blocks. A lecture note with no solutions in it builds one PDF and its tagged twin, and says why it built nothing else.
+
+Other modes: `base` (the plain build alone, fully settled), `full` (every variant, skipping the content check), `quick` (one pass, references may be stale), `accessible` (normal + tagged pair), `draft` (adds a `DRAFT` watermark), and each variant name as a single-shot build.
+
+Each tagged PDF is accompanied by `<base>_accessible-report.html` — veraPDF's PDF/UA-2 conformance report, written whether the file passes or fails, since a report naming the clauses it broke is the one worth reading. That is the artifact to hand over when someone asks for proof of accessibility (UNR requires one with a filed thesis). It needs veraPDF and a JRE; without them the build is unaffected and says the report was skipped. See `accessible_report` / `accessible_report_full` in the plugin settings.
+
+`default_variants` in `builder_settings` (or `TEXLIB_VARIANTS`) pins the set — e.g. `["student"]` to keep `Ctrl+B` to one extra PDF, or `["base"]` for the pre-0.8.0 single-PDF behaviour.
+
+Every class **except `thesis`** loads `texlib-build.sty` and responds to these; `thesis` loads no TeXLib package at all, so the flags do not exist in it. Source-level equivalents (`\solutions`, `\keys`, `\rubrics`, `\drafts`, `\studentmode`, `\instructormode`) can go in a document preamble instead. The Sublime build system surfaces the modes as palette entries; `smoke_test.py` injects the single-variant ones via the same compile-time mechanism.
+
+> **Renamed in 0.8.0.** `key` → `solutions`, and what used to be `solutions` is now `instructor`. The old tokens still work and report the rename rather than silently building the wrong thing — which matters here, because `solutions` survived the rename with a *different* meaning. The underlying TeX flags (`\ifkey`, `\ifsolutions`, `\ifrubric`) are unchanged, so no document or class needed to move.
 
 ## Repo layout
 

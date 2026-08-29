@@ -14,8 +14,9 @@ Usage:
     python smoke_test.py                 # build every module in default mode
     python smoke_test.py Notes Exams     # build a subset
     python smoke_test.py --student       # also build with \\StudentMode
-    python smoke_test.py --key           # also build with \\ShowKey
-    python smoke_test.py --modes all     # default + student + key + solutions
+    python smoke_test.py --solutions     # also build the student key (\\ShowKey)
+    python smoke_test.py --instructor    # also build the instructor copy
+    python smoke_test.py --modes all     # default + student + solutions + instructor + rubric
     python smoke_test.py --timeout 180   # raise per-build timeout (seconds)
     python smoke_test.py -v              # print full TeX log on failure
     python smoke_test.py --no-content    # build-only (skip pdftotext/artifact checks)
@@ -96,7 +97,11 @@ PDFTOTEXT = shutil.which("pdftotext")
 PDFTOPPM = shutil.which("pdftoppm")
 MAGICK = shutil.which("magick")
 COMPARE = shutil.which("compare")  # ImageMagick 6 standalone
-VERAPDF = shutil.which("verapdf") or shutil.which("verapdf.bat")
+# Not shutil.which: veraPDF's installer does not put it on PATH, so `which`
+# alone reported "not installed" on machines where a full veraPDF sat in the
+# user's home directory -- turning the local conformance check into a silent
+# soft-skip. find_verapdf falls back to the known install roots.
+VERAPDF = _spec.find_verapdf()
 # biber: biblatex documents need it between passes or the bibliography is
 # empty. Optional like the rest -- absent, the build still succeeds and the
 # reference list is simply blank.
@@ -152,12 +157,18 @@ CLASS_HOME_MODULE = {
 }
 
 # Build-flag toggles. Each maps a CLI flag to a TeX macro define.
+#
+# These are the SINGLE-VARIANT renderings, named by audience to match the
+# builder's mode tokens (0.8.0). The harness deliberately does not exercise the
+# `default'/`full' fan-out: that is builder logic, covered without a toolchain
+# by Sublime/test_texlib_builder.py, and running it here would multiply every
+# module's build time by the size of its variant set for no extra TeX coverage.
 MODES = {
-    "default":   None,
-    "student":   r"\def\StudentMode{}",
-    "key":       r"\def\ShowKey{}",
-    "solutions": r"\def\ShowSolutions{}",
-    "rubric":    r"\def\ShowRubric{}",
+    "default":    None,
+    "student":    r"\def\StudentMode{}",
+    "solutions":  r"\def\ShowKey{}",
+    "instructor": r"\def\ShowSolutions{}\def\ShowRubric{}\def\InstructorMode{}",
+    "rubric":     r"\def\ShowRubric{}",
 }
 
 # A stub coursemeta.tex dropped into every build directory. course-metadata.sty
@@ -1056,8 +1067,10 @@ def main() -> int:
     )
     p.add_argument("modules", nargs="*", help="Subset of modules to test (default: all)")
     p.add_argument("--student", action="store_true", help=r"Also build with \StudentMode")
-    p.add_argument("--key", action="store_true", help=r"Also build with \ShowKey")
-    p.add_argument("--solutions", action="store_true", help=r"Also build with \ShowSolutions")
+    p.add_argument("--solutions", action="store_true",
+                   help=r"Also build the student key (\ShowKey)")
+    p.add_argument("--instructor", action="store_true",
+                   help=r"Also build the instructor copy (\ShowSolutions + \ShowRubric)")
     p.add_argument("--rubric", action="store_true", help=r"Also build with \ShowRubric")
     p.add_argument(
         "--accessible", action="store_true",
@@ -1069,7 +1082,8 @@ def main() -> int:
         "--modes",
         choices=["default", "all"],
         default="default",
-        help="Shortcut: 'all' = default+student+key+solutions+rubric. Default: just default.",
+        help="Shortcut: 'all' = default+student+solutions+instructor+rubric. "
+             "Default: just default.",
     )
     p.add_argument("--timeout", type=int, default=120, help="Per-build timeout in seconds.")
     p.add_argument("-v", "--verbose", action="store_true", help="Show last 50 log lines on failure.")
@@ -1137,7 +1151,7 @@ def main() -> int:
 
     modes: list[tuple[str, str | None]] = [("default", None)]
     enable_all = args.modes == "all"
-    for flag in ("student", "key", "solutions", "rubric"):
+    for flag in ("student", "solutions", "instructor", "rubric"):
         if enable_all or getattr(args, flag):
             modes.append((flag, MODES[flag]))
     # Accessible is opt-in only (never folded into --modes all): it is expensive

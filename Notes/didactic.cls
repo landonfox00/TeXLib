@@ -141,7 +141,20 @@
 % Header: L = unit title  C = build badge  R = current (sub)section. Shared
 % mechanism; the badge wording is class-specific (lecture notes -> "Instructor
 % Version").
-\SetTeXLibBuildBadge{\ifsolutions Instructor Version\fi}
+% A student-facing solutions build reveals the same worked bodies an instructor
+% build does -- lecture notes have no rubric machinery, so the two differ only
+% in what the badge says they are. \ifkey therefore implies \ifsolutions here,
+% exactly as it does in quiz.cls and for the same reason: every gating site
+% below already tests \ifsolutions, and one implication is better than a second
+% condition on each of them.
+\ifkey\solutionstrue\fi
+\renewcommand{\keys}{\keytrue\solutionstrue}
+\TeXLibDeclareVariants{student,solutions,instructor}
+% Badge wording is the ONLY thing separating the two answer-bearing builds, so
+% \ifinstructor -- raised by the instructor variant and nothing else -- has to
+% be tested before \ifsolutions, which both of them raise.
+\SetTeXLibBuildBadge{%
+	\ifinstructor Instructor Version\else\ifsolutions Solutions\fi\fi}
 \SetTeXLibHeader{\bfseries\GetUnitTitle}{\TeXLibBuildBadge}{\rightmark}
 % Right header tracks the current (sub)section: number + full title, e.g.
 % "2.1 Differentiation Rules". Every level routes its number+title into
@@ -342,8 +355,11 @@
 % (\ifsolutions). Otherwise capture and DISCARD the real body (so a student
 % build never ships the answer, even invisibly) and emit a dashed breakable
 % blank box of height #2 to write in.
+% {soln}, {answer} and {ans} all route through this environment, so the one note
+% here covers the whole family.
 \NewDocumentEnvironment{solution}{ s O{3cm} }
 {%
+	\TeXLibNoteSolution
 	\IfBooleanTF{#1}{\@sol@showtrue}{%
 		\ifgatesolution
 			\ifsolutions \@sol@showtrue \else \@sol@showfalse \fi
@@ -467,6 +483,7 @@
 % a gated \pf.) \texlib@acc@tagsuspend/@tagresume come from texlib-build.sty and
 % are no-ops in a normal build.
 \newcommand{\texlib@wrk@lead}[1]{%
+	\TeXLibNoteSolution
 	\ifsolutions
 		#1%
 	\else

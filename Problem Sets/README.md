@@ -124,9 +124,10 @@ Plus all `course-metadata` keys — usually set in `coursemeta.tex`.
 
 ### Commands
 
-`\maketitle` — emits the title block: title, course/term, optional
-"Answer Key" annotation, optional due date, optional Name field
-(student mode), boxed instructions paragraph.
+`\maketitle` — emits the title block: title, course/term, optional build
+annotation ("Solutions" under `\ifkey`, "Instructor Version" under
+`\ifinstructor`), optional due date, optional Name field (student mode), boxed
+instructions paragraph.
 
 `\GetPsetNumber`, `\GetPsetTitle`, `\GetPsetDue`,
 `\GetPsetInstructions` — direct getters.
@@ -223,10 +224,14 @@ a worked example's solution is part of the exposition, not a gated answer
 | Position           | Content                          |
 |--------------------|----------------------------------|
 | Header L           | `\GetPsetTitle` (bold)           |
-| Header R           | `\GetCourse`                     |
-| Footer L           | `\GetTerm`                       |
+| Header C           | build badge — "Solutions" under `\ifkey`, "Instructor Version" under `\ifinstructor`, empty otherwise |
+| Header R           | `\GetTermSection`                |
+| Footer L           | `\GetCourse`                     |
 | Footer C           | `<page> of <total>`              |
-| Footer R           | `\GetInstructor`, or "Answer Key" if `\ifkey` |
+| Footer R           | `\GetInstitution`                |
+
+(The footer is the shared three-slot layout from `texlib-footer.sty`; the build
+badge sits in the header centre via `\SetTeXLibBuildBadge`.)
 
 ---
 

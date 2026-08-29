@@ -52,6 +52,27 @@ def module_literal(path, name):
     raise AssertionError("%s: no module-level %s" % (path, name))
 
 
+def module_dict_keys(path, name):
+    """Keys of a module-level `name = {...}` dict, read without importing.
+
+    Separate from module_literal because MODE_MACROS' VALUES stopped being
+    literals: the single-variant entries reference VARIANT_MACROS so the two
+    tables cannot drift, and ast.literal_eval rejects the subscript. Parity is
+    about which modes are DECLARED, so the keys are all this file ever needed.
+    """
+    with open(path, encoding="utf-8") as fh:
+        tree = ast.parse(fh.read(), filename=path)
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == name:
+                    if not isinstance(node.value, ast.Dict):
+                        raise AssertionError("%s: %s is not a dict literal"
+                                             % (path, name))
+                    return [ast.literal_eval(k) for k in node.value.keys]
+    raise AssertionError("%s: no module-level %s" % (path, name))
+
+
 def strip_jsonc(text):
     """Drop // line comments outside of strings. Sublime's .sublime-build and
     .sublime-commands are JSON-with-comments, which json.loads will not take;
@@ -93,7 +114,7 @@ ok = True
 
 # --- the four declaration sites ---------------------------------------------
 picker = [tok for (tok, _cap, _blurb) in module_literal(PLUGIN, "MODES")]
-macros = module_literal(BRAIN, "MODE_MACROS")
+macros = module_dict_keys(BRAIN, "MODE_MACROS")
 quick = module_literal(BRAIN, "MODE_QUICK")
 # _extract_mode accepts MODE_MACROS plus the separately-dispatched quick mode.
 accepted = set(macros) | {quick}
