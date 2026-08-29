@@ -43,9 +43,16 @@
 
 % Compile-time toggles
 \ifdefined\ShowSolutions      \solutionstrue        \fi
+% \ShowKeyInline is \ShowKey with a different layout, and it has to say so by
+% DEFINING \ShowKey, not merely by raising \ifkey. The classes do not agree on
+% which to test: quiz.cls reads \ifkey, but autoexam.cls reads \ifdefined\ShowKey
+% (it drives \AutoExamSolMode, i.e. which copies the version loop emits) and so
+% would see no key request at all -- an exam or review built inline came out with
+% every solution missing, silently. Declared before the \ShowKey line below so
+% that test and every downstream \ifdefined\ShowKey sees it; texlib-build is
+% loaded by texlib-assessment before autoexam reaches its own check.
+\ifdefined\ShowKeyInline      \def\ShowKey{}\solinlinetrue \fi
 \ifdefined\ShowKey            \keytrue              \fi
-% Implies \ShowKey: an inline key is a key, laid out differently.
-\ifdefined\ShowKeyInline      \keytrue\solinlinetrue \fi
 % A rubric annotates a worked solution, so it implies one: a rubric-only build
 % renders point apportionments and common-error notes floating against blank
 % answer space, which is of no use to anyone.  \ShowRubric therefore raises
