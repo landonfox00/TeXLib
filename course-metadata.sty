@@ -79,6 +79,13 @@
 % sidecar below). Unset by default -> the builder derives the department
 % submission name <SUBJECT> <number>.<section>_<term>_<LastName>.
 \meta_create_var:nn { publish-name }   { PublishName }
+% Pin which build variants this document is worth producing, overriding both
+% the class's \TeXLibDeclareVariants and the builder's content detection --
+% e.g. build-variants = {student, instructor} on a worksheet whose "solutions"
+% copy nobody wants. Unset by default; comma-separated; `none' means the base
+% PDF alone. Written into the .buildmeta sidecar by texlib-build.sty, so the
+% planner sees it without a second discovery mechanism.
+\meta_create_var:nn { build-variants } { BuildVariants }
 % Per-class instructions-file keys. They live here (not in each class) so a
 % course can point every quiz/exam/card-set/pset at one file course-wide from
 % coursemeta.tex — coursemeta is read at this package's load, before any class

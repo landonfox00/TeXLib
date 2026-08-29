@@ -366,6 +366,26 @@ def scenario_bank_solutions_mode():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _page_offset_of_last_copy(combined_pdf, last_slice_pdf):
+    """How many combined pages precede the LAST sliced copy.
+
+    Derived from the two PDFs rather than from a known copy layout, so a change
+    in how many copies a build mode emits cannot silently invalidate a
+    hardcoded page arithmetic -- which is exactly what the 0.8.0 rename did.
+    Returns None when pypdf is unavailable, so the caller can skip rather than
+    fail on a missing optional dependency.
+    """
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return None
+    try:
+        return len(PdfReader(combined_pdf).pages) - len(
+            PdfReader(last_slice_pdf).pages)
+    except Exception:  # noqa: BLE001 - a malformed PDF is the test's problem
+        return None
+
+
 def scenario_sliced_copy_inverse_search():
     """The sliced per-version copies are pages carved out of the combined PDF
     with pypdf, so they carry no SyncTeX map of their own and a viewer looks for
@@ -383,8 +403,13 @@ def scenario_sliced_copy_inverse_search():
     try:
         write(tmp, "bank.tex", BANK_TEX)
         write(tmp, "autoexam.tex", AUTOEXAM_TEX)          # \versions{A,B}
+        # `solutions' is AutoExamSolMode=only since the 0.8.0 rename (it is the
+        # student-facing key), so this emits A-sol, B-sol -- not the four copies
+        # A, B, A-sol, B-sol the pre-rename `solutions' produced. Every page
+        # number below is derived rather than hardcoded because of exactly that:
+        # the copy layout is not this scenario's subject, slice fidelity is.
         run_build(tmp, "autoexam.tex", aux_directory="<<temp>>",
-                  options=["--texlib-mode=solutions"])    # -> dual: A,B then A,B sol
+                  options=["--texlib-mode=solutions"])    # -> only: A-sol, B-sol
 
         combined = os.path.join(tmp, "autoexam.pdf")
         slice_pdf = os.path.join(tmp, "autoexam_A_solutions.pdf")
@@ -407,7 +432,9 @@ def scenario_sliced_copy_inverse_search():
               r["line"] == BANK_STEM_LINE, f"got line {r['line']!r}")
 
         # Same point, same page, through the parent's map: the two must agree.
-        cpos = find_word(combined, "SYNCNEEDLESTEM", occurrence=3)  # A,B,then A-sol
+        # A-sol is the FIRST copy in an `only' build (it was the third when this
+        # mode meant dual), so occurrence 1 is the one the slice was cut from.
+        cpos = find_word(combined, "SYNCNEEDLESTEM", occurrence=1)
         if cpos:
             rc = synctex_edit(combined, *cpos)
             check("the slice answers exactly as the combined map does",
@@ -415,18 +442,23 @@ def scenario_sliced_copy_inverse_search():
                   f"slice {r['input']}:{r['line']} vs combined "
                   f"{rc['input']}:{rc['line']}")
 
-        # FORWARD search, the other direction. The fixture is 2 versions +
-        # solutions = four 2-page copies (A, B, A-sol, B-sol), so B-sol is
-        # combined pages 7-8 and a combined answer of page 8 must come back as
-        # page 2 through its slice's own map. Asserted against B-sol rather than
-        # A-sol deliberately: forward search into a multi-version exam resolves a
-        # bank line to ONE page, because the per-problem SyncTeX redirect gives
-        # bank.tex an Input: tag per \@@input and the lookup takes the last --
-        # a pre-existing limitation of the version loop, visible in the COMBINED
-        # PDF exactly as much as in a slice (a document-body line resolves to no
-        # page at all there, the body being re-emitted through a scratch file).
-        # The slice carries whatever the parent had; that faithfulness is what is
-        # being checked here, not the upstream lookup.
+        # FORWARD search, the other direction. B-sol is the LAST copy in the
+        # combined PDF, so its pages sit at the end and a combined answer must
+        # come back shifted by everything before it. That shift is computed --
+        # combined page count minus the slice's own -- rather than written down,
+        # so the assertion survives a change in how many copies the mode emits.
+        # It was hardcoded to 6 (four 2-page copies) and silently became wrong
+        # the moment `solutions' stopped meaning dual.
+        #
+        # Asserted against B-sol rather than A-sol deliberately: forward search
+        # into a multi-version exam resolves a bank line to ONE page, because the
+        # per-problem SyncTeX redirect gives bank.tex an Input: tag per \@@input
+        # and the lookup takes the last -- a pre-existing limitation of the
+        # version loop, visible in the COMBINED PDF exactly as much as in a slice
+        # (a document-body line resolves to no page at all there, the body being
+        # re-emitted through a scratch file). The slice carries whatever the
+        # parent had; that faithfulness is what is being checked here, not the
+        # upstream lookup.
         bank_tex = os.path.join(tmp, "bank.tex")
         combined_pages = synctex_view(combined, bank_tex, BANK_STEM_LINE)
         bsol = os.path.join(tmp, "autoexam_B_solutions.pdf")
@@ -434,10 +466,12 @@ def scenario_sliced_copy_inverse_search():
             slice_pages = synctex_view(bsol, bank_tex, BANK_STEM_LINE)
             check("forward search resolves through the slice's own map",
                   bool(slice_pages), f"combined gave {combined_pages}")
-            check("...to the page the combined answer maps onto (7-8 -> 1-2)",
-                  slice_pages and combined_pages
-                  and int(slice_pages[0]) == int(combined_pages[0]) - 6,
-                  f"slice {slice_pages} vs combined {combined_pages}")
+            offset = _page_offset_of_last_copy(combined, bsol)
+            check("...to the page the combined answer maps onto",
+                  slice_pages and combined_pages and offset is not None
+                  and int(slice_pages[0]) == int(combined_pages[0]) - offset,
+                  f"slice {slice_pages} vs combined {combined_pages}, "
+                  f"offset {offset}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

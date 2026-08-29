@@ -124,7 +124,9 @@ Other modes: `base` (the plain build alone, fully settled), `full` (every varian
 
 Each tagged PDF is accompanied by `<base>_accessible-report.html` — veraPDF's PDF/UA-2 conformance report, written whether the file passes or fails, since a report naming the clauses it broke is the one worth reading. That is the artifact to hand over when someone asks for proof of accessibility (UNR requires one with a filed thesis). It needs veraPDF and a JRE; without them the build is unaffected and says the report was skipped. See `accessible_report` / `accessible_report_full` in the plugin settings.
 
-`default_variants` in `builder_settings` (or `TEXLIB_VARIANTS`) pins the set — e.g. `["student"]` to keep `Ctrl+B` to one extra PDF, or `["base"]` for the pre-0.8.0 single-PDF behaviour.
+`default_variants` in `builder_settings` (or `TEXLIB_VARIANTS`) pins the set — e.g. `["student"]` to keep `Ctrl+B` to one extra PDF, or `["base"]` for the pre-0.8.0 single-PDF behaviour. A single document overrides everything with `\metasetup{build-variants = {student, instructor}}`, or `none` for the base PDF alone.
+
+For a versioned exam each variant is sliced per version, so `\versions{A,B}` gives `exam_A.pdf` / `exam_B.pdf` (student), `exam_A_solutions.pdf` (the key) and `exam_A_instructor.pdf` (key plus rubric).
 
 Every class **except `thesis`** loads `texlib-build.sty` and responds to these; `thesis` loads no TeXLib package at all, so the flags do not exist in it. Source-level equivalents (`\solutions`, `\keys`, `\rubrics`, `\drafts`, `\studentmode`, `\instructormode`) can go in a document preamble instead. The Sublime build system surfaces the modes as palette entries; `smoke_test.py` injects the single-variant ones via the same compile-time mechanism.
 

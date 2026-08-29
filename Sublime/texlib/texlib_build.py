@@ -913,6 +913,11 @@ class TexlibBuildCore:
         declared = [v.strip() for v in (meta or {}).get("variants", "").split(",")
                     if v.strip()]
         variants, skipped = [], []
+        # An explicit \metasetup{build-variants = none} is a decision, not an
+        # absence, and it has to read as one: a document that quietly produced a
+        # single PDF would look identical to a planner that had failed.
+        if [v.lower() for v in declared] == ["none"]:
+            return [], [("all", "this document pins build-variants = none")]
         for name in PLANNED_VARIANTS:
             if name not in declared:
                 continue
@@ -1104,6 +1109,49 @@ class TexlibBuildCore:
         # a JVM launch per variant out of the edit loop.
         if tagged and variant == "base":
             self._write_accessible_report(tex_dir, dest)
+        # A versioned exam emits every copy into ONE PDF plus a .vmap. The base
+        # build's map is sliced in _postprocess; a variant's map lives in that
+        # variant's own output directory and was never read, so a \versions
+        # document's variant PDFs came out as collated blobs while the base's
+        # came out per version. Slice them here, from the copy that just landed
+        # beside the source.
+        if not tagged:
+            self._slice_variant_versions(variant, out_dir, tex_dir, dest)
+
+    # Which suffix a variant's answer-bearing per-version slices carry. The
+    # `solutions' variant keeps the historic "_solutions" because those copies
+    # ARE the answer key -- <base>_A_solutions.pdf is the name collate_keys.py
+    # and the SyncTeX slicer have always looked for. `instructor' needs its own
+    # or it would overwrite them copy for copy.
+    VARIANT_SLICE_SUFFIX = {
+        "solutions": "_solutions",
+        "solutions-inline": "_solutions",
+        "instructor": "_instructor",
+    }
+
+    def _slice_variant_versions(self, variant, out_dir, tex_dir, pdf_path):
+        """Slice one variant's combined multi-version PDF, if it wrote a .vmap.
+
+        No-op for the overwhelmingly common single-version document, which
+        writes no .vmap at all. `base_name` stays the document's real base so
+        the slices read <base>_A_solutions.pdf rather than
+        <base>_solutions_A_solutions.pdf -- the variant is expressed by the
+        suffix, not by a doubled stem.
+        """
+        vmap = os.path.join(out_dir, self.base_name + ".vmap")
+        if not os.path.exists(vmap) or not os.path.exists(pdf_path):
+            return
+        suffix = self.VARIANT_SLICE_SUFFIX.get(variant)
+        if suffix is None:
+            return
+        try:
+            _produced, messages = self._run_pdfpost(
+                "slice", vmap, pdf_path, tex_dir, extra=(suffix,),
+                base_name=self.base_name)
+            for m in messages:
+                self.display(m + "\n")
+        finally:
+            self._force_remove(vmap)
 
     def _sweep_stale_variants(self, tex_dir):
         """Delete variant PDFs this build deliberately did NOT produce.
@@ -2692,7 +2740,8 @@ class TexlibBuildCore:
         TexlibBuildCore._ext_python_cache = found
         return found
 
-    def _run_pdfpost(self, op, sidecar_path, pdf_path, out_dir):
+    def _run_pdfpost(self, op, sidecar_path, pdf_path, out_dir, extra=(),
+                     base_name=None):
         """Run a pypdf post-processing op (slice a .vmap, split a .spl).
 
         Runs in-process when pypdf is importable here (the CLI test harness /
@@ -2704,7 +2753,11 @@ class TexlibBuildCore:
         spans are absorbed on the way past (see _absorb_pdfpost) rather than
         returned, so existing two-value callers are untouched.
         """
-        base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+        # Normally the output stem IS the input PDF's stem. A variant slice is
+        # the exception: its source is <base>_instructor.pdf but its slices must
+        # read <base>_A_instructor.pdf, not <base>_instructor_A_instructor.pdf.
+        if base_name is None:
+            base_name = os.path.splitext(os.path.basename(pdf_path))[0]
         pdfpost = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "texlib_pdfpost.py"
         )
@@ -2714,7 +2767,7 @@ class TexlibBuildCore:
             import pypdf  # noqa: F401
             import texlib_pdfpost
             result = texlib_pdfpost._OPS[op](
-                sidecar_path, pdf_path, out_dir, base_name
+                sidecar_path, pdf_path, out_dir, base_name, *extra
             )
             return self._absorb_pdfpost(result)
         except ImportError:
@@ -2738,7 +2791,8 @@ class TexlibBuildCore:
             ]
         try:
             proc = subprocess.run(
-                py + [pdfpost, op, sidecar_path, pdf_path, out_dir, base_name],
+                py + [pdfpost, op, sidecar_path, pdf_path, out_dir, base_name]
+                + [str(e) for e in extra],
                 capture_output=True, text=True, encoding="utf-8",
                 errors="replace", creationflags=_NO_WINDOW,
             )

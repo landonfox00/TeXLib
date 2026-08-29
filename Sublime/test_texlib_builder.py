@@ -330,6 +330,30 @@ def main():
     check("prune -> the omission is REPORTED, not silent",
           "no solution content" in disp, repr(disp[:400]))
 
+    # A document can pin its own set with \metasetup{build-variants=...}, which
+    # texlib-build.sty writes into the sidecar's variants= line -- so the
+    # planner needs no second discovery mechanism for it.
+    PINNED_META = ("variants=student\nhas-solutions=1\nhas-rubric=1\n"
+                   "has-commonerrors=0\nhas-partsolution=0\n")
+    cmds, _ = run_builder(PSET, options=["--texlib-mode=default"],
+                          aux_files={"doc.buildmeta": PINNED_META})
+    args = " ".join(_args(cmds))
+    check("document pin: only the pinned variant is built",
+          r"\def\StudentMode{}" in args and r"\def\ShowKey{}" not in args,
+          args[:400])
+
+    # `none' is a DECISION, and must not look like a planner that gave up.
+    NONE_META = ("variants=none\nhas-solutions=1\nhas-rubric=1\n"
+                 "has-commonerrors=0\nhas-partsolution=0\n")
+    cmds, disp = run_builder(PSET, options=["--texlib-mode=default"],
+                             aux_files={"doc.buildmeta": NONE_META})
+    args = " ".join(_args(cmds))
+    check("document pin: none -> no variant compiles",
+          r"\def\StudentMode{}" not in args and r"\def\ShowKey{}" not in args,
+          args[:400])
+    check("document pin: none is reported, not silent",
+          "build-variants = none" in disp, repr(disp[:300]))
+
     # `full' is the same plan with the content gate switched off -- that is the
     # entire difference between the two modes.
     cmds, _ = run_builder(PSET, options=["--texlib-mode=full"],
@@ -1029,6 +1053,64 @@ def main():
               os.path.exists(bpv + "_A_solutions.pdf")
               and len(PdfReader(bpv + "_A_solutions.pdf").pages) == 2)
         check("vmap: .vmap consumed after slicing", not os.path.exists(bpv + ".vmap"))
+
+        # A VARIANT's combined PDF is sliced too. Before this, only the base
+        # build's .vmap was read -- a variant writes its map into its own output
+        # directory -- so a \versions document's <base>_instructor.pdf came out
+        # as one collated blob while the base came out per version.
+        #
+        # The suffix is what keeps the two apart: the instructor copies must not
+        # be written over the key's <base>_A_solutions.pdf, which is the name
+        # collate_keys.py and the SyncTeX slicer look for.
+        tmpvv = tempfile.mkdtemp(prefix="texlib_vmapvar_")
+        outv = os.path.join(tmpvv, "variants", "instructor")
+        os.makedirs(outv)
+        variant_pdf = os.path.join(tmpvv, "doc_instructor.pdf")
+        _blank_pdf(variant_pdf, 4)
+        with open(os.path.join(outv, "doc.vmap"), "w", encoding="utf-8") as fh:
+            fh.write("A|sol|1\nB|sol|3\n")
+        vv = TexlibBuilder(); vv.tex_dir = tmpvv; vv.base_name = "doc"
+        vv._aux_target = None
+        vv._slice_variant_versions("instructor", outv, tmpvv, variant_pdf)
+        check("variant vmap: instructor slices carry _instructor, not _solutions",
+              os.path.exists(os.path.join(tmpvv, "doc_A_instructor.pdf"))
+              and os.path.exists(os.path.join(tmpvv, "doc_B_instructor.pdf")),
+              sorted(os.listdir(tmpvv)))
+        check("variant vmap: does NOT overwrite the key's _solutions names",
+              not os.path.exists(os.path.join(tmpvv, "doc_A_solutions.pdf")),
+              sorted(os.listdir(tmpvv)))
+        check("variant vmap: each slice gets its 2 pages",
+              len(PdfReader(os.path.join(tmpvv, "doc_A_instructor.pdf")).pages) == 2)
+        check("variant vmap: the variant's map is consumed",
+              not os.path.exists(os.path.join(outv, "doc.vmap")))
+
+        # The `solutions' variant keeps the historic name -- those copies ARE
+        # the answer key, and downstream tooling is built on that spelling.
+        tmpvs = tempfile.mkdtemp(prefix="texlib_vmapsol_")
+        outs = os.path.join(tmpvs, "variants", "solutions")
+        os.makedirs(outs)
+        sol_pdf = os.path.join(tmpvs, "doc_solutions.pdf")
+        _blank_pdf(sol_pdf, 4)
+        with open(os.path.join(outs, "doc.vmap"), "w", encoding="utf-8") as fh:
+            fh.write("A|sol|1\nB|sol|3\n")
+        vs = TexlibBuilder(); vs.tex_dir = tmpvs; vs.base_name = "doc"
+        vs._aux_target = None
+        vs._slice_variant_versions("solutions", outs, tmpvs, sol_pdf)
+        check("variant vmap: solutions slices keep _solutions",
+              os.path.exists(os.path.join(tmpvs, "doc_A_solutions.pdf"))
+              and os.path.exists(os.path.join(tmpvs, "doc_B_solutions.pdf")),
+              sorted(os.listdir(tmpvs)))
+
+        # A single-version document writes no .vmap at all: the common case must
+        # stay a silent no-op, not an error.
+        tmpvn = tempfile.mkdtemp(prefix="texlib_vmapnone_")
+        none_pdf = os.path.join(tmpvn, "doc_solutions.pdf")
+        _blank_pdf(none_pdf, 2)
+        vn = TexlibBuilder(); vn.tex_dir = tmpvn; vn.base_name = "doc"
+        vn._aux_target = None
+        vn._slice_variant_versions("solutions", tmpvn, tmpvn, none_pdf)
+        check("variant vmap: no .vmap -> no-op, PDF untouched",
+              len(os.listdir(tmpvn)) == 1)
 
         # No \versions{} (empty version label) -> no "_" version segment, just
         # <base>.pdf / <base>_solutions.pdf.

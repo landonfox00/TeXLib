@@ -160,10 +160,29 @@
 \newcommand{\TeXLib@variants}{}
 \newcommand{\TeXLibDeclareVariants}[1]{\renewcommand{\TeXLib@variants}{#1}}
 
+% A document may override its class's declaration with the course-metadata key
+%   \metasetup{build-variants = {student, instructor}}
+% (or `none' for the base PDF alone) -- for the worksheet whose solutions copy
+% nobody wants, or the one handout that needs a variant its class does not
+% normally offer. Guarded on the getter existing rather than on the package,
+% because texlib-build is loaded by classes that reach course-metadata at
+% different points and this runs at \AtEndDocument, by which time either the
+% key resolved or it never will.
+% It is resolved by \edef into a macro BEFORE the write, never tested inline
+% inside it: \GetBuildVariants is an expandable expl3 getter, so \ifx against
+% \@empty would compare its MEANING (never equal) rather than its expansion,
+% which is the thing we care about -- and an \edef cannot live inside \write's
+% own expansion pass anyway. \ifcsname is expandable, so the whole thing
+% collapses to nothing when course-metadata never loaded.
+\newcommand{\TeXLib@bv}{}
+
 \newwrite\TeXLib@bm@stream
 \AtEndDocument{%
+	\begingroup
+	\edef\TeXLib@bv{\ifcsname GetBuildVariants\endcsname\GetBuildVariants\fi}%
+	\ifx\TeXLib@bv\@empty \let\TeXLib@bv\TeXLib@variants \fi
 	\immediate\openout\TeXLib@bm@stream=\jobname.buildmeta\relax
-	\immediate\write\TeXLib@bm@stream{variants=\TeXLib@variants}%
+	\immediate\write\TeXLib@bm@stream{variants=\TeXLib@bv}%
 	\immediate\write\TeXLib@bm@stream{%
 		has-solutions=\ifTeXLib@feat@solutions 1\else 0\fi}%
 	\immediate\write\TeXLib@bm@stream{%
@@ -173,6 +192,7 @@
 	\immediate\write\TeXLib@bm@stream{%
 		has-partsolution=\ifTeXLib@feat@partsolution 1\else 0\fi}%
 	\immediate\closeout\TeXLib@bm@stream
+	\endgroup
 }
 
 % Tag suspension around DISCARDED content --------------------------------------

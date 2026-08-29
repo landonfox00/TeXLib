@@ -179,6 +179,18 @@
 % builder then slices as the STUDENT PDF. Same `dual' as \ShowSolutions, and
 % checked after it so combining the two is idempotent, not order-dependent.
 \ifdefined\ShowRubric        \def\AutoExamSolMode{dual}\fi
+% \InstructorMode is the builder's `instructor' variant, and it is checked LAST
+% so it wins over the \ShowSolutions/\ShowRubric it always arrives with.
+%
+% `only', not `dual': in a variant fan-out the blank student copies have already
+% been typeset and sliced by the BASE compile, so a dual instructor build would
+% emit a second identical set and the slicer would write them straight over
+% <base>_A.pdf. Emitting the instructor copies alone also keeps the per-version
+% slice names unambiguous -- <base>_A_instructor.pdf beside the key's
+% <base>_A_solutions.pdf. A hand-written \def\ShowSolutions{} with no
+% \InstructorMode still means `dual', so nothing about the documented
+% source-level workflow changes.
+\ifdefined\InstructorMode    \def\AutoExamSolMode{only}\solutionstrue\fi
 % If BOTH source commands were used, warn and keep dual (\justsolutions ignored).
 \AtBeginDocument{%
 	\if@ax@src@dual\if@ax@src@only
