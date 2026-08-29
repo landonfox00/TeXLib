@@ -4,6 +4,16 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- **An answer key can now be laid out inside the student's answer space instead of replacing it.** New build mode `key-inline` (`\def\ShowKeyInline{}`, source-level `\keysinline`, Sublime "Answer Key (in answer space)"), raising a new `\ifsolinline`. Problems authored with per-part `{partsolution}` blocks have each solution drawn into the blank the student would have written in, so the key page is geometrically identical to the student copy — part labels land within 0.02in, measured — and reads like a filled-in paper rather than a separate document. The mark moves from the title block to the running header, where it costs no body space; leaving it in the title block was itself a full line of drift. Opt-in throughout: an ordinary `key` build is unchanged, verified by a zero-pixel diff on both the student and key halves of a real quiz.
+
+### Fixed
+
+- **`{partsolution}` was unusable inside a `parts` list.** It set its body to `\hsize\textwidth`, chosen to span the text block the way the full-bleed `{solution}` box does — but a part solution belongs to one `\ppart`, not to the problem, so the body landed back at the problem's left margin while its own "Solution." header sat at the part margin, and it overhung the right edge by 17pt. It now takes `\linewidth`, so it lines up under the part it belongs to, and it carries the same green tint and 1.5pt left accent as `{solution}` (hand-drawn for the same SyncTeX reason, not tcolorbox) instead of setting its prose in green. The environment had shipped since 0.7.1 with no call sites anywhere in the repo, which is why none of this had surfaced.
+
+- **`\workbox` and `\stretch` were suppressed independently in solution builds, and only together are they coherent.** Both collapse to nothing under `\ifsolutions` so a key is not padded with blank space. Lifting one without the other deletes the trailing share the engine emits per problem, leaving the surviving `\stretch` calls to split the whole page — every gap comes out wider than the student copy. They are now gated on the same flag.
+
 ## [0.7.4] — 2026-08-25
 
 The visual-parity release: the tagged (accessible) PDF is no longer the

@@ -149,10 +149,17 @@
 	% First page carries the course section number on the left (the large
 	% "Quiz <n>" heading sits just below it, so repeating the quiz title here
 	% would be redundant). Running pages carry \GetQuizTitle on the left instead.
-	\firstpageheader{\bfseries Section~\GetCourseSection}{}{Name:\ \underline{\hspace{2.5in}}}%
+	% \ifsolinline moves the "Answer Key" mark up here from the title block, where
+	% it is a line of body copy and so pushes every problem down ~1 line. That
+	% defeats the whole point of the inline layout, which is a key page whose
+	% geometry matches the student copy exactly. The header costs no body space
+	% and shows on both leaves.
+	\firstpageheader{\bfseries Section~\GetCourseSection\ifsolinline\ \textmd{---
+		\textit{Answer Key}}\fi}{}{Name:\ \underline{\hspace{2.5in}}}%
 	% Footer L: full course name via the shared \GetCourse ("Math 181 Calculus I").
 	\firstpagefooter{\GetCourse}{\thepage\ of \pageref{LastPage}}{\GetInstitution}%
-	\runningheader{\bfseries\GetQuizTitle}{}{Name:\ \underline{\hspace{2.5in}}}%
+	\runningheader{\bfseries\GetQuizTitle\ifsolinline\ \textmd{---
+		\textit{Answer Key}}\fi}{}{Name:\ \underline{\hspace{2.5in}}}%
 	\runningfooter{\GetCourse}{\thepage\ of \pageref{LastPage}}{\GetInstitution}%
 }
 
@@ -170,7 +177,9 @@
 \renewcommand{\maketitle}{%
 	\begin{center}
 		{\LARGE \GetQuizTitle}%
-		\ifkey\par\vspace{0.4em}\textit{Answer~Key}\fi
+		% \ifsolinline carries the mark in the running header instead; see the
+		% \firstpageheader note above.
+		\ifkey\ifsolinline\else\par\vspace{0.4em}\textit{Answer~Key}\fi\fi
 	\end{center}
 	\par\medskip
 	% Instructions: file / inline / default alike are wrapped in the titled box

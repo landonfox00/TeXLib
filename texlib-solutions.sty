@@ -417,24 +417,41 @@
 	\fi
 }
 
-% {partsolution} — inline per-part solution placed directly after \ppart; green
-% prose with a bold "Solution." inline header (no tcolorbox, which would break
-% inside the exam-class 'parts' list), shown when \ifsolutions.
+% {partsolution} — per-part solution placed directly after \ppart, shown when
+% \ifsolutions.  Same chrome as {solution} above (green tint + 1.5pt left accent,
+% hand-drawn rather than tcolorbox, which would both break inside the exam-class
+% 'parts' list and orphan the content for SyncTeX reverse search).
+%
+% Measure is \linewidth, NOT \textwidth, and the box is deliberately NOT pulled
+% back by -\@totalleftmargin the way {solution} is.  {solution} is full-bleed to
+% the text block because it follows the whole problem; a part solution belongs to
+% one \ppart, so it takes that part's measure and lines up under the part's text.
+% An earlier \textwidth version left the body at the problem margin while its
+% "Solution." header sat at the part margin, and overhung the right edge by 17pt.
+%
+% Under \ifsolinline the rendered box declares ZERO height and depth and is
+% lowered one \baselineskip, so it is drawn INTO the answer space the student
+% would have written in instead of displacing it -- which is what keeps a key
+% page geometrically identical to its student copy.  \raisebox, not \smash:
+% \smash also zeroes the size but leaves the ink on the CURRENT baseline, which
+% is the part's own text line, so every solution printed over its question.
+% Caveat: nothing bounds the overlay, so a solution taller than its answer space
+% silently overprints the next part.
+\newsavebox{\@partsol@wrap}
 \newenvironment{partsolution}{%
 	\ifsolutions
-		\par\smallskip
+		\par
+		% The opening \smallskip is real vertical space, so it is suppressed in
+		% the inline layout for the same reason the box declares no size.
+		\ifsolinline\else\smallskip\fi
 		\gdef\@partsol@rubric{}%
 		\@in@partsolutiontrue
 		\setbox\@partsol@box\vbox\bgroup
-			% \textwidth (not \linewidth): the unvboxed prose below lands at the
-			% true left text margin, so a full-\textwidth measure reaches — and stops
-			% at — the right margin, spanning the text block exactly like the
-			% full-bleed {solution} box above (verified: no right-margin overhang).
-			\hsize\textwidth
+			\hsize\dimexpr\linewidth-12pt\relax
 	\else
 		% Same asymmetry as {solution} above: the render branch opens with
-		% \par\smallskip, this one opened the discard box in whatever mode the
-		% part's prose left behind.
+		% \par, this one opened the discard box in whatever mode the part's
+		% prose left behind.
 		\ifdefined\TeXLibAccessibleMode\par\fi
 		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
@@ -443,30 +460,57 @@
 		\egroup
 		\@in@partsolutionfalse
 		% Same container-stamping as {solution}: harvest from the body box and
-		% stamp it BEFORE \unvbox splices its content into the page list (the
-		% spliced nodes keep their stamped fields; after the splice there is no
-		% register left to walk).
+		% stamp it BEFORE it is spliced into the page list (the spliced nodes keep
+		% their stamped fields; afterwards there is no register left to walk).
 		\ifdefined\directlua
 			\directlua{texlib_synctex_read_target(\number\@partsol@box)
 				texlib_synctex_stamp_box(\number\@partsol@box)}%
 		\fi
-		\noindent\texlibsolheader%
-		\par
-		{\color{green!40!black}\unvbox\@partsol@box}%
-		\normalcolor
-		% Beneath the prose, right-aligned -- same reason as {solution}: as an
-		% overlay on the header line it pushed the part's own text down by the
-		% full height of the rubric box.
-		\ifrubric
-			\ifx\@partsol@rubric\@empty\else
-				\par\vspace{6pt}\noindent
-				\hfill\@emit@rubric@overlay{\@partsol@rubric}%
+		% Header, body and any rubric share one vtop so a single fill backs them.
+		\setbox\@partsol@wrap\vtop{%
+			\hsize\dimexpr\linewidth-12pt\relax
+			\noindent\texlibsolheader\par
+			\noindent\box\@partsol@box
+			\ifrubric
+				\ifx\@partsol@rubric\@empty\else
+					\par\vspace{6pt}\noindent
+					\hfill\@emit@rubric@overlay{\@partsol@rubric}%
+				\fi
 			\fi
+		}%
+		\ifsolinline
+			\begingroup
+				\parskip\z@skip
+				\par\nointerlineskip\noindent
+				\raisebox{-\baselineskip}[\z@][\z@]{\@partsol@frame}%
+				\par\nointerlineskip
+			\endgroup
+		\else
+			\par\noindent\@partsol@frame\par\smallskip
 		\fi
-		\par\smallskip
 	\else
 		\egroup\texlib@acc@tagresume
 	\fi
+}
+
+% \@partsol@frame — draws \@partsol@wrap with the {solution} tint and accent.
+% Geometry mirrors {solution}'s: fill flush to the box it backs, accent keeping
+% its 6pt overhang.  That pairing is empirical and SyncTeX-load-bearing there;
+% it is reused here rather than re-derived, but the measure differs (\linewidth),
+% so re-run sol_probe (SYNCTEX.md) before trusting reverse search inside one.
+\newcommand{\@partsol@frame}{%
+	\parbox[t]{\dimexpr\linewidth-12pt\relax}{%
+		\noindent
+		\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsoltint}{%
+			\rule[-\dp\@partsol@wrap]%
+				{\dimexpr\linewidth\relax}%
+				{\dimexpr\ht\@partsol@wrap+\dp\@partsol@wrap\relax}}}}%
+		\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsolrulecolor}{%
+			\vrule width 1.5pt
+				height \dimexpr\ht\@partsol@wrap+6pt\relax
+				depth \dimexpr\dp\@partsol@wrap+6pt\relax}}}%
+		\box\@partsol@wrap
+	}%
 }
 
 % \rubric{pts}{text} — one grading criterion, shown only when \ifrubric.  Appends
@@ -522,9 +566,18 @@
 % \workbox{n} — proportional answer space (= \vspace{\stretch{n}}), but suppressed
 % in a solution/key build so a key copy is not padded with blank space.  Overrides
 % the always-on default from texlib-problembank.sty.
+%
+% \ifsolinline keeps it, because there the answer space is what the solutions are
+% drawn into.  Suppressing only \stretch and not this one is a silent trap: the
+% engine emits one \workbox per \problem retrieval for the space AFTER the
+% problem, so dropping it deletes that share and the surviving \stretch calls
+% split the whole page between them -- every gap then comes out wider than the
+% student copy, which is exactly the geometry the inline layout exists to match.
 \RenewDocumentCommand{\workbox}{m}{%
-	\ifsolutions\else
-		\vspace{\stretch{#1}}%
+	\ifsolutions
+		\ifsolinline\vspace{\texlib@stretch{#1}}\fi
+	\else
+		\vspace{\texlib@stretch{#1}}%
 	\fi
 }
 
@@ -540,8 +593,20 @@
 % shoving the solution down to the page bottom instead of right below the
 % problem. Collapsing it to 0pt under \ifsolutions fixes every such call
 % without having to touch each bank file; student builds are unaffected.
+%
+% \ifsolinline exempts itself: that layout puts the solution INSIDE the part, so
+% it comes BEFORE the stretch rather than after it, and the page-bottom failure
+% this override exists to prevent cannot arise.  A problem that mixes an inline
+% {partsolution} with a trailing full-problem {solution} would still hit it --
+% the two are mutually exclusive by construction, not by an assertion here.
 \let\texlib@stretch\stretch
-\renewcommand{\stretch}[1]{\ifsolutions \z@\else\texlib@stretch{#1}\fi}
+\renewcommand{\stretch}[1]{%
+	\ifsolutions
+		\ifsolinline\texlib@stretch{#1}\else\z@\fi
+	\else
+		\texlib@stretch{#1}%
+	\fi
+}
 
 % ===========================================================================
 % Multiple-choice key frame (the {mcproblems} section)
