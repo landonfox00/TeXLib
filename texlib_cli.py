@@ -279,32 +279,56 @@ def texmf_target():
 
 
 def payload_files(root=HERE):
-    """Every .cls/.sty/.lua the classes need, as (source, basename) pairs.
+    """What an install copies, as (source, destination-relative-path) pairs.
 
-    Flat, because the basenames are unique across the tree and kpathsea
-    searches a TDS leaf directory as one namespace. Sublime/ is skipped: it
-    holds the editor integration, not the library.
+    Two shapes, deliberately:
 
-    `test_*.lua` is excluded at any depth for the same reason the installer's
-    Copy-LibraryTree drops `test_*.py`: the Lua test files sit right next to the
-    engines they exercise, and shipping them puts a file called `test_shuffle`
-    into every TeX installation's global search namespace -- where the next
-    person's `\\input{test_shuffle}` finds ours.
+    * `.cls`/`.sty`/`.lua` land FLAT. Their basenames are unique across the
+      tree and kpathsea searches a TDS leaf directory as one namespace, so a
+      flat drop is what `\\documentclass{didactic}` needs.
+    * `Syllabi/statements/**` keeps its `statements/<profile>/<slug>.tex`
+      structure, because that structure IS the lookup key -- syllabus.cls
+      resolves `statements/unr/disability.tex` by relative subpath, and
+      `unr/disability.tex` and `generic/disability.tex` deliberately share a
+      basename. Flattening them would collide two files whose whole purpose is
+      to be alternatives to each other. kpathsea resolves the relative subpath
+      from a TEXMF tree (verified in test_texlib_cli.py), so this works the
+      same installed as it does on TEXINPUTS.
+
+    `test_*` is excluded at any depth for the same reason the installer's
+    Copy-LibraryTree drops `test_*.py`: the Lua test files sit right next to
+    the engines they exercise, and shipping them puts a file called
+    `test_shuffle` into every TeX installation's global search namespace --
+    where the next person's `\\input{test_shuffle}` finds ours.
     """
     out = []
     seen = {}
+    statements_root = os.path.join(root, "Syllabi", "statements")
+
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [
             d for d in dirnames
             if not d.startswith(".") and d not in
             ("Sublime", "SublimeUser", "__pycache__", "dist", "tests", "examples")
         ]
+        in_statements = os.path.commonpath(
+            [os.path.abspath(dirpath), statements_root]) == statements_root \
+            if os.path.isdir(statements_root) else False
+
         for fn in sorted(filenames):
-            if not fn.lower().endswith(TEX_SOURCE_EXTS):
-                continue
             if fn.startswith("test_") or fn.startswith("_test"):
                 continue
             src = os.path.join(dirpath, fn)
+
+            if in_statements:
+                if not fn.lower().endswith(".tex"):
+                    continue
+                rel = os.path.relpath(src, os.path.dirname(statements_root))
+                out.append((src, rel.replace(os.sep, "/")))
+                continue
+
+            if not fn.lower().endswith(TEX_SOURCE_EXTS):
+                continue
             if fn in seen:
                 sys.stderr.write(
                     "texlib: two files named %s (%s and %s); a flat TEXMF "
@@ -346,8 +370,10 @@ def cmd_install(args):
             print("    %s" % name)
         return 0
     os.makedirs(target, exist_ok=True)
-    for src, name in files:
-        shutil.copy2(src, os.path.join(target, name))
+    for src, rel in files:
+        dest = os.path.join(target, *rel.split("/"))
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copy2(src, dest)
     refresh_texmf_db()
     print("texlib: installed %d file(s) into" % len(files))
     print("  %s" % target)
@@ -361,19 +387,32 @@ def cmd_install(args):
     return 0
 
 
+def installed_count(target):
+    """How many library files an install left at `target`.
+
+    Walks rather than listing one level: since the statements keep their
+    `statements/<profile>/` structure, a flat listdir undercounts an install by
+    every statement in it and would report a populated tree as nearly empty.
+    """
+    if not os.path.isdir(target):
+        return 0
+    exts = TEX_SOURCE_EXTS + (".tex",)
+    return sum(1 for d, _sub, files in os.walk(target)
+               for f in files if f.lower().endswith(exts))
+
+
 def cmd_uninstall(args):
     target = args.target or texmf_target()
-    if not os.path.isdir(target):
+    n = installed_count(target)
+    if not n:
         print("texlib: nothing installed at %s" % target)
         return 0
-    names = [f for f in os.listdir(target)
-             if f.lower().endswith(TEX_SOURCE_EXTS)]
     if args.dry_run:
-        print("texlib: would remove %d file(s) from %s" % (len(names), target))
+        print("texlib: would remove %d file(s) from %s" % (n, target))
         return 0
     shutil.rmtree(target)
     refresh_texmf_db()
-    print("texlib: removed %d file(s) from %s" % (len(names), target))
+    print("texlib: removed %d file(s) from %s" % (n, target))
     return 0
 
 
@@ -440,9 +479,7 @@ def cmd_doctor(args):
     print()
     print("Resolution")
     installed = texmf_target()
-    n_installed = len([f for f in os.listdir(installed)
-                       if f.lower().endswith(TEX_SOURCE_EXTS)]) \
-        if os.path.isdir(installed) else 0
+    n_installed = installed_count(installed)
     if n_installed:
         line("OK", "TEXMF install", "%d file(s) in %s" % (n_installed, installed))
         if root_ok:

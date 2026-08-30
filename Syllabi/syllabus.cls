@@ -411,6 +411,125 @@
 \let\recitations\recitation
 
 % ==============================================================================
+% 7b. POLICY STATEMENTS
+% ==============================================================================
+% Required syllabus language -- disability accommodations, academic integrity,
+% civil rights, mental health -- is mandated per institution and reworded
+% without notice. Retyping it into every syllabus every term is how a course
+% ends up shipping last year's phone number.
+%
+% Seventeen statement files shipped under Syllabi/statements/ from the start,
+% each carrying a comment promising an override "via the coursemeta
+% statements-path". No such key existed, \aipolicy was never defined, and
+% nothing in the repository \input the files at all: the content was real and
+% wholly unreachable, and the template shipped example.edu placeholders instead.
+% This is that promised mechanism, built institution-neutral.
+%
+% \policystatement{disability} resolves in three steps, most specific first:
+%
+%   1. <coursemeta dir>/<statements-path>/disability.tex   the author's own
+%   2. statements/<institution-profile>/disability.tex     a shipped profile
+%   3. statements/generic/disability.tex                   the neutral fallback
+%
+% Step 1 is what makes this usable by someone whose institution has no profile
+% here: drop one file next to coursemeta.tex and it wins, no fork required.
+% Step 2 falling through to step 3 per-slug is what makes a profile cheap to
+% start -- override only the statements your institution actually mandates and
+% inherit the rest.
+%
+% Resolution is by \IfFileExists, so it works identically whether TeXLib is on
+% TEXINPUTS (Syllabi/ is a search segment) or installed into a TEXMF tree
+% (kpathsea resolves the relative subpath); both are verified in the test suite.
+
+% A gap an author must fill, rendered so it cannot be missed. The neutral
+% statements can state a policy's substance but cannot invent an institution's
+% office names, URLs and phone numbers -- and a syllabus that quietly tells
+% students to contact a plausible-looking wrong office is worse than one that
+% visibly says "fill this in". Also warns, so a build log carries it too.
+\newcommand{\statementplaceholder}[1]{%
+	\ClassWarning{syllabus}{Policy statement placeholder not filled in: #1}%
+	\par\nobreak\smallskip\noindent
+	\textcolor{red}{\textbf{[Fill in:] }\textit{#1}}%
+	\par\smallskip
+}
+
+% Default heading per slug. \policystatement[Other Heading]{slug} overrides.
+\newcommand{\texlib@stmt@sethead}[2]{\@namedef{texlib@stmt@head@#1}{#2}}
+\texlib@stmt@sethead{academic-dishonesty}   {Academic Integrity}
+\texlib@stmt@sethead{academic-success}      {Academic Support Services}
+\texlib@stmt@sethead{ai-permitted}          {Use of AI Tools}
+\texlib@stmt@sethead{ai-limited}            {Use of AI Tools}
+\texlib@stmt@sethead{ai-prohibited}         {Use of AI Tools}
+\texlib@stmt@sethead{basic-needs}           {Food and Housing Security}
+\texlib@stmt@sethead{campus-closures}       {Campus Closures}
+\texlib@stmt@sethead{civil-rights}          {Civil Rights and Title IX}
+\texlib@stmt@sethead{content-accessibility} {Content Accessibility}
+\texlib@stmt@sethead{disability}            {Disability Services}
+\texlib@stmt@sethead{disability-online}     {Disability Services}
+\texlib@stmt@sethead{failure-to-comply}     {Classroom Conduct}
+\texlib@stmt@sethead{instructor-recording}  {Course Recordings}
+\texlib@stmt@sethead{mental-health}         {Student Wellness}
+\texlib@stmt@sethead{recording}             {Recording of Class}
+\texlib@stmt@sethead{student-athletes}      {University-Approved Absences}
+\texlib@stmt@sethead{veteran-services}      {Veteran Services}
+
+% Resolved path for the slug, or empty. Not wrapped in a group: the result has
+% to survive, and \global for a value used two lines later is worse.
+\newcommand{\texlib@stmt@file}{}
+\newcommand{\texlib@stmt@try}[1]{%
+	\ifx\texlib@stmt@file\@empty
+		\IfFileExists{#1}{\renewcommand{\texlib@stmt@file}{#1}}{}%
+	\fi
+}
+\newcommand{\texlib@stmt@resolve}[1]{%
+	\renewcommand{\texlib@stmt@file}{}%
+	\IfMetaSet{statements-path}{%
+		\texlib@stmt@try{\GetCourseMetaDir\GetStatementsPath/#1.tex}%
+	}{}%
+	\IfMetaSet{institution-profile}{%
+		\texlib@stmt@try{statements/\GetInstitutionProfile/#1.tex}%
+	}{}%
+	\texlib@stmt@try{statements/generic/#1.tex}%
+}
+
+% \policystatement[Heading]{slug}
+%
+% The \xspace is load-bearing for the same reason it is on the section
+% shortcuts above: \syllabussection ends with a control sequence, so TeX skips
+% the following newline and no space token survives -- the heading ran straight
+% into the statement as "Disability Services.Any student with a disability".
+% Here the next token is \input or \statementplaceholder rather than a newline,
+% neither of which is in \xspace's exception list, so the space appears.
+\NewDocumentCommand{\policystatement}{ o m }{%
+	\texlib@stmt@resolve{#2}%
+	\syllabussection{\IfValueTF{#1}{#1}{%
+		\@ifundefined{texlib@stmt@head@#2}{#2}{\@nameuse{texlib@stmt@head@#2}}}}\xspace
+	\ifx\texlib@stmt@file\@empty
+		% Loud, not silent. A missing statement in a syllabus is a compliance
+		% gap, and the failure mode to avoid is a heading with nothing under it.
+		\ClassWarning{syllabus}{No policy statement found for `#2'}%
+		\statementplaceholder{No statement named `#2' in your statements-path,
+			your institution profile, or the generic set. Check the spelling,
+			or add \detokenize{#2}.tex to your statements-path.}%
+	\else
+		\input{\texlib@stmt@file}%
+	\fi
+}
+
+% \policystatements{a, b, c} -- the common case, in document order. expl3's
+% clist mapping trims surrounding spaces per item, so `a, b' and `a,b' behave
+% identically; hand-rolled trimming here would be a worse copy of that.
+\ExplSyntaxOn
+\NewDocumentCommand{\policystatements}{ m }{
+	\clist_map_inline:nn {#1} { \policystatement {##1} }
+}
+\ExplSyntaxOff
+
+% \aipolicy[permitted|limited|prohibited] -- the stance is the whole choice,
+% and all three headings are the same, so this is one command not three.
+\NewDocumentCommand{\aipolicy}{ O{permitted} }{\policystatement{ai-#1}}
+
+% ==============================================================================
 % 8. GRADE TABLES
 % ==============================================================================
 % Usage: the rows in #1 / #2 are separated by `\\ \hline`; the LAST row is

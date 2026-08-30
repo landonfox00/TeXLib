@@ -75,6 +75,16 @@
 \meta_create_var:nn { bank-path }      { BankPath }
 \meta_create_var:nn { gradebook-path } { GradebookPath }
 \meta_create_var:nn { preamble-file }  { PreambleFile }
+% Which shipped set of syllabus policy statements \policystatement should draw
+% on -- a directory name under Syllabi/statements/ (e.g. `unr'). Unset means the
+% institution-neutral `generic' set alone. A profile need not be complete: any
+% statement it does not carry falls back to generic, so a new institution can
+% start by overriding only the handful whose wording is actually mandated.
+\meta_create_var:nn { institution-profile } { InstitutionProfile }
+% A directory of the author's OWN policy statements, resolved coursemeta-relative
+% (like bank-path). Searched before any shipped profile, so an adopter can supply
+% or correct one statement without forking the library or waiting on a profile.
+\meta_create_var:nn { statements-path } { StatementsPath }
 % Optional override for the builder's shareable-copy basename (see the publish
 % sidecar below). Unset by default -> the builder derives the department
 % submission name <SUBJECT> <number>.<section>_<term>_<LastName>.

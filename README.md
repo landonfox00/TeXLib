@@ -5,7 +5,7 @@
 
 A LaTeX library for teaching mathematics: shared `.sty` packages, a set of document-class modules (exams, quizzes, lecture notes, problem sets, schedules, syllabi, report cards, bingo cards, problem-bank catalogs, and a thesis class), a LuaLaTeX engine for randomized exams, and a build tool that turns one source file into every copy the course needs — student, solutions, instructor — each with a tagged PDF/UA-2 twin and a veraPDF conformance report to prove it.
 
-It is developed at the University of Nevada, Reno and used there every semester, but nothing outside [`Syllabi/statements/`](Syllabi/statements/) (UNR policy text) and [`Thesis/`](Thesis/) (Graduate School filing rules) is institution-specific.
+It is developed at the University of Nevada, Reno and used there every semester. The one place an institution's own rules have to appear — the required policy language in a syllabus — is [chosen by profile](Syllabi/README.md#policy-statements), with an institution-neutral set shipped as the default and UNR as one profile among however many people contribute. Only [`Thesis/`](Thesis/), which encodes one Graduate School's filing requirements, is still UNR-specific.
 
 ## Quickstart
 
@@ -131,7 +131,7 @@ Each module is a document class plus a README; the canonical `<module>-template.
 | [`Quizzes/`](Quizzes/) | `quiz.cls` | Short-form quiz class. |
 | [`Report Cards/`](Report%20Cards/) | `report-card.cls` | Per-section report-card class for end-of-term grade summaries. |
 | [`Schedule/`](Schedule/) | `schedule.cls` | Course-schedule / calendar class. Uses `calendar.lua`, `date.lua`, and `schedule.lua` for date math. |
-| [`Syllabi/`](Syllabi/) | `syllabus.cls` | Course-syllabus class. `syllabus-template.tex` is a complete example syllabus — course info, learning outcomes, grading, and policy statements. |
+| [`Syllabi/`](Syllabi/) | `syllabus.cls` | Course-syllabus class. `syllabus-template.tex` is a complete example syllabus — course info, learning outcomes, grading, and policy statements. Required policy language (`\policystatement{disability}`) resolves from your own file, then your `institution-profile`, then an institution-neutral set; see [Policy statements](Syllabi/README.md#policy-statements). |
 | [`Thesis/`](Thesis/) | `thesis.cls` | **Prototype.** Accessible UNR thesis/dissertation class: tagged, PDF/UA-2 + PDF/A-4f conformant, following the Graduate School filing guidelines. CI-gated, but see [`Thesis/README.md`](Thesis/README.md) for what's not yet done before treating it as final. |
 
 Autoexam retains a set of **deprecated aliases** (`\theExamNumber`, `\theExamDate`, `\thePS`, `\examsetup`, `\examversions`, `\overview`) with no removal date: each still has dozens of live uses across existing course material, and they stay until a cross-course migration retires them (see `texlib-problembank.sty` for the removal precedent). Don't use them in new documents.

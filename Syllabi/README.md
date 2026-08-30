@@ -1,8 +1,10 @@
-# `syllabus` — UNR course syllabus
+# `syllabus` — course syllabus
 
 A LaTeX class for typesetting course syllabi. The title block, page
 header, and contact-info table are all driven by `coursemeta.tex` and
-class-local metadata keys.
+class-local metadata keys, and the required policy language comes from a
+[statement set](#policy-statements) chosen by institution rather than retyped
+each term.
 
 ## What it gives you
 
@@ -154,6 +156,75 @@ Render an `Exam | Date` table from the coursemeta `exam1-date`..`exam5-date`
 keys plus `final-date`. Only assessments whose date is set appear; if none are
 set, the command produces nothing. The same keys drive `autoexam`'s exam date,
 so the dates are single-sourced — set them once in `coursemeta.tex`.
+
+### Policy statements
+
+Required syllabus language — disability accommodations, academic integrity,
+civil rights, mental health — is mandated per institution and reworded without
+notice. These commands keep it out of your document source.
+
+`\policystatement[Heading]{slug}`
+Emit the standard heading for `slug` and the statement text under it. The
+heading defaults per slug (`disability` → "Disability Services"); the optional
+argument overrides it.
+
+`\policystatements{a, b, c}`
+The same, for several in document order. Spaces around the commas are trimmed.
+
+`\aipolicy[permitted|limited|prohibited]`
+Shorthand for `\policystatement{ai-<stance>}`. Defaults to `permitted`.
+
+`\statementplaceholder{what is missing}`
+Renders a red **[Fill in:]** note and logs a warning. The neutral statements use
+it wherever an institution's own office name, URL or phone number is needed —
+a syllabus that quietly points students at a plausible wrong office is worse
+than one that visibly says "fill this in".
+
+#### How a slug resolves
+
+Three steps, most specific first:
+
+| Step | Location | Set by |
+|---|---|---|
+| 1 | `<coursemeta dir>/<statements-path>/<slug>.tex` | `statements-path` |
+| 2 | `statements/<profile>/<slug>.tex` | `institution-profile` |
+| 3 | `statements/generic/<slug>.tex` | *(always available)* |
+
+Both keys are optional and live in `coursemeta.tex`. With neither set you get
+the institution-neutral set, which states each policy's substance and marks the
+local details in red.
+
+Step 1 is what makes this usable at an institution with no profile here: drop
+one file next to `coursemeta.tex` and it wins, with no fork. Step 2 falling
+through to step 3 *per slug* is what makes a profile cheap to start — override
+only the statements your institution actually mandates and inherit the rest.
+
+A slug found nowhere produces the heading, a red placeholder naming the slug,
+and a build warning. It never produces a silent empty section, because an empty
+section in a syllabus is a compliance gap that looks like a formatting bug.
+
+#### Shipped sets
+
+| Profile | Slugs | Notes |
+|---|---|---|
+| `generic` | all 17 | Institution-neutral. The fallback; always present. |
+| `unr` | all 17 | University of Nevada, Reno (UAM 6,501 / 6,502 wording). |
+
+Slugs: `academic-dishonesty`, `academic-success`, `ai-permitted`, `ai-limited`,
+`ai-prohibited`, `basic-needs`, `campus-closures`, `civil-rights`,
+`content-accessibility`, `disability`, `disability-online`,
+`failure-to-comply`, `instructor-recording`, `mental-health`, `recording`,
+`student-athletes`, `veteran-services`.
+
+**Adding a profile.** Create `Syllabi/statements/<slug>/` and add only the
+statements your institution mandates differently; the rest fall through to
+`generic`. `python texlib_cli.py install` ships whatever is there, and
+`test_texlib_cli.py` checks that every profile slug has a generic fallback.
+Contributions of institution profiles are welcome.
+
+> These are **defaults, not legal advice.** Your institution's required wording
+> is whatever your institution currently says it is; check the shipped text
+> against the current policy before you file a syllabus on it.
 
 ### Predicates
 

@@ -123,8 +123,14 @@ names = [n for _src, n in payload]
 ok &= check(bool(payload), "payload_files: finds the library payload")
 ok &= check(len(names) == len(set(names)),
             "payload_files: basenames are unique (a flat TDS dir needs that)")
-ok &= check(all(n.lower().endswith(C.TEX_SOURCE_EXTS) for n in names),
-            "payload_files: only .cls/.sty/.lua")
+                                       # Two shapes, and nothing else:
+_flat = [n for n in names if "/" not in n]
+ok &= check(all(n.lower().endswith(C.TEX_SOURCE_EXTS) for n in _flat),
+            "payload_files: the flat half is .cls/.sty/.lua only")
+ok &= check(all(n.startswith("statements/") for n in names if "/" in n),
+            "payload_files: the only nested half is statements/")
+ok &= check(len(_flat) == len(set(_flat)),
+            "payload_files: flat basenames do not collide")
 # Regression: the first cut of this shipped test_shuffle.lua and six siblings
 # into TEXMFHOME, putting 'test_shuffle' in every TeX installation's global
 # namespace. Same class of mistake the installer's Copy-LibraryTree guards.
@@ -137,6 +143,32 @@ ok &= check(not any(os.sep + "examples" + os.sep in s for s, _n in payload),
 for required in ("didactic.cls", "course-metadata.sty", "texlib-build.sty",
                  "problem_engine.lua"):
     ok &= check(required in names, "payload_files: ships %s" % required)
+
+# Syllabus policy statements are the one part of the payload that must NOT be
+# flattened: syllabus.cls resolves them by relative subpath, and
+# unr/disability.tex and generic/disability.tex share a basename on purpose --
+# they are alternatives to each other. A flat install would collide them.
+stmts = [n for n in names if n.startswith("statements/")]
+ok &= check(bool(stmts), "payload_files: ships the policy statements")
+ok &= check(all(n.count("/") == 2 for n in stmts),
+            "payload_files: statements keep statements/<profile>/<slug>.tex")
+ok &= check("statements/generic/disability.tex" in stmts
+            and "statements/unr/disability.tex" in stmts,
+            "payload_files: same slug survives in two profiles")
+ok &= check(all(n.endswith(".tex") for n in stmts),
+            "payload_files: statements are .tex only")
+# Every slug a profile carries must have a neutral fallback, or an adopter who
+# sets no institution-profile gets a red placeholder where a real statement
+# should be -- which is the failure the generic set exists to prevent.
+_prof = {}
+for n in stmts:
+    _, profile, slug = n.split("/")
+    _prof.setdefault(profile, set()).add(slug)
+_gaps = sorted(s for p, v in _prof.items() if p != "generic"
+               for s in v - _prof.get("generic", set()))
+ok &= check(not _gaps,
+            "every profile slug has a generic fallback"
+            + (" -- missing: %s" % ", ".join(_gaps) if _gaps else ""))
 
 
 # --- Off-PATH TeX detection --------------------------------------------------
