@@ -89,7 +89,7 @@ The Sublime plugin and the CLI are two front-ends over one build core (`TexlibBu
 | [`texlib-footer.sty`](texlib-footer.sty) | Shared `fancyhdr` footer: `[Course] [page X of Y] [Institution]`. Headers stay class-specific. |
 | [`texlib-mathutils.sty`](texlib-mathutils.sty) | Math macros: `\mbb`/`\mrm`/`\mcal`/`\msf`/`\mf`/`\mscr`, auto-sizing `\abs`/`\lrp`/`\lrb`/`\lrcb`, `\dd`/`\deriv`/`\inte`, bold-red `\todo`. |
 | [`texlib-theorems.sty`](texlib-theorems.sty) | `tcolorbox` styles for theorem environments: colored thin left-rule + ~2% background tint. Styles: `texlibtheorem` (red), `texlibproposition` (violet), `texlibdefinition` (blue), `texlibprocedure` (teal), `texlibexample` (black), `texlibquestion` (orange), `texlibnote` (gray). Customize with `\texlibtheoremsetup{rule=false, tint=false, theorem-color=…}` — toggle the left rule or tint globally, or recolor any family. |
-| [`quiver.sty`](quiver.sty) | Third-party. Vendored from https://q.uiver.app for commutative-diagram support. Not covered by this repo's license — see [LICENSE](LICENSE). |
+| [`quiver.sty`](quiver.sty) | Third-party. Vendored from https://q.uiver.app for commutative-diagram support. Not covered by this repo's license — see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). |
 
 ### Lua engine
 
@@ -183,9 +183,11 @@ Every class **except `thesis`** loads `texlib-build.sty` and responds to these; 
 ├── examples/              # templates/ + fixtures/ + scenarios/ + end-to-end course examples, smoke-built
 ├── tests/                 # visual_refs/ — committed reference renders the visual CI gate diffs against
 ├── coursemeta.example.tex # copy-paste starter for per-course metadata
+├── texlib_cli.py          # the editor-independent command line (build / install / doctor)
 ├── CHANGELOG.md
 ├── TODO.md
-├── LICENSE
+├── LICENSE                # plain MIT, nothing appended (detectors stop reading otherwise)
+├── THIRD-PARTY-NOTICES.md # vendored code + build-time dependency licenses
 └── README.md
 ```
 
@@ -193,4 +195,4 @@ Build artifacts (`*.pdf`, `*.aux`, `*.log`, `*.out`, `*.toc`, `*.synctex.gz`, ..
 
 ## License
 
-MIT — see [LICENSE](LICENSE). `quiver.sty` retains its original authorship.
+MIT — see [LICENSE](LICENSE). Vendored code and the build-time dependencies keep their own terms; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). `quiver.sty` in particular retains its original authorship and is not covered by this repo's license.

@@ -1,8 +1,11 @@
 # Contributing to TeXLib
 
-TeXLib is a personal LaTeX teaching library (`.sty`/`.cls`/`.lua`) plus course
-materials, shared publicly so colleagues can use and improve it. Contributions
-are welcome — bug reports, new bank problems, class fixes, and tooling.
+TeXLib is a LaTeX teaching library (`.sty`/`.cls`/`.lua`) with a build tool,
+developed in the open so anyone teaching mathematics can use and improve it.
+Contributions are welcome — bug reports, new bank problems, class fixes, and
+tooling. You do not need to be at the author's institution, and you do not
+need Sublime Text: `python texlib_cli.py build FILE.tex` is the whole build,
+and `python texlib_cli.py doctor` will tell you what your machine is missing.
 
 ## Ground rules
 
