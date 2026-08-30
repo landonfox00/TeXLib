@@ -21,6 +21,11 @@ jobs:
         run: python -m pip install --quiet pypdf==6.16.2
       - name: Builder logic + orchestration tests
         run: python Sublime/test_texlib_builder.py
+      - name: CLI host (root resolution, TEXINPUTS, TEXMF payload, modes)
+        # Also the guard that the build core still imports with no Sublime
+        # present: every other CLI test would keep passing if it stopped, while
+        # the CLI itself became unusable outside the editor.
+        run: python test_texlib_cli.py
       - name: Version contract (manifest == CHANGELOG == every Provides == plugin probe)
         # texlib-manifest.json is the machine-readable mirror of the release
         # tag. This asserts it agrees with the newest released CHANGELOG
