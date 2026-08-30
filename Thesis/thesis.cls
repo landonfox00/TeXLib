@@ -8,7 +8,7 @@
 % ACCESSIBLE BY DESIGN. UNR now requires accessible (tagged) theses, so tagging
 % is intrinsic here, not an opt-in mode: the document MUST begin with
 %     \DocumentMetadata{ lang=en, tagging=on,
-%         tagging-setup={ math/setup={mathml-SE}, table/header-rows=1 },
+%         tagging-setup={ math/setup={mathml-AF}, table/header-rows=1 },
 %         pdfstandard={ua-2,a-4f} }
 %     \documentclass{thesis}
 % (\DocumentMetadata can only enable tagging BEFORE \documentclass.) The class

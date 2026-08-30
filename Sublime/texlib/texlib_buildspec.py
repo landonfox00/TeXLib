@@ -53,13 +53,28 @@ LUALATEX_CLASSES = {
 # The accessible (tagged PDF/UA-2 + PDF/A-4f) build prefix, injected ahead of
 # \documentclass because \DocumentMetadata can only switch tagging on there.
 #
-# Both MathML methods are emitted deliberately: readers split on which they
-# understand. AF (associated files) is what Firefox's viewer and Foxit read —
-# the in-browser path from an LMS link — and SE (structure elements) is what
-# Adobe Acrobat reads. Dropping either silently halves screen-reader coverage.
+# Readers split on which MathML method they understand. AF (associated files)
+# is what Firefox's viewer and Foxit read — the in-browser path from an LMS
+# link — and SE (structure elements) is what Adobe Acrobat reads, so emitting
+# both is what covers a class. We emit AF only, under protest, because SE is
+# currently unusable:
+#
+#   luamml 0.9.2 (TeX Live 2026, 2026-06-20) keeps references to math *noad*
+#   nodes — a radical's delimiter and degree — and writes marked-content
+#   attributes to them from the structure-element writer after mlist_to_hlist
+#   has freed them. Two \sqrt[n]{...} in one formula is enough for a freed
+#   slot to be recycled, and LuaTeX aborts the run outright: "(nodes): trying
+#   to delete an attribute reference of a non attribute node", no PDF. It
+#   reproduces on a bare article + \DocumentMetadata, so it is not ours, and
+#   only the SE path reaches the writer — AF alone is unaffected.
+#
+# That is not an edge case here: 14 documents in the teaching tree carry 57
+# such formulas, most of them in the Notes section that teaches radical laws,
+# where \sqrt[n]{ab} = \sqrt[n]{a}\sqrt[n]{b} IS the content. Restore
+# mathml-SE the moment a fixed luamml ships; nothing else has to change.
 ACCESSIBLE_DOCMETA = (
     r"\DocumentMetadata{lang=en,tagging=on,"
-    r"tagging-setup={math/setup={mathml-AF,mathml-SE},table/header-rows=1},"
+    r"tagging-setup={math/setup={mathml-AF},table/header-rows=1},"
     r"pdfstandard={ua-2,a-4f}}"
 )
 

@@ -420,12 +420,14 @@ def main():
           and aarg.index(r"\DocumentMetadata") < aarg.index(r"\input"), aarg)
     check("accessible -> \\def\\TeXLibAccessibleMode injected",
           r"\def\TeXLibAccessibleMode{}" in aarg, aarg)
-    # Both MathML methods, because readers split on which one they understand:
-    # AF is what Firefox's viewer and Foxit read (the in-browser path from an LMS
-    # link), SE is what Adobe Acrobat reads. Shipping one drops the math to
-    # "x 2 plus y 2" for everyone on the other side of that split.
-    check("accessible -> both MathML methods requested",
-          "mathml-AF" in aarg and "mathml-SE" in aarg, aarg)
+    # AF is what Firefox's viewer and Foxit read -- the in-browser path from an
+    # LMS link. SE (Acrobat's path) is deliberately absent: luamml 0.9.2 aborts
+    # the run on two \sqrt[n]{...} in one formula, and only SE reaches the code
+    # that does it. See ACCESSIBLE_DOCMETA; restore SE when upstream is fixed.
+    check("accessible -> MathML AF requested",
+          "mathml-AF" in aarg, aarg)
+    check("accessible -> MathML SE withheld (luamml 0.9.2 use-after-free)",
+          "mathml-SE" not in aarg, aarg)
     # The jobname must stay the REAL base name: autoexam reads its document body
     # from <jobname>.tex, so a suffixed jobname truncated the tagged exam. The
     # output is separated by directory (aux/a11y) instead, and _postprocess
@@ -1840,8 +1842,10 @@ def main():
           "bingo" in _bs.LUALATEX_CLASSES)
     check("buildspec: thesis is in LUALATEX_CLASSES",
           "thesis" in _bs.LUALATEX_CLASSES)
-    check("buildspec: accessible macro carries both MathML methods",
-          "mathml-AF" in _bs.ACCESSIBLE_MACRO and "mathml-SE" in _bs.ACCESSIBLE_MACRO)
+    check("buildspec: accessible macro carries MathML AF",
+          "mathml-AF" in _bs.ACCESSIBLE_MACRO)
+    check("buildspec: accessible macro withholds MathML SE",
+          "mathml-SE" not in _bs.ACCESSIBLE_MACRO)
 
     # accessible_macro_for: a document with its OWN \DocumentMetadata (the
     # thesis template's layout) must get the marker only -- the TL2026 kernel
