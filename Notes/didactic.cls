@@ -265,10 +265,21 @@
 % real environments internally, so hooking the real names below is sufficient.
 \newif\if@didactic@thmenum
 \@didactic@thmenumfalse
-\setlist[enumerate,1]{%
-	label = {\if@didactic@thmenum\textbf{\roman*.}\else\emph{\roman*.}\fi},
-	ref   = \roman*,
-}
+% ref is not a key the block-based lists know, so under tagging every \item
+% raises "Some keys specified on the enumerate environment are unknown" and the
+% value is dropped anyway. Block already numbers these items in lowercase roman
+% on its own, so \ref output is identical with the key absent -- guarding it
+% costs nothing and removes four errors per list from every accessible build.
+\ifdefined\TeXLibAccessibleMode
+	\setlist[enumerate,1]{%
+		label = {\if@didactic@thmenum\textbf{\roman*.}\else\emph{\roman*.}\fi},
+	}
+\else
+	\setlist[enumerate,1]{%
+		label = {\if@didactic@thmenum\textbf{\roman*.}\else\emph{\roman*.}\fi},
+		ref   = \roman*,
+	}
+\fi
 \newcommand{\@didactic@enumbold}[1]{\AtBeginEnvironment{#1}{\@didactic@thmenumtrue}}
 % amsthm plain style (theorem family):
 \@didactic@enumbold{theorem}
