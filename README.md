@@ -3,7 +3,9 @@
 [![smoke](https://github.com/landonfox00/TeXLib/actions/workflows/smoke.yml/badge.svg)](https://github.com/landonfox00/TeXLib/actions/workflows/smoke.yml)
 [![tests](https://github.com/landonfox00/TeXLib/actions/workflows/tests.yml/badge.svg)](https://github.com/landonfox00/TeXLib/actions/workflows/tests.yml)
 
-A personal LaTeX library for math teaching at the University of Nevada, Reno: shared `.sty` packages, a set of document-class modules (exams, quizzes, lecture notes, problem sets, schedules, syllabi, report cards, bingo cards, problem-bank catalogs, and a thesis class), a LuaLaTeX engine for randomized exams, a Sublime Text build system, and a smoke-test harness that builds every module after refactors.
+A LaTeX library for teaching mathematics: shared `.sty` packages, a set of document-class modules (exams, quizzes, lecture notes, problem sets, schedules, syllabi, report cards, bingo cards, problem-bank catalogs, and a thesis class), a LuaLaTeX engine for randomized exams, and a build tool that turns one source file into every copy the course needs — student, solutions, instructor — each with a tagged PDF/UA-2 twin and a veraPDF conformance report to prove it.
+
+It is developed at the University of Nevada, Reno and used there every semester, but nothing outside [`Syllabi/statements/`](Syllabi/statements/) (UNR policy text) and [`Thesis/`](Thesis/) (Graduate School filing rules) is institution-specific.
 
 ## Quickstart
 
@@ -17,19 +19,18 @@ Set up TeXLib on a new machine or for a new course.
    git clone https://github.com/landonfox00/TeXLib.git
    cd TeXLib
    ```
-3. **Tell `kpathsea` where to find the shared `.sty` files.** Add the absolute path to the TeXLib root to your `TEXINPUTS`:
+3. **Install the classes** so `\documentclass{didactic}` resolves in any editor:
    ```
-   # bash/zsh
-   export TEXINPUTS=".:/abs/path/to/TeXLib:$TEXINPUTS"
-   # PowerShell
-   $env:TEXINPUTS = ".;C:\path\to\TeXLib;$env:TEXINPUTS"
+   python texlib_cli.py install
    ```
-   Make the change permanent in your shell rc / Windows environment variables. **Warning:** `kpathsea` cannot resolve `TEXINPUTS` entries that contain commas, so watch for commas in any path component. On Windows that means OneDrive paths like `OneDrive - University of Nevada, Reno` need a junction (for example, `OneDriveUNR`); see [Sublime/README.md](Sublime/README.md) for the workaround used in the Sublime build system.
-4. **(Optional) Run the smoke test** to confirm everything builds:
+   This copies the `.cls`/`.sty`/`.lua` files into your `TEXMFHOME` (`kpsewhich -var-value=TEXMFHOME` will tell you where that is). Re-run it after pulling library updates. `python texlib_cli.py uninstall` reverses it.
+
+   *Developing the library itself?* Skip this — an installed copy **shadows** your working tree, so you would keep building against the last copy you installed. Put the TeXLib root on `TEXINPUTS` instead (the `texlib_cli.py` build command derives it for you, and so does the Sublime plugin). **Warning:** `kpathsea` cannot resolve `TEXINPUTS` entries containing commas, so watch for commas in any path component — on Windows that means OneDrive paths like `OneDrive - University of Nevada, Reno` need a junction; see [Sublime/README.md](Sublime/README.md).
+4. **(Optional) Check the setup:**
    ```
-   python smoke_test.py
+   python texlib_cli.py doctor
    ```
-   Exit code 0 means every module's template built cleanly.
+   It reports the toolchain, whether veraPDF and pypdf are available, and how a build will actually resolve the classes. `python smoke_test.py` goes further and builds every module's template; exit code 0 means they all built cleanly.
 
 ### Per-course setup
 
@@ -47,13 +48,34 @@ Set up TeXLib on a new machine or for a new course.
      ...
    \end{document}
    ```
-4. **Build.** From Sublime Text (with the build system from `Sublime/` installed) it's `Ctrl+B` — the builder picks the right engine per class. From the command line the engine matters:
+4. **Build.**
+   ```
+   python texlib_cli.py build yourfile.tex
+   ```
+   That is the whole command, for every class. It picks the engine, runs the rerun-until-settled loop, runs biber when the bibliography actually changed, and produces every variant the document supports plus their tagged PDF/UA twins. `--mode solutions` (or `student`, `instructor`, `base`, `draft`, `quick`, `accessible`) builds just one; `python texlib_cli.py modes` lists them. See [Build modes and variants](#build-modes-and-variants) below, and [Using TeXLib from your editor](#using-texlib-from-your-editor) for wiring that command to a keystroke.
+
+   From Sublime Text (with the build system from `Sublime/` installed) the same build is `Ctrl+B`.
+
+   Calling the engine by hand works too, but then the engine choice is yours to get right:
    ```
    lualatex yourfile.tex          # autoexam / quiz / schedule / bingo / report-card / bank / thesis
    pdflatex yourfile.tex          # didactic / pset / syllabus
    ```
    The split is defined in one place, `LUALATEX_CLASSES` in [`Sublime/texlib/texlib_buildspec.py`](Sublime/texlib/texlib_buildspec.py). Getting it wrong is not a soft failure: `bingo.cls` and `schedule.cls` call `\directlua` at class load, so under `pdflatex` they fatal immediately.
-   `Ctrl+B` builds every variant the document supports; to build just one (student copy, solutions, instructor copy, draft) see [Build modes and variants](#build-modes-and-variants) below.
+
+## Using TeXLib from your editor
+
+The build lives in `texlib_cli.py`, not in any editor, so wiring it up is a one-liner wherever you write.
+
+| Editor | Wiring |
+|---|---|
+| **Any editor, any OS** | `python /path/to/TeXLib/texlib_cli.py build %f` |
+| **Sublime Text** | Install `Sublime/` (see [Sublime/README.md](Sublime/README.md)) — `Ctrl+B`, plus completions, a bank browser, and a Doctor. |
+| **VS Code** | A task in `.vscode/tasks.json` whose `command` is the line above, bound to `Ctrl+Shift+B`. |
+| **Makefile / latexmk** | `%.pdf: %.tex` → the same line. Exit code is 0 on success, 1 on a build error. |
+| **CI** | Same again; `--quiet` suppresses the engine log and prints only the condensed error report. |
+
+The Sublime plugin and the CLI are two front-ends over one build core (`TexlibBuildCore`), so a fix in the build reaches both. If they ever disagree, the core is right and one of the hosts has a bug.
 
 ## What's in here
 
@@ -74,6 +96,14 @@ Set up TeXLib on a new machine or for a new course.
 - [`problem_engine.lua`](problem_engine.lua) — LuaLaTeX engine driving the shared problem-bank workflow. Handles problem-bank loading, version randomization (autoexam), per-problem SyncTeX redirection (so inverse-search lands in the bank file, not generated temp files), and the per-version page-shuffle. Loaded automatically by both the `autoexam` and `quiz` document classes.
 
 ### Tooling
+
+- [`texlib_cli.py`](texlib_cli.py) — the editor-independent command line. `build` (any class, any mode), `install` / `uninstall` (classes into `TEXMFHOME`), `doctor` (what a build would use), `modes`. A host over the shared build core, not a second build implementation.
+
+  ```
+  python texlib_cli.py build exam.tex                    # every applicable variant
+  python texlib_cli.py build notes.tex --mode accessible # tagged twin + veraPDF report
+  python texlib_cli.py build *.tex --quiet               # errors only; exit 1 if any failed
+  ```
 
 - [`smoke_test.py`](smoke_test.py) — builds every per-module template and reports pass/fail. Safety net for refactors that touch shared `.sty`/`.cls` files. Usage:
 
