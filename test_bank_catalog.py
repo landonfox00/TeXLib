@@ -81,14 +81,24 @@ def check(label, cond, detail=""):
 
 
 def _stage(tmp):
-    """Copy the shared payload + Bank/bank.cls into the temp build dir (the
-    comma-safe way -- no comma-bearing TEXINPUTS)."""
+    """Copy the shared payload + everything in Bank/ into the temp build dir
+    (the comma-safe way -- no comma-bearing TEXINPUTS).
+
+    Bank/ is copied wholesale rather than by naming bank.cls, because since the
+    texlib- rename that name is a two-line wrapper whose whole job is to
+    \\LoadClass{texlib-bank}. Staging the wrapper alone gets you a build that
+    dies at the wrapper's own \\endinput with no useful message -- the real
+    class simply is not there. Any harness that stages by hardcoded filename
+    has this bug latent in it."""
     for entry in os.listdir(TEXLIB_ROOT):
         src = os.path.join(TEXLIB_ROOT, entry)
         if os.path.isfile(src) and entry.lower().endswith((".sty", ".lua", ".cls")):
             shutil.copy2(src, os.path.join(tmp, entry))
-    shutil.copy2(os.path.join(TEXLIB_ROOT, "Bank", "bank.cls"),
-                 os.path.join(tmp, "bank.cls"))
+    bank = os.path.join(TEXLIB_ROOT, "Bank")
+    for entry in os.listdir(bank):
+        src = os.path.join(bank, entry)
+        if os.path.isfile(src) and entry.lower().endswith((".sty", ".lua", ".cls")):
+            shutil.copy2(src, os.path.join(tmp, entry))
 
 
 def main():
