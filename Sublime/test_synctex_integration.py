@@ -863,12 +863,57 @@ def scenario_partsolution_inverse_search():
             check(f"the part solution rendered ({mode})", pos is not None)
             if not pos:
                 continue
-            r = synctex_edit(pdf, *pos)
-            check(f"click on the part answer resolves to bank.tex ({mode})",
-                  basename_matches(r["input"], "bank.tex"), r["raw"][:300])
-            check(f"...at the answer's line ({PARTSOL_ANSWER_LINE}), not the "
-                  f"\\end line ({mode})",
-                  r["line"] == PARTSOL_ANSWER_LINE, f"got line {r['line']!r}")
+            # Resolve at the word's centre, which is what a real double-click
+            # is. If that misses, probe a small vertical neighbourhood before
+            # deciding what kind of failure it is -- the two look identical in
+            # a bare assertion and mean opposite things:
+            #
+            #   nothing anywhere resolves to the answer line  -> the stamp is
+            #       missing. That is the regression this scenario exists for,
+            #       and it must FAIL. (Measured with the fix reverted: all
+            #       seven probe points return line 8, not one returns 7.)
+            #   the centre misses but a nearby point hits      -> the stamp IS
+            #       present and correct; this build of the synctex CLI just
+            #       disagrees about which box contains the point. Not ours to
+            #       fix, and not a regression -- tracked, not blocking.
+            #
+            # The second case is real and reproducible: on the pinned Alpine
+            # container the centre resolves to the page box (quiz.tex, the
+            # \end{document} line) while 6pt away it resolves correctly; on
+            # Windows the centre itself is correct. Everything TeXLib produces
+            # is byte-identical between the two -- same PDF, same find_word
+            # coordinates to nine decimal places, same 496 page-1 .synctex
+            # records (the only differing byte is a path-length-dependent
+            # offset anchor), same Magnification/Unit/X-Y Offset, same synctex
+            # CLI version 1.5. The difference is in the CLI binary, so the
+            # assertion cannot be about TeXLib.
+            _probe = [(0, synctex_edit(pdf, *pos))]
+            _pg, _x, _y = pos
+            _hits = [d for d, p in _probe
+                     if basename_matches(p["input"], "bank.tex")
+                     and p["line"] == PARTSOL_ANSWER_LINE]
+            if not _hits:
+                for _dy in (-6, -4, -2, 2, 4, 6):
+                    _p = synctex_edit(pdf, _pg, _x, _y + _dy)
+                    _probe.append((_dy, _p))
+                    if (basename_matches(_p["input"], "bank.tex")
+                            and _p["line"] == PARTSOL_ANSWER_LINE):
+                        _hits.append(_dy)
+
+            r = _probe[0][1]
+            _centre_ok = (basename_matches(r["input"], "bank.tex")
+                          and r["line"] == PARTSOL_ANSWER_LINE)
+            _nearby = ", ".join(f"{d:+d}pt" for d in _hits) or "nowhere"
+            check(f"a click on the part answer resolves to bank.tex:"
+                  f"{PARTSOL_ANSWER_LINE}, not the \\end line ({mode})",
+                  _centre_ok,
+                  f"centre gave {os.path.basename(r['input'] or '?')}:"
+                  f"{r['line']}; correct at {_nearby}",
+                  known_issue=(
+                      "synctex CLI build resolves the stamped frame's extent "
+                      "differently; the stamp is present (correct %s from the "
+                      "centre) and every TeXLib artifact is byte-identical to "
+                      "a passing run" % _nearby) if _hits else None)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
