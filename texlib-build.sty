@@ -3,11 +3,12 @@
 % documents respond to the same compile-time / source-level toggles.
 %
 % Compile-time (passed via lualatex \def\Show…{}\input{file.tex}):
-%   \ShowSolutions  \ShowKey  \ShowRubric  \ShowDraft
+%   \ShowSolutions  \ShowKey  \ShowKeyInline  \ShowRubric  \ShowDraft
 %   \StudentMode    \InstructorMode
 %
 % Source-level (placed in the document preamble):
-%   \solutions  \keys  \rubrics  \drafts  \studentmode  \instructormode
+%   \solutions  \keys  \keysinline  \rubrics  \drafts  \studentmode
+%   \instructormode
 %
 % Conditionals exposed to class authors and downstream documents:
 %   \ifsolutions  \ifkey  \ifrubric  \ifdraft  \ifstudent  \ifinstructor
@@ -29,6 +30,11 @@
 % Conditionals
 \newif\ifsolutions
 \newif\ifkey
+% Inline-key layout: per-part {partsolution} blocks are drawn INTO the student's
+% reserved answer space rather than replacing it, so the key page is
+% geometrically identical to the student copy.  Opt-in, because it reverses the
+% \stretch / \workbox suppressions below that every other solution build wants.
+\newif\ifsolinline
 \newif\ifrubric
 \newif\ifdraft
 \newif\ifstudent
@@ -37,6 +43,15 @@
 
 % Compile-time toggles
 \ifdefined\ShowSolutions      \solutionstrue        \fi
+% \ShowKeyInline is \ShowKey with a different layout, and it has to say so by
+% DEFINING \ShowKey, not merely by raising \ifkey. The classes do not agree on
+% which to test: quiz.cls reads \ifkey, but autoexam.cls reads \ifdefined\ShowKey
+% (it drives \AutoExamSolMode, i.e. which copies the version loop emits) and so
+% would see no key request at all -- an exam or review built inline came out with
+% every solution missing, silently. Declared before the \ShowKey line below so
+% that test and every downstream \ifdefined\ShowKey sees it; texlib-build is
+% loaded by texlib-assessment before autoexam reaches its own check.
+\ifdefined\ShowKeyInline      \def\ShowKey{}\solinlinetrue \fi
 \ifdefined\ShowKey            \keytrue              \fi
 % A rubric annotates a worked solution, so it implies one: a rubric-only build
 % renders point apportionments and common-error notes floating against blank
@@ -51,6 +66,7 @@
 % Source-level toggles
 \newcommand{\solutions}{\solutionstrue}
 \newcommand{\keys}{\keytrue}
+\newcommand{\keysinline}{\keytrue\solinlinetrue}
 \newcommand{\rubrics}{\rubrictrue}
 \newcommand{\drafts}{\drafttrue}
 \newcommand{\studentmode}{\studenttrue\instructorfalse}

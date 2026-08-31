@@ -140,6 +140,11 @@ MODE_MACROS = {
     # does NOT carry \ShowRubric -- point apportionments and common-error notes
     # are grading-internal. "solutions" is the instructor build and carries both.
     "key":       r"\def\ShowKey{}",
+    # Same key, different layout: per-part {partsolution} blocks are drawn into
+    # the student's answer space instead of replacing it, so the page geometry
+    # matches the student copy. Only affects problems authored with
+    # {partsolution}; anything using a trailing {solution} builds as "key".
+    "key-inline": r"\def\ShowKeyInline{}",
     "solutions": r"\def\ShowSolutions{}\def\ShowRubric{}",
     "student":   r"\def\StudentMode{}",
     # No "rubric" mode. A rubric annotates a worked solution, so rubric-without-

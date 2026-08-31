@@ -47,6 +47,7 @@ _NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 MODES = [
     ("default", "Default", "No \\Show... flag."),
     ("key", "Answer Key", "Injects \\def\\ShowKey{}."),
+    ("key-inline", "Answer Key (in answer space)", "Injects \\def\\ShowKeyInline{}."),
     ("solutions", "Solutions + Rubric", "Injects \\def\\ShowSolutions{}\\def\\ShowRubric{}."),
     ("student", "Student Copy", "Injects \\def\\StudentMode{}."),
     # No "rubric" mode: a rubric annotates a worked solution, so rubric-without-
