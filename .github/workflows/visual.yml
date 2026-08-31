@@ -116,3 +116,13 @@ jobs:
           name: visual-refs
           path: tests/visual_refs/
           retention-days: 7
+          # WITHOUT THIS THE MANIFEST NEVER ARRIVES. `.regen-manifest` is the
+          # documented tell for "did this run regenerate, or die before it and
+          # upload the plain checkout?" -- and upload-artifact excludes hidden
+          # files by default, so the one file the comments above tell you to
+          # read was silently dropped from every artifact this job ever
+          # produced. The guard read as present and was not, which is worse
+          # than not having written it: a run that died at `apk add` uploaded
+          # refs byte-identical to the committed ones, with no manifest, and
+          # "no manifest" was indistinguishable from "this feature is broken".
+          include-hidden-files: true
