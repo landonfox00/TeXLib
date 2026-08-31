@@ -2,12 +2,18 @@ name: accessible
 
 # PDF/UA-2 conformance gate.
 #
-# All nine document classes conform as of the accessible-mode work, and until
-# this workflow existed NOTHING in CI defended that: tests.yml runs the logic
-# suites, smoke.yml builds documents but never in accessible mode, and
-# visual.yml diffs renders. Conformance was checked only when someone
-# remembered to run `python smoke_test.py --accessible` by hand. This job makes
-# a regression a red check instead of a discovery months later.
+# All TEN document classes conform (didactic, pset, quiz, autoexam, schedule,
+# syllabus, report-card, bingo, bank, thesis) -- this said "nine" from the day
+# it was written, which was already wrong, and the count is the one number a
+# reader uses to decide whether their class is covered. CLASS_HOME_MODULE in
+# smoke_test.py is the authority; count it there rather than trusting a comment.
+#
+# Until this workflow existed NOTHING in CI defended conformance: tests.yml runs
+# the logic suites, smoke.yml builds documents but never in accessible mode, and
+# visual.yml diffs renders. It was checked only when someone remembered to run
+# `python smoke_test.py --accessible` by hand. This job makes a regression a red
+# check instead of a discovery months later. See ACCESSIBILITY.md for what the
+# gate does and does not promise.
 #
 # Scope: the nine module templates + fixtures, i.e. the CLASSES. The scenario
 # packs are covered locally by a11y_gallery.py, which is far too expensive for
