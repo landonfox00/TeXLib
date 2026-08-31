@@ -125,8 +125,9 @@ ok &= check(len(names) == len(set(names)),
             "payload_files: basenames are unique (a flat TDS dir needs that)")
                                        # Two shapes, and nothing else:
 _flat = [n for n in names if "/" not in n]
-ok &= check(all(n.lower().endswith(C.TEX_SOURCE_EXTS) for n in _flat),
-            "payload_files: the flat half is .cls/.sty/.lua only")
+ok &= check(all(n.lower().endswith(C.TEX_SOURCE_EXTS)
+                or n.lower().endswith("-instructions.tex") for n in _flat),
+            "payload_files: the flat half is .cls/.sty/.lua + -instructions.tex")
 ok &= check(all(n.startswith(("statements/", "profiles/"))
                 for n in names if "/" in n),
             "payload_files: the nested half is statements/ and profiles/ only")
@@ -171,6 +172,42 @@ ok &= check(not _gaps,
             "every profile slug has a generic fallback"
             + (" -- missing: %s" % ", ".join(_gaps) if _gaps else ""))
 
+# Regression: the payload shipped only .cls/.sty/.lua, so the four
+# <prefix>-instructions.tex defaults were missing from every install and every
+# Overleaf bundle. A quiz then died at build time with "File
+# `quiz-instructions.tex' not found", which reads like the author's missing file
+# rather than a broken install. Caught only because the Overleaf probe built a
+# quiz; the earlier TEXMF install test used a syllabus and a lecture note.
+_instr = [n for n in names if n.endswith("-instructions.tex")]
+ok &= check(len(_instr) == 4,
+            "payload_files: ships the four -instructions.tex defaults (got %d)"
+            % len(_instr))
+for _want in ("quiz-instructions.tex", "autoexam-instructions.tex",
+              "pset-instructions.tex", "bingo-instructions.tex"):
+    ok &= check(_want in names, "payload_files: ships %s" % _want)
+# ...and nothing else .tex from a module dir. Quizzes/title.tex is \input by
+# nothing and would put `title' in the global TeX search namespace.
+ok &= check("title.tex" not in names,
+            "payload_files: does NOT ship the generically-named title.tex")
+
+
+# --- Overleaf bundle ----------------------------------------------------------
+_ov = C.build_parser().parse_args(["overleaf", "-n"])
+ok &= check(_ov.dry_run and _ov.func is C.cmd_overleaf, "parser: overleaf -n")
+ok &= check(C.build_parser().parse_args(["overleaf"]).output is None,
+            "parser: overleaf defaults its output path")
+ok &= check("Compiler" in C.OVERLEAF_README
+            and "LuaLaTeX" in C.OVERLEAF_README,
+            "overleaf README names the compiler setting")
+# The README tells Overleaf users to reach for the source-level switches,
+# because they have no build tool to pass compile-time flags. If a switch it
+# names stops existing, the instructions become wrong silently.
+_switches = ("\\solutions", "\\keys", "\\rubrics", "\\studentmode", "\\drafts")
+_declared = open(os.path.join(HERE, "texlib-build.sty"),
+                 encoding="utf-8", errors="replace").read()
+for _sw in _switches:
+    ok &= check(_sw in C.OVERLEAF_README and _sw in _declared,
+                "overleaf README's %s switch exists in texlib-build.sty" % _sw)
 # Thesis profiles keep their directory the same way statements do, and for the
 # same reason: the class resolves profiles/<name>.tex by relative subpath. This
 # was missed when statements/ was special-cased -- the two landed on branches

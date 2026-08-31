@@ -344,7 +344,21 @@ def payload_files(root=HERE):
                 out.append((src, rel.replace(os.sep, "/")))
                 continue
 
-            if not fn.lower().endswith(TEX_SOURCE_EXTS):
+            # The four <module>/<prefix>-instructions.tex files are the default
+            # body of the instructions box, \input by name when a document sets
+            # no <prefix>-instructions-file key. They are .tex, so the extension
+            # filter dropped them, and an install without them fails at build
+            # time with "File `quiz-instructions.tex' not found" -- which reads
+            # like a missing user file, not a broken install.
+            #
+            # Matched by that narrow suffix rather than by "*.tex in a module
+            # dir" on purpose: Quizzes/title.tex would qualify under the broad
+            # rule, is \input by nothing, and would put a file called `title'
+            # into the global search namespace of every TeX installation that
+            # ran the installer.
+            if fn.lower().endswith("-instructions.tex"):
+                pass
+            elif not fn.lower().endswith(TEX_SOURCE_EXTS):
                 continue
             if fn in seen:
                 sys.stderr.write(
@@ -431,6 +445,112 @@ def cmd_uninstall(args):
     refresh_texmf_db()
     print("texlib: removed %d file(s) from %s" % (n, target))
     return 0
+
+
+# --- Overleaf bundle ----------------------------------------------------------
+
+OVERLEAF_README = """\
+# TeXLib on Overleaf
+
+Unzip this into your Overleaf project (or upload the zip with **New File ->
+Upload**, which expands it). The `.cls`, `.sty` and `.lua` files must sit at the
+**project root**, beside your document -- Overleaf gives you no `TEXINPUTS`, so
+that is how the classes are found. Keep the `statements/` folder as a folder.
+
+Then:
+
+```latex
+\\documentclass{didactic}     % or pset, quiz, autoexam, syllabus, schedule,
+\\begin{document}             %    report-card, bingo, bank, thesis
+...
+\\end{document}
+```
+
+**Set the compiler.** Menu -> Compiler. `quiz`, `autoexam`, `schedule`,
+`bingo`, `report-card`, `bank` and `thesis` require **LuaLaTeX** and fail
+immediately under pdfLaTeX. `didactic`, `pset` and `syllabus` work under either.
+
+## What works
+
+Everything the document itself controls: all ten classes, the problem-bank
+engine and randomized exams, schedules, the syllabus policy statements, the
+theorem environments, metadata via `coursemeta.tex`.
+
+Build variants are available through the source-level switches, since Overleaf
+has no build tool to pass compile-time flags:
+
+```latex
+\\solutions      % answers            (equivalent to --mode solutions)
+\\keys           % the student's key
+\\rubrics        % + grading rubric
+\\studentmode    % blank answer space
+\\drafts         % DRAFT watermark
+```
+
+Put one in the preamble, recompile, download. Comment it out for the student
+copy.
+
+## What does not work here
+
+- **One PDF per compile.** The variant fan-out that produces student, solutions
+  and instructor copies in one go is part of the build tool, not the classes.
+  Use the switches above and compile once per copy.
+- **No veraPDF report.** Accessible builds still tag correctly -- put
+  `\\DocumentMetadata{...}` before `\\documentclass` -- but nothing on Overleaf
+  can validate the result. Download the PDF and check it locally, or use
+  veraPDF's own web tooling.
+- **Overleaf's TeX Live may be older than TeXLib targets.** Tagging in
+  particular moves fast; if an accessible build errors, that is usually the
+  cause. Menu -> Settings -> TeX Live version.
+- **No SyncTeX redirection into bank files.** Inverse search lands in the
+  generated body, not in `bank.tex`.
+
+## Updating
+
+Re-run `python texlib_cli.py overleaf` against a newer checkout and re-upload.
+The bundle carries no version stamp of its own; it is whatever the checkout was.
+"""
+
+
+def cmd_overleaf(args):
+    """Bundle the library flat, for a platform with no TEXINPUTS and no install.
+
+    Overleaf is the largest population of LaTeX users who cannot run
+    `texlib_cli.py install`, cannot set an environment variable, and cannot put
+    anything in a TEXMF tree. What they can do is drop files in the project
+    root, which is exactly the flat layout `install` already produces -- so this
+    is the same payload in a zip, plus a README about what a build tool's
+    absence costs them.
+    """
+    import zipfile  # noqa: PLC0415 - only this command needs it
+
+    out = args.output or "texlib-overleaf.zip"
+    files = payload_files()
+    if not files:
+        sys.stderr.write("texlib: no payload found; is this a checkout?\n")
+        return 2
+    if args.dry_run:
+        print("texlib: would write %s with %d file(s)" % (out, len(files) + 1))
+        return 0
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        for src, rel in files:
+            z.write(src, rel)
+        z.writestr("README-TEXLIB.md", OVERLEAF_README)
+    size = os.path.getsize(out)
+    print("texlib: wrote %s (%d files, %s)"
+          % (out, len(files) + 1, human_size(size)))
+    print()
+    print("Upload it to Overleaf with New File -> Upload; it expands in place.")
+    print("The .cls/.sty/.lua must end up at the project root. See")
+    print("README-TEXLIB.md inside for the compiler setting and what is lost.")
+    return 0
+
+
+def human_size(n):
+    for unit in ("B", "KB", "MB"):
+        if n < 1024 or unit == "MB":
+            return "%.0f %s" % (n, unit) if unit == "B" else "%.1f %s" % (n, unit)
+        n /= 1024.0
 
 
 # --- doctor ------------------------------------------------------------------
@@ -754,6 +874,14 @@ def build_parser():
     u.add_argument("--target", metavar="DIR")
     u.add_argument("-n", "--dry-run", action="store_true")
     u.set_defaults(func=cmd_uninstall)
+
+    o = sub.add_parser("overleaf",
+                       help="bundle the library as a zip for Overleaf, where "
+                            "nothing can be installed")
+    o.add_argument("-o", "--output", metavar="ZIP",
+                   help="output path (default: texlib-overleaf.zip)")
+    o.add_argument("-n", "--dry-run", action="store_true")
+    o.set_defaults(func=cmd_overleaf)
 
     d = sub.add_parser("doctor", help="report what a build would use")
     d.add_argument("-v", "--verbose", action="store_true")

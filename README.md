@@ -90,6 +90,7 @@ The build lives in `texlib_cli.py`, not in any editor, so wiring it up is a one-
 | **Sublime Text** | Install `Sublime/` (see [Sublime/README.md](Sublime/README.md)) — `Ctrl+B`, plus completions, a bank browser, and a Doctor. |
 | **VS Code** | A task in `.vscode/tasks.json` whose `command` is the line above, bound to `Ctrl+Shift+B`. |
 | **Makefile / latexmk** | `%.pdf: %.tex` → the same line. Exit code is 0 on success, 1 on a build error. |
+| **Overleaf** | You cannot install anything or set `TEXINPUTS` there. `python texlib_cli.py overleaf` writes a zip to upload into the project instead; the classes then work, with one PDF per compile and the source-level switches (`\solutions`, `\keys`, …) standing in for build modes. The bundle's own `README-TEXLIB.md` covers the compiler setting and the limits. |
 | **CI** | Same again; `--quiet` suppresses the engine log and prints only the condensed error report. |
 
 The Sublime plugin and the CLI are two front-ends over one build core (`TexlibBuildCore`), so a fix in the build reaches both. If they ever disagree, the core is right and one of the hosts has a bug.
@@ -114,12 +115,13 @@ The Sublime plugin and the CLI are two front-ends over one build core (`TexlibBu
 
 ### Tooling
 
-- [`texlib_cli.py`](texlib_cli.py) — the editor-independent command line. `build` (any class, any mode), `install` / `uninstall` (classes into `TEXMFHOME`), `doctor` (what a build would use), `modes`. A host over the shared build core, not a second build implementation.
+- [`texlib_cli.py`](texlib_cli.py) — the editor-independent command line. `build` (any class, any mode), `install` / `uninstall` (classes into `TEXMFHOME`), `overleaf` (a zip for a machine you cannot install on), `doctor` (what a build would use), `modes`. A host over the shared build core, not a second build implementation.
 
   ```
   python texlib_cli.py build exam.tex                    # every applicable variant
   python texlib_cli.py build notes.tex --mode accessible # tagged twin + veraPDF report
   python texlib_cli.py build *.tex --quiet               # errors only; exit 1 if any failed
+  python texlib_cli.py overleaf                          # texlib-overleaf.zip
   ```
 
 - [`smoke_test.py`](smoke_test.py) — builds every per-module template and reports pass/fail. Safety net for refactors that touch shared `.sty`/`.cls` files. Usage:
