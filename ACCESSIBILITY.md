@@ -1,12 +1,7 @@
 # Accessibility
 
-TeXLib produces **tagged, PDF/UA-2 conformant** PDFs, and proves it on every
-build rather than claiming it.
-
-This document is written to be checkable. Where it makes a claim, it says how
-that claim is enforced and where the enforcement lives, because "accessible" is
-invisible in a rendered page and an unverifiable assertion about it is worth
-nothing.
+TeXLib produces **tagged, PDF/UA-2 conformant** PDFs. Every accessible build is
+validated with veraPDF and writes the conformance report next to the PDF.
 
 ## What you get
 
@@ -25,14 +20,12 @@ python texlib_cli.py build notes.tex --mode accessible
 or `Ctrl+Shift+B` → "Accessible" in Sublime, or `python smoke_test.py
 --accessible` across every shipped template at once.
 
-The pair is deliberate rather than a replacement. Turning tagging on costs real
-visual fidelity — `tcolorbox` theorem wraps are dropped, because their inner
-list breaks under tagging — so the normal PDF stays the one you print and
-project, and the tagged twin is the one a screen reader can navigate. A single
-"accessible mode" that quietly degraded your lecture notes would get switched
-off, and then nothing would be accessible.
+Both PDFs are kept because tagging costs visual fidelity: `tcolorbox` theorem
+wraps are dropped, since their inner list breaks under tagging. The normal PDF
+is the one to print and project; the tagged twin is the one a screen reader can
+navigate.
 
-## How the claim is enforced
+## How conformance is verified
 
 - **A required check.** `.github/workflows/accessible.yml` runs
   `smoke_test.py --accessible` on every PR to `main` and nightly, inside a
@@ -48,9 +41,9 @@ off, and then nothing would be accessible.
   flavour the documents actually declare. veraPDF's autodetect would silently
   fall back to a weaker profile on a file whose XMP claim is missing — which is
   the very defect the check exists to catch.
-- **No vacuous green.** If veraPDF is absent the gate fails rather than
-  skipping. A soft skip on a missing validator is indistinguishable from a pass,
-  and that failure mode has bitten this repo before.
+- **A missing validator fails the gate.** If veraPDF is absent the job fails
+  instead of skipping, because a skipped check reports the same green as a
+  passing one.
 
 ## Getting the evidence
 
@@ -71,29 +64,25 @@ skipped. Note that veraPDF's installer does **not** put itself on `PATH`;
 TeXLib looks in the known install roots as well, so a complete veraPDF in
 `~/verapdf` is found rather than reported missing.
 
-## Limitations, stated plainly
-
-An accessibility document that lists only strengths is marketing. These are the
-real gaps.
+## Known limitations
 
 **Mathematics tagging is split across two methods, and readers disagree.**
 MathML can be attached as associated files (AF), which Firefox's viewer and
 Foxit read — the in-browser path from an LMS link — or as structure elements
 (SE), which Adobe Acrobat reads. Emitting both is what covers a class of
 readers; emitting one silently flattens the mathematics for the other half.
-Which methods are emitted is declared in exactly one place,
-`ACCESSIBLE_DOCMETA` in [`Sublime/texlib/texlib_buildspec.py`](Sublime/texlib/texlib_buildspec.py)
-— read it there rather than trusting this paragraph, because the answer has
-changed under a toolchain bug and may change back. At the time of writing, SE
-emission is constrained by a `luamml` defect that aborts the run outright on two
-`\sqrt[n]{...}` in a single formula; the constraint is a workaround for someone
-else's bug, not a design choice, and it is documented at the declaration.
 
-**A better checker score is not better accessibility.** TeXLib deliberately does
-**not** set `\tagpdfsetup{math/alt/use}`. It raises the number an Ally- or
-UDOIT-style checker reports, and it does so by replacing the real MathML with
-flat alt text that hides the actual markup from screen readers. That trade is
-available to anyone who wants it and TeXLib will not make it for you.
+Which methods are emitted is declared once, in `ACCESSIBLE_DOCMETA` in
+[`Sublime/texlib/texlib_buildspec.py`](Sublime/texlib/texlib_buildspec.py).
+Check the current value there — it has changed to work around a toolchain bug
+and may change back. SE emission is presently constrained by a `luamml` defect
+that aborts the run on two `\sqrt[n]{...}` in a single formula; the reasoning is
+recorded at the declaration.
+
+**`\tagpdfsetup{math/alt/use}` is deliberately not set.** It raises the score an
+Ally- or UDOIT-style checker reports by replacing the MathML with flat alt text,
+which hides the real markup from screen readers. Set it in your own preamble if
+you need the higher score.
 
 **Tagging changes what LaTeX accepts.** Under `tagging=on`:
 
@@ -105,25 +94,22 @@ available to anyone who wants it and TeXLib will not make it for you.
   `texlib-crossref.sty`, which uses cleveref normally and `zref-clever` in an
   accessible build. If you load cleveref yourself, you will hit this.
 
-**Conformance is a floor, not a ceiling.** PDF/UA-2 conformance means the
-structure is machine-checkable and correct. It does not mean your alt text is
-good, your colour contrast is adequate, or your tables are comprehensible. Those
-are yours.
+**Conformance covers structure only.** PDF/UA-2 means the document's structure
+is machine-checkable and correct. It says nothing about the quality of your alt
+text, your colour contrast, or whether your tables are comprehensible.
 
 ## Why this exists
 
-The US Department of Justice's Title II rule sets compliance deadlines for
-public entities' web content and mobile apps, falling in 2026 and 2027 depending
-on the entity's size. Course materials distributed through an LMS are in scope,
-and a PDF is the format most likely to fail. Consult the rule and your
-institution's own guidance for the date that applies to you — this file is not
-legal advice and the deadline is not the reason to do it.
+An untagged LaTeX handout reaches a screen-reader user as an unnavigable wall of
+text, with the mathematics read as gibberish or skipped. The LaTeX kernel can now
+produce the tagging that fixes this; most of the remaining work is knowing which
+packages break under it, which is what this library encodes.
 
-The reason to do it is that a student using a screen reader currently gets, from
-a typical LaTeX handout, an unnavigable wall of text with the mathematics
-rendered as gibberish or omitted entirely. The machinery to fix that exists in
-the LaTeX kernel now. Most of the work is in knowing which parts break, which is
-what this library encodes.
+Separately, the US Department of Justice's Title II rule sets compliance
+deadlines for public entities' web content, falling in 2026 and 2027 depending
+on the entity's size. Course materials distributed through an LMS are in scope.
+Consult the rule and your institution's guidance for the date that applies to
+you; this file is not legal advice.
 
 ## Checking your own document
 

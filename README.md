@@ -10,7 +10,7 @@ It is developed at the University of Nevada, Reno and used there every semester.
 
 ## Accessibility
 
-Every class here builds a **tagged, PDF/UA-2 conformant** twin of your document, and writes veraPDF's conformance report beside it so the claim is checkable rather than asserted. All ten classes are covered by a required CI gate that runs on every pull request and nightly in a pinned TeX Live container.
+Every class builds a **tagged, PDF/UA-2 conformant** twin of your document and writes veraPDF's conformance report beside it. All ten classes are covered by a required CI gate that runs on every pull request and nightly in a pinned TeX Live container.
 
 ```bash
 python texlib_cli.py build notes.tex --mode accessible
