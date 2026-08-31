@@ -56,6 +56,10 @@
 \ifkey\solutionstrue\fi
 \renewcommand{\keys}{\keytrue\solutionstrue}
 
+% Variants the builder may emit for a quiz. No `student': a quiz reads no
+% \ifstudent, so a student build is byte-identical to the default one.
+\TeXLibDeclareVariants{solutions,instructor}
+
 \ExplSyntaxOn
 
 \tl_new:N \g__quiz_number_tl
@@ -149,17 +153,17 @@
 	% First page carries the course section number on the left (the large
 	% "Quiz <n>" heading sits just below it, so repeating the quiz title here
 	% would be redundant). Running pages carry \GetQuizTitle on the left instead.
-	% \ifsolinline moves the "Answer Key" mark up here from the title block, where
+	% \ifsolinline moves the "Solutions" mark up here from the title block, where
 	% it is a line of body copy and so pushes every problem down ~1 line. That
 	% defeats the whole point of the inline layout, which is a key page whose
 	% geometry matches the student copy exactly. The header costs no body space
-	% and shows on both leaves.
+	% and shows on both leaves. Same word as the title block uses, deliberately.
 	\firstpageheader{\bfseries Section~\GetCourseSection\ifsolinline\ \textmd{---
-		\textit{Answer Key}}\fi}{}{Name:\ \underline{\hspace{2.5in}}}%
+		\textit{Solutions}}\fi}{}{Name:\ \underline{\hspace{2.5in}}}%
 	% Footer L: full course name via the shared \GetCourse ("Math 181 Calculus I").
 	\firstpagefooter{\GetCourse}{\thepage\ of \pageref{LastPage}}{\GetInstitution}%
 	\runningheader{\bfseries\GetQuizTitle\ifsolinline\ \textmd{---
-		\textit{Answer Key}}\fi}{}{Name:\ \underline{\hspace{2.5in}}}%
+		\textit{Solutions}}\fi}{}{Name:\ \underline{\hspace{2.5in}}}%
 	\runningfooter{\GetCourse}{\thepage\ of \pageref{LastPage}}{\GetInstitution}%
 }
 
@@ -176,10 +180,14 @@
 
 \renewcommand{\maketitle}{%
 	\begin{center}
-		{\LARGE \GetQuizTitle}%
+		% An answer-bearing build titles itself "<Quiz title> Solutions" -- one
+		% heading, not a title plus a separate "Answer Key" line under it. The
+		% quiz title carries the number ("Quiz 1"), so this reads "Quiz 1
+		% Solutions" by default and "<custom title> Solutions" when quiz-title is
+		% set.
 		% \ifsolinline carries the mark in the running header instead; see the
 		% \firstpageheader note above.
-		\ifkey\ifsolinline\else\par\vspace{0.4em}\textit{Answer~Key}\fi\fi
+		{\LARGE \GetQuizTitle\ifkey\ifsolinline\else\ Solutions\fi\fi}%
 	\end{center}
 	\par\medskip
 	% Instructions: file / inline / default alike are wrapped in the titled box

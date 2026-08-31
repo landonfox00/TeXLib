@@ -366,6 +366,26 @@ def scenario_bank_solutions_mode():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _page_offset_of_last_copy(combined_pdf, last_slice_pdf):
+    """How many combined pages precede the LAST sliced copy.
+
+    Derived from the two PDFs rather than from a known copy layout, so a change
+    in how many copies a build mode emits cannot silently invalidate a
+    hardcoded page arithmetic -- which is exactly what the 0.8.0 rename did.
+    Returns None when pypdf is unavailable, so the caller can skip rather than
+    fail on a missing optional dependency.
+    """
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return None
+    try:
+        return len(PdfReader(combined_pdf).pages) - len(
+            PdfReader(last_slice_pdf).pages)
+    except Exception:  # noqa: BLE001 - a malformed PDF is the test's problem
+        return None
+
+
 def scenario_sliced_copy_inverse_search():
     """The sliced per-version copies are pages carved out of the combined PDF
     with pypdf, so they carry no SyncTeX map of their own and a viewer looks for
@@ -383,8 +403,13 @@ def scenario_sliced_copy_inverse_search():
     try:
         write(tmp, "bank.tex", BANK_TEX)
         write(tmp, "autoexam.tex", AUTOEXAM_TEX)          # \versions{A,B}
+        # `solutions' is AutoExamSolMode=only since the 0.8.0 rename (it is the
+        # student-facing key), so this emits A-sol, B-sol -- not the four copies
+        # A, B, A-sol, B-sol the pre-rename `solutions' produced. Every page
+        # number below is derived rather than hardcoded because of exactly that:
+        # the copy layout is not this scenario's subject, slice fidelity is.
         run_build(tmp, "autoexam.tex", aux_directory="<<temp>>",
-                  options=["--texlib-mode=solutions"])    # -> dual: A,B then A,B sol
+                  options=["--texlib-mode=solutions"])    # -> only: A-sol, B-sol
 
         combined = os.path.join(tmp, "autoexam.pdf")
         slice_pdf = os.path.join(tmp, "autoexam_A_solutions.pdf")
@@ -407,7 +432,9 @@ def scenario_sliced_copy_inverse_search():
               r["line"] == BANK_STEM_LINE, f"got line {r['line']!r}")
 
         # Same point, same page, through the parent's map: the two must agree.
-        cpos = find_word(combined, "SYNCNEEDLESTEM", occurrence=3)  # A,B,then A-sol
+        # A-sol is the FIRST copy in an `only' build (it was the third when this
+        # mode meant dual), so occurrence 1 is the one the slice was cut from.
+        cpos = find_word(combined, "SYNCNEEDLESTEM", occurrence=1)
         if cpos:
             rc = synctex_edit(combined, *cpos)
             check("the slice answers exactly as the combined map does",
@@ -415,18 +442,23 @@ def scenario_sliced_copy_inverse_search():
                   f"slice {r['input']}:{r['line']} vs combined "
                   f"{rc['input']}:{rc['line']}")
 
-        # FORWARD search, the other direction. The fixture is 2 versions +
-        # solutions = four 2-page copies (A, B, A-sol, B-sol), so B-sol is
-        # combined pages 7-8 and a combined answer of page 8 must come back as
-        # page 2 through its slice's own map. Asserted against B-sol rather than
-        # A-sol deliberately: forward search into a multi-version exam resolves a
-        # bank line to ONE page, because the per-problem SyncTeX redirect gives
-        # bank.tex an Input: tag per \@@input and the lookup takes the last --
-        # a pre-existing limitation of the version loop, visible in the COMBINED
-        # PDF exactly as much as in a slice (a document-body line resolves to no
-        # page at all there, the body being re-emitted through a scratch file).
-        # The slice carries whatever the parent had; that faithfulness is what is
-        # being checked here, not the upstream lookup.
+        # FORWARD search, the other direction. B-sol is the LAST copy in the
+        # combined PDF, so its pages sit at the end and a combined answer must
+        # come back shifted by everything before it. That shift is computed --
+        # combined page count minus the slice's own -- rather than written down,
+        # so the assertion survives a change in how many copies the mode emits.
+        # It was hardcoded to 6 (four 2-page copies) and silently became wrong
+        # the moment `solutions' stopped meaning dual.
+        #
+        # Asserted against B-sol rather than A-sol deliberately: forward search
+        # into a multi-version exam resolves a bank line to ONE page, because the
+        # per-problem SyncTeX redirect gives bank.tex an Input: tag per \@@input
+        # and the lookup takes the last -- a pre-existing limitation of the
+        # version loop, visible in the COMBINED PDF exactly as much as in a slice
+        # (a document-body line resolves to no page at all there, the body being
+        # re-emitted through a scratch file). The slice carries whatever the
+        # parent had; that faithfulness is what is being checked here, not the
+        # upstream lookup.
         bank_tex = os.path.join(tmp, "bank.tex")
         combined_pages = synctex_view(combined, bank_tex, BANK_STEM_LINE)
         bsol = os.path.join(tmp, "autoexam_B_solutions.pdf")
@@ -434,10 +466,12 @@ def scenario_sliced_copy_inverse_search():
             slice_pages = synctex_view(bsol, bank_tex, BANK_STEM_LINE)
             check("forward search resolves through the slice's own map",
                   bool(slice_pages), f"combined gave {combined_pages}")
-            check("...to the page the combined answer maps onto (7-8 -> 1-2)",
-                  slice_pages and combined_pages
-                  and int(slice_pages[0]) == int(combined_pages[0]) - 6,
-                  f"slice {slice_pages} vs combined {combined_pages}")
+            offset = _page_offset_of_last_copy(combined, bsol)
+            check("...to the page the combined answer maps onto",
+                  slice_pages and combined_pages and offset is not None
+                  and int(slice_pages[0]) == int(combined_pages[0]) - offset,
+                  f"slice {slice_pages} vs combined {combined_pages}, "
+                  f"offset {offset}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -759,6 +793,131 @@ def scenario_quiz_bank_problem():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# --- Fixture: a \ppart part carrying a {partsolution} -------------------------
+# {partsolution} shipped from 0.7.1 with no call site anywhere in the repo, so
+# nothing here ever built one and its inverse search was never measured. Line
+# numbers are load-bearing.
+PARTSOL_BANK_TEX = (
+    "% partsolution fixture\n"                                  # 1
+    "\\begin{problem}{ppsol}[topic=fr]\n"                       # 2
+    "\tPARTSOLSTEM the stem line.\n"                            # 3
+    "\t\\begin{parts}\n"                                        # 4
+    "\t\t\\ppart PARTSOLPART the first part.\n"                 # 5
+    "\t\t\\begin{partsolution}\n"                               # 6
+    "\t\t\tPARTSOLANSWER is the worked part answer.\n"          # 7
+    "\t\t\\end{partsolution}\n"                                 # 8
+    "\t\\end{parts}\n"                                          # 9
+    "\\end{problem}\n"                                          # 10
+)
+PARTSOL_ANSWER_LINE = 7
+
+PARTSOL_QUIZ_TEX = (
+    "\\documentclass[quiz-number=1]{quiz}\n"
+    "\\loadbank{bank.tex}\n"
+    "\\begin{document}\n"
+    "\\maketitle\n"
+    "\\begin{problems}\n"
+    "\\problem{ppsol}\n"
+    "\\end{problems}\n"
+    "\\end{document}\n"
+)
+
+
+def scenario_partsolution_inverse_search():
+    """A click on a part solution's answer must land on the ANSWER, not on
+    \\end{partsolution}.
+
+    {partsolution} harvested its SyncTeX target from the body box and stamped
+    that same body box. Everything built afterwards -- the wrap vtop carrying
+    the "Solution." header and rubric, and \\@partsol@frame's parbox, its two
+    \\smash\\rlap wrappers and the tint/accent rules -- was created while TeX was
+    reading the \\end line, kept that line, and NESTED OUTSIDE the stamped box.
+    {solution} survives the same shape (its unstamped chrome is a documented
+    cosmetic residual), but a part solution sits one level deeper, inside the
+    exam-class {parts} list, and there the outer line-8 containers win the
+    parser's smallest-then-deepest contest.
+
+    Measured before the fix, in BOTH the key and key-inline layouts: right file,
+    line 8 instead of 7. The left padding band -- answered by the stamped
+    container -- was already correct, which is what made this invisible.
+
+    Fix: harvest from the body box, assemble, then stamp the finished frame.
+    Both layouts are asserted because key-inline routes the frame through a
+    zero-height \\raisebox that the normal layout does not have.
+    """
+    for mode in ("key", "key-inline"):
+        print(f"\n=== Scenario 12: {{partsolution}} inverse search ({mode}) ===")
+        tmp = tempfile.mkdtemp(prefix="texlib_synctex_it_partsol_")
+        try:
+            write(tmp, "bank.tex", PARTSOL_BANK_TEX)
+            write(tmp, "quiz.tex", PARTSOL_QUIZ_TEX)
+            run_build(tmp, "quiz.tex", aux_directory="<<temp>>",
+                      options=[f"--texlib-mode={mode}"])
+
+            pdf = os.path.join(tmp, "quiz.pdf")
+            check(f"PDF was produced ({mode})", os.path.exists(pdf))
+            if not os.path.exists(pdf):
+                continue
+
+            pos = find_word(pdf, "PARTSOLANSWER")
+            check(f"the part solution rendered ({mode})", pos is not None)
+            if not pos:
+                continue
+            # Resolve at the word's centre, which is what a real double-click
+            # is. If that misses, probe a small vertical neighbourhood before
+            # deciding what kind of failure it is -- the two look identical in
+            # a bare assertion and mean opposite things:
+            #
+            #   nothing anywhere resolves to the answer line  -> the stamp is
+            #       missing. That is the regression this scenario exists for,
+            #       and it must FAIL. (Measured with the fix reverted: all
+            #       seven probe points return line 8, not one returns 7.)
+            #   the centre misses but a nearby point hits      -> the stamp IS
+            #       present and correct; this build of the synctex CLI just
+            #       disagrees about which box contains the point. Not ours to
+            #       fix, and not a regression -- tracked, not blocking.
+            #
+            # The second case is real and reproducible: on the pinned Alpine
+            # container the centre resolves to the page box (quiz.tex, the
+            # \end{document} line) while 6pt away it resolves correctly; on
+            # Windows the centre itself is correct. Everything TeXLib produces
+            # is byte-identical between the two -- same PDF, same find_word
+            # coordinates to nine decimal places, same 496 page-1 .synctex
+            # records (the only differing byte is a path-length-dependent
+            # offset anchor), same Magnification/Unit/X-Y Offset, same synctex
+            # CLI version 1.5. The difference is in the CLI binary, so the
+            # assertion cannot be about TeXLib.
+            _probe = [(0, synctex_edit(pdf, *pos))]
+            _pg, _x, _y = pos
+            _hits = [d for d, p in _probe
+                     if basename_matches(p["input"], "bank.tex")
+                     and p["line"] == PARTSOL_ANSWER_LINE]
+            if not _hits:
+                for _dy in (-6, -4, -2, 2, 4, 6):
+                    _p = synctex_edit(pdf, _pg, _x, _y + _dy)
+                    _probe.append((_dy, _p))
+                    if (basename_matches(_p["input"], "bank.tex")
+                            and _p["line"] == PARTSOL_ANSWER_LINE):
+                        _hits.append(_dy)
+
+            r = _probe[0][1]
+            _centre_ok = (basename_matches(r["input"], "bank.tex")
+                          and r["line"] == PARTSOL_ANSWER_LINE)
+            _nearby = ", ".join(f"{d:+d}pt" for d in _hits) or "nowhere"
+            check(f"a click on the part answer resolves to bank.tex:"
+                  f"{PARTSOL_ANSWER_LINE}, not the \\end line ({mode})",
+                  _centre_ok,
+                  f"centre gave {os.path.basename(r['input'] or '?')}:"
+                  f"{r['line']}; correct at {_nearby}",
+                  known_issue=(
+                      "synctex CLI build resolves the stamped frame's extent "
+                      "differently; the stamp is present (correct %s from the "
+                      "centre) and every TeXLib artifact is byte-identical to "
+                      "a passing run" % _nearby) if _hits else None)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 # --- Fixture: didactic (lecture notes), a non-exam class that also loads
 # texlib-problembank so a lecture handout can \getproblem{id} directly in
 # running prose -- never previously built through this suite. ---------------
@@ -970,6 +1129,7 @@ def main():
     scenario_schedule_boxgrid_builder()
     scenario_schedule_boxgrid_plain_cli()
     scenario_sliced_copy_inverse_search()
+    scenario_partsolution_inverse_search()
 
     summary = f"\n{_c.passed} passed, {_c.failed} failed"
     if _c.known:

@@ -77,12 +77,12 @@ ok = True
 
 # 1. autoexam, no magic comment, default mode -> lua force + file-line-error.
 cmds, msgs, disp = run_case("autoexam-default",
-                            docclass="autoexam", engine="pdflatex", mode="default")
-ok &= check(len(cmds) == 1, "autoexam/default: single pass (no rerun signal)")
+                            docclass="autoexam", engine="pdflatex", mode="base")
+ok &= check(len(cmds) == 1, "autoexam/base: single pass (no rerun signal)")
 ok &= check(cmds and cmds[0][0] == "lualatex", "autoexam: engine forced to lualatex")
 ok &= check(cmds and "-file-line-error" in cmds[0], "autoexam: -file-line-error present")
 ok &= check("requires lualatex" in disp, "autoexam: force message displayed")
-ok &= check(cmds and cmds[0][-1] == "doc.tex", "autoexam/default: bare \\input arg")
+ok &= check(cmds and cmds[0][-1] == "doc.tex", "autoexam/base: bare \\input arg")
 
 # 2. pset, key mode -> pdflatex kept, macro injected.
 cmds, msgs, disp = run_case("pset-key",
@@ -96,7 +96,7 @@ ok &= check(cmds and "-file-line-error" in cmds[0], "pset: -file-line-error pres
 #    is what really produces that warning) triggers exactly one more pass, and
 #    the settled pass ends it.
 cmds, msgs, disp = run_case(
-    "pset-rerun", docclass="pset", engine="pdflatex", mode="default",
+    "pset-rerun", docclass="pset", engine="pdflatex", mode="base",
     outs=["Rerun to get cross-references right.", ""],
     writes=[r"\newlabel{a}{{1}{7}}", None])
 ok &= check(len(cmds) == 2, "rerun: 'Rerun to get' -> 2 passes then settles")
@@ -115,14 +115,14 @@ ok &= check(msgs and "quick" in msgs[0], "quick: labeled a quick single pass")
 # 5. The veto: the log asks for a rerun but the pass consumed and produced
 #    byte-identical state -> another pass is provably a no-op, so it is skipped.
 cmds, msgs, disp = run_case(
-    "pset-stable-veto", docclass="pset", engine="pdflatex", mode="default",
+    "pset-stable-veto", docclass="pset", engine="pdflatex", mode="base",
     outs=["Rerun to get cross-references right."] * 4)
 ok &= check(len(cmds) == 1, "veto: stable aux state overrides a log rerun request")
 
 # 6. The blind spot: state moved but the log said nothing (autoexam guts
 #    \@testdef, so a shifted "page X of Y" footer never warns) -> settle it.
 cmds, msgs, disp = run_case(
-    "autoexam-silent", docclass="autoexam", engine="lualatex", mode="default",
+    "autoexam-silent", docclass="autoexam", engine="lualatex", mode="base",
     outs=["", ""], writes=[r"\newlabel{@lastqpage@A}{{}{4}}", None])
 ok &= check(len(cmds) == 2, "silent log: aux change alone earns a settling pass")
 ok &= check(len(msgs) == 2 and "rerun 2" in msgs[1],
@@ -132,7 +132,7 @@ ok &= check(len(msgs) == 2 and "rerun 2" in msgs[1],
 #    seeds the unversioned case from os.time()) never converges; a silent log
 #    buys STATE_ONLY_RERUNS extra passes, not the whole MAX_RERUNS budget.
 cmds, msgs, disp = run_case(
-    "quiz-churn", docclass="quiz", engine="lualatex", mode="default",
+    "quiz-churn", docclass="quiz", engine="lualatex", mode="base",
     outs=[""] * 6, writes=["v%d" % n for n in range(6)])
 ok &= check(len(cmds) == 1 + texlib_build.STATE_ONLY_RERUNS,
             "churn: silent-log reruns stop at STATE_ONLY_RERUNS (%d passes)"
@@ -141,7 +141,7 @@ ok &= check(len(cmds) == 1 + texlib_build.STATE_ONLY_RERUNS,
 # 8. Oscillation A -> B -> A: no fixed point exists, so stop at the cycle
 #    instead of spending the rest of MAX_RERUNS rediscovering it.
 cmds, msgs, disp = run_case(
-    "pset-oscillate", docclass="pset", engine="pdflatex", mode="default",
+    "pset-oscillate", docclass="pset", engine="pdflatex", mode="base",
     outs=["Rerun to get cross-references right."] * 5,
     writes=["A", "B", "A", "B", "A"])
 ok &= check(len(cmds) == 3, "oscillation: stops at the repeat (3 passes)")
@@ -149,7 +149,7 @@ ok &= check("oscillating" in disp, "oscillation: reported, not silent")
 
 # 9. Hitting the ceiling is reported rather than silently truncating the build.
 cmds, msgs, disp = run_case(
-    "pset-unsettled", docclass="pset", engine="pdflatex", mode="default",
+    "pset-unsettled", docclass="pset", engine="pdflatex", mode="base",
     outs=["Rerun to get cross-references right."] * 6,
     writes=["v%d" % n for n in range(6)])
 ok &= check(len(cmds) == texlib_build.MAX_RERUNS,
@@ -163,12 +163,12 @@ ok &= check("unsettled after" in disp, "ceiling: reported, not silent")
 BBL_A = "\\relax\n\\abx@aux@read@bbl@mdfivesum{nohash}\n\\abx@aux@read@bblrerun\n"
 BBL_B = "\\relax\n\\abx@aux@read@bbl@mdfivesum{nobblfile}\n"
 cmds, msgs, disp = run_case(
-    "didactic-bbl-noise", docclass="didactic", engine="pdflatex", mode="default",
+    "didactic-bbl-noise", docclass="didactic", engine="pdflatex", mode="base",
     outs=["", ""], writes=[BBL_A, BBL_B])
 ok &= check(len(cmds) == 2,
             "bbl noise: pass 1 creating the aux still earns its settling pass")
 cmds, msgs, disp = run_case(
-    "didactic-bbl-settled", docclass="didactic", engine="pdflatex", mode="default",
+    "didactic-bbl-settled", docclass="didactic", engine="pdflatex", mode="base",
     outs=["", "", ""], writes=[BBL_A, BBL_B, BBL_B])
 ok &= check(len(cmds) == 2,
             "bbl noise: an aux differing only in biblatex rerun flags is settled")
@@ -178,7 +178,7 @@ ok &= check(len(cmds) == 2,
 os.environ["TEXLIB_STATE_RERUN"] = "0"
 try:
     cmds, msgs, disp = run_case(
-        "pset-optout", docclass="pset", engine="pdflatex", mode="default",
+        "pset-optout", docclass="pset", engine="pdflatex", mode="base",
         outs=["Rerun to get cross-references right.", ""])
 finally:
     del os.environ["TEXLIB_STATE_RERUN"]

@@ -143,7 +143,13 @@
 \fancyhf{}
 % Header: L = pset title  C = build badge  R = term + section. (R was \GetCourse,
 % which duplicated the footer-left course; term/section removes that redundancy.)
-\SetTeXLibBuildBadge{\ifkey Answer Key\fi}
+% pset is the one class that branches on all three flags, so all three variants
+% are genuinely different documents.
+\TeXLibDeclareVariants{student,solutions,instructor}
+% \ifinstructor first: the instructor variant raises \ifsolutions, the student
+% key raises \ifkey, and only \ifinstructor tells them apart.
+\SetTeXLibBuildBadge{%
+	\ifinstructor Instructor Version\else\ifkey Solutions\fi\fi}
 \SetTeXLibHeader{\bfseries\GetPsetTitle}{\TeXLibBuildBadge}{\GetTermSection}
 \SetTeXLibFooter
 % Rule bleed comes from texlib-sectionhang's [LR] offset (loaded at the end of
@@ -163,7 +169,11 @@
 	\begin{center}
 		{\LARGE \bfseries \GetPsetTitle} \\[0.4em]
 		{\Large \GetCourse \space\textendash\space \GetTerm} \\[0.2em]
-		\ifkey \textit{Answer Key} \\[0.4em] \fi
+		\ifinstructor
+			\textit{Instructor Version} \\[0.4em]
+		\else
+			\ifkey \textit{Solutions} \\[0.4em] \fi
+		\fi
 		\ifx\\\GetPsetDue\\\else
 			\textbf{Due:}\ \GetPsetDue \\[0.4em]
 		\fi
@@ -310,6 +320,7 @@
 \NewTColorBox{solution}{ O{3cm} }{
 	texlibbase,
 	code={
+		\TeXLibNoteSolution
 		\ifsolutions
 			\tcbset{
 				colback=\texlibsoltint,
@@ -350,7 +361,9 @@
 				% signature swallows the optional [height] arg; empty body = discard.
 				\let\solution\@undefined
 				\let\endsolution\@undefined
-				\NewEnviron{solution}[1][3cm]{}%
+				% Body discarded, but the note still fires: this is the build
+				% the variant planner most needs the truth from.
+				\NewEnviron{solution}[1][3cm]{\TeXLibNoteSolution}%
 			\fi
 		\fi
 	\fi

@@ -5,10 +5,13 @@
 	// TeXLib.sublime-build, so the TeXLib build system must be selected
 	// (Tools > Build System > TeXLib, or "Automatic" for a .tex file).
 	{ "caption": "TeXLib: Build (current mode)", "command": "build" },
-	{ "caption": "TeXLib: Build — Answer Key",         "command": "build", "args": {"variant": "Answer Key"} },
-	{ "caption": "TeXLib: Build — Solutions + Rubric", "command": "build", "args": {"variant": "Solutions + Rubric"} },
+	{ "caption": "TeXLib: Build — Base only",          "command": "build", "args": {"variant": "Base only (one PDF)"} },
+	{ "caption": "TeXLib: Build — Solutions",          "command": "build", "args": {"variant": "Solutions (student key)"} },
+	{ "caption": "TeXLib: Build — Solutions (inline)", "command": "build", "args": {"variant": "Solutions (in the answer space)"} },
+	{ "caption": "TeXLib: Build — Instructor",         "command": "build", "args": {"variant": "Instructor (solutions + rubric)"} },
 	{ "caption": "TeXLib: Build — Student Copy",       "command": "build", "args": {"variant": "Student Copy"} },
 	{ "caption": "TeXLib: Build — Draft",              "command": "build", "args": {"variant": "Draft"} },
 	{ "caption": "TeXLib: Build — Quick",              "command": "build", "args": {"variant": "Quick (single pass, refs may be stale)"} },
+	{ "caption": "TeXLib: Build — Full (all variants)", "command": "build", "args": {"variant": "Full (every variant, no pruning)"} },
 	{ "caption": "TeXLib: Build — Accessible",         "command": "build", "args": {"variant": "Accessible (normal + tagged PDF/UA pair)"} }
 ]

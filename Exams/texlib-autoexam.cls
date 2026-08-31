@@ -87,6 +87,11 @@
 \let\@autoexam@rubrictrue\rubrictrue
 \let\@autoexam@rubricfalse\rubricfalse
 
+% Variants the builder may emit for an exam. No `student': autoexam reads no
+% \ifstudent -- the blank copy is what the default build already produces, and
+% the version loop emits it alongside the instructor copies in a `dual' build.
+\TeXLibDeclareVariants{solutions,instructor}
+
 % Versioning is autoexam-specific (not part of texlib-build).
 \newif\if@autoexam@versioned
 \@autoexam@versionedfalse
@@ -174,6 +179,18 @@
 % builder then slices as the STUDENT PDF. Same `dual' as \ShowSolutions, and
 % checked after it so combining the two is idempotent, not order-dependent.
 \ifdefined\ShowRubric        \def\AutoExamSolMode{dual}\fi
+% \InstructorMode is the builder's `instructor' variant, and it is checked LAST
+% so it wins over the \ShowSolutions/\ShowRubric it always arrives with.
+%
+% `only', not `dual': in a variant fan-out the blank student copies have already
+% been typeset and sliced by the BASE compile, so a dual instructor build would
+% emit a second identical set and the slicer would write them straight over
+% <base>_A.pdf. Emitting the instructor copies alone also keeps the per-version
+% slice names unambiguous -- <base>_A_instructor.pdf beside the key's
+% <base>_A_solutions.pdf. A hand-written \def\ShowSolutions{} with no
+% \InstructorMode still means `dual', so nothing about the documented
+% source-level workflow changes.
+\ifdefined\InstructorMode    \def\AutoExamSolMode{only}\solutionstrue\fi
 % If BOTH source commands were used, warn and keep dual (\justsolutions ignored).
 \AtBeginDocument{%
 	\if@ax@src@dual\if@ax@src@only
@@ -185,11 +202,20 @@
 	\fi\fi
 }
 
-% Cover-page build-mode word: an \ifkey build (\ShowKey / \keys) labels its cover
-% "Answer Key" -- matching quiz.cls's \ifkey header -- while any other solutions
-% build (\ShowSolutions / \justsolutions) says "Solutions". \ifkey builds are
-% always instructor-only, so this word only ever appears on a key copy.
-\newcommand{\@autoexam@solword}{\ifkey Answer Key\else Solutions\fi}
+% Cover-page build-mode word. Keyed on \ifinstructor, not \ifkey: after the
+% 0.8.0 rename the STUDENT-facing key is the `solutions' build (\ShowKey), so
+% labelling that cover "Answer Key" while the instructor copy said "Solutions"
+% had the two exactly backwards against the mode that produced them.
+%
+% The instructor copy says so and stops there -- it always carries rubrics, so
+% appending "and Rubrics" would be noise. A rubric raised on its own still
+% announces itself, which is why that suffix survives on the other branch.
+\newcommand{\@autoexam@solword}{%
+	\ifinstructor
+		Instructor Version%
+	\else
+		Solutions\if@autoexam@rubric\space and Rubrics\fi
+	\fi}
 
 % texlib-problembank.sty loads problem_engine.lua and defines the shared
 % machinery: \setvar/\setrng/\calcvar/\get, \pick* commands, \getlist/\geti/
@@ -869,13 +895,12 @@
 		\ifdim\wd\z@>\z@ \large\GetTermSection \\ \vspace{0.1em} \fi
 		\large \GetExamDate
 		% Build-mode label: shown in red when solutions and/or rubrics are on.
-		% "Answer Key" for an \ifkey build, else "Solutions" (see \@autoexam@solword).
+		% \@autoexam@solword carries the rubric suffix itself now (the instructor
+		% copy implies rubrics and says only "Instructor Version"), so this no
+		% longer appends one -- doing both produced "Instructor Version and
+		% Rubrics and Rubrics".
 		\ifsolutions
-			\if@autoexam@rubric
-				\\ \large\textcolor{red}{\textbf{\@autoexam@solword\space and Rubrics}}%
-			\else
-				\\ \large\textcolor{red}{\textbf{\@autoexam@solword}}%
-			\fi
+			\\ \large\textcolor{red}{\textbf{\@autoexam@solword}}%
 		\else
 			\if@autoexam@rubric
 				\\ \large\textcolor{red}{\textbf{Rubrics}}%

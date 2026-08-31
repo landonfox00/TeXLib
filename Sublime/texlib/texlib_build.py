@@ -128,30 +128,92 @@ LUALATEX_CLASSES = _spec.LUALATEX_CLASSES
 GRADEBOOK_CLASSES = {"report-card"}
 GRADEBOOK_SHEETS = ("Report View", "Report Cards")
 
+# --- Variants ----------------------------------------------------------------
+# A VARIANT is one rendering of the document: the same source, a different
+# audience. Each is its own compile -- the flags change what is typeset
+# globally, so they cannot share a run -- and each lands as
+# <base>_<variant>.pdf beside the source.
+#
+# The names are the audience, not the mechanism, which is the whole point of
+# the 0.8.0 rename: `solutions' is the copy a STUDENT gets after the fact
+# (answers, no grading apparatus) and `instructor' is the copy that carries the
+# rubric and the common-error notes. The underlying TeX flags are unchanged --
+# \ifkey, \ifsolutions, \ifrubric still mean exactly what they meant, so no
+# course document and no class file had to move -- only these mode tokens did.
+#
+# \InstructorMode rides along on `instructor' so \ifinstructor finally means
+# something: it is how a class tells an instructor copy from a student key when
+# both reveal the same answers (the badge wording), which is the only
+# difference for the classes that have no rubric machinery at all.
+VARIANT_MACROS = {
+    "student":    r"\def\StudentMode{}",
+    "solutions":  r"\def\ShowKey{}",
+    "instructor": r"\def\ShowSolutions{}\def\ShowRubric{}\def\InstructorMode{}",
+    # Same answers as `solutions', drawn INTO the student's reserved answer
+    # space instead of replacing it, so the page geometry matches the student
+    # copy. Only meaningful for problems authored with {partsolution}; the
+    # planner offers it only when the sidecar reports one.
+    "solutions-inline": r"\def\ShowKeyInline{}",
+}
+
+# Variants the planner will consider, in emission order. `solutions-inline' is
+# deliberately absent: it is a layout preference, not an audience, so it is
+# opt-in per document rather than something a default build fans out into.
+PLANNED_VARIANTS = ("student", "solutions", "instructor")
+
+# Modes that fan out into a whole variant set rather than building once.
+# `default' prunes against what the document actually contains; `full' does not
+# -- that is the entire difference between them, and it is what makes `full'
+# the "I don't trust the detection" escape hatch.
+MULTI_VARIANT_MODES = ("default", "full")
+
+# Aux subdirectory holding one output directory per variant. Variants cannot
+# share an output directory (same \jobname -- see _build_accessible on why the
+# jobname must not change), so each gets its own.
+VARIANT_SUBDIR = "variants"
+
+# builder_settings knob: pin the variant set for every build, bypassing the
+# planner. A list of variant names, or ["base"] for the old single-PDF
+# behaviour.
+VARIANT_SETTING = "default_variants"
+VARIANT_ENV = "TEXLIB_VARIANTS"
+
 # Build mode  ->  the compile-time macro the TeXLib classes respond to.
 # texlib-build.sty turns these \def's into the \ifsolutions / \ifkey / ...
 # conditionals that every TeXLib class branches on.
 MODE_MACROS = {
+    # Both fan out; see MULTI_VARIANT_MODES. The empty macro is the BASE
+    # compile they each start from -- the plain build, which is also what
+    # writes the .buildmeta the planner then reads.
     "default":   "",
-    "full":      "",   # same as default (full 2-pass); a stable token the host
-                       # never remaps, so "Build — Full" forces a settling build
-                       # even when default_build_mode is "quick".
-    # "key" is the student-facing, after-the-fact answer key, so it deliberately
-    # does NOT carry \ShowRubric -- point apportionments and common-error notes
-    # are grading-internal. "solutions" is the instructor build and carries both.
-    "key":       r"\def\ShowKey{}",
-    # Same key, different layout: per-part {partsolution} blocks are drawn into
-    # the student's answer space instead of replacing it, so the page geometry
-    # matches the student copy. Only affects problems authored with
-    # {partsolution}; anything using a trailing {solution} builds as "key".
-    "key-inline": r"\def\ShowKeyInline{}",
-    "solutions": r"\def\ShowSolutions{}\def\ShowRubric{}",
-    "student":   r"\def\StudentMode{}",
+    "full":      "",
+    # The plain build ALONE: one compile, no fan-out, but the full biber +
+    # cross-reference settling loop. This is what `default' meant before the
+    # variant fan-out, and it is the mode to want when you need one correct
+    # PDF now -- `quick' is faster but leaves references unsettled, which is a
+    # different trade.
+    "base":      "",
+    # Single-variant modes: build exactly this one rendering and stop. These are
+    # what the Ctrl+Shift+B picker offers for when you want one file, now.
+    "student":    VARIANT_MACROS["student"],
+    "solutions":  VARIANT_MACROS["solutions"],
+    "instructor": VARIANT_MACROS["instructor"],
+    "solutions-inline": VARIANT_MACROS["solutions-inline"],
     # No "rubric" mode. A rubric annotates a worked solution, so rubric-without-
-    # solutions is of no use to anyone; \ShowRubric now implies \ifsolutions
-    # (texlib-build.sty) and "solutions" above is how you ask for both.
+    # solutions is of no use to anyone; \ShowRubric implies \ifsolutions
+    # (texlib-build.sty) and "instructor" above is how you ask for both.
     "draft":     r"\def\ShowDraft{}",
     "accessible": None,  # special-cased: see ACCESSIBLE_* and _build_accessible.
+}
+
+# Retired mode tokens -> their replacement. Kept so a stale keybinding, a
+# scripted --texlib-mode=, or muscle memory reports the rename instead of
+# silently falling back to `default' and quietly building the wrong thing --
+# which is exactly what `solutions' would have done, since the token survived
+# the rename with a DIFFERENT meaning.
+RENAMED_MODES = {
+    "key": "solutions",
+    "key-inline": "solutions-inline",
 }
 
 # --- Accessible (tagged PDF/UA) mode ----------------------------------------
@@ -197,6 +259,12 @@ ACCESSIBLE_DOCMETA = _spec.ACCESSIBLE_DOCMETA
 SOLUTION_COPY_SUFFIX = "_solutions.pdf"
 ACCESSIBLE_MACRO = _spec.ACCESSIBLE_MACRO
 accessible_macro_for = _spec.accessible_macro_for
+
+# veraPDF conformance reporting for the accessible build. Located via the shared
+# finder rather than shutil.which: the installer does not put veraPDF on PATH.
+ACCESSIBLE_REPORT_SUFFIX = _spec.VERAPDF_REPORT_SUFFIX
+find_verapdf = _spec.find_verapdf
+verapdf_report_cmd = _spec.verapdf_report_cmd
 
 # A pseudo-mode: a single engine pass with no biber and no rerun loop, for fast
 # preview while writing. Cross-references / citations may be stale; a normal
@@ -343,6 +411,14 @@ class TexlibBuildCore:
         self._pass_count = 0
         self._biber_count = 0
 
+        # Variant fan-out state, reset per build so a single-variant build
+        # after a Ctrl+B cannot inherit the previous plan and sweep away PDFs
+        # it knows nothing about.
+        self._variant_build = False
+        self._variant_pdfs = []
+        self._variants_built = None
+        self._variants_skipped = []
+
         # Convergence state (see _record_state_baseline / _needs_another_run):
         # the aux fingerprint the current pass started from, and every
         # fingerprint seen this build, for cycle detection.
@@ -408,6 +484,15 @@ class TexlibBuildCore:
             yield from self._count_passes(
                 self._build_accessible(base, engine, tex_dir, engine_options)
             )
+        elif mode in MULTI_VARIANT_MODES:
+            # The fan-out also produces tagged twins, so the publish step must
+            # treat this like an accessible build and clone from the tagged
+            # half (an untagged PDF on WebCampus is exactly what UDOIT flags).
+            self._accessible_build = True
+            yield from self._count_passes(
+                self._build_variants(base, engine, tex_dir, engine_options,
+                                     prune=(mode != "full"))
+            )
         else:
             yield from self._count_passes(self._build_once(base, engine, mode))
 
@@ -456,6 +541,17 @@ class TexlibBuildCore:
                 mode = match.group(1).strip().lower()
             else:
                 passthrough.append(opt)
+        # A retired token is remapped LOUDLY, never silently dropped to default:
+        # `key' became `solutions', and `solutions' still exists meaning
+        # something else, so a silent fallback here would build an instructor
+        # copy for someone who asked for a student key.
+        if mode in RENAMED_MODES:
+            new = RENAMED_MODES[mode]
+            self.display(
+                f"TeXLib: build mode {mode!r} was renamed to {new!r} in 0.8.0 "
+                f"(the names are the audience now); building {new!r}.\n"
+            )
+            mode = new
         if mode not in MODE_MACROS and mode != MODE_QUICK:
             self.display(
                 f"TeXLib: unknown build mode {mode!r}; falling back to default.\n"
@@ -756,6 +852,353 @@ class TexlibBuildCore:
         yield (cmd, f"{ACCESSIBLE_ENGINE} [accessible] run 1...")
         yield (cmd, f"{ACCESSIBLE_ENGINE} [accessible] run 2 (settle)...")
 
+    # ------------------------------------------------------------------ #
+    # Variant planning + fan-out
+    # ------------------------------------------------------------------ #
+    def _read_buildmeta(self, tex_dir):
+        """Read the <base>.buildmeta sidecar texlib-build.sty writes at
+        \\AtEndDocument; return its key=value map, or None when absent.
+
+        Absent means one of: a class that does not load texlib-build (thesis),
+        a build that died before \\end{document}, or a document predating the
+        sidecar. All three mean "plan nothing extra", which is the safe answer.
+
+        Unlike .pubmeta this is NOT deleted after reading -- a later
+        single-variant build in the same aux dir can reuse it, and it is
+        gitignored scratch either way.
+        """
+        path = self._find_in_dirs(
+            self.base_name + ".buildmeta",
+            [getattr(self, "_aux_target", None), tex_dir],
+        )
+        if not path:
+            return None
+        meta = {}
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, val = line.split("=", 1)
+                    meta[key.strip()] = val.strip()
+        except OSError:
+            return None
+        return meta
+
+    def _plan_variants(self, meta, prune):
+        """Decide which variants this build should emit.
+
+        Returns (variants, skipped) where `skipped` is a list of
+        (variant, reason) so the summary can say what it did NOT build --
+        silent pruning is the one way autodetection goes wrong, so every
+        omission is reported.
+
+        Two independent gates:
+          * DECLARED. The class says which variants it distinguishes
+            (\\TeXLibDeclareVariants). A class that declares nothing produces
+            one PDF, which is right for syllabus/schedule/report-card -- none
+            branches on a solution flag.
+          * DETECTED. The document says what it actually contains. No
+            {solution} anywhere means `solutions' and `instructor' would be
+            byte-identical to the plain build; no \\rubric and no
+            {commonerrors} means `instructor' differs from `solutions' by its
+            badge alone -- still worth having (the badge is how you tell the
+            copies apart in a stack) but worth SAYING, so it is reported.
+
+        `prune=False' (the `full' mode) applies the declared gate only. There
+        is no point offering a variant the class cannot render differently,
+        but "I don't believe the content detection" is a real thing to want.
+        """
+        declared = [v.strip() for v in (meta or {}).get("variants", "").split(",")
+                    if v.strip()]
+        variants, skipped = [], []
+        # An explicit \metasetup{build-variants = none} is a decision, not an
+        # absence, and it has to read as one: a document that quietly produced a
+        # single PDF would look identical to a planner that had failed.
+        if [v.lower() for v in declared] == ["none"]:
+            return [], [("all", "this document pins build-variants = none")]
+        for name in PLANNED_VARIANTS:
+            if name not in declared:
+                continue
+            if prune and name in ("solutions", "instructor") \
+                    and (meta or {}).get("has-solutions") != "1":
+                skipped.append((name, "no solution content in this document"))
+                continue
+            variants.append(name)
+        # An inline key is only meaningful where {partsolution} is used, so it
+        # is never planned into a default set -- but say so when the document
+        # could have had it, or nobody will ever discover the mode exists.
+        if (meta or {}).get("has-partsolution") == "1" \
+                and "solutions-inline" in declared:
+            skipped.append(("solutions-inline",
+                            "layout preference; build it explicitly"))
+        return variants, skipped
+
+    def _configured_variants(self):
+        """The `default_variants' override, or None to let the planner decide.
+        ["base"] (or an empty list) pins the old single-PDF behaviour."""
+        raw = os.environ.get(VARIANT_ENV)
+        if raw is None:
+            getter = getattr(self, "builder_settings", None) or {}
+            try:
+                raw = getter.get(VARIANT_SETTING)
+            except AttributeError:
+                raw = None
+        if raw is None:
+            return None
+        if isinstance(raw, str):
+            raw = [v for v in re.split(r"[,\s]+", raw) if v]
+        names = [str(v).strip().lower() for v in raw if str(v).strip()]
+        if names in ([], ["base"], ["none"]):
+            return []
+        unknown = [n for n in names if n not in VARIANT_MACROS]
+        if unknown:
+            self.display(
+                f"TeXLib: ignoring unknown {VARIANT_SETTING} entries "
+                f"{unknown!r}; known variants are "
+                f"{sorted(VARIANT_MACROS)}.\n"
+            )
+        return [n for n in names if n in VARIANT_MACROS]
+
+    def _variant_out_dir(self, tag):
+        """Aux output directory for one variant compile (created on demand).
+
+        Each variant needs its OWN directory because \\jobname must stay the
+        document's real base name -- autoexam reads its body from
+        <jobname>.tex and truncates silently otherwise (see
+        _build_accessible). Same reason the accessible half gets a11y/.
+        """
+        parent = getattr(self, "_aux_target", None) or self._tex_dir()
+        out_dir = os.path.join(parent, VARIANT_SUBDIR, tag)
+        try:
+            os.makedirs(out_dir, exist_ok=True)
+        except OSError:
+            return parent
+        return out_dir
+
+    @staticmethod
+    def _variant_pdf_name(base_name, variant, tagged):
+        """<base>_<variant>[_accessible].pdf, with the BASE variant keeping the
+        plain names <base>.pdf / <base>_accessible.pdf so every existing
+        consumer -- the viewer, forward sync, preferred_pdf, the publish step,
+        package_for_lms -- keeps working untouched."""
+        stem = base_name if variant == "base" else f"{base_name}_{variant}"
+        return stem + (ACCESSIBLE_SUFFIX if tagged else "") + ".pdf"
+
+    def _build_variants(self, base, engine, tex_dir, engine_options, prune):
+        """Base compile, then one compile per planned variant, then the tagged
+        twins -- the fan-out behind Ctrl+B.
+
+        The base compile runs FIRST and unflagged for three reasons: it is the
+        artifact <base>.pdf has always meant, it is what the publish step and
+        forward sync read, and it is what writes the .buildmeta the plan is
+        computed from. That last point is what makes the detection exact from
+        the very first build rather than one build late: solution bodies are
+        typeset into a discarded \\vbox even when hidden, so the plain compile
+        already knows everything the planner needs.
+        """
+        self._variant_build = True
+        self._variant_pdfs = []
+        yield from self._build_once(base, engine, None)
+
+        meta = self._read_buildmeta(tex_dir)
+        override = self._configured_variants()
+        if override is not None:
+            variants, skipped = override, []
+            if variants:
+                self.display(
+                    f"TeXLib: {VARIANT_SETTING} pins the variant set to "
+                    f"{', '.join(variants)}.\n")
+        else:
+            variants, skipped = self._plan_variants(meta, prune)
+            if meta is None:
+                self.display(
+                    "TeXLib: no .buildmeta sidecar -- building the base PDF "
+                    "only. (Expected for thesis, which loads no TeXLib build "
+                    "package; otherwise the build may have stopped before "
+                    "\\end{document}.)\n")
+
+        # Tracked as (variant, tagged) pairs actually PRODUCED, not as variant
+        # names: the summary and the stale sweep both need to know exactly
+        # which artifacts this build stands behind, and those two axes do not
+        # always both apply (a pinned base-only build emits no tagged twin).
+        self._variants_built = [("base", False)]
+        self._variants_skipped = list(skipped)
+
+        # An explicit base-only pin means the pre-0.8.0 single PDF: no
+        # variants, and no tagged twin either. Returning here rather than
+        # falling through the empty loops keeps that promise literal -- and the
+        # sweep below still runs, so pinning back to base cleans up the variant
+        # PDFs an earlier fan-out left behind.
+        if override == []:
+            return
+
+        for variant in variants:
+            macro = VARIANT_MACROS[variant]
+            yield from self._build_one_variant(
+                variant, macro, engine, tex_dir, engine_options, tagged=False)
+            self._variants_built.append((variant, False))
+
+        # Tagged twins last: they are the slowest half (a second full compile
+        # each, forced to lualatex regardless of the class's own engine), so
+        # every normal PDF is on disk before the first one starts.
+        for variant in ["base"] + variants:
+            yield from self._build_one_variant(
+                variant, VARIANT_MACROS.get(variant, ""), engine, tex_dir,
+                engine_options, tagged=True)
+            self._variants_built.append((variant, True))
+
+    def _build_one_variant(self, variant, macro, engine, tex_dir,
+                           engine_options, tagged):
+        """One variant compile into its own output directory.
+
+        Two fixed passes rather than the convergence loop: the loop's state
+        digest is keyed on the aux dir the BASE build owns, and a variant
+        writing its own .aux there would make every subsequent variant look
+        unsettled. Two passes is what the accessible half has always used and
+        settles the "page X of Y" footer and \\pageref the same way.
+        """
+        tag = variant + ("-a11y" if tagged else "")
+        out_dir = self._variant_out_dir(tag)
+        engine_for = ACCESSIBLE_ENGINE if tagged else engine
+        cmd_base = self._base_engine_cmd(
+            engine_for, self._aux_target, tex_dir, engine_options)
+        cmd = [c for c in cmd_base
+               if not str(c).startswith("-output-directory=")]
+        prefix = macro or ""
+        if tagged:
+            prefix = accessible_macro_for(
+                os.path.join(tex_dir, self.tex_name)) + prefix
+        cmd += [f"-output-directory={out_dir}",
+                f"--jobname={self.base_name}",
+                (f"{prefix}\\input{{{self.tex_name}}}" if prefix
+                 else self.tex_name)]
+        label = f"{engine_for} [{tag}]"
+        yield (cmd, f"{label} run 1...")
+        yield (cmd, f"{label} run 2 (settle)...")
+        self._copy_back_variant(tex_dir, variant, tagged, out_dir)
+
+    def _copy_back_variant(self, tex_dir, variant, tagged, out_dir):
+        """Copy one finished variant out as <base>_<variant>[_accessible].pdf."""
+        src = os.path.join(out_dir, self.base_name + ".pdf")
+        if not os.path.exists(src):
+            self.display(
+                f"TeXLib: variant {variant!r}"
+                f"{' (tagged)' if tagged else ''} produced no PDF; skipped.\n")
+            return
+        dest = os.path.join(
+            tex_dir, self._variant_pdf_name(self.base_name, variant, tagged))
+        self._force_remove(dest)
+        try:
+            shutil.copy2(src, dest)
+            # Held separately, NOT appended to produced_pdfs: _postprocess
+            # resets that list after the build finishes, so anything recorded
+            # here would be thrown away. It merges this list back in.
+            self._variant_pdfs.append(os.path.basename(dest))
+        except OSError as exc:
+            self.display(f"TeXLib: could not write {dest}: {exc}\n")
+            return
+        # The conformance report, for the BASE tagged PDF only. The fan-out
+        # reaches here rather than through _copy_back_accessible (which finds
+        # nothing: the variant builds write to <aux>/<variant>-a11y/, not
+        # <aux>/a11y/), so without this a plain Ctrl+B would produce tagged
+        # PDFs and no report at all. Base only, deliberately: every variant is
+        # the same document with different content revealed, so their tag
+        # structure is the same structure, and one veraPDF run per build keeps
+        # a JVM launch per variant out of the edit loop.
+        if tagged and variant == "base":
+            self._write_accessible_report(tex_dir, dest)
+        # A versioned exam emits every copy into ONE PDF plus a .vmap. The base
+        # build's map is sliced in _postprocess; a variant's map lives in that
+        # variant's own output directory and was never read, so a \versions
+        # document's variant PDFs came out as collated blobs while the base's
+        # came out per version. Slice them here, from the copy that just landed
+        # beside the source.
+        if not tagged:
+            self._slice_variant_versions(variant, out_dir, tex_dir, dest)
+
+    # Which suffix a variant's answer-bearing per-version slices carry. The
+    # `solutions' variant keeps the historic "_solutions" because those copies
+    # ARE the answer key -- <base>_A_solutions.pdf is the name collate_keys.py
+    # and the SyncTeX slicer have always looked for. `instructor' needs its own
+    # or it would overwrite them copy for copy.
+    VARIANT_SLICE_SUFFIX = {
+        "solutions": "_solutions",
+        "solutions-inline": "_solutions",
+        "instructor": "_instructor",
+    }
+
+    def _slice_variant_versions(self, variant, out_dir, tex_dir, pdf_path):
+        """Slice one variant's combined multi-version PDF, if it wrote a .vmap.
+
+        No-op for the overwhelmingly common single-version document, which
+        writes no .vmap at all. `base_name` stays the document's real base so
+        the slices read <base>_A_solutions.pdf rather than
+        <base>_solutions_A_solutions.pdf -- the variant is expressed by the
+        suffix, not by a doubled stem.
+        """
+        vmap = os.path.join(out_dir, self.base_name + ".vmap")
+        if not os.path.exists(vmap) or not os.path.exists(pdf_path):
+            return
+        suffix = self.VARIANT_SLICE_SUFFIX.get(variant)
+        if suffix is None:
+            return
+        try:
+            _produced, messages = self._run_pdfpost(
+                "slice", vmap, pdf_path, tex_dir, extra=(suffix,),
+                base_name=self.base_name)
+            for m in messages:
+                self.display(m + "\n")
+        finally:
+            self._force_remove(vmap)
+
+    def _sweep_stale_variants(self, tex_dir):
+        """Delete variant PDFs this build deliberately did NOT produce.
+
+        A leftover <base>_instructor.pdf from before the rubrics came out of a
+        document is worse than no file: it looks current, it is named as
+        though the planner chose it, and nothing about it says it is three
+        edits old. Only names this scheme owns are ever removed, and only when
+        the build actually planned a set (never after a single-variant build,
+        which is not evidence about any other variant).
+        """
+        built = getattr(self, "_variants_built", None)
+        if built is None:
+            return
+        keep = {self._variant_pdf_name(self.base_name, variant, tagged).lower()
+                for variant, tagged in built}
+        removed = []
+        for variant in VARIANT_MACROS:
+            for tagged in (False, True):
+                name = self._variant_pdf_name(self.base_name, variant, tagged)
+                if name.lower() in keep:
+                    continue
+                path = os.path.join(tex_dir, name)
+                if not os.path.exists(path):
+                    continue
+                # _force_remove returns None whether or not it succeeded, so
+                # confirm by absence rather than by its return value.
+                self._force_remove(path)
+                if not os.path.exists(path):
+                    removed.append(name)
+        # The conformance report describes the base tagged PDF specifically, so
+        # it goes when that PDF does. A report outliving the file it certifies
+        # is the same failure mode as a stale _instructor.pdf, and worse in
+        # kind: this one is EVIDENCE, and it would be filed with a thesis.
+        base_tagged = self._variant_pdf_name(self.base_name, "base", True)
+        if base_tagged.lower() not in keep:
+            report = os.path.join(
+                tex_dir, self.base_name + ACCESSIBLE_REPORT_SUFFIX)
+            if os.path.exists(report):
+                self._force_remove(report)
+                if not os.path.exists(report):
+                    removed.append(os.path.basename(report))
+        if removed:
+            self.display(
+                "TeXLib: removed stale artifacts no longer planned: "
+                + ", ".join(sorted(removed)) + "\n")
+
     def _accessible_out_dir(self):
         """Aux subdirectory the accessible build writes into (created on demand)."""
         parent = getattr(self, "_aux_target", None) or self._tex_dir()
@@ -779,6 +1222,68 @@ class TexlibBuildCore:
                 f"TeXLib: accessible copy -> {os.path.basename(dest)}\n")
         except OSError as exc:
             self.display(f"TeXLib: could not write {dest}: {exc}\n")
+            return
+        self._write_accessible_report(tex_dir, dest)
+
+    def _write_accessible_report(self, tex_dir, pdf_path):
+        """Write veraPDF's conformance report beside <base>_accessible.pdf.
+
+        A tagged PDF's accessibility is invisible in the render, so the build
+        that produces one should also produce the evidence that it conforms --
+        UNR now requires an accessibility report to be filed with a thesis, and
+        a reviewer asking "is this actually accessible?" about any handout wants
+        the same artifact. veraPDF was already being run over these files by
+        `smoke_test.check_verapdf`, which parses the failed clauses out and
+        DISCARDS the report; this writes it out where the author can read it.
+
+        Never fails the build. veraPDF is optional in the same way pdftotext and
+        ImageMagick are, and a missing report is not a reason to lose a PDF that
+        built cleanly.
+
+        Exit status is load-bearing and is NOT an error condition: veraPDF exits
+        0 for a conforming file and 1 for a non-conforming one, and writes a
+        valid report either way -- a failing report is precisely when the author
+        most needs to read it. Only >1 is a tool error.
+        """
+        if not self._setting_on(
+                "accessible_report", "TEXLIB_A11Y_REPORT", True):
+            return
+        exe = find_verapdf()
+        if not exe:
+            self.display(
+                "TeXLib: veraPDF not found -- no accessibility report written. "
+                "Install it or set accessible_report off to silence this.\n")
+            return
+        itemize = self._setting_on(
+            "accessible_report_full", "TEXLIB_A11Y_REPORT_FULL", False)
+        dest = os.path.join(
+            tex_dir, self.base_name + ACCESSIBLE_REPORT_SUFFIX)
+        try:
+            proc = subprocess.run(
+                verapdf_report_cmd(exe, pdf_path, "html", itemize),
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                creationflags=_NO_WINDOW, timeout=300,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            self.display(f"TeXLib: veraPDF report not written ({exc}).\n")
+            return
+        if proc.returncode > 1:
+            err = (proc.stderr or b"").decode("utf-8", "replace").strip()
+            self.display(
+                f"TeXLib: veraPDF error (exit {proc.returncode}) "
+                f"-- no accessibility report. {err[:200]}\n")
+            return
+        try:
+            with open(dest, "wb") as f:
+                f.write(proc.stdout or b"")
+        except OSError as exc:
+            self.display(f"TeXLib: could not write {dest}: {exc}\n")
+            return
+        verdict = "PASSED" if proc.returncode == 0 else "FAILED"
+        detail = "" if itemize else " (set accessible_report_full for the itemized form)"
+        self.display(
+            f"TeXLib: PDF/UA-2 {verdict} -- accessibility report -> "
+            f"{os.path.basename(dest)}{detail}\n")
 
     def _tex_dir(self):
         """The directory containing the root .tex file."""
@@ -1287,8 +1792,17 @@ class TexlibBuildCore:
         # An accessible build wrote into the aux dir's a11y/ subdirectory under
         # the document's REAL jobname (see _build_accessible); bring it out under
         # the _accessible name so it lands beside, not on top of, the primary PDF.
-        if getattr(self, "_accessible_build", False):
+        # The variant fan-out sets _accessible_build too (so the publish step
+        # clones from the tagged half) but routes through variants/<name>-a11y/
+        # and has already copied each twin out, so it must not run this.
+        if getattr(self, "_accessible_build", False) \
+                and not getattr(self, "_variant_build", False):
             self._copy_back_accessible(tex_dir)
+
+        # Merge the fan-out's artifacts into produced_pdfs, which was reset
+        # above, then delete variant PDFs this build deliberately did not plan.
+        self.produced_pdfs.extend(getattr(self, "_variant_pdfs", []))
+        self._sweep_stale_variants(tex_dir)
 
         self._split_pdf_if_signaled(base_path)
 
@@ -2150,6 +2664,33 @@ class TexlibBuildCore:
             f"TeXLib: build finished in {elapsed:.1f}s -- "
             f"{passes} pass(es){biber_str}{size_str}.\n"
         )
+        self._display_variant_summary(tex_dir)
+
+    def _display_variant_summary(self, tex_dir):
+        """List what the fan-out produced AND what it chose not to.
+
+        The omissions are the important half. Autodetection that silently
+        drops a variant is indistinguishable from autodetection that is wrong,
+        and the person reading this is the only one who can tell which it was.
+        """
+        built = getattr(self, "_variants_built", None)
+        if built is None:
+            return
+        lines = []
+        for name, tagged in built:
+            pdf = self._variant_pdf_name(self.base_name, name, tagged)
+            path = os.path.join(tex_dir, pdf)
+            if not os.path.exists(path):
+                continue
+            try:
+                size = self._human_size(os.path.getsize(path))
+            except OSError:
+                size = "?"
+            lines.append(f"    {pdf}  ({size})")
+        if lines:
+            self.display("TeXLib: variants produced:\n" + "\n".join(lines) + "\n")
+        for name, reason in getattr(self, "_variants_skipped", []):
+            self.display(f"TeXLib: variant {name!r} not built -- {reason}.\n")
 
     @staticmethod
     def _human_size(n):
@@ -2199,7 +2740,8 @@ class TexlibBuildCore:
         TexlibBuildCore._ext_python_cache = found
         return found
 
-    def _run_pdfpost(self, op, sidecar_path, pdf_path, out_dir):
+    def _run_pdfpost(self, op, sidecar_path, pdf_path, out_dir, extra=(),
+                     base_name=None):
         """Run a pypdf post-processing op (slice a .vmap, split a .spl).
 
         Runs in-process when pypdf is importable here (the CLI test harness /
@@ -2211,7 +2753,11 @@ class TexlibBuildCore:
         spans are absorbed on the way past (see _absorb_pdfpost) rather than
         returned, so existing two-value callers are untouched.
         """
-        base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+        # Normally the output stem IS the input PDF's stem. A variant slice is
+        # the exception: its source is <base>_instructor.pdf but its slices must
+        # read <base>_A_instructor.pdf, not <base>_instructor_A_instructor.pdf.
+        if base_name is None:
+            base_name = os.path.splitext(os.path.basename(pdf_path))[0]
         pdfpost = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "texlib_pdfpost.py"
         )
@@ -2221,7 +2767,7 @@ class TexlibBuildCore:
             import pypdf  # noqa: F401
             import texlib_pdfpost
             result = texlib_pdfpost._OPS[op](
-                sidecar_path, pdf_path, out_dir, base_name
+                sidecar_path, pdf_path, out_dir, base_name, *extra
             )
             return self._absorb_pdfpost(result)
         except ImportError:
@@ -2245,7 +2791,8 @@ class TexlibBuildCore:
             ]
         try:
             proc = subprocess.run(
-                py + [pdfpost, op, sidecar_path, pdf_path, out_dir, base_name],
+                py + [pdfpost, op, sidecar_path, pdf_path, out_dir, base_name]
+                + [str(e) for e in extra],
                 capture_output=True, text=True, encoding="utf-8",
                 errors="replace", creationflags=_NO_WINDOW,
             )
@@ -2326,6 +2873,18 @@ class TexlibBuildCore:
         pref = (preference or "").strip()
         if not pref or pref.lower() in ("combined", "default", "main"):
             return combined
+
+        # A variant name resolves to that variant's PDF directly. Checked before
+        # the slice logic below because the two vocabularies overlap: "student"
+        # is both a variant and a kind of exam slice, and the slice branch would
+        # otherwise answer "the first produced PDF that isn't a solutions copy"
+        # -- which, after a fan-out, can be the instructor variant.
+        if pref.lower() in VARIANT_MACROS:
+            candidate = os.path.join(
+                tex_dir, self._variant_pdf_name(self.base_name, pref.lower(),
+                                                False))
+            if os.path.exists(candidate):
+                return candidate
 
         def _is_solution(name):
             return name.lower().endswith(SOLUTION_COPY_SUFFIX)

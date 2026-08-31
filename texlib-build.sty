@@ -87,6 +87,114 @@
 \newcommand{\SetTeXLibBuildBadge}[1]{\renewcommand{\texlib@buildbadge}{#1}}
 \newcommand{\TeXLibBuildBadge}{\textit{\texlib@buildbadge}}
 
+% Draft watermark --------------------------------------------------------------
+% \ifdraft was declared here from the start and read by NOTHING -- ten classes,
+% zero branches -- while the README advertised a "Draft watermark" and the
+% Sublime palette offered a Draft build that provably changed nothing. A mode
+% that silently does nothing is worse than no mode, so it does something now.
+%
+% Drawn through the kernel's shipout/background hook rather than a watermark
+% package, so this stays dependency-free: texlib-build is loaded very early
+% (before a class has processed its own options) and pulling xcolor/graphicx in
+% here could change how those options resolve. The hook is installed at
+% \AtBeginDocument instead, by which point every TeXLib class has loaded both --
+% and guarded, so a document that somehow has neither degrades to a warning
+% rather than an undefined-control-sequence.
+\ifdraft
+	\AtBeginDocument{%
+		\@ifundefined{rotatebox}{%
+			\PackageWarning{texlib-build}{%
+				Draft build requested but graphicx/xcolor are not loaded;
+				no watermark drawn}%
+		}{%
+			\AddToHook{shipout/background}{%
+				\put(0.5\paperwidth,-0.5\paperheight){%
+					\makebox(0,0){%
+						\rotatebox{45}{%
+							\textcolor{black!12}{%
+								\fontsize{5cm}{5cm}\selectfont\bfseries DRAFT}}}}%
+			}%
+		}%
+	}
+\fi
+
+% Build-variant planning sidecar -----------------------------------------------
+% The builder plans a multi-variant build (student / solutions / instructor,
+% each optionally tagged) and needs two facts it cannot get by reading the .tex:
+% WHICH variants this class distinguishes, and WHETHER this document actually
+% carries solution or rubric content. The second is unscrapeable from source --
+% problems arrive through \loadbank / \getproblem / \importproblem at
+% coursemeta-relative paths, so the only component that knows what was really
+% typeset is the engine. So the engine reports it, in a <jobname>.buildmeta
+% sidecar, exactly like the .pubmeta / .vmap / .schedmeta sidecars the builder
+% already consumes.
+%
+% The detection is EXACT, not approximate, and that is the whole point: a build
+% that hides solutions still typesets them into a discarded \vbox
+% (texlib-solutions.sty, didactic.cls, pset.cls), so the environment runs either
+% way and \TeXLibNoteSolution fires in a plain student build too. That is what
+% lets the builder plan the entire variant set from its FIRST compile rather
+% than learning it one build late.
+%
+% Classes declare what they distinguish, once, near their build-flag setup:
+%   \TeXLibDeclareVariants{student,solutions,instructor}
+% A class that declares nothing (syllabus, schedule, report-card, bank) gets a
+% single-PDF build, which is correct -- none of them branches on a solution flag
+% in a way that would produce a different document.
+\newif\ifTeXLib@feat@solutions
+\newif\ifTeXLib@feat@rubric
+\newif\ifTeXLib@feat@commonerrors
+\newif\ifTeXLib@feat@partsolution
+% \global because the noting sites sit inside environments (and inside the
+% discard \vbox group), so a local assignment would be rolled back at \egroup
+% and the sidecar would report a document with no solutions in it.
+\newcommand{\TeXLibNoteSolution}{\global\TeXLib@feat@solutionstrue}
+\newcommand{\TeXLibNoteRubric}{\global\TeXLib@feat@rubrictrue}
+\newcommand{\TeXLibNoteCommonErrors}{\global\TeXLib@feat@commonerrorstrue}
+% A {partsolution} is a solution, so it notes both: the inline-key variant needs
+% the specific flag, and every other solution-bearing variant needs the general
+% one.
+\newcommand{\TeXLibNotePartSolution}{%
+	\global\TeXLib@feat@partsolutiontrue \TeXLibNoteSolution}
+
+\newcommand{\TeXLib@variants}{}
+\newcommand{\TeXLibDeclareVariants}[1]{\renewcommand{\TeXLib@variants}{#1}}
+
+% A document may override its class's declaration with the course-metadata key
+%   \metasetup{build-variants = {student, instructor}}
+% (or `none' for the base PDF alone) -- for the worksheet whose solutions copy
+% nobody wants, or the one handout that needs a variant its class does not
+% normally offer. Guarded on the getter existing rather than on the package,
+% because texlib-build is loaded by classes that reach course-metadata at
+% different points and this runs at \AtEndDocument, by which time either the
+% key resolved or it never will.
+% It is resolved by \edef into a macro BEFORE the write, never tested inline
+% inside it: \GetBuildVariants is an expandable expl3 getter, so \ifx against
+% \@empty would compare its MEANING (never equal) rather than its expansion,
+% which is the thing we care about -- and an \edef cannot live inside \write's
+% own expansion pass anyway. \ifcsname is expandable, so the whole thing
+% collapses to nothing when course-metadata never loaded.
+\newcommand{\TeXLib@bv}{}
+
+\newwrite\TeXLib@bm@stream
+\AtEndDocument{%
+	\begingroup
+	\edef\TeXLib@bv{\ifcsname GetBuildVariants\endcsname\GetBuildVariants\fi}%
+	\ifx\TeXLib@bv\@empty \let\TeXLib@bv\TeXLib@variants \fi
+	\immediate\openout\TeXLib@bm@stream=\jobname.buildmeta\relax
+	\immediate\write\TeXLib@bm@stream{variants=\TeXLib@bv}%
+	\immediate\write\TeXLib@bm@stream{%
+		has-solutions=\ifTeXLib@feat@solutions 1\else 0\fi}%
+	\immediate\write\TeXLib@bm@stream{%
+		has-rubric=\ifTeXLib@feat@rubric 1\else 0\fi}%
+	\immediate\write\TeXLib@bm@stream{%
+		has-commonerrors=\ifTeXLib@feat@commonerrors 1\else 0\fi}%
+	\immediate\write\TeXLib@bm@stream{%
+		has-partsolution=\ifTeXLib@feat@partsolution 1\else 0\fi}%
+	\immediate\closeout\TeXLib@bm@stream
+	\endgroup
+}
+
 % Tag suspension around DISCARDED content --------------------------------------
 % Gating a build mode off does not stop the hidden content being typeset -- the
 % classes capture it into a throwaway \vbox and drop the box. tagpdf still walks

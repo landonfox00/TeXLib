@@ -10,6 +10,11 @@ cancel->kill path, the PER-DOCUMENT build registry that lets distinct documents
 build in parallel, and the per-build aux-env injection that keeps those parallel
 builds from racing a shared TEXLIB_AUX_DIR. No Sublime, no TeX.
 
+Every case here builds in `base' mode, not `default'. These exercise the rerun
+driver, and `default' now fans out into a whole variant set -- the extra
+compiles would swamp the command counts these assertions are made of. The
+fan-out has its own coverage in test_texlib_builder.py.
+
 Run:  python Sublime/test_texlib_runner.py
 """
 import hashlib
@@ -153,7 +158,7 @@ with tempfile.TemporaryDirectory() as tmp:
     texlib.subprocess.Popen = factory
     host = texlib_build.TexlibBuild(
         tex_root=root, engine="pdflatex",
-        options=["--texlib-mode=default"], display=msgs.append,
+        options=["--texlib-mode=base"], display=msgs.append,
         aux_directory="<<root>>",
     )
     ev = threading.Event()
@@ -204,7 +209,7 @@ def _drive_delegation(pdf_exists, cancel_on_pass1):
 
         host = texlib_build.TexlibBuild(
             tex_root=root, engine="pdflatex",
-            options=["--texlib-mode=default"], display=lambda t: None,
+            options=["--texlib-mode=base"], display=lambda t: None,
             aux_directory="<<root>>",
         )
         entry = {"thread": None, "cancel": ev, "proc": None}
@@ -363,7 +368,7 @@ def _drive_finish(script_lines):
             fh.write("\\documentclass{pset}\n\\begin{document}\nx\n\\end{document}\n")
         host = texlib_build.TexlibBuild(
             tex_root=root, engine="pdflatex",
-            options=["--texlib-mode=default"], display=lambda t: None,
+            options=["--texlib-mode=base"], display=lambda t: None,
             aux_directory="<<root>>")
 
         def on_finish(state, errs, warns):
@@ -426,7 +431,7 @@ with tempfile.TemporaryDirectory() as tmp:
     texlib.subprocess.Popen = factory
     host = texlib_build.TexlibBuild(          # aux_directory defaults to <<temp>>
         tex_root=root, engine="pdflatex",
-        options=["--texlib-mode=default"], display=lambda t: None)
+        options=["--texlib-mode=base"], display=lambda t: None)
     ev = threading.Event()
     texlib.TexlibBuildCommand()._drive(
         host, tmp, lambda t: None, ev, "", root,

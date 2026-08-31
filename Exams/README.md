@@ -133,13 +133,18 @@ Compile-time toggles: `\ShowSolutions`, `\ShowKey`, `\ShowRubric`,
 
 Two answer-revealing builds, distinguished by *which* copies they emit:
 
-- `\ShowKey` / `\keys` → **key copies only** (`AutoExamSolMode=only`): the
-	instructor copy of each version, with `\ifsolutions` on. An exam's answer
-	key IS its instructor copy, so `\ifkey` implies `\ifsolutions`. The cover
-	reads "Answer Key".
-- `\ShowSolutions` / `\solutions` → **dual** (`AutoExamSolMode=dual`): the
-	blank student copies *and* the key copies, collated for the builder to
-	slice. The cover reads "Solutions".
+- `\ShowKey` / `\keys` (build mode `solutions`) → **key copies only**
+	(`AutoExamSolMode=only`): the answer-bearing copy of each version, with
+	`\ifsolutions` on. An exam's answer key IS its worked copy, so `\ifkey`
+	implies `\ifsolutions`. The cover reads "Solutions".
+- `\ShowSolutions` / `\solutions` (build mode `instructor`, which also defines
+	`\InstructorMode` and `\ShowRubric`) → **dual** (`AutoExamSolMode=dual`):
+	the blank student copies *and* the answer copies, collated for the builder
+	to slice. The cover reads "Instructor Version".
+
+The cover word is keyed on `\ifinstructor`, not `\ifkey`: after the 0.8.0
+rename the student-facing key is the `solutions` build, so labelling it
+"Answer Key" while the instructor copy said "Solutions" had the two backwards.
 
 `\ShowRubric` / `\rubrics` overlays the grading rubrics on top of either
 (rubrics live inside a shown solution, so they need one of the above too).

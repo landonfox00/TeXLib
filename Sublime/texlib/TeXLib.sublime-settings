@@ -137,4 +137,53 @@
     // writes a11y_gallery.html beside itself); set it only for an unusual layout.
     //
     // "a11y_gallery_path": "C:/_texlibjunc/a11y_gallery.py"
+
+    // accessible_report: on an accessible build, run veraPDF over the tagged
+    // PDF and write its conformance report as <base>_accessible-report.html
+    // beside it. Default: true.
+    //
+    // A tagged PDF's accessibility is invisible in the render, so the evidence
+    // has to be a separate artifact -- UNR requires an accessibility report to
+    // be filed with a thesis, and it is what answers "is this actually
+    // accessible?" for any handout. The report is written whether the file
+    // conforms or not: a FAILED report naming the ISO clauses it broke is the
+    // one you most need to read.
+    //
+    // Needs veraPDF (verapdf.org) and a JRE. Its installer does not put itself
+    // on PATH, so the plugin also looks in ~/verapdf, %LOCALAPPDATA%, and
+    // Program Files. Without it the build is unaffected and says the report was
+    // skipped. Set false to silence that.
+    //
+    // "accessible_report": true
+
+    // accessible_report_full: itemize every PASSED check in the report, not
+    // just the failures (veraPDF --success). Default: false.
+    //
+    // The default lean report is ~20 KB and answers "did it pass?". The full
+    // form runs to ~1 MB because it evidences all ~840 checks a conforming file
+    // satisfies, each against its ISO 32005 clause -- overkill for a routine
+    // build, and exactly what to attach when someone asks for proof.
+    //
+    // "accessible_report_full": false
+
+    // default_variants: pin what Ctrl+B builds, bypassing the planner.
+    // Default: unset, i.e. the planner decides per document.
+    //
+    // A plain build normally emits the base PDF plus every variant the
+    // document actually supports -- student / solutions / instructor -- each
+    // with a tagged PDF/UA twin. That is the right default for producing
+    // course materials and the wrong one for the write-compile-look loop,
+    // since every variant is its own compile. Two ways to trim it:
+    //
+    //   ["student"]   base + the student copy (+ their tagged twins)
+    //   ["base"]      the base PDF alone -- pre-0.8.0 behaviour, no twin
+    //
+    // Switching to a smaller set SWEEPS the variant PDFs it no longer builds,
+    // so a stale _instructor.pdf cannot sit there looking current.
+    //
+    // For a fast inner loop prefer default_build_mode: "quick" (one pass, no
+    // biber) and leave this alone -- the full set is one Ctrl+Shift+B away.
+    // Env override: TEXLIB_VARIANTS (comma- or space-separated).
+    //
+    // "default_variants": ["student"]
 }

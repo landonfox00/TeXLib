@@ -44,7 +44,8 @@ def _force_remove(path):
         pass
 
 
-def slice_from_vmap(vmap_path, pdf_path, out_dir, base_name):
+def slice_from_vmap(vmap_path, pdf_path, out_dir, base_name,
+                    sol_suffix="_solutions"):
     """Slice a combined multi-copy PDF into one PDF per version/solutions copy.
 
     Each .vmap line is "version|stu-or-sol|start_page" in typeset order (version
@@ -53,6 +54,13 @@ def slice_from_vmap(vmap_path, pdf_path, out_dir, base_name):
     final record.  Returns {"produced": [names], "messages": [strings],
     "ranges": {name: [first, last]}}; does NOT delete the .vmap (the caller
     removes it on every outcome).  Raises ImportError if pypdf is unavailable.
+
+    `sol_suffix` names the answer-bearing copies. It exists because the variant
+    fan-out slices more than one combined PDF per build: the `solutions'
+    variant keeps the historic "_solutions" (those copies ARE the key), while
+    the `instructor' variant passes "_instructor" so its per-version slices do
+    not overwrite the key's. Defaulted, so every existing caller and the CLI
+    contract are unchanged.
     """
     from pypdf import PdfReader, PdfWriter
 
@@ -91,7 +99,7 @@ def slice_from_vmap(vmap_path, pdf_path, out_dir, base_name):
                     ver or "(none)", "sol" if is_sol else "stu",
                     start, end, total))
             continue
-        suffix = "_solutions" if is_sol else ""
+        suffix = sol_suffix if is_sol else ""
         ver_part = "_{}".format(ver) if ver else ""
         out_name = "{}{}{}.pdf".format(base_name, ver_part, suffix)
         if out_name == base_pdf_name:
@@ -167,14 +175,21 @@ _OPS = {"slice": slice_from_vmap, "split": split_from_spl}
 
 
 def main(argv):
-    if len(argv) != 5 or argv[0] not in _OPS:
+    # The optional 6th argument is `slice''s sol_suffix (see slice_from_vmap).
+    # Accepted only for `slice'; `split' has no such axis, and silently
+    # swallowing an extra argument there would hide a caller bug.
+    if not (5 <= len(argv) <= 6) or argv[0] not in _OPS:
         sys.stderr.write(
             "usage: texlib_pdfpost.py {slice|split} <sidecar> <pdf> "
-            "<out_dir> <base_name>\n")
+            "<out_dir> <base_name> [sol_suffix]\n")
         return 2
-    op, sidecar, pdf, out_dir, base = argv
+    op, sidecar, pdf, out_dir, base = argv[:5]
+    extra = argv[5:]
+    if extra and op != "slice":
+        sys.stderr.write("texlib_pdfpost.py: %s takes no sol_suffix\n" % op)
+        return 2
     try:
-        result = _OPS[op](sidecar, pdf, out_dir, base)
+        result = _OPS[op](sidecar, pdf, out_dir, base, *extra)
     except ImportError:
         return PYPDF_MISSING_EXIT
     sys.stdout.write(json.dumps(result))

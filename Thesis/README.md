@@ -122,6 +122,28 @@ Tagging is intrinsic, not optional: the document **must** begin with
 place PDF tagging can be switched on). The template already includes it; the
 class warns if it is missing.
 
+## The accessibility report
+
+UNR requires an accessibility report to be filed alongside the manuscript. An
+accessible build writes one automatically — `<base>_accessible-report.html`,
+veraPDF's PDF/UA-2 conformance report, beside the tagged PDF. Building through
+`--texlib-mode=accessible` (or Sublime's Accessible variant) produces the pair;
+by hand it is:
+
+```
+verapdf --flavour ua2 --format html --success thesis-template.pdf > thesis-report.html
+```
+
+`--success` itemizes every passed check (~1 MB) rather than only the failures
+(~20 KB); for a filing artifact, itemized is the safer choice. Needs veraPDF
+and a JRE — the build says so and carries on if it is missing.
+
+**What format the Graduate School actually accepts is unconfirmed.** Their
+guidance points at Adobe Acrobat Pro, whose checker emits its own artifact also
+called an "Accessibility Report"; veraPDF validates PDF/UA-2 far more strictly
+(to the ISO clause) but it is a *different* document. Ask before filing. See
+the note in the Not-yet-done section below.
+
 ## Authoring
 
 ```latex
@@ -169,6 +191,14 @@ single ambiguous symbol (for example, `\sin^{-1}`).
   typesets its own, which matches section 4 and Hurtado's template but not a
   literal reading of the merge instruction. Ask before filing; the class can do
   either.
+- **The accessibility report's required format is unresolved.** Hurtado's
+  2026-08-25 department email states that accessibility reports must now be
+  submitted with thesis documents, but his guidelines doc does not yet define
+  one — no contents, no producing tool, no submission process; he has said that
+  doc needs updating. The class emits a veraPDF report (above) on the assumption
+  that ISO-clause-level PDF/UA-2 conformance is at least sufficient evidence.
+  Confirm with the Graduate School, or at his forthcoming workshop, before
+  filing on that assumption.
 - Optional semantic `<Title>` / `<H1>` tagging of the title and committee pages
   (currently auto-tagged as paragraphs — valid, but less precise for a screen
   reader; see Hurtado's manual-tagging approach).

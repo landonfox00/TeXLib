@@ -2,8 +2,9 @@
 	// TeXLib.sublime-build -- build system for the TeXLib library.
 	//
 	// Deploy to Packages/User/. Then in Sublime: Tools > Build System > TeXLib.
-	//   Ctrl+B         -- build in the default mode (no \Show... flag)
-	//   Ctrl+Shift+B   -- pick a mode: Answer Key, Solutions, Student, ...
+	//   Ctrl+B         -- default: the base PDF plus every variant this
+	//                     document actually supports, each with a tagged twin
+	//   Ctrl+Shift+B   -- pick one: Base only, Solutions, Instructor, ...
 	// The "TeXLib: Build ..." entries in the command palette do the same.
 	//
 	// Each variant passes --texlib-mode=<mode> through LaTeXTools' documented
@@ -33,18 +34,35 @@
 
 	"variants": [
 		{
-			"name": "Answer Key",
+			// The plain build alone -- what Ctrl+B did before the variant
+			// fan-out. Fully settled, unlike Quick.
+			"name": "Base only (one PDF)",
 			"builder": "texlib",
-			"options": ["--texlib-mode=key"]
+			"options": ["--texlib-mode=base"]
+		},
+		{
+			// The STUDENT-facing key: answers, no grading apparatus. This is
+			// what "Answer Key" used to be called; the mode names are the
+			// audience now, not the mechanism.
+			"name": "Solutions (student key)",
+			"builder": "texlib",
+			"options": ["--texlib-mode=solutions"]
+		},
+		{
+			// Same answers, laid into the student's reserved blank so the key
+			// page's geometry matches the student copy. Needs {partsolution}.
+			"name": "Solutions (in the answer space)",
+			"builder": "texlib",
+			"options": ["--texlib-mode=solutions-inline"]
 		},
 		{
 			// Instructor build: worked solutions AND the grading rubric.
 			// There is deliberately no rubric-only variant -- a rubric
 			// annotates a solution, so rubric-without-solutions is never
-			// what you want. \ShowRubric now implies \ifsolutions anyway.
-			"name": "Solutions + Rubric",
+			// what you want. \ShowRubric implies \ifsolutions anyway.
+			"name": "Instructor (solutions + rubric)",
 			"builder": "texlib",
-			"options": ["--texlib-mode=solutions"]
+			"options": ["--texlib-mode=instructor"]
 		},
 		{
 			"name": "Student Copy",
@@ -60,6 +78,14 @@
 			"name": "Quick (single pass, refs may be stale)",
 			"builder": "texlib",
 			"options": ["--texlib-mode=quick"]
+		},
+		{
+			// Default without the content check: builds the answer variants
+			// even when the document reports no solutions. The escape hatch
+			// for when you don't believe the detection.
+			"name": "Full (every variant, no pruning)",
+			"builder": "texlib",
+			"options": ["--texlib-mode=full"]
 		},
 		{
 			// Paired build: the normal PDF (the class's own engine, unchanged)

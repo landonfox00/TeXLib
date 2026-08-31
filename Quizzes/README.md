@@ -140,9 +140,12 @@ slightly different numbers — set the seed once, regenerate, print.
 
 ### Build flags (TeXLib unified CLI)
 
-`\ifsolutions`, `\ifkey`, `\ifrubric`, `\ifdraft`, `\ifstudent`,
-`\ifinstructor` and the matching compile-time defines. The `\ifkey`
-flag adds an "Answer Key" annotation under the title.
+`\ifsolutions`, `\ifkey`, `\ifsolinline`, `\ifrubric`, `\ifdraft`,
+`\ifstudent`, `\ifinstructor` and the matching compile-time defines. `\ifkey`
+implies `\ifsolutions` here (a quiz is a single copy), and titles the document
+"<quiz title> Solutions" — "Quiz 1 Solutions" by default — rather than adding a
+separate annotation line. Under `\ifsolinline` the mark moves to the running
+header instead, so the key page's geometry matches the student copy.
 
 ### Commands
 
