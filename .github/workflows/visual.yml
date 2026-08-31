@@ -45,6 +45,17 @@ jobs:
       # outcome-deciding apk packages are therefore version-pinned below; when
       # Alpine drops a pinned version this fails loudly at `apk add`, and the
       # bump (plus a ref regen if rendering shifts) happens deliberately.
+      #
+      # That is not hypothetical: Alpine dropped 7.1.2.27-r0 and this gate went
+      # red on every PR with "unable to select packages: imagemagick-7.1.2.30-r0
+      # breaks world[imagemagick=7.1.2.27-r0]" -- the pin failing loudly, as
+      # designed, but at `apk add` rather than at a diff, so the job never
+      # reaches a render. Two things to know when it happens again: the failure
+      # looks nothing like a visual regression (~1m20s, no image comparison in
+      # the log), and an `update_refs` dispatch dies the same way BEFORE
+      # regenerating, so its artifact is the plain checkout -- check
+      # .regen-manifest before committing anything from it. Bumped to
+      # 7.1.2.30-r0 on 2026-08-30.
       # 20260701 is TeX Live 2026; the refs are regenerated in this same
       # container (update_refs dispatch), so refs and checks share a toolchain.
       - name: Visual regression in pinned TeX Live
@@ -54,7 +65,7 @@ jobs:
           # poppler-utils -> pdftoppm (PDF->PNG); imagemagick -> magick compare.
           run: |
             set -e
-            apk add --no-cache python3 poppler-utils=25.12.0-r1 imagemagick=7.1.2.27-r0
+            apk add --no-cache python3 poppler-utils=25.12.0-r1 imagemagick=7.1.2.30-r0
             # Fail loudly if the compare tool is missing: smoke_test soft-skips
             # visual checks when ImageMagick is absent, which would make this
             # gate pass vacuously.
@@ -105,3 +116,13 @@ jobs:
           name: visual-refs
           path: tests/visual_refs/
           retention-days: 7
+          # WITHOUT THIS THE MANIFEST NEVER ARRIVES. `.regen-manifest` is the
+          # documented tell for "did this run regenerate, or die before it and
+          # upload the plain checkout?" -- and upload-artifact excludes hidden
+          # files by default, so the one file the comments above tell you to
+          # read was silently dropped from every artifact this job ever
+          # produced. The guard read as present and was not, which is worse
+          # than not having written it: a run that died at `apk add` uploaded
+          # refs byte-identical to the committed ones, with no manifest, and
+          # "no manifest" was indistinguishable from "this feature is broken".
+          include-hidden-files: true

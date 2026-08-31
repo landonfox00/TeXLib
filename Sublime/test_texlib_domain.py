@@ -97,12 +97,43 @@ ok &= check(texlib_complete._key_position("  course-num")
             and not texlib_complete._key_position("  course-number = 18"),
             "D5: key position vs value position")
 
-# D5 integration: the REAL course-metadata.sty exposes the known keys.
-real = os.path.join(os.path.dirname(HERE), "course-metadata.sty")
+# D5 integration: the REAL texlib-coursemeta.sty exposes the known keys. Read
+# that, NOT course-metadata.sty -- the old name survives as a compatibility
+# wrapper with no \meta_create_var lines in it, so reading it returns zero keys
+# and no error. That is how the rename silently broke coursemeta completions.
+real = os.path.join(os.path.dirname(HERE), "texlib-coursemeta.sty")
 if os.path.isfile(real):
     with open(real, encoding="utf-8", errors="replace") as fh:
         rk = texlib_complete.coursemeta_keys(fh.read())
     ok &= check({"course-number", "lecture-days", "exam1-date"} <= set(rk),
-                "D5: real course-metadata.sty keys extracted (%d keys)" % len(rk))
+                "D5: real texlib-coursemeta.sty keys extracted (%d keys)" % len(rk))
+
+# The guard the rename needed and did not have. Anything that reads a package
+# BY PATH to extract content -- the completion source, this test -- must read
+# the real file, never the compatibility wrapper. A wrapper parses fine and
+# yields nothing, so the failure is silent: completions just stop appearing.
+# Assert the wrapper really is empty of keys, so that if someone ever moves the
+# declarations back into it this test says so instead of the reader going quiet.
+wrapper = os.path.join(os.path.dirname(HERE), "course-metadata.sty")
+if os.path.isfile(wrapper):
+    with open(wrapper, encoding="utf-8", errors="replace") as fh:
+        wk = texlib_complete.coursemeta_keys(fh.read())
+    ok &= check(not wk,
+                "D5: the course-metadata.sty wrapper declares no keys "
+                "(readers must use texlib-coursemeta.sty) -- found %d" % len(wk))
+
+# And the live completion path must actually find them, which is the thing a
+# user notices. _meta_keys() resolves the file itself; if it ever reads the
+# wrapper again this returns an empty list and nobody hears about it.
+#
+# _repo_root() consults a Sublime setting first, which the stub does not
+# provide, so give it one that answers "no override" and let the real
+# path-derivation below it run.
+import sublime as _sub  # noqa: E402  (the stub installed above)
+if not hasattr(_sub, "load_settings"):
+    _sub.load_settings = lambda _name: type("S", (), {"get": lambda s, k: None})()
+_live = texlib_complete._meta_keys()
+ok &= check({"course-number", "exam1-date"} <= set(_live),
+            "D5: _meta_keys() resolves the real package (%d keys)" % len(_live))
 
 report(ok)
