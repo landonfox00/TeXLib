@@ -4,6 +4,17 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- **A worklist of every US institution that could use a thesis profile, derived from IPEDS.** `thesis_institutions.py` fetches the federal institutional-characteristics survey and filters it to institutions whose highest offering is a master'''s or above: **2,135 of them, 1,283 doctorate-granting**. `next` gives the next one alphabetically with no profile, `scaffold <slug>` writes a skeleton, `list` shows coverage.
+
+  The list is derived rather than checked in by hand because a hand-assembled list of two thousand university names is wrong on day one in ways nobody can see — a plausible name for an institution that does not exist reads exactly like a real one. (It also corrects a number I had quoted from memory: the doctorate-granting count is 1,283, not the ~430 I said, which is closer to the Carnegie R1/R2 figure. That is the argument for deriving it.) `institutions.source` records the URL, the survey year, the filter and the access date, since a CSV cannot carry a comment and an unattributed list gets assumed to be curated.
+
+  **`scaffold` writes a skeleton, never a profile.** Every institution-specific value is a placeholder, the skeleton renders the neutral pages until someone replaces them, and it carries a provenance header — source URL, access date, who read it — to be filled in by a person who read the graduate school'''s requirements. IPEDS supplies a name and nothing else; it cannot tell you a margin. Getting one wrong does not produce a bad commit, it produces a rejected dissertation for someone who trusted the profile.
+
+  Alphabetical order, and `next` reads its answer off the profiles directory rather than a stored cursor — nothing to lose or disagree with. An `ALIASES` map handles profiles named for what a document types (`profile=unr`, not `profile=university-of-nevada-reno`); without it the worklist reported UNR as unwritten and `next` would eventually have scaffolded a duplicate.
+
+
 ### Changed
 
 - **Classes and packages carry a `texlib-` prefix; every old name stays as a wrapper.** `didactic`, `quiz`, `thesis`, `schedule`, `bank`, `pset`, `bingo`, `syllabus`, `autoexam` and `report-card` are names no library should own. Each collides with a file of the same name sitting next to a user's document, and CTAN will not allocate them — which made the whole set unpublishable. They are now `texlib-<name>.cls`, with `basic-utilities` → `texlib-utilities` and `course-metadata` → `texlib-coursemeta`.

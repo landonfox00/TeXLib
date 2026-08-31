@@ -48,6 +48,36 @@ Asking for a profile that does not exist warns and falls back to the neutral
 pages rather than failing the build; asking for `generic` explicitly is the
 same as asking for nothing, and does not warn.
 
+#### The institution worklist
+
+`thesis_institutions.py` maintains the list of US institutions that could use a
+profile, and scaffolds one.
+
+```
+python thesis_institutions.py fetch                  # refresh from IPEDS
+python thesis_institutions.py next                   # next one with no profile
+python thesis_institutions.py scaffold <slug>        # write a skeleton
+python thesis_institutions.py list --state NV
+```
+
+The list is **derived, not curated**: it comes from the federal IPEDS
+institutional-characteristics survey, filtered to institutions whose highest
+offering is a master's or above — 2,135 of them, 1,283 doctorate-granting.
+A hand-assembled list of two thousand university names would be wrong on day one
+in ways nobody could see, since a plausible name for an institution that does
+not exist reads exactly like a correct one. `institutions.source` records where
+the committed copy came from and when.
+
+Work proceeds **alphabetically**, and `next` reads the answer off the profiles
+directory, so there is no cursor to lose or disagree with.
+
+`scaffold` writes a skeleton, not a profile. Every institution-specific value in
+it is a placeholder, it renders the neutral pages until someone replaces them,
+and it carries a provenance header — source URL, access date, who read it — that
+must be filled in. IPEDS supplies an institution'''s name and nothing else; it
+cannot tell you a margin. **Nobody should file a thesis against a scaffolded
+profile until a person has read that graduate school'''s own requirements.**
+
 ## Status
 
 The example (`thesis-template.tex`) builds with **0 errors** and passes veraPDF
