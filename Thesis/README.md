@@ -1,10 +1,82 @@
-# Thesis — accessible UNR thesis / dissertation class
+# Thesis — accessible thesis / dissertation class
 
-`thesis.cls` is a report-based LaTeX class for University of Nevada, Reno M.S.
-theses and Ph.D. dissertations that produces a **tagged, PDF/UA-conformant**
-document — meeting UNR's accessibility requirement — following the Graduate
-School filing guidelines and building on Paul Hurtado's accessible thesis
-template (v0.5, <https://www.pauljhurtado.com/latex/>).
+`texlib-thesis.cls` is a report-based LaTeX class for M.S. theses and Ph.D.
+dissertations that produces a **tagged, PDF/UA-conformant** document. It was
+built at the University of Nevada, Reno on Paul Hurtado's accessible thesis
+template (v0.5, <https://www.pauljhurtado.com/latex/>), but the conformance
+machinery is not UNR's, so it is not confined to UNR.
+
+The parts a graduate school actually dictates — the title page, the
+committee-approval page, and the margin/spacing figures — live in an
+[institution profile](#institution-profiles). `unr` is the reference profile;
+an institution with no profile yet still gets a conformant document from the
+neutral defaults.
+
+**`\documentclass{thesis}` still works and is unchanged.** It is now a
+two-line wrapper that loads this class with `profile=unr`, and the rendered
+output is pixel-identical to the pre-split class across all ten pages of the
+shipped template.
+
+## Institution profiles
+
+```latex
+\documentclass[profile=unr]{texlib-thesis}   % or just \documentclass{thesis}
+\documentclass{texlib-thesis}                % neutral defaults
+```
+
+A profile is one file, `Thesis/profiles/<name>.tex`, loaded last so it can use
+anything the class loaded. It owns exactly three things:
+
+| What | How |
+|---|---|
+| The institution name | `\thesisinstitution{...}` |
+| The two pages | `\renewcommand{\thesistitlepage}{...}`, `\renewcommand{\thesisapprovalpage}{...}` |
+| The filing figures | `\thesissetgeometry{left=1in, ...}`, `\thesissetspacing{double\|onehalf\|single}` |
+
+Everything else — the tagged-PDF stack, the trivlist-free theorem
+environments, `\ThesisMathIntent`, the front-matter machinery, the
+degree/committee metadata model, biblatex — is shared and needs no profile.
+
+**Writing one.** Copy [`profiles/unr.tex`](profiles/unr.tex), which is
+commented as the reference, and replace the two page bodies. The committee list
+(`\committeemember`) and its per-member signature rule are provided by the
+class, so a minimal profile is a name plus two layouts. Profiles for other
+institutions are welcome — see the caveat in
+[Status](#status) about checking current wording before filing.
+
+Asking for a profile that does not exist warns and falls back to the neutral
+pages rather than failing the build; asking for `generic` explicitly is the
+same as asking for nothing, and does not warn.
+
+#### The institution worklist
+
+`thesis_institutions.py` maintains the list of US institutions that could use a
+profile, and scaffolds one.
+
+```
+python thesis_institutions.py fetch                  # refresh from IPEDS
+python thesis_institutions.py next                   # next one with no profile
+python thesis_institutions.py scaffold <slug>        # write a skeleton
+python thesis_institutions.py list --state NV
+```
+
+The list is **derived, not curated**: it comes from the federal IPEDS
+institutional-characteristics survey, filtered to institutions whose highest
+offering is a master's or above — 2,135 of them, 1,283 doctorate-granting.
+A hand-assembled list of two thousand university names would be wrong on day one
+in ways nobody could see, since a plausible name for an institution that does
+not exist reads exactly like a correct one. `institutions.source` records where
+the committed copy came from and when.
+
+Work proceeds **alphabetically**, and `next` reads the answer off the profiles
+directory, so there is no cursor to lose or disagree with.
+
+`scaffold` writes a skeleton, not a profile. Every institution-specific value in
+it is a placeholder, it renders the neutral pages until someone replaces them,
+and it carries a provenance header — source URL, access date, who read it — that
+must be filled in. IPEDS supplies an institution'''s name and nothing else; it
+cannot tell you a margin. **Nobody should file a thesis against a scaffolded
+profile until a person has read that graduate school'''s own requirements.**
 
 ## Status
 

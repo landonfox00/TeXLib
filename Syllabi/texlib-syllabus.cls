@@ -1,0 +1,667 @@
+% syllabus.cls
+% UNR Course Syllabus Class — TeXLib unified style
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesClass{texlib-syllabus}[2026/08/25 v0.7.4 UNR Course Syllabus (TeXLib)]
+
+% ==============================================================================
+% 0. OPTIONS
+% ==============================================================================
+% Per-document metadata may be passed in the class option list, e.g.
+%   \documentclass[office={NLLC 146F}, office-hours={MWF 2-3pm}]{syllabus}
+% Any option containing "=" is a metadata key=value pair; every other option
+% (11pt, twoside, ...) is forwarded to article. Metadata is applied at the end
+% of section 4 (after coursemeta.tex loads, so document options win) by reading
+% \@raw@classoptionslist directly — that list preserves spaces in values, which
+% the \CurrentOption seen here does not. \DeclareOption* therefore only forwards
+% the non-metadata options; the key=value ones still pass through it (a no-op)
+% so the kernel marks them used. Safe because no base-class option uses key=value.
+\DeclareOption*{%
+	\@expandtwoargs\in@{=}{\CurrentOption}%
+	\ifin@\else
+		\PassOptionsToClass{\CurrentOption}{article}%
+	\fi
+}
+\ProcessOptions\relax
+\LoadClass[11pt]{article}
+
+% A class-option value containing a comma (e.g. a date like {May 2, 2026}) is
+% split by the kernel's option parser into a stray fragment with no "=", which
+% would be reported as an "unused global option". The real values are consumed
+% from \@raw@classoptionslist below, so discard those spurious leftovers.
+\AtEndOfClass{\global\let\@unusedoptionlist\@empty}
+
+% Pre-declare xcolor options so dvipsnames stays effective regardless of
+% which package pulls xcolor in first.
+\PassOptionsToPackage{dvipsnames}{xcolor}
+
+% ==============================================================================
+% 1. PACKAGES
+% ==============================================================================
+\RequirePackage[margin=1in]{geometry}
+\RequirePackage{xparse}
+\RequirePackage{expl3}
+\RequirePackage{etoolbox}
+\RequirePackage{xstring}
+\RequirePackage{xspace}   % section shortcuts: restore the gobbled inter-word space
+\RequirePackage{graphicx}
+\RequirePackage{fancyhdr, lastpage, enumitem, makecell, qrcode}
+\RequirePackage{xcolor}
+% Link colours must be DEFINED before hyperref consumes them below. A normal
+% build tolerates defining them later (hyperref resolves link colours at
+% shipout), but \DocumentMetadata{tagging=on} (accessible build) initialises
+% hyperref early enough that an undefined darkblue/darkred here is a hard error.
+\definecolor{darkblue}{rgb}{0,0,.6}
+\definecolor{darkred}{rgb}{.7,0,0}
+\definecolor{darkgreen}{rgb}{0,.6,0}
+\RequirePackage[colorlinks,pdfusetitle,
+				urlcolor=darkblue, citecolor=darkblue, linkcolor=darkred,
+				bookmarksnumbered, plainpages=false]{hyperref}
+
+\RequirePackage{course-metadata}
+
+% ==============================================================================
+% 2. BUILD FLAGS — UNIFIED TeXLib CLI
+% ==============================================================================
+\RequirePackage{texlib-build}
+
+% Publishable: the builder clones the built PDF to
+% "<SUBJECT> <number>.<section>_<term>_<LastName>.pdf" and Syllabus.pdf and drops
+% a "<course> <term> Syllabus" desktop shortcut. See the publish sidecar in
+% course-metadata.sty.
+%
+% NO coded-suffix here, deliberately: that coded name is the file mailed to
+% math@unr.edu, and the Math & Stat Office asks for exactly
+% "MATH XXX.YYYY_Fall 2026_InstructorLastName". The syllabus therefore owns the
+% unsuffixed name and every other publishable class declares a suffix.
+\TeXLibDeclarePublishable{syllabus}{Syllabus}{Syllabus}
+
+% PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty for why
+% every class needs one. Matches the published-copy naming.
+\TeXLibDeclareDocTitle{\GetCourse\space\GetTerm\space Syllabus}
+
+
+% ==============================================================================
+% 3. LIST DEFAULTS
+% ==============================================================================
+% (Link colours darkblue/darkred/darkgreen are defined above, before hyperref.)
+\setlist{noitemsep, topsep=2pt, parsep=0pt, partopsep=0pt}
+% ACCESSIBLE: a tagged build routes every list through latex-lab's block
+% templates, which take their vertical spacing from the CLASSIC per-level list
+% hooks (\@listi/\@listii/\@listiii) and ignore enumitem's spacing keys -- the
+% \setlist above visibly loosens (an extra ~28pt around a three-item list), and
+% everything below the first bulleted block shifts against the print PDF.
+% Mirror the same four values into the level hooks, so both builds space lists
+% identically. Label and margin keys are unaffected (block honours those), and
+% a normal build never reads the hooks differently, so this is gated anyway to
+% keep the print path byte-identical.
+\ifdefined\TeXLibAccessibleMode
+	\def\@listi{\leftmargin\leftmargini
+		\topsep 2\p@ \parsep\z@ \itemsep\z@ \partopsep\z@}
+	\let\@listI\@listi
+	\g@addto@macro\@listii{\topsep 2\p@ \parsep\z@ \itemsep\z@ \partopsep\z@}
+	\g@addto@macro\@listiii{\topsep 2\p@ \parsep\z@ \itemsep\z@ \partopsep\z@}
+\fi
+
+% ==============================================================================
+% 4. CLASS-LOCAL METADATA KEYS
+% ==============================================================================
+\ExplSyntaxOn
+
+% Instructor-contact and scheduling fields — email / instructor-email, office,
+% office-hours, organizer, class-time, class-time-alt, short-title / syllabus-title
+% — are course-wide keys defined in course-metadata.sty (v8.2+). A course may set
+% them once in coursemeta.tex as defaults; a document's class options still
+% override (this class re-applies its option list after coursemeta loads). We read
+% the shared \GetEmail / \GetOffice / ... getters and the \g__meta_short-title_tl
+% store via the composite accessors below.
+
+% Composite accessors for the default info table. Each is fully expandable and
+% yields nothing when its underlying field(s) are unset, so the info-table
+% emptiness filter (expansion + \tl_if_blank) drops the entry and reflows.
+\NewExpandableDocumentCommand{\GetInstructorOrOrganizer}{}{
+	\tl_if_empty:cTF { g__meta_instructor_tl }
+		{ \GetOrganizer }
+		{ \GetInstructor }
+}
+% Class meeting time: an explicit class-time wins (with an optional alternate
+% appended); otherwise fall back to the coursemeta lecture pattern
+% (lecture-days + lecture-times) so a course need not repeat it here. Expands to
+% nothing when none are set, and the info-table filter then drops the row.
+\NewExpandableDocumentCommand{\GetClassTimeFull}{}{
+	\tl_if_empty:cTF { g__meta_class-time_tl }
+		{
+			\tl_if_empty:cTF { g__meta_lecture-days_tl }
+				{ \GetLectureTimes }
+				{ \GetLectureDays
+				  \tl_if_empty:cF { g__meta_lecture-times_tl } { ~\GetLectureTimes } }
+		}
+		{
+			\GetClassTime
+			\tl_if_empty:cF { g__meta_class-time-alt_tl } { ~/~\GetClassTimeAlt }
+		}
+}
+\NewExpandableDocumentCommand{\GetEmailLinked}{}{
+	\tl_if_empty:cF { g__meta_email_tl } { \href{mailto:\GetEmail}{\GetEmail} }
+}
+
+\NewExpandableDocumentCommand{\GetShortTitle}   {}{
+	\tl_if_empty:cTF { g__meta_short-title_tl }
+		{ \GetCourse }
+		{ \tl_use:c { g__meta_short-title_tl } }
+}
+% \GetSyllabusTitle -- canonical \Get<class>Title name (mirrors \GetPsetTitle,
+% \GetUnitTitle, ...); \GetShortTitle is kept as the original alias.
+\NewExpandableDocumentCommand{\GetSyllabusTitle}{}{
+	\tl_if_empty:cTF { g__meta_short-title_tl }
+		{ \GetCourse }
+		{ \tl_use:c { g__meta_short-title_tl } }
+}
+
+\NewDocumentCommand{\IfSyllSet}{ m +m +m } {
+	\tl_if_empty:cTF { g__syll_#1_tl } { #3 } { #2 }
+}
+
+\ExplSyntaxOff
+
+% Apply document metadata from the class option list now that the keys above and
+% coursemeta.tex are loaded (so document options override coursemeta defaults).
+\MetaApplyClassOptions
+
+% ==============================================================================
+% 5. PAGE LAYOUT
+% ==============================================================================
+\RequirePackage{texlib-footer}   % shared footer: Course | page X of Y | Institution
+\setlength{\headheight}{14pt}
+\pagestyle{fancy}
+\fancyhf{}
+% Header: L = syllabus title  C = (none)  R = term + section.
+\SetTeXLibHeader{\bfseries\GetSyllabusTitle}{}{\GetTermSection}
+\SetTeXLibFooter                  % L = \GetCourse (shared default)
+% Rule bleed comes from texlib-sectionhang's [LR] offset (loaded at the end of
+% this class), so \TeXLibRuleBleed must NOT also be called.
+
+% Title page (\maketitle uses \thispagestyle{plain}): keep the shared footer,
+% suppress the header + its rule.
+\TeXLibFooterOnlyPagestyle{plain}
+
+\renewcommand{\thefootnote}{\fnsymbol{footnote}}
+
+% ==============================================================================
+% 6. TITLE BLOCK
+% ==============================================================================
+% The course-info table under the title is fully customizable via
+% \setsyllabusinfo. An entry whose value expands to empty is dropped and the
+% remaining entries reflow into the grid; if every value is empty the whole
+% framed block -- rules included -- is suppressed.
+\ExplSyntaxOn
+
+\seq_new:N \g__syll_info_seq
+\seq_new:N \g__syll_info_kept_seq
+\int_new:N \g__syll_info_cols_int
+
+\keys_define:nn { syll / info } {
+	columns .int_gset:N = \g__syll_info_cols_int,
+}
+
+% \setsyllabusinfo[columns=N]{ \syllabusentry{Label}{Value} ... } redefines the
+% info table. \syllabusentry is live only inside this argument; labels and values
+% are stored unexpanded and the values are evaluated at \maketitle time. Each
+% call resets columns to the default of 2 unless [columns=N] overrides it.
+\NewDocumentCommand{\setsyllabusinfo}{ O{} +m }{
+	\seq_gclear:N \g__syll_info_seq
+	\int_gset:Nn \g__syll_info_cols_int { 2 }
+	\keys_set:nn { syll / info } { #1 }
+	\group_begin:
+		\cs_set:Npn \syllabusentry ##1 ##2 {
+			\seq_gput_right:Nn \g__syll_info_seq { { ##1 } { ##2 } }
+		}
+		#2
+	\group_end:
+}
+
+% Keep only entries whose value is non-empty.  The test expands the value with
+% \protected@edef, not a raw e-expansion: that fully expands the (expandable)
+% \Get... accessors -- so an unset field reads as blank -- while leaving robust
+% commands like \href intact instead of executing them mid-test.
+\cs_new_eq:Nc \__syll_protected_edef:N { protected@edef }
+\tl_new:N \l__syll_probe_tl
+\cs_new_protected:Npn \__syll_filter_info: {
+	\seq_gclear:N \g__syll_info_kept_seq
+	\seq_map_inline:Nn \g__syll_info_seq { \__syll_filter_one:nn ##1 }
+}
+\cs_new_protected:Npn \__syll_filter_one:nn #1 #2 {
+	\__syll_protected_edef:N \l__syll_probe_tl { #2 }
+	\tl_if_blank:VF \l__syll_probe_tl
+		{ \seq_gput_right:Nn \g__syll_info_kept_seq { { #1 } { #2 } } }
+}
+
+\tl_new:N  \l__syll_pre_tl
+\tl_new:N  \l__syll_rows_tl
+\tl_new:N  \l__syll_table_tl
+\int_new:N \l__syll_cols_int
+\int_new:N \l__syll_n_int
+
+\cs_new:Npn \__syll_cell:nn #1 #2 { \textbf{#1:} & #2 }
+
+% Pad a partial final row out to a full set of column pairs (two empty tabular
+% columns per missing entry) so the alignment never ends ragged.
+\cs_new_protected:Npn \__syll_pad_row:n #1 {
+	\int_set:Nn \l_tmpa_int { \int_mod:nn { #1 } { \l__syll_cols_int } }
+	\int_step_inline:nn { 2 * ( \l__syll_cols_int - \l_tmpa_int ) }
+		{ \tl_put_right:Nn \l__syll_rows_tl { & } }
+}
+
+% Assemble \l__syll_table_tl: \begin{tabular}{<spec>} <rows> \end{tabular} for the
+% kept entries laid out in \g__syll_info_cols_int columns of label/value pairs.
+\cs_new_protected:Npn \__syll_build_table: {
+	\int_set:Nn \l__syll_cols_int { \g__syll_info_cols_int }
+	\int_compare:nNnT { \l__syll_cols_int } < { 1 }
+		{ \int_set:Nn \l__syll_cols_int { 1 } }
+	\int_set:Nn \l__syll_n_int { \seq_count:N \g__syll_info_kept_seq }
+	% column spec: @{}ll@{\hspace{3em}}ll...@{}
+	\tl_clear:N \l__syll_pre_tl
+	\tl_put_right:Nn \l__syll_pre_tl { @{} }
+	\int_step_inline:nn { \l__syll_cols_int } {
+		\int_compare:nNnT { ##1 } > { 1 }
+			{ \tl_put_right:Nn \l__syll_pre_tl { @{\hspace{3em}} } }
+		\tl_put_right:Nn \l__syll_pre_tl { ll }
+	}
+	\tl_put_right:Nn \l__syll_pre_tl { @{} }
+	% rows: a \\ closes each full row; a partial final row is padded first
+	\tl_clear:N \l__syll_rows_tl
+	\seq_map_indexed_inline:Nn \g__syll_info_kept_seq {
+		\tl_put_right:Nn \l__syll_rows_tl { \__syll_cell:nn ##2 }
+		\int_compare:nNnTF { \int_mod:nn { ##1 } { \l__syll_cols_int } } = { 0 }
+			{ \tl_put_right:Nn \l__syll_rows_tl { \\ } }
+			{
+				\int_compare:nNnTF { ##1 } = { \l__syll_n_int }
+					{ \__syll_pad_row:n { ##1 }
+					  \tl_put_right:Nn \l__syll_rows_tl { \\ } }
+					{ \tl_put_right:Nn \l__syll_rows_tl { & } }
+			}
+	}
+	\tl_set:Ne \l__syll_table_tl {
+		\exp_not:N \begin { tabular } { \exp_not:V \l__syll_pre_tl }
+			\exp_not:V \l__syll_rows_tl
+		\exp_not:N \end { tabular }
+	}
+}
+
+% Bridges to the expl3 logic above, with all-letter names so the typesetting
+% wrapper (\syllabusinfotable) can stay in normal catcodes -- markup like
+% \begin{center} misbehaves if tokenized under \ExplSyntaxOn (ignored spaces).
+\NewDocumentCommand{\syllInfoCompute}{}{
+	\__syll_filter_info:
+	\seq_if_empty:NF \g__syll_info_kept_seq { \__syll_build_table: }
+}
+\NewDocumentCommand{\syllInfoIfPresent}{ +m }{
+	\seq_if_empty:NF \g__syll_info_kept_seq { #1 }
+}
+\NewExpandableDocumentCommand{\syllInfoTable}{}{ \tl_use:N \l__syll_table_tl }
+
+\ExplSyntaxOff
+
+% Emit the framed info block, or nothing at all if no entry has a value. The
+% inter-element newlines (spaces) below are load-bearing: inside center they let
+% the rules and minipage stack vertically. Ending those lines with % would glue
+% all three onto one overfull line.
+\newcommand{\syllabusinfotable}{%
+	\syllInfoCompute
+	\syllInfoIfPresent{%
+		\vspace{-0.98cm}
+		\begin{center}
+			\rule{6.5in}{0.4pt}\\[5pt]
+			% Center the info tabular directly rather than left-aligning it in a
+			% fixed-width (0.8\textwidth) minipage: a wide layout (e.g. a 3-column
+			% \setsyllabusinfo) overran that box and sat off-centre, shifted right.
+			% \\[5pt] gives symmetric space above the bottom rule (mirrors the top).
+			{\renewcommand{\arraystretch}{1.0}%
+			\syllInfoTable}\\[5pt]
+			\rule{6.5in}{0.4pt}
+		\end{center}
+		\vspace{-0.55cm}
+	}%
+}
+
+% Built-in default: reproduces the historical 3x2 grid (Instructor/Time,
+% Email/Classroom, Office/Office Hours). Instructor falls back to Organizer
+% (relabelled) when unset; an alternate class time is appended to Time. Override
+% by calling \setsyllabusinfo in the preamble.
+\setsyllabusinfo{
+	\syllabusentry{\IfMetaSet{instructor}{Instructor}{Organizer}}{\GetInstructorOrOrganizer}
+	\syllabusentry{Time}{\GetClassTimeFull}
+	\syllabusentry{Email}{\GetEmailLinked}
+	\syllabusentry{Classroom}{\GetCourseRoom}
+	\syllabusentry{Office}{\GetOffice}
+	\syllabusentry{Office Hours}{\GetOfficeHours}
+}
+
+\renewcommand{\maketitle}{%
+	\thispagestyle{plain}%
+	\begin{center}
+		{\LARGE \GetCourse} \\[0.2cm]
+		% Section line renders only if course-section is set to a non-empty
+		% value. For courses without a section number, leave course-section
+		% out of coursemeta.tex (and don't call \coursesection{...}).
+		\IfMetaSet{course-section}{%
+			{\Large Section\ \GetCourseSection} \\[0.15cm]
+		}{}%
+		{\large \GetTerm}
+	\end{center}
+	\syllabusinfotable
+	\setlength{\unitlength}{1in}
+	\renewcommand{\arraystretch}{2}
+}
+
+% ==============================================================================
+% 7. SECTION COMMAND
+% ==============================================================================
+% The bold run-in title hangs onto the shared structural-hang line
+% (\texlibsectionhang, from texlib-sectionhang loaded at the end of this
+% class); the syllabus body text that follows stays at the normal margin.
+\newcommand{\syllabussection}[1]{%
+	\vskip.15in
+	\noindent\hspace*{-\texlibsectionhang}\textbf{#1.}%
+}
+
+% Section shortcuts: common syllabus headings as one-word commands. Each emits
+% \syllabussection{<standard title>}, so body prose follows exactly as with
+% \syllabussection; an optional argument overrides the title, e.g.
+% \academicintegrity[Academic Honesty]. \texlib@syllsec{\cmd}{Title} mints one.
+%
+% The trailing \xspace is load-bearing. In the bare form the shortcut is a
+% control word with no mandatory argument, so TeX skips the newline after it and
+% NO space token survives -- "\officehours" on its own line ran straight into the
+% prose as "Office Hours.Walk-in office hours...". The braced \syllabussection{X}
+% never had the fault (its closing brace lets the newline become a space), which
+% is why it went unnoticed: the template uses the braced form throughout and only
+% examples/Math181-Fall2026/syllabus.tex uses the shortcuts.
+%
+% \xspace and not a bare \space, because the [title] form ALREADY emits the
+% space -- xparse leaves the newline after "]" in the input -- and the following
+% token is often not a word at all. \xspace's default exception list covers every
+% such case: a space token (\@sptoken), \par for a following blank line, and
+% punctuation. So the space appears before prose and nowhere else.
+\newcommand{\texlib@syllsec}[2]{%
+	\NewDocumentCommand{#1}{o}{\syllabussection{\IfValueTF{##1}{##1}{#2}}\xspace}%
+}
+\texlib@syllsec{\coursedescription} {Course Description}
+\texlib@syllsec{\prerequisites}     {Prerequisites}
+\texlib@syllsec{\requiredmaterials} {Required Materials}
+\texlib@syllsec{\learningoutcomes}  {Learning Outcomes}
+\texlib@syllsec{\grading}           {Grading}
+\texlib@syllsec{\courseschedule}    {Course Schedule}
+\texlib@syllsec{\examschedule}      {Exam Schedule}
+\texlib@syllsec{\recitation}        {Recitation}
+\texlib@syllsec{\officehours}       {Office Hours}
+\texlib@syllsec{\communication}     {Communication}
+\texlib@syllsec{\attendancepolicy}  {Attendance Policy}
+\texlib@syllsec{\latework}          {Late and Make-up Work}
+\texlib@syllsec{\academicintegrity} {Academic Integrity}
+\texlib@syllsec{\accommodations}    {Accommodations}
+\texlib@syllsec{\academicsupport}   {Academic Support}
+\texlib@syllsec{\wellness}          {Student Wellness}
+\texlib@syllsec{\inclusivity}       {Inclusivity}
+\texlib@syllsec{\technology}        {Technology Requirements}
+\texlib@syllsec{\titleix}           {Title IX}
+\let\communications\communication   % plural alias for \communication
+% Plural alias: a course with several recitation sections normally heads the
+% block "Recitations". \recitation[Discussion Section] covers the other common
+% local names for the same meeting.
+\let\recitations\recitation
+
+% ==============================================================================
+% 7b. POLICY STATEMENTS
+% ==============================================================================
+% Required syllabus language -- disability accommodations, academic integrity,
+% civil rights, mental health -- is mandated per institution and reworded
+% without notice. Retyping it into every syllabus every term is how a course
+% ends up shipping last year's phone number.
+%
+% Seventeen statement files shipped under Syllabi/statements/ from the start,
+% each carrying a comment promising an override "via the coursemeta
+% statements-path". No such key existed, \aipolicy was never defined, and
+% nothing in the repository \input the files at all: the content was real and
+% wholly unreachable, and the template shipped example.edu placeholders instead.
+% This is that promised mechanism, built institution-neutral.
+%
+% \policystatement{disability} resolves in three steps, most specific first:
+%
+%   1. <coursemeta dir>/<statements-path>/disability.tex   the author's own
+%   2. statements/<institution-profile>/disability.tex     a shipped profile
+%   3. statements/generic/disability.tex                   the neutral fallback
+%
+% Step 1 is what makes this usable by someone whose institution has no profile
+% here: drop one file next to coursemeta.tex and it wins, no fork required.
+% Step 2 falling through to step 3 per-slug is what makes a profile cheap to
+% start -- override only the statements your institution actually mandates and
+% inherit the rest.
+%
+% Resolution is by \IfFileExists, so it works identically whether TeXLib is on
+% TEXINPUTS (Syllabi/ is a search segment) or installed into a TEXMF tree
+% (kpathsea resolves the relative subpath); both are verified in the test suite.
+
+% A gap an author must fill, rendered so it cannot be missed. The neutral
+% statements can state a policy's substance but cannot invent an institution's
+% office names, URLs and phone numbers -- and a syllabus that quietly tells
+% students to contact a plausible-looking wrong office is worse than one that
+% visibly says "fill this in". Also warns, so a build log carries it too.
+\newcommand{\statementplaceholder}[1]{%
+	\ClassWarning{syllabus}{Policy statement placeholder not filled in: #1}%
+	\par\nobreak\smallskip\noindent
+	\textcolor{red}{\textbf{[Fill in:] }\textit{#1}}%
+	\par\smallskip
+}
+
+% Default heading per slug. \policystatement[Other Heading]{slug} overrides.
+\newcommand{\texlib@stmt@sethead}[2]{\@namedef{texlib@stmt@head@#1}{#2}}
+\texlib@stmt@sethead{academic-dishonesty}   {Academic Integrity}
+\texlib@stmt@sethead{academic-success}      {Academic Support Services}
+\texlib@stmt@sethead{ai-permitted}          {Use of AI Tools}
+\texlib@stmt@sethead{ai-limited}            {Use of AI Tools}
+\texlib@stmt@sethead{ai-prohibited}         {Use of AI Tools}
+\texlib@stmt@sethead{basic-needs}           {Food and Housing Security}
+\texlib@stmt@sethead{campus-closures}       {Campus Closures}
+\texlib@stmt@sethead{civil-rights}          {Civil Rights and Title IX}
+\texlib@stmt@sethead{content-accessibility} {Content Accessibility}
+\texlib@stmt@sethead{disability}            {Disability Services}
+\texlib@stmt@sethead{disability-online}     {Disability Services}
+\texlib@stmt@sethead{failure-to-comply}     {Classroom Conduct}
+\texlib@stmt@sethead{instructor-recording}  {Course Recordings}
+\texlib@stmt@sethead{mental-health}         {Student Wellness}
+\texlib@stmt@sethead{recording}             {Recording of Class}
+\texlib@stmt@sethead{student-athletes}      {University-Approved Absences}
+\texlib@stmt@sethead{veteran-services}      {Veteran Services}
+
+% Resolved path for the slug, or empty. Not wrapped in a group: the result has
+% to survive, and \global for a value used two lines later is worse.
+\newcommand{\texlib@stmt@file}{}
+\newcommand{\texlib@stmt@try}[1]{%
+	\ifx\texlib@stmt@file\@empty
+		\IfFileExists{#1}{\renewcommand{\texlib@stmt@file}{#1}}{}%
+	\fi
+}
+\newcommand{\texlib@stmt@resolve}[1]{%
+	\renewcommand{\texlib@stmt@file}{}%
+	\IfMetaSet{statements-path}{%
+		\texlib@stmt@try{\GetCourseMetaDir\GetStatementsPath/#1.tex}%
+	}{}%
+	\IfMetaSet{institution-profile}{%
+		\texlib@stmt@try{statements/\GetInstitutionProfile/#1.tex}%
+	}{}%
+	\texlib@stmt@try{statements/generic/#1.tex}%
+}
+
+% \policystatement[Heading]{slug}
+%
+% The \xspace is load-bearing for the same reason it is on the section
+% shortcuts above: \syllabussection ends with a control sequence, so TeX skips
+% the following newline and no space token survives -- the heading ran straight
+% into the statement as "Disability Services.Any student with a disability".
+% Here the next token is \input or \statementplaceholder rather than a newline,
+% neither of which is in \xspace's exception list, so the space appears.
+\NewDocumentCommand{\policystatement}{ o m }{%
+	\texlib@stmt@resolve{#2}%
+	\syllabussection{\IfValueTF{#1}{#1}{%
+		\@ifundefined{texlib@stmt@head@#2}{#2}{\@nameuse{texlib@stmt@head@#2}}}}\xspace
+	\ifx\texlib@stmt@file\@empty
+		% Loud, not silent. A missing statement in a syllabus is a compliance
+		% gap, and the failure mode to avoid is a heading with nothing under it.
+		\ClassWarning{syllabus}{No policy statement found for `#2'}%
+		\statementplaceholder{No statement named `#2' in your statements-path,
+			your institution profile, or the generic set. Check the spelling,
+			or add \detokenize{#2}.tex to your statements-path.}%
+	\else
+		\input{\texlib@stmt@file}%
+	\fi
+}
+
+% \policystatements{a, b, c} -- the common case, in document order. expl3's
+% clist mapping trims surrounding spaces per item, so `a, b' and `a,b' behave
+% identically; hand-rolled trimming here would be a worse copy of that.
+\ExplSyntaxOn
+\NewDocumentCommand{\policystatements}{ m }{
+	\clist_map_inline:nn {#1} { \policystatement {##1} }
+}
+\ExplSyntaxOff
+
+% \aipolicy[permitted|limited|prohibited] -- the stance is the whole choice,
+% and all three headings are the same, so this is one command not three.
+\NewDocumentCommand{\aipolicy}{ O{permitted} }{\policystatement{ai-#1}}
+
+% ==============================================================================
+% 8. GRADE TABLES
+% ==============================================================================
+% Usage: the rows in #1 / #2 are separated by `\\ \hline`; the LAST row is
+% written bare (no trailing `\\ \hline`) and these macros close the table.
+% The closing `\\ \hline` below supplies the last row's terminator plus the
+% bottom rule -- writing it as bare `\hline` would land mid-row and trigger
+% "! Misplaced \noalign." A last row that *does* end with `\\` still compiles
+% (it just adds a blank trailing row), so the macros tolerate both styles.
+\newcommand{\gradecategories}[1]{%
+	\begin{tabular}{|c|c|}
+		\hline
+		Category & Total Grade \\
+		\hline\hline
+		#1
+		\\ \hline
+	\end{tabular}%
+}
+
+% \gradebound{<left of x>}{<right of x>} -- a grade-range cell aligned ON the x.
+%
+% A plain centred cell centres each range as a whole string, so "$90 \leq x$" and
+% "$80 \leq x < 90$" put their x's in different places and the column reads
+% ragged. This pads both sides to the SAME fixed width, so every entry has
+% identical total width and the x lands on a common axis -- the column centres,
+% and the x's line up down it:
+%
+%     A & \gradebound{90 \leq}{}        \\ \hline
+%     B & \gradebound{80 \leq}{< 90}    \\ \hline
+%
+% Both arguments are set in math mode; either may be empty. Widen
+% \gradeboundwidth if a course uses longer bounds than the two-digit defaults.
+%
+% KNOWN LIMITATION: a row with an EMPTY LOWER bound (the open-ended F row,
+% \gradebound{}{< 60}) sits 1.8pt -- one \, -- left of the rest. Rows with both
+% bounds, and rows with an empty UPPER bound (the A row), align exactly. Measured
+% by extracting the x glyph origins from the built PDF, so it is real and not a
+% rendering artifact; the cause is not yet identified. Cosmetic and confined to
+% that one row.
+\newlength{\gradeboundwidth}
+\setlength{\gradeboundwidth}{3.6em}
+% An empty argument must NOT become "$$" -- that opens display math and shifts
+% the cell (the F row, which has no lower bound, drifted ~2pt before this guard).
+% \if\relax\detokenize{..}\relax is the same empty test basic-utilities uses.
+\newcommand{\texlib@gb@side}[1]{\if\relax\detokenize{#1}\relax\else$#1$\fi}
+% The x lives INSIDE the right-aligned box, so it is anchored to that box's right
+% edge rather than to whatever precedes it. Both boxes are a fixed width, so the
+% cell's total width -- and therefore its centring -- is identical on every row,
+% and the x lands on the same axis even when a bound is empty (the F row).
+\newcommand{\gradebound}[2]{%
+	\makebox[\gradeboundwidth][r]{\texlib@gb@side{#1}\,$x$}%
+	\makebox[\gradeboundwidth][l]{\,\texlib@gb@side{#2}}%
+}
+
+\newcommand{\gradescale}[1]{%
+	\begin{tabular}{|c|c|}
+		\hline
+		Grade Letter & Grade Range (\%) \\
+		\hline\hline
+		#1
+		\\ \hline
+	\end{tabular}%
+}
+
+\newcommand{\gradetables}[2]{%
+	\begin{center}
+		\gradecategories{#1}
+		\hskip 0.5in
+		\gradescale{#2}
+	\end{center}
+}
+
+% ------------------------------------------------------------------------------
+% \examdatetable -- exam-date table driven by coursemeta
+% ------------------------------------------------------------------------------
+% Builds a two-column "Exam | Date" table from the coursemeta exam<N>-date keys
+% (exam1-date .. exam5-date) plus final-date. Only assessments whose date is set
+% appear; if none are set, the command produces nothing. Single-sources exam
+% dates with autoexam (which reads the same exam<N>-date keys), so a reschedule
+% edits one place.
+\ExplSyntaxOn
+\tl_new:N \l__syll_examrows_tl
+\NewDocumentCommand{\examdatetable}{}{
+	\tl_clear:N \l__syll_examrows_tl
+	\clist_map_inline:nn { 1, 2, 3, 4, 5 } {
+		\tl_if_exist:cT { g__meta_exam ##1 -date_tl } {
+			\tl_if_empty:cF { g__meta_exam ##1 -date_tl } {
+				\tl_put_right:Nn \l__syll_examrows_tl
+					{ Exam~##1 & \tl_use:c { g__meta_exam ##1 -date_tl } \\ \hline }
+			}
+		}
+	}
+	% final-date is stored as M-D for the schedule; render it human-readable so it
+	% matches the free-form exam<N>-date rows above (e.g. "Tuesday, December 15,
+	% 2026"). When final-time is set it is stacked UNDER the date in the same
+	% cell: UAM 3,517 pins the final to its Final Week slot, which is generally
+	% neither the course's meeting time nor a time students can infer from the
+	% meeting pattern, so it belongs on the syllabus -- and \makecell keeps the
+	% Date column from stretching to fit a date and a time side by side, since no
+	% unit-exam row has a time to put beside it. Unset final-time -> date alone,
+	% exactly as before.
+	\tl_if_empty:cF { g__meta_final-date_tl } {
+		\tl_if_empty:cTF { g__meta_final-time_tl }
+			{
+				\tl_put_right:Nn \l__syll_examrows_tl
+					{ Final~Exam & \MetaHumanMonthDay{\GetFinalDate} \\ \hline }
+			}
+			{
+				\tl_put_right:Nn \l__syll_examrows_tl
+					{
+						Final~Exam &
+						\makecell{ \MetaHumanMonthDay{\GetFinalDate} \\ \GetFinalTime }
+						\\ \hline
+					}
+			}
+	}
+	\tl_if_empty:NF \l__syll_examrows_tl {
+		\begin { tabular } { | c | c | }
+			\hline
+			Exam & Date \\
+			\hline \hline
+			\tl_use:N \l__syll_examrows_tl
+		\end { tabular }
+	}
+}
+\ExplSyntaxOff
+
+% ==============================================================================
+% Structural hang: \syllabussection titles (via the \hspace above), any raw
+% \section-family headings, and the running header/footer all hang onto one
+% outer left edge. Loaded LAST so its redefinitions land on top of the article
+% defaults.
+% ==============================================================================
+\RequirePackage{texlib-sectionhang}
+
+\endinput
