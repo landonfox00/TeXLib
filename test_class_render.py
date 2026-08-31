@@ -118,8 +118,19 @@ def build(doc, module_cls, macro=""):
             src = os.path.join(TEXLIB_ROOT, entry)
             if os.path.isfile(src) and entry.lower().endswith((".sty", ".lua", ".cls")):
                 shutil.copy2(src, os.path.join(tmp, entry))
-        shutil.copy2(os.path.join(TEXLIB_ROOT, *module_cls.split("/")),
-                     os.path.join(tmp, os.path.basename(module_cls)))
+        # Copy the class's whole module directory, not just the named .cls.
+        # Since the texlib- rename the bare name is a two-line wrapper around
+        # texlib-<name>.cls, so staging it alone gives a build that dies at the
+        # wrapper's own \endinput -- the real class is not there. The sibling
+        # .lua engines in the same directory were always needed too; naming one
+        # file only ever worked because the classes that need them were not
+        # exercised here.
+        module_dir = os.path.join(TEXLIB_ROOT,
+                                  os.path.dirname(module_cls.replace("/", os.sep)))
+        for entry in os.listdir(module_dir):
+            src = os.path.join(module_dir, entry)
+            if os.path.isfile(src) and entry.lower().endswith((".sty", ".lua", ".cls")):
+                shutil.copy2(src, os.path.join(tmp, entry))
 
         arg = f"{macro}\\input{{doc.tex}}" if macro else "doc.tex"
         rc = 0
