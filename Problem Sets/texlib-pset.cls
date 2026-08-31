@@ -271,7 +271,13 @@
 % The `parts` environment above sets its own inline label, so it is
 % unaffected; only a bare \begin{enumerate} picks this up.  ref=\roman*
 % keeps \cref output (e.g. "item ii") consistent with the printed label.
-\setlist[enumerate,1]{label=\textbf{\roman*.}, ref=\roman*}
+% Dropped under tagging: block does not know the key, errors once per \item,
+% and numbers the items in lowercase roman anyway (see didactic.cls).
+\ifdefined\TeXLibAccessibleMode
+	\setlist[enumerate,1]{label=\textbf{\roman*.}}
+\else
+	\setlist[enumerate,1]{label=\textbf{\roman*.}, ref=\roman*}
+\fi
 
 % ==============================================================================
 % 7. THEOREM-LIKE ENVIRONMENTS (boxed via tcolorbox, shared TeXLib styling)

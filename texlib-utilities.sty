@@ -30,13 +30,31 @@
 % Renders bold a., b., c., ...   General \begin{enumerate} is unaffected.
 \RequirePackage[shortlabels]{enumitem}
 \newlist{parts}{enumerate}{4}
-\setlist[parts]{
-	label    = \textbf{\alph*.},
-	labelsep = 0.5em,
-	leftmargin = *,
-	itemsep  = 2pt,
-	topsep   = 4pt,
-}
+% leftmargin=* is enumitem's "derive the margin from the label width" sentinel,
+% not a dimension. Under tagging the block-based lists read the value as a
+% dimension and every \begin{parts} emits "Missing number"/"Illegal unit of
+% measure" (three errors apiece) before recovering at 0pt. pset.cls already
+% carries this fix for the {parts} it redefines; the base declaration here is
+% what Notes and Report Cards get, and it was still handing them the sentinel.
+% 2em is what * resolved to for a bold "a." label (labelwidth ~1.5em +
+% labelsep 0.5em). The normal branch keeps *, so print output is unchanged.
+\ifdefined\TeXLibAccessibleMode
+	\setlist[parts]{
+		label    = \textbf{\alph*.},
+		labelsep = 0.5em,
+		leftmargin = 2em,
+		itemsep  = 2pt,
+		topsep   = 4pt,
+	}
+\else
+	\setlist[parts]{
+		label    = \textbf{\alph*.},
+		labelsep = 0.5em,
+		leftmargin = *,
+		itemsep  = 2pt,
+		topsep   = 4pt,
+	}
+\fi
 
 % =========================================================
 % 1. MATH MACROS

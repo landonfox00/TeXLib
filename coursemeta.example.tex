@@ -34,6 +34,24 @@
 	% gradebook. Resolved like bank-path; an .xlsx value is mapped to the
 	% .csv the TeXLib builder exports from it.
 	gradebook-path  = {gradebook.xlsx},
+	% --- Syllabus policy statements -------------------------------------------
+	% \policystatement{disability} (syllabus.cls) resolves in three steps, most
+	% specific first:
+	%   1. <this file's dir>/<statements-path>/disability.tex   your own wording
+	%   2. statements/<institution-profile>/disability.tex      a shipped profile
+	%   3. statements/generic/disability.tex                    neutral fallback
+	% Both keys are optional. With neither set you get the generic set, which
+	% states each policy's substance and marks the institution-specific gaps in
+	% red so they cannot ship unfilled.
+	%
+	% A directory of your own statements, resolved relative to this file. Wins
+	% over everything; no trailing slash. Use it to correct one statement
+	% without forking the library.
+	% statements-path     = {statements},
+	% A set shipped under Syllabi/statements/. `unr' is the only one so far;
+	% contributions welcome. A profile need not be complete -- anything it does
+	% not carry falls through to generic.
+	% institution-profile = unr,
 	% --- Optional course-wide defaults (a document's class options override) ----
 	% Instructor contact + scheduling fields. These were historically options of
 	% the syllabus class; set here, they become defaults for every document.

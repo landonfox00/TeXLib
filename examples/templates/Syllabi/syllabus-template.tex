@@ -96,22 +96,29 @@ Course grades will be determined as follows:
 Point students to your schedule document, or list the key dates here.
 
 % --- Policy statements -------------------------------------------------------
-% Replace the placeholders below with your institution's required language
-% (academic support resources, disability accommodations, academic integrity).
-% \href{url}{text} makes a clickable link.
+% \policystatement{slug} emits the heading and the required language together,
+% resolved from (1) your own statements-path, (2) your institution-profile,
+% (3) the shipped institution-neutral set -- see coursemeta.example.tex.
+%
+% With no coursemeta keys set you get the generic wording, which states each
+% policy's substance and marks anything that needs a local office name, URL or
+% phone number in red, so an unfilled gap cannot reach a student unnoticed.
+% Set institution-profile in coursemeta.tex to pick up a full local set.
 
-\syllabussection{Academic Support Services}
-Describe the tutoring, writing, and other support resources available to
-students, e.g.\ \href{https://example.edu/tutoring}{the Tutoring Center}.
+\policystatements{
+	academic-success,
+	disability,
+	academic-dishonesty,
+	civil-rights,
+	mental-health,
+	basic-needs,
+}
 
-\syllabussection{Disability Services}
-Any student with a disability needing academic adjustments or accommodations is
-requested to speak with me or the
-\href{https://example.edu/disability}{Disability Resource Center} as soon as
-possible to arrange appropriate accommodations.
+% AI stance: permitted (default), limited, or prohibited.
+\aipolicy[limited]
 
-\syllabussection{Academic Integrity}
-State your institution's academic-integrity policy and the consequences of
-violations, with a link to the official policy where available.
+% Anything the shipped sets do not cover is still an ordinary section.
+\syllabussection{Attendance}
+State your attendance and make-up policy here.
 
 \end{document}

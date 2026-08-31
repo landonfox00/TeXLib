@@ -148,7 +148,7 @@ the note in the Not-yet-done section below.
 
 ```latex
 \DocumentMetadata{lang=en, tagging=on,
-  tagging-setup={math/setup={mathml-SE}, table/header-rows=1},
+  tagging-setup={math/setup={mathml-AF}, table/header-rows=1},
   pdfstandard={ua-2, a-4f}}
 \documentclass{thesis}          % add [twoside] to shift margins for binding
 

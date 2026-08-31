@@ -3,6 +3,7 @@
 result helpers, and toolchain probes copy-pasted across test_*.py. Dev-only --
 deploy.ps1 excludes it. Because Python puts a script's own directory on sys.path,
 `import _testkit` resolves from any Sublime/test_*.py with no extra path setup."""
+import glob
 import os
 import shutil
 import subprocess
@@ -53,12 +54,20 @@ def find_poppler(tool="pdftotext"):
     """Absolute path to a poppler-flavored `tool` (pdftotext/pdftoppm), or None.
     Git for Windows ships an xpdf-flavored pdftotext that shadows poppler's on
     PATH and silently lacks -bbox (prints usage instead of erroring), so probe
-    the -v banner and take the first candidate whose banner says poppler."""
+    the -v banner and take the first candidate whose banner says poppler.
+
+    The TeX Live fallback is GLOBBED by year, newest first, not pinned to one.
+    It was hardcoded to 2025, which survived only because that was the year on
+    PATH; installing 2026 alongside it (and eventually removing 2025) would have
+    left the fallback pointing at nothing, and a missing poppler does not fail
+    the suites -- it soft-skips them. A green run that silently verified no
+    content is the same failure the veraPDF lookup already had."""
     candidates = []
     which = shutil.which(tool)
     if which:
         candidates.append(which)
-    candidates.append(rf"C:\texlive\2025\bin\windows\{tool}.exe")
+    candidates.extend(sorted(
+        glob.glob(rf"C:\texlive\*\bin\windows\{tool}.exe"), reverse=True))
     for cand in candidates:
         try:
             proc = subprocess.run([cand, "-v"], capture_output=True, text=True,

@@ -161,6 +161,16 @@ EXAMPLES = [
                  "counters would renumber Definition to 1.1, a flat scheme "
                  "would drop the '.1', and a missing reset would make the "
                  "section-2 boxes 1.4/1.5."),
+    Example("examples/fixtures/MathML", "nth-root-mathml.tex", "fixture", _FIXTURE,
+            expect=["RADPRODUCTMARK", "RADQUOTIENTMARK", "RADCANCELMARK",
+                    "RADEXPONENTMARK"],
+            note="Two or more \\sqrt[n]{...} in ONE formula: the shape that "
+                 "aborts a tagged build under mathml-SE, via a luamml 0.9.2 "
+                 "use-after-free on the radical's delimiter and degree noads. "
+                 "Two roots in SEPARATE formulas are fine, so nothing else in "
+                 "the corpus trips it -- the suite ran 36/36 green while the "
+                 "bug was live. Tagged accessible, so restoring mathml-SE has "
+                 "to build these four formulas before it can pass."),
 
     # -- Course folders: end-to-end realism ------------------------------------
     # Build-only (no expect): they share one coursemeta.tex across several
