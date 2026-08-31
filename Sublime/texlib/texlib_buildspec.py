@@ -45,6 +45,10 @@ LUALATEX_CLASSES = {
     "report-card",
     "bank",
     "thesis",
+    # The wrapper thesis.cls loads this; a document that names the real class
+    # directly must select the same engine, or fontspec dies under pdflatex
+    # with "requires XeTeX or LuaTeX" and the cause looks like the document.
+    "texlib-thesis",
 }
 
 # The accessible (tagged PDF/UA-2 + PDF/A-4f) build prefix, injected ahead of

@@ -1,10 +1,52 @@
-# Thesis — accessible UNR thesis / dissertation class
+# Thesis — accessible thesis / dissertation class
 
-`thesis.cls` is a report-based LaTeX class for University of Nevada, Reno M.S.
-theses and Ph.D. dissertations that produces a **tagged, PDF/UA-conformant**
-document — meeting UNR's accessibility requirement — following the Graduate
-School filing guidelines and building on Paul Hurtado's accessible thesis
-template (v0.5, <https://www.pauljhurtado.com/latex/>).
+`texlib-thesis.cls` is a report-based LaTeX class for M.S. theses and Ph.D.
+dissertations that produces a **tagged, PDF/UA-conformant** document. It was
+built at the University of Nevada, Reno on Paul Hurtado's accessible thesis
+template (v0.5, <https://www.pauljhurtado.com/latex/>), but the conformance
+machinery is not UNR's, so it is not confined to UNR.
+
+The parts a graduate school actually dictates — the title page, the
+committee-approval page, and the margin/spacing figures — live in an
+[institution profile](#institution-profiles). `unr` is the reference profile;
+an institution with no profile yet still gets a conformant document from the
+neutral defaults.
+
+**`\documentclass{thesis}` still works and is unchanged.** It is now a
+two-line wrapper that loads this class with `profile=unr`, and the rendered
+output is pixel-identical to the pre-split class across all ten pages of the
+shipped template.
+
+## Institution profiles
+
+```latex
+\documentclass[profile=unr]{texlib-thesis}   % or just \documentclass{thesis}
+\documentclass{texlib-thesis}                % neutral defaults
+```
+
+A profile is one file, `Thesis/profiles/<name>.tex`, loaded last so it can use
+anything the class loaded. It owns exactly three things:
+
+| What | How |
+|---|---|
+| The institution name | `\thesisinstitution{...}` |
+| The two pages | `\renewcommand{\thesistitlepage}{...}`, `\renewcommand{\thesisapprovalpage}{...}` |
+| The filing figures | `\thesissetgeometry{left=1in, ...}`, `\thesissetspacing{double\|onehalf\|single}` |
+
+Everything else — the tagged-PDF stack, the trivlist-free theorem
+environments, `\ThesisMathIntent`, the front-matter machinery, the
+degree/committee metadata model, biblatex — is shared and needs no profile.
+
+**Writing one.** Copy [`profiles/unr.tex`](profiles/unr.tex), which is
+commented as the reference, and replace the two page bodies. The committee list
+(`\committeemember`) and its per-member signature rule are provided by the
+class, so a minimal profile is a name plus two layouts. Profiles for other
+institutions are welcome — see the caveat in
+[Status](#status) about checking current wording before filing.
+
+Asking for a profile that does not exist warns and falls back to the neutral
+pages rather than failing the build; asking for `generic` explicitly is the
+same as asking for nothing, and does not warn.
 
 ## Status
 
