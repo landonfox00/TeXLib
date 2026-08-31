@@ -4,6 +4,17 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- **Classes and packages carry a `texlib-` prefix; every old name stays as a wrapper.** `didactic`, `quiz`, `thesis`, `schedule`, `bank`, `pset`, `bingo`, `syllabus`, `autoexam` and `report-card` are names no library should own. Each collides with a file of the same name sitting next to a user's document, and CTAN will not allocate them — which made the whole set unpublishable. They are now `texlib-<name>.cls`, with `basic-utilities` → `texlib-utilities` and `course-metadata` → `texlib-coursemeta`.
+
+  **Nothing breaks.** Each old name remains as a two-line wrapper that passes options through and loads the real class, exactly as `thesis.cls` has since the split. Verified: the full smoke suite is **18/18** through the old names, which is what every shipped template, the scenario packs and the example courses actually use. The new names were verified separately by building a lecture note, a quiz and the real syllabus template against `texlib-didactic`, `texlib-quiz` and `texlib-syllabus` with no `TEXINPUTS` and no `TEXMFHOME` — the last of those clean, no errors.
+
+  `LUALATEX_CLASSES` now carries **both spellings** of all seven lua-only classes. Only the bare names were listed, so a document naming the real class directly would have selected pdflatex — and `bingo`/`schedule` `\directlua` at class load, so that fatals immediately with an error that reads like the document is broken.
+
+  `quiver.sty` keeps its upstream name: renaming vendored third-party code would break its own documentation, and it is not ours to rename.
+
+
 ### Added
 
 - **The accessible thesis class is no longer confined to one university.** `thesis.cls` split into `texlib-thesis.cls` — the institution-neutral machinery — and `Thesis/profiles/unr.tex`, which holds the three things a graduate school actually dictates: the title page, the committee-approval page, and the margin/spacing figures. `\documentclass[profile=unr]{texlib-thesis}` selects a profile; `\documentclass{texlib-thesis}` alone gets neutral defaults that still produce a conformant document, because a class that errored without a profile would be useless to exactly the person the split is for.
