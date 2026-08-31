@@ -16,6 +16,44 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 - **A failed ref regeneration can't impersonate "no rendering change" anymore.** The `update_refs` dispatch uploads its artifact on `always()` — deliberately, so a broken later phase can't withhold refs an earlier phase regenerated — but that meant a run that died *before* regenerating uploaded the plain checkout, byte-identical to a regeneration that changed nothing. (It fooled the TL2026 pin bump's first dispatch for several minutes.) The regen path now writes `tests/visual_refs/.regen-manifest` — run id, container image, ImageMagick and pdftoppm versions — and each phase appends its `…=regenerated` line only after completing, so the artifact discloses exactly what was regenerated and by what. Gitignored; documented in the refs README. Also: `TODO.md` caught up with reality (the seed-pinning half of its last open item shipped with the scenario packs; the stale `tests/scenarios/` path is fixed).
 
+### Added
+
+- **A worklist of every US institution that could use a thesis profile, derived from IPEDS.** `thesis_institutions.py` fetches the federal institutional-characteristics survey and filters it to institutions whose highest offering is a master'''s or above: **2,135 of them, 1,283 doctorate-granting**. `next` gives the next one alphabetically with no profile, `scaffold <slug>` writes a skeleton, `list` shows coverage.
+
+  The list is derived rather than checked in by hand because a hand-assembled list of two thousand university names is wrong on day one in ways nobody can see — a plausible name for an institution that does not exist reads exactly like a real one. (It also corrects a number I had quoted from memory: the doctorate-granting count is 1,283, not the ~430 I said, which is closer to the Carnegie R1/R2 figure. That is the argument for deriving it.) `institutions.source` records the URL, the survey year, the filter and the access date, since a CSV cannot carry a comment and an unattributed list gets assumed to be curated.
+
+  **`scaffold` writes a skeleton, never a profile.** Every institution-specific value is a placeholder, the skeleton renders the neutral pages until someone replaces them, and it carries a provenance header — source URL, access date, who read it — to be filled in by a person who read the graduate school'''s requirements. IPEDS supplies a name and nothing else; it cannot tell you a margin. Getting one wrong does not produce a bad commit, it produces a rejected dissertation for someone who trusted the profile.
+
+  Alphabetical order, and `next` reads its answer off the profiles directory rather than a stored cursor — nothing to lose or disagree with. An `ALIASES` map handles profiles named for what a document types (`profile=unr`, not `profile=university-of-nevada-reno`); without it the worklist reported UNR as unwritten and `next` would eventually have scaffolded a duplicate.
+
+
+### Changed
+
+- **Classes and packages carry a `texlib-` prefix; every old name stays as a wrapper.** `didactic`, `quiz`, `thesis`, `schedule`, `bank`, `pset`, `bingo`, `syllabus`, `autoexam` and `report-card` are names no library should own. Each collides with a file of the same name sitting next to a user's document, and CTAN will not allocate them — which made the whole set unpublishable. They are now `texlib-<name>.cls`, with `basic-utilities` → `texlib-utilities` and `course-metadata` → `texlib-coursemeta`.
+
+  **Nothing breaks.** Each old name remains as a two-line wrapper that passes options through and loads the real class, exactly as `thesis.cls` has since the split. Verified: the full smoke suite is **18/18** through the old names, which is what every shipped template, the scenario packs and the example courses actually use. The new names were verified separately by building a lecture note, a quiz and the real syllabus template against `texlib-didactic`, `texlib-quiz` and `texlib-syllabus` with no `TEXINPUTS` and no `TEXMFHOME` — the last of those clean, no errors.
+
+  `LUALATEX_CLASSES` now carries **both spellings** of all seven lua-only classes. Only the bare names were listed, so a document naming the real class directly would have selected pdflatex — and `bingo`/`schedule` `\directlua` at class load, so that fatals immediately with an error that reads like the document is broken.
+
+  `quiver.sty` keeps its upstream name: renaming vendored third-party code would break its own documentation, and it is not ours to rename.
+
+
+### Added
+
+- **The accessible thesis class is no longer confined to one university.** `thesis.cls` split into `texlib-thesis.cls` — the institution-neutral machinery — and `Thesis/profiles/unr.tex`, which holds the three things a graduate school actually dictates: the title page, the committee-approval page, and the margin/spacing figures. `\documentclass[profile=unr]{texlib-thesis}` selects a profile; `\documentclass{texlib-thesis}` alone gets neutral defaults that still produce a conformant document, because a class that errored without a profile would be useless to exactly the person the split is for.
+
+  The valuable half was never UNR's. The tagged-PDF stack, the trivlist-free theorem environments (amsthm builds on `\trivlist`, which tags as a list and violates PDF/UA — these are plain headed paragraphs with per-environment counters so `\cref` still names them), `\ThesisMathIntent`, the front-matter machinery and the degree/committee metadata model apply to any graduate school, and almost nobody else has them. Only two page layouts and three numbers were local, which is why the split is a profile file rather than a fork.
+
+  A profile owns `\thesisinstitution`, `\thesistitlepage`, `\thesisapprovalpage`, and optionally `\thesissetgeometry` / `\thesissetspacing`. It is loaded last, so it can use fontspec faces, tikz and graphicx without ordering rules of its own — which is why `\termesfont` (a Times-like face for one committee page) moved out of the class and into `unr.tex` where it belongs. A missing profile warns and falls back rather than failing; `generic` is the built-in default and has no file.
+
+  **`\documentclass{thesis}` is unchanged.** It is now a two-line wrapper over `texlib-thesis` with `profile=unr`, kept because both shipped templates, the scenario pack, the builder test and any dissertation already written against it say exactly that. Verified rather than assumed: the shipped template built pre-split and post-split renders **pixel-identical across all ten pages** (ImageMagick AE = 0). The neutral profile was checked the same way it will be used — a generic dissertation built clean and **passed veraPDF for PDF/UA-2**.
+
+  Two things worth knowing. `\geometry`'s argument is parsed by keyval, which does not expand macros, so the parameterized margins must be `\edef`'d before they are handed over — passing the macro straight in makes keyval read the whole list as one undefined key. And `texlib-thesis` had to join `LUALATEX_CLASSES`: the wrapper is covered by `thesis` already, but a document naming the real class directly would otherwise select pdflatex and die in fontspec with an error that looks like the document's fault.
+
+### Added
+
+- **A failed ref regeneration can't impersonate "no rendering change" anymore.** The `update_refs` dispatch uploads its artifact on `always()` — deliberately, so a broken later phase can't withhold refs an earlier phase regenerated — but that meant a run that died *before* regenerating uploaded the plain checkout, byte-identical to a regeneration that changed nothing. (It fooled the TL2026 pin bump's first dispatch for several minutes.) The regen path now writes `tests/visual_refs/.regen-manifest` — run id, container image, ImageMagick and pdftoppm versions — and each phase appends its `…=regenerated` line only after completing, so the artifact discloses exactly what was regenerated and by what. Gitignored; documented in the refs README. Also: `TODO.md` caught up with reality (the seed-pinning half of its last open item shipped with the scenario packs; the stale `tests/scenarios/` path is fixed).
+
 ## [0.7.4] — 2026-08-25
 
 The visual-parity release: the tagged (accessible) PDF is no longer the

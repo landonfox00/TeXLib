@@ -842,9 +842,14 @@ def _stage_schedule_engine(tmp):
         for f in glob.glob(os.path.join(TEXLIB_ROOT, pat)):
             shutil.copy(f, tmp)
     sched = os.path.join(TEXLIB_ROOT, "Schedule")
-    for f in glob.glob(os.path.join(sched, "*.lua")):
-        shutil.copy(f, tmp)
-    shutil.copy(os.path.join(sched, "schedule.cls"), tmp)
+    for pat in ("*.lua", "*.cls"):
+        for f in glob.glob(os.path.join(sched, pat)):
+            shutil.copy(f, tmp)
+    # *.cls, not "schedule.cls": since the texlib- rename that name is a
+    # two-line wrapper around texlib-schedule.cls. Copying the wrapper alone
+    # leaves the real class to be found on the search path -- which still
+    # builds, and so looks fine, while defeating the isolation this function
+    # exists for (see the docstring above).
 
 
 def scenario_schedule_boxgrid_builder():

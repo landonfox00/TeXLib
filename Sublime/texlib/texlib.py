@@ -203,7 +203,13 @@ def _resolve_texinputs(raw):
 # like a TeXLib library. A package copied somewhere else entirely resolves to
 # something that fails the probe, and the default stays empty rather than
 # pointing builds at a wrong tree. An explicit `texinputs` setting always wins.
-_CORE_LIBRARY_FILES = ("course-metadata.sty", "texlib-build.sty", "basic-utilities.sty")
+# Probe for the REAL packages, not the compatibility wrappers. The wrappers
+# happen to exist today, so probing for them works -- until someone retires
+# them, at which point this silently returns "" and every build fails at
+# \documentclass with no explanation (see CHANGELOG 0.7.x, the shipped-
+# commented-out-texinputs incident).
+_CORE_LIBRARY_FILES = ("texlib-coursemeta.sty", "texlib-build.sty",
+                       "texlib-utilities.sty")
 _TEX_SOURCE_EXTS = (".sty", ".cls", ".lua")
 _derived_texinputs_cache = []
 

@@ -1,0 +1,7 @@
+source: https://nces.ed.gov/ipeds/datacenter/data/HD2023.zip
+accessed: 2026-08-31
+survey: IPEDS HD2023 (institutional characteristics)
+filter: HLOFFER in {7,8,9} -- master's, post-master's, doctorate
+rows: 2135
+doctorate_granting: 1283
+regenerate: python thesis_institutions.py fetch

@@ -45,6 +45,18 @@ LUALATEX_CLASSES = {
     "report-card",
     "bank",
     "thesis",
+    # Both spellings of every lua-only class. The texlib-* name is the real
+    # class since the CTAN rename; the bare name is its compatibility wrapper,
+    # and a document may say either. Selecting pdflatex for one of these is not
+    # a soft failure -- bingo and schedule \directlua at class load and fatal
+    # immediately, and the error reads like the document is broken.
+    "texlib-thesis",
+    "texlib-quiz",
+    "texlib-autoexam",
+    "texlib-schedule",
+    "texlib-bingo",
+    "texlib-report-card",
+    "texlib-bank",
 }
 
 # The accessible (tagged PDF/UA-2 + PDF/A-4f) build prefix, injected ahead of

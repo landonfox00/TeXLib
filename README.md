@@ -40,9 +40,13 @@ Set up TeXLib on a new machine or for a new course.
 2. **Drop in a `coursemeta.tex`** with the institution / instructor / course / term values. Copy [`coursemeta.example.tex`](coursemeta.example.tex) and edit, or look at [`examples/Math181-Fall2026/`](examples/Math181-Fall2026/) for a working end-to-end course folder. `course-metadata.sty` auto-discovers this file from the document directory or any of five ancestors, so a single `coursemeta.tex` at the course root applies to every document underneath it.
 3. **Pick a document class** from the [Modules](#modules) table below and start a new `.tex`:
    ```latex
-   \documentclass{didactic}        % lecture notes
-   % or {pset}, {quiz}, {autoexam}, {schedule}, {syllabus}, {report-card},
-   %    {bingo}, {bank}, {thesis}
+   \documentclass{texlib-didactic}     % lecture notes
+   % or texlib-{pset, quiz, autoexam, schedule, syllabus, report-card,
+   %            bingo, bank, thesis}
+   %
+   % The bare names ({didactic}, {quiz}, ...) still work -- each is a
+   % compatibility wrapper -- but they are too generic for a library to
+   % claim, so prefer the texlib- form in new documents.
    \begin{document}
      ...
    \end{document}
@@ -89,19 +93,30 @@ Set up TeXLib on a new machine or for a new course.
 
 ### Modules
 
+**Class and package names carry a `texlib-` prefix.** `didactic`, `quiz`,
+`thesis`, `schedule`, `bank` and the rest are names no library should claim:
+they collide with a file of the same name sitting next to your document, and
+CTAN will not allocate them. Every old name remains as a compatibility wrapper,
+so `\documentclass{didactic}` and `\RequirePackage{course-metadata}` keep
+working with identical output; the wrappers are two lines each and there is
+nothing in them to drift. `basic-utilities` is now `texlib-utilities` and
+`course-metadata` is `texlib-coursemeta`. `quiver.sty` keeps its upstream name,
+since renaming vendored third-party code would break its own documentation.
+
+
 Each module is a document class plus a README; the canonical `<module>-template.tex` files live under [`examples/templates/`](examples/templates/). `smoke_test.py` builds every module's template to catch regressions in the shared `.sty` files.
 
 | Module | Class | Purpose |
 |---|---|---|
-| [`Bank/`](Bank/) | `bank.cls` | Problem-bank catalog / preview class. A thin wrapper that `\loadbank`s a bare-fragment problem bank and renders a browsable `\printbankcatalog` (number, id, attrs, stem, solution) for instructor perusal. |
-| [`Bingo/`](Bingo/) | `bingo.cls` | 5×5 math-symbol bingo cards. Supports a standard layout (math expression per cell) and a labeled layout with separate `\bingolegend{...}` table, used for exam-review bingo. |
-| [`Exams/`](Exams/) | `autoexam.cls` | Randomized-exam class. Paired with [`problem_engine.lua`](problem_engine.lua) and a problem `bank.tex`; emits multiple shuffled versions per build. |
-| [`Notes/`](Notes/) | `didactic.cls` | Lecture-notes class with section-numbered theorems and a large theorem taxonomy (theorem, lemma, corollary, proposition, definition, procedure, example, question, note, ...). |
-| [`Problem Sets/`](Problem%20Sets/) | `pset.cls` | Problem-set class with flat theorem numbering and a smaller taxonomy. |
-| [`Quizzes/`](Quizzes/) | `quiz.cls` | Short-form quiz class. |
-| [`Report Cards/`](Report%20Cards/) | `report-card.cls` | Per-section report-card class for end-of-term grade summaries. |
-| [`Schedule/`](Schedule/) | `schedule.cls` | Course-schedule / calendar class. Uses `calendar.lua`, `date.lua`, and `schedule.lua` for date math. |
-| [`Syllabi/`](Syllabi/) | `syllabus.cls` | Course-syllabus class. `syllabus-template.tex` is a complete example syllabus — course info, learning outcomes, grading, and policy statements. |
+| [`Bank/`](Bank/) | `texlib-bank.cls` | Problem-bank catalog / preview class. A thin wrapper that `\loadbank`s a bare-fragment problem bank and renders a browsable `\printbankcatalog` (number, id, attrs, stem, solution) for instructor perusal. |
+| [`Bingo/`](Bingo/) | `texlib-bingo.cls` | 5×5 math-symbol bingo cards. Supports a standard layout (math expression per cell) and a labeled layout with separate `\bingolegend{...}` table, used for exam-review bingo. |
+| [`Exams/`](Exams/) | `texlib-autoexam.cls` | Randomized-exam class. Paired with [`problem_engine.lua`](problem_engine.lua) and a problem `bank.tex`; emits multiple shuffled versions per build. |
+| [`Notes/`](Notes/) | `texlib-didactic.cls` | Lecture-notes class with section-numbered theorems and a large theorem taxonomy (theorem, lemma, corollary, proposition, definition, procedure, example, question, note, ...). |
+| [`Problem Sets/`](Problem%20Sets/) | `texlib-pset.cls` | Problem-set class with flat theorem numbering and a smaller taxonomy. |
+| [`Quizzes/`](Quizzes/) | `texlib-quiz.cls` | Short-form quiz class. |
+| [`Report Cards/`](Report%20Cards/) | `texlib-report-card.cls` | Per-section report-card class for end-of-term grade summaries. |
+| [`Schedule/`](Schedule/) | `texlib-schedule.cls` | Course-schedule / calendar class. Uses `calendar.lua`, `date.lua`, and `schedule.lua` for date math. |
+| [`Syllabi/`](Syllabi/) | `texlib-syllabus.cls` | Course-syllabus class. `syllabus-template.tex` is a complete example syllabus — course info, learning outcomes, grading, and policy statements. |
 | [`Thesis/`](Thesis/) | `thesis.cls` | **Prototype.** Accessible UNR thesis/dissertation class: tagged, PDF/UA-2 + PDF/A-4f conformant, following the Graduate School filing guidelines. CI-gated, but see [`Thesis/README.md`](Thesis/README.md) for what's not yet done before treating it as final. |
 
 Autoexam retains a set of **deprecated aliases** (`\theExamNumber`, `\theExamDate`, `\thePS`, `\examsetup`, `\examversions`, `\overview`) with no removal date: each still has dozens of live uses across existing course material, and they stay until a cross-course migration retires them (see `texlib-problembank.sty` for the removal precedent). Don't use them in new documents.
