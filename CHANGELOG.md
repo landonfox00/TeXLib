@@ -6,6 +6,18 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Added
 
+- **The accessible thesis class is no longer confined to one university.** `thesis.cls` split into `texlib-thesis.cls` — the institution-neutral machinery — and `Thesis/profiles/unr.tex`, which holds the three things a graduate school actually dictates: the title page, the committee-approval page, and the margin/spacing figures. `\documentclass[profile=unr]{texlib-thesis}` selects a profile; `\documentclass{texlib-thesis}` alone gets neutral defaults that still produce a conformant document, because a class that errored without a profile would be useless to exactly the person the split is for.
+
+  The valuable half was never UNR's. The tagged-PDF stack, the trivlist-free theorem environments (amsthm builds on `\trivlist`, which tags as a list and violates PDF/UA — these are plain headed paragraphs with per-environment counters so `\cref` still names them), `\ThesisMathIntent`, the front-matter machinery and the degree/committee metadata model apply to any graduate school, and almost nobody else has them. Only two page layouts and three numbers were local, which is why the split is a profile file rather than a fork.
+
+  A profile owns `\thesisinstitution`, `\thesistitlepage`, `\thesisapprovalpage`, and optionally `\thesissetgeometry` / `\thesissetspacing`. It is loaded last, so it can use fontspec faces, tikz and graphicx without ordering rules of its own — which is why `\termesfont` (a Times-like face for one committee page) moved out of the class and into `unr.tex` where it belongs. A missing profile warns and falls back rather than failing; `generic` is the built-in default and has no file.
+
+  **`\documentclass{thesis}` is unchanged.** It is now a two-line wrapper over `texlib-thesis` with `profile=unr`, kept because both shipped templates, the scenario pack, the builder test and any dissertation already written against it say exactly that. Verified rather than assumed: the shipped template built pre-split and post-split renders **pixel-identical across all ten pages** (ImageMagick AE = 0). The neutral profile was checked the same way it will be used — a generic dissertation built clean and **passed veraPDF for PDF/UA-2**.
+
+  Two things worth knowing. `\geometry`'s argument is parsed by keyval, which does not expand macros, so the parameterized margins must be `\edef`'d before they are handed over — passing the macro straight in makes keyval read the whole list as one undefined key. And `texlib-thesis` had to join `LUALATEX_CLASSES`: the wrapper is covered by `thesis` already, but a document naming the real class directly would otherwise select pdflatex and die in fontspec with an error that looks like the document's fault.
+
+### Added
+
 - **A failed ref regeneration can't impersonate "no rendering change" anymore.** The `update_refs` dispatch uploads its artifact on `always()` — deliberately, so a broken later phase can't withhold refs an earlier phase regenerated — but that meant a run that died *before* regenerating uploaded the plain checkout, byte-identical to a regeneration that changed nothing. (It fooled the TL2026 pin bump's first dispatch for several minutes.) The regen path now writes `tests/visual_refs/.regen-manifest` — run id, container image, ImageMagick and pdftoppm versions — and each phase appends its `…=regenerated` line only after completing, so the artifact discloses exactly what was regenerated and by what. Gitignored; documented in the refs README. Also: `TODO.md` caught up with reality (the seed-pinning half of its last open item shipped with the scenario packs; the stale `tests/scenarios/` path is fixed).
 
 ## [0.7.4] — 2026-08-25
