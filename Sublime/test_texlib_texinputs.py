@@ -32,7 +32,7 @@ from _testkit import stub_sublime, check, report  # noqa: E402
 stub_sublime("WindowCommand", "EventListener")
 
 SRC = os.path.join(HERE, "texlib", "texlib.py")
-CORE = ("course-metadata.sty", "texlib-build.sty", "basic-utilities.sty")
+CORE = ("texlib-coursemeta.sty", "texlib-build.sty", "texlib-utilities.sty")
 _loaded = [0]
 
 

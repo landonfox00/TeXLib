@@ -1,0 +1,124 @@
+% profiles/unr.tex — University of Nevada, Reno
+% ============================================================================
+% The reference institution profile for texlib-thesis.cls, and the one to copy
+% when writing another. It reproduces exactly what thesis.cls emitted before the
+% class was split, so `\documentclass{thesis}' (the wrapper, which passes
+% profile=unr) is unchanged for every existing document.
+%
+% A profile owns three things and nothing else:
+%   * \thesisinstitution — the name used in warnings and on the pages
+%   * \thesistitlepage / \thesisapprovalpage — the two page layouts
+%   * optionally \thesissetgeometry / \thesissetspacing — the filing figures
+%
+% Loaded LAST by the class, so everything it needs (fontspec faces, tikz,
+% graphicx, the metadata macros) already exists.
+%
+% PROTOTYPE, and the wording is the part that rots: check the committee-page
+% text and the margin rule against the current Graduate School filing
+% guidelines before a real submission. Built on Paul Hurtado's accessible
+% template (v0.5, pauljhurtado.com/latex).
+
+\thesisinstitution{University of Nevada, Reno}
+
+% UNR requires 1.0in on ALL FOUR sides, with no exception for binding -- tables
+% and appendices included. The manuscript is filed electronically ("no hard
+% copies will be produced"), so the wider inner margin a bound copy would want
+% is not something the filed document may have: an inner=1.25in twoside build is
+% 0.25in out of spec on every odd page and would be caught by the Graduate
+% School's margin check. twoside therefore stays a LAYOUT option only -- it still
+% governs where headers and \cleardoublepage blanks fall -- and does not change
+% the margins. Add a binding offset at print time, not in the filed PDF.
+%
+% These are the class defaults too, so the call is redundant today. It is here
+% anyway because it is the line a new profile edits, and because a later change
+% to the neutral default must not silently move UNR's filed margins.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+\thesissetspacing{double}
+
+% TeX Gyre Termes gives the committee page its required Times-like face. Latin
+% Modern (the class default elsewhere) satisfies UNR's "Times New Roman, Arial,
+% or a similarly clear font" and embeds every face, which the Graduate School
+% requires.
+\newfontfamily{\termesfont}{TeX Gyre Termes}
+
+% --- Title page --------------------------------------------------------------
+% UNR: unnumbered, centred. The title is emitted through \thesis@tagtitle so a
+% future explicit \tagstructbegin can wrap it without touching this file.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\textsc{University of Nevada, Reno}\par
+		\vfill\vfill\vfill
+		\thesis@tagtitle{Title}{{\large\bfseries\@title}}\par
+		\vfill\vfill
+		A \thesis@docnoun{} submitted in partial fulfillment of the\\
+		requirements for the degree of \thesis@degree{} in\\
+		\thesis@program\par
+		\vfill\vfill
+		by\\[1em]{\bfseries\@author}\par
+		\vfill\vfill
+		\thesis@advisor~/ \thesis@DocNoun{} Advisor\par
+		\vfill
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% A double blue frame, the Graduate School heading, the author in bold caps, the
+% title, the degree, and each committee member with a signature rule. The hidden
+% tagged "Committee Approval Page" H1 gives a screen reader a heading; the frame
+% is decorative and drawn with tikz overlay so it contributes no structure.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\begin{tikzpicture}[remember picture, overlay]
+		\draw[draw={rgb,255:red,0;green,0;blue,128}, line width=0.75pt]
+			([xshift=1.5pt,yshift=-1.5pt]current page text area.north west)
+			rectangle
+			([xshift=-1.5pt,yshift=1.5pt]current page text area.south east);
+		\draw[draw={rgb,255:red,0;green,0;blue,128}, line width=0.75pt]
+			([xshift=3pt,yshift=-3pt]current page text area.north west)
+			rectangle
+			([xshift=-3pt,yshift=3pt]current page text area.south east);
+	\end{tikzpicture}%
+	\begin{center}
+		\thesis@tagtitle{H1}{{\color{white}\tiny Committee Approval Page}}\par
+		\vspace{-1em}
+		\includegraphics[width=0.68in, alt={University of Nevada, Reno logo}]{UNRlogoN}\par
+		\begingroup\termesfont
+		\vspace{1mm}
+		{\fontsize{12}{18}\selectfont\textcolor[RGB]{0,0,128}{THE GRADUATE SCHOOL}}\par
+		\vfill
+		{\fontsize{12}{12}\selectfont We recommend that the \thesis@docnoun\\
+			prepared under our supervision by}\par
+		\vfill
+		\MakeUppercase{\bfseries\@author}\par
+		\vfill
+		{\fontsize{12}{12}\selectfont entitled}\par
+		\begin{minipage}{0.7\textwidth}
+			\centering\bfseries
+			\hyphenpenalty=10000 \exhyphenpenalty=10000 \emergencystretch=2em
+			\@title\par
+		\end{minipage}\par
+		\vfill
+		{\fontsize{12}{12}\selectfont be accepted in partial fulfillment of the\\
+			requirements for the degree of}\par
+		\vfill
+		{\bfseries\MakeUppercase{\thesis@degree}}\par
+		\thesis@committee
+		\vfill
+		\thesis@date\par
+		\endgroup
+	\end{center}%
+	\loadgeometry{normal}\doublespacing\clearpage
+}
+
+% Historic names, kept so documents written against the pre-split class still
+% build. \makeUNRtitlepage in particular appears in both shipped templates and
+% in the scenario pack.
+\let\makeUNRtitlepage\thesistitlepage
+\let\committeeapprovalpage\thesisapprovalpage

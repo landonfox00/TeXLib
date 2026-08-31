@@ -303,7 +303,18 @@ def payload_files(root=HERE):
     """
     out = []
     seen = {}
-    statements_root = os.path.join(root, "Syllabi", "statements")
+    # Directories whose internal structure IS the lookup key, so they keep it
+    # through an install instead of being flattened. Both are resolved by
+    # relative subpath from a class -- statements/<profile>/<slug>.tex and
+    # profiles/<name>.tex -- and both deliberately reuse filenames across
+    # subdirectories, which a flat drop would collide.
+    #
+    # Thesis/profiles was missed when statements/ was special-cased, because the
+    # two landed on separate branches that could not see each other. The symptom
+    # is quiet: an installed copy has no profiles, so profile=unr warns once and
+    # renders the institution-neutral pages, which look entirely plausible.
+    STRUCTURED = [os.path.join(root, "Syllabi", "statements"),
+                  os.path.join(root, "Thesis", "profiles")]
 
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [
@@ -311,19 +322,25 @@ def payload_files(root=HERE):
             if not d.startswith(".") and d not in
             ("Sublime", "SublimeUser", "__pycache__", "dist", "tests", "examples")
         ]
-        in_statements = os.path.commonpath(
-            [os.path.abspath(dirpath), statements_root]) == statements_root \
-            if os.path.isdir(statements_root) else False
+        structured_root = None
+        for _root in STRUCTURED:
+            if os.path.isdir(_root) and os.path.commonpath(
+                    [os.path.abspath(dirpath), _root]) == _root:
+                structured_root = _root
+                break
 
         for fn in sorted(filenames):
             if fn.startswith("test_") or fn.startswith("_test"):
                 continue
             src = os.path.join(dirpath, fn)
 
-            if in_statements:
+            if structured_root:
+                # .tex only: institutions.csv and its .source sidecar are the
+                # worklist, not library payload, and have no business in a
+                # TEXMF tree.
                 if not fn.lower().endswith(".tex"):
                     continue
-                rel = os.path.relpath(src, os.path.dirname(statements_root))
+                rel = os.path.relpath(src, os.path.dirname(structured_root))
                 out.append((src, rel.replace(os.sep, "/")))
                 continue
 

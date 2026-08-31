@@ -112,12 +112,22 @@ def _repo_root():
 
 def _meta_keys():
     if _META_KEYS_CACHE[0] is None:
-        path = os.path.join(_repo_root(), "course-metadata.sty")
-        try:
-            with open(path, encoding="utf-8", errors="replace") as fh:
-                _META_KEYS_CACHE[0] = coursemeta_keys(fh.read())
-        except OSError:
-            _META_KEYS_CACHE[0] = []
+        # texlib-coursemeta.sty holds the \meta_create_var declarations. The
+        # old name course-metadata.sty still exists but is a wrapper with no
+        # keys in it, so reading that one yields ZERO completions and no error
+        # -- the plugin would just quietly stop offering coursemeta keys. Try
+        # the real file first, fall back for a checkout older than the rename.
+        _META_KEYS_CACHE[0] = []
+        for _name in ("texlib-coursemeta.sty", "course-metadata.sty"):
+            path = os.path.join(_repo_root(), _name)
+            try:
+                with open(path, encoding="utf-8", errors="replace") as fh:
+                    keys = coursemeta_keys(fh.read())
+            except OSError:
+                continue
+            if keys:
+                _META_KEYS_CACHE[0] = keys
+                break
     return _META_KEYS_CACHE[0]
 
 

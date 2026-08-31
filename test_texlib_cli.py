@@ -128,8 +128,9 @@ _flat = [n for n in names if "/" not in n]
 ok &= check(all(n.lower().endswith(C.TEX_SOURCE_EXTS)
                 or n.lower().endswith("-instructions.tex") for n in _flat),
             "payload_files: the flat half is .cls/.sty/.lua + -instructions.tex")
-ok &= check(all(n.startswith("statements/") for n in names if "/" in n),
-            "payload_files: the only nested half is statements/")
+ok &= check(all(n.startswith(("statements/", "profiles/"))
+                for n in names if "/" in n),
+            "payload_files: the nested half is statements/ and profiles/ only")
 ok &= check(len(_flat) == len(set(_flat)),
             "payload_files: flat basenames do not collide")
 # Regression: the first cut of this shipped test_shuffle.lua and six siblings
@@ -207,6 +208,21 @@ _declared = open(os.path.join(HERE, "texlib-build.sty"),
 for _sw in _switches:
     ok &= check(_sw in C.OVERLEAF_README and _sw in _declared,
                 "overleaf README's %s switch exists in texlib-build.sty" % _sw)
+# Thesis profiles keep their directory the same way statements do, and for the
+# same reason: the class resolves profiles/<name>.tex by relative subpath. This
+# was missed when statements/ was special-cased -- the two landed on branches
+# that could not see each other -- and the symptom is quiet, because an install
+# with no profiles makes profile=unr fall back to the neutral pages, which look
+# entirely plausible.
+_profiles = [n for n in names if n.startswith("profiles/")]
+ok &= check("profiles/unr.tex" in _profiles,
+            "payload_files: ships the thesis profiles (%d)" % len(_profiles))
+ok &= check(all(n.endswith(".tex") for n in _profiles),
+            "payload_files: thesis profiles are .tex only")
+# institutions.csv and its .source sidecar are the worklist, not library
+# payload; a TEXMF tree has no use for 2,135 university names.
+ok &= check(not any("institutions" in n for n in names),
+            "payload_files: the institution worklist does NOT ship")
 
 
 # --- Off-PATH TeX detection --------------------------------------------------
