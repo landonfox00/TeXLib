@@ -1,7 +1,7 @@
 % schedule.cls
 % UNR Course Schedule Class — TeXLib unified style
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{texlib-schedule}[2026/08/25 v0.7.4 UNR Course Schedule (TeXLib)]
+\ProvidesClass{texlib-schedule}[2026/08/31 v0.8.0 UNR Course Schedule (TeXLib)]
 
 % ==============================================================================
 % 0. OPTIONS

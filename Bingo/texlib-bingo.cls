@@ -1,7 +1,7 @@
 % bingo.cls
 % Math Bingo Card Class — TeXLib unified style
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{texlib-bingo}[2026/08/25 v0.7.4 Math Bingo Cards (TeXLib)]
+\ProvidesClass{texlib-bingo}[2026/08/31 v0.8.0 Math Bingo Cards (TeXLib)]
 
 % ==============================================================================
 % 0. OPTIONS

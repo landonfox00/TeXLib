@@ -8,7 +8,7 @@
 %% \documentclass{bingo} keeps working, unchanged, with identical output.
 %% Prefer \documentclass{texlib-bingo} in new documents.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{bingo}[2026/08/25 v0.7.4 bingo wrapper over texlib-bingo (TeXLib)]
+\ProvidesClass{bingo}[2026/08/31 v0.8.0 bingo wrapper over texlib-bingo (TeXLib)]
 \DeclareOption*{\PassOptionsToClass{\CurrentOption}{texlib-bingo}}
 \ProcessOptions\relax
 \LoadClass{texlib-bingo}
