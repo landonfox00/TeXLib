@@ -8,7 +8,7 @@
 %% \documentclass{quiz} keeps working, unchanged, with identical output.
 %% Prefer \documentclass{texlib-quiz} in new documents.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{quiz}[2026/08/25 v0.7.4 quiz wrapper over texlib-quiz (TeXLib)]
+\ProvidesClass{quiz}[2026/08/31 v0.8.0 quiz wrapper over texlib-quiz (TeXLib)]
 \DeclareOption*{\PassOptionsToClass{\CurrentOption}{texlib-quiz}}
 \ProcessOptions\relax
 \LoadClass{texlib-quiz}

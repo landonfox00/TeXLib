@@ -1,7 +1,7 @@
 % quiz.cls
 % UNR In-Class Quiz Class — TeXLib unified style (subclass of exam.cls)
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{texlib-quiz}[2026/08/25 v0.7.4 UNR In-Class Quizzes (TeXLib)]
+\ProvidesClass{texlib-quiz}[2026/08/31 v0.8.0 UNR In-Class Quizzes (TeXLib)]
 
 % Per-document metadata may be passed in the class option list, e.g.
 %   \documentclass[quiz-number=3, quiz-title={Pop Quiz}]{quiz}

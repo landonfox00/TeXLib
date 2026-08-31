@@ -1,6 +1,6 @@
 {
   "name": "TeXLib",
-  "version": "0.7.4",
+  "version": "0.8.0",
   "core_files": [
     "texlib-coursemeta.sty",
     "texlib-build.sty",
