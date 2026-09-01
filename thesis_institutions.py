@@ -54,6 +54,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PROFILES = os.path.join(HERE, "Thesis", "profiles")
 WORKLIST = os.path.join(PROFILES, "institutions.csv")
 SOURCE   = os.path.join(PROFILES, "institutions.source")
+BLOCKED  = os.path.join(PROFILES, "institutions.blocked.csv")
 
 IPEDS_URL = "https://nces.ed.gov/ipeds/datacenter/data/HD{year}.zip"
 DEFAULT_YEAR = 2023
@@ -181,6 +182,50 @@ def existing_profiles():
     return have | {ipeds for ipeds, short in ALIASES.items() if short in have}
 
 
+def blocked_slugs():
+    """Institutions a research pass could not complete, and why.
+
+    Without this, `next` re-picks the same institution every run forever: it
+    returns the first slug with no profile, and an institution whose filing
+    requirements are behind a login, only in a scanned PDF, or simply not
+    published never gets one. One unresearchable institution would stall the
+    whole queue.
+
+    Blocking is not a verdict on the institution -- it is a note that THIS
+    attempt failed, with the date and reason, so a later attempt can be
+    deliberate rather than accidental.
+    """
+    if not os.path.exists(BLOCKED):
+        return {}
+    out = {}
+    with open(BLOCKED, encoding="utf-8", newline="") as f:
+        for row in csv.DictReader(f):
+            out[row["slug"]] = row
+    return out
+
+
+def cmd_block(args):
+    """Record that a research pass could not complete for this institution."""
+    rows = load_worklist()
+    match = [r_ for r_ in rows if r_["slug"] == args.slug]
+    if not match:
+        sys.exit("thesis_institutions: %r is not in the worklist" % args.slug)
+    blocked = blocked_slugs()
+    if args.slug in blocked and not args.force:
+        sys.exit("thesis_institutions: %r is already blocked (%s)"
+                 % (args.slug, blocked[args.slug].get("reason", "")))
+    exists = os.path.exists(BLOCKED)
+    with open(BLOCKED, "a", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["slug", "date", "reason"])
+        if not exists:
+            w.writeheader()
+        w.writerow({"slug": args.slug, "date": today(), "reason": args.reason})
+    print("blocked %s (%s)" % (args.slug, args.reason))
+    print("`next` will skip it. Remove the row from %s to retry."
+          % os.path.relpath(BLOCKED, HERE))
+    return 0
+
+
 def cmd_list(args):
     rows = load_worklist()
     if args.state:
@@ -206,13 +251,17 @@ def cmd_next(args):
     from the profiles directory alone with no separate cursor to lose.
     """
     have = existing_profiles()
+    skip = set(blocked_slugs())
     for r_ in load_worklist():
-        if r_["slug"] not in have:
+        if r_["slug"] not in have and r_["slug"] not in skip:
             print(r_["slug"] if args.quiet else
                   "%s\n  %s (%s)\n  %s" % (r_["slug"], r_["name"], r_["state"],
                                            r_["web"] or "(no web address on file)"))
             return 0
-    print("every institution in the worklist has a profile")
+    n_blocked = len(blocked_slugs())
+    print("no institution left to work on"
+          + (" (%d blocked; see %s)" % (n_blocked, os.path.basename(BLOCKED))
+             if n_blocked else ""))
     return 0
 
 
@@ -322,6 +371,14 @@ def build_parser():
                    help="doctorate-granting only")
     l.add_argument("-n", "--number", type=int, default=20)
     l.set_defaults(func=cmd_list)
+
+    bk = sub.add_parser("block",
+                        help="record that a research pass could not complete, "
+                             "so `next` stops re-picking it")
+    bk.add_argument("slug")
+    bk.add_argument("reason", help="why -- e.g. 'requirements behind a login'")
+    bk.add_argument("--force", action="store_true", help="re-block")
+    bk.set_defaults(func=cmd_block)
 
     n = sub.add_parser("next", help="next institution alphabetically with no profile")
     n.add_argument("-q", "--quiet", action="store_true", help="print the slug only")
