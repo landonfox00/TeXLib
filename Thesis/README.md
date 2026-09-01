@@ -71,6 +71,16 @@ the committed copy came from and when.
 Work proceeds **alphabetically**, and `next` reads the answer off the profiles
 directory, so there is no cursor to lose or disagree with.
 
+**Researching one is governed by [profiles/RESEARCHING.md](profiles/RESEARCHING.md)** — what a profile may contain, which sources count, the verification pass, and what a PR has to state. Read it before filling in a skeleton; the scheduled routine follows it verbatim.
+
+If an institution'''s requirements cannot be found, record that rather than guessing:
+
+```
+python thesis_institutions.py block <slug> "requirements behind a student login"
+```
+
+Without it `next` returns the same institution every run forever.
+
 `scaffold` writes a skeleton, not a profile. Every institution-specific value in
 it is a placeholder, it renders the neutral pages until someone replaces them,
 and it carries a provenance header — source URL, access date, who read it — that
