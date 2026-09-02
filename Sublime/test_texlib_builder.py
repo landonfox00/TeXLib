@@ -449,6 +449,53 @@ def main():
     check("accessible -> --texlib-mode token NOT passed to engine",
           not any("--texlib-mode" in str(x) for c in cmds for x in c[0]), cmds)
 
+    # (k1c) solutions-inline has to be DISCOVERABLE. It is deliberately never
+    # planned into a default set -- it is a layout preference, and
+    # PLANNED_VARIANTS excludes it -- so the planner's one job here is to say
+    # the mode exists when the document uses {partsolution}. That notice is
+    # gated on the class DECLARING solutions-inline, and for a long time no
+    # class did, so it never fired: a quiz whose parts carry {partsolution}
+    # produced a `solutions' copy whose answer space had collapsed (
+    # texlib-solutions.sty keys \workbox and \stretch off \ifsolinline) and
+    # never mentioned the mode that keeps the geometry.
+    INLINE_META = ("variants=solutions,instructor,solutions-inline\n"
+                   "has-solutions=1\nhas-rubric=0\n"
+                   "has-commonerrors=0\nhas-partsolution=1\n")
+    QUIZ = r"\documentclass{quiz}\begin{document}x\end{document}"
+    cmds, disp = run_builder(QUIZ, options=["--texlib-mode=default"],
+                             aux_files={"doc.buildmeta": INLINE_META})
+    check("inline: a document using {partsolution} is TOLD the mode exists",
+          "solutions-inline" in disp, repr(disp[-300:]))
+    check("inline: and told it is a layout choice to build explicitly",
+          "layout preference" in disp, repr(disp[-300:]))
+    # Announced, not built: it must cost no compile.
+    check("inline: announcing it does NOT spend a compile",
+          not any("ShowKeyInline" in str(x) for c in cmds for x in c[0]),
+          [x for c in cmds for x in c[0] if "ShowKeyInline" in str(x)])
+    # And it stays quiet for a document that cannot use it.
+    NOINLINE_META = INLINE_META.replace("has-partsolution=1",
+                                        "has-partsolution=0")
+    _, disp2 = run_builder(QUIZ, options=["--texlib-mode=default"],
+                           aux_files={"doc.buildmeta": NOINLINE_META})
+    check("inline: silent when the document has no {partsolution}",
+          "solutions-inline" not in disp2, repr(disp2[-200:]))
+
+    # The declaration and the rendering must not drift apart: a class that keys
+    # anything off \ifsolinline should declare the variant, and one that does
+    # not should not claim it.
+    _here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for _cls, _want in (("Quizzes/texlib-quiz.cls", True),
+                        ("Exams/texlib-autoexam.cls", True),
+                        ("Notes/texlib-didactic.cls", False)):
+        _p = os.path.join(_here, *_cls.split("/"))
+        _src = open(_p, encoding="utf-8", errors="replace").read()
+        _decl = [l for l in _src.splitlines()
+                 if "\\TeXLibDeclareVariants" in l]
+        _has = any("solutions-inline" in l for l in _decl)
+        check("inline: %s %s solutions-inline"
+              % (os.path.basename(_cls), "declares" if _want else "does not claim"),
+              _has == _want, _decl)
+
     # (k2) a lualatex class in accessible mode: same pairing, one engine.
     cmds, _ = run_builder(
         r"\documentclass{quiz}\begin{document}x\end{document}",
