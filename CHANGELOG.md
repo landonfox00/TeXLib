@@ -34,6 +34,15 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   and a thesis is where nth-roots are likeliest — the trade-off is documented
   at both declarations rather than decided for the author.
 
+- **A second example in one directory no longer erases the first one's content assertions.** `examples/manifest.py` built its three expectation views — `expect_text`, `expect_absent`, `expect_artifact_nonempty` — keyed by `module` alone. Two entries sharing a module directory therefore did not combine; the later declaration *replaced* the earlier one. Adding a second fixture beside `examples/fixtures/Notes/theorem-numbering.tex` silently dropped its five theorem-numbering assertions and checked the newcomer's tokens against theorem-numbering's PDF instead — both documents still built, the suite still reported green, and neither was actually being asserted. It was worked around at the time by giving the new fixture its own `examples/fixtures/MathML/` directory, which sidesteps the collision without closing it.
+
+  This is precisely the failure the manifest exists to eliminate — its own docstring says the old four-registry scheme was replaced because "adding one to the wrong subset failed silently" — reappearing one level down, inside the file meant to be the cure. The views are now keyed by `(module, template)`, and `check_content` in `smoke_test.py` looks them up per *document* rather than per module. Build-only entries are unaffected: `examples/Math181-Fall2026` still declares five documents in one module with no `expect` at all.
+
+  Two guards keep it from returning. `_check_unique_documents` runs at manifest import and raises on two entries naming the same document, so a duplicate is a hard error in `smoke_test`, the gallery and the builder suite alike rather than a quietly reduced check. `Sublime/test_texlib_builder.py` adds five checks: a synthetic pair sharing one module, asserting all three views keep both sides (synthetic because the real corpus is now free of the collision, and a guard that only holds while the hazard is absent guards nothing); a conservation law over the real corpus — every declared assertion set survives into its view, which is the form that keeps holding as examples are added; and the duplicate-declaration error itself.
+
+  One nearby check is genuinely dead and stays that way for now: `build_scenario` asks for the schedule grid's non-emptiness under the bare module name `Schedule`, while the manifest declares that artifact under `examples/templates/Schedule`. The lookup has matched nothing since the templates moved. It is called out in a comment at the call site rather than fixed here, because turning an inert assertion back on is a separate change with its own blast radius.
+
+
 ## [0.8.0] — 2026-08-31
 
 The release that makes TeXLib usable by someone who is not its author: a build

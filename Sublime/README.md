@@ -13,7 +13,8 @@ machine paths, two overlapping build scripts, and `__pycache__` junk).
 | `texlib_builder.py` | `Packages/User/` | The custom LaTeXTools builder (`builder: "texlib"`). |
 | `TeXLib.sublime-build` | `Packages/User/` | Build system + the mode-picker variants. |
 | `LaTeXTools.sublime-settings` | `Packages/User/` | LaTeXTools config: engine path, `texlib` builder, comma-safe `TEXINPUTS`. |
-| `Preferences.sublime-settings` | `Packages/User/` | Editor prefs: `font_size` 10, full `added_words` / `ignored_words` lists. |
+| `Preferences.sublime-settings` | `Packages/User/` | Global editor prefs (font size, word wrap, auto-complete triggers). Ships no word lists. |
+| `LaTeX.sublime-settings` | `Packages/User/` | LaTeX-syntax settings: the `added_words` / `ignored_words` spell-check lists. See [Spell check](#spell-check). |
 | `Default (Windows).sublime-keymap` | `Packages/User/` | Personal Windows keybindings (currently all commented). |
 | `Default.sublime-commands` | `Packages/User/` | Command-palette entries for the build modes. |
 | `Package Control.sublime-settings` | `Packages/User/` | Installed-packages list (LaTeXTools, Package Control, PowerShell, UnitTesting). |
@@ -115,6 +116,82 @@ python smoke_test.py                          # full template builds
 
 `.github/workflows/tests.yml` runs the no-TeX logic suite on every push, plus
 an integration job that installs TeX Live + biber.
+
+## Spell check
+
+TeXLib ships 637 mathematical words in `LaTeX.sublime-settings` under
+`added_words`. Two things about that list surprise people.
+
+### `added_words` replaces the global list — it does not stack
+
+Sublime resolves each setting from the last file in the cascade that defines the
+key, and for an array that means **replacement, not union**. A syntax-specific
+`added_words` therefore shadows the one in `Preferences.sublime-settings`
+entirely.
+
+So the **Add Word** command — which writes to global `Preferences` — *has no
+effect while you are editing LaTeX*. The word applies in every other syntax and
+silently does nothing in `.tex`. Measured on Sublime build 4200:
+
+| setting file | `added_words` |
+|---|---|
+| `Packages/User/Preferences.sublime-settings` | 8 |
+| `Packages/User/LaTeX.sublime-settings` | 637 |
+| what a `.tex` view actually resolves | **637** |
+
+The union would be 640. The three words present only in `Preferences` were
+inactive in every `.tex` file. (An older version of this README and of the
+settings-file header claimed the two "stack"; they do not.)
+
+### Where to put words
+
+- **Shared mathematical vocabulary** — terminology, mathematician surnames,
+  journal names — goes in the `added_words` array in the **repo copy** of
+  `LaTeX.sublime-settings`, then deploy. Everyone gets it, and it survives
+  re-deploys because the repo is the source.
+
+  Do **not** hand-edit the deployed `Packages/User/` copy: `deploy.ps1` and
+  TeXLib-Installer overwrite that file with the repo copy, taking your edits
+  with it.
+
+- **Personal vocabulary** — collaborator names, lab-internal jargon,
+  course-internal terms — goes in a **separate dictionary package**, not in
+  `added_words` anywhere. Sublime 4's `dictionary` setting accepts a *list* of
+  `.dic` paths and consults every entry, so a second dictionary is genuinely
+  additive — `en_US` stays fully in force — and it can be attached to as many
+  syntaxes as you like. A package under `Packages/MyDict/` shipping
+  `mydict.dic` plus its own syntax settings:
+
+  ```json
+  "dictionary": [
+      "Packages/Language - English/en_US.dic",
+      "Packages/MyDict/mydict.dic"
+  ]
+  ```
+
+  stacks cleanly with TeXLib's file (the two define disjoint keys), survives
+  every re-deploy, and never ships to coworkers.
+
+> **Do not add a `dictionary` key to TeXLib's `LaTeX.sublime-settings`.**
+> `Packages/User/` wins outright for any key it defines, so a `dictionary`
+> there would silently disable such a package's list. If TeXLib ever genuinely
+> needs one, it must list *both* `.dic` files itself.
+
+### Why there is no `Bibtex.sublime-settings` / `TeX.sublime-settings`
+
+`added_words` is per-syntax, and `LaTeX.sublime-settings` reaches the LaTeX
+syntax only. `.bib` files use the `Bibtex` syntax (LaTeXTools may claim them as
+`BibLaTeX` instead) and `.sty`/`.cls` use `TeX`, so **none** of the 637 words
+reach them.
+
+TeXLib deliberately does not paper over that with two more settings files. It
+would mean maintaining three copies of one array — which would drift — for two
+file types a dictionary serves better anyway: `.bib` is mostly proper nouns and
+titles, and `.sty`/`.cls` is macro code where spell check is mostly noise. The
+dictionary route covers every syntax from a single word list.
+
+If that call is ever revisited, the new files must declare `added_words` only —
+never `dictionary`, for the reason above.
 
 ## Notes
 

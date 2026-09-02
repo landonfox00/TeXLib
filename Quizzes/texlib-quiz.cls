@@ -58,7 +58,16 @@
 
 % Variants the builder may emit for a quiz. No `student': a quiz reads no
 % \ifstudent, so a student build is byte-identical to the default one.
-\TeXLibDeclareVariants{solutions,instructor}
+%
+% `solutions-inline' is declared but never planned into a default set: it is a
+% layout preference, not a content difference, and PLANNED_VARIANTS excludes it,
+% so declaring it costs no compile. What declaring it does is let the planner
+% SAY the mode exists when the document uses {partsolution} -- which is the only
+% way anyone finds out. A quiz reads \ifsolinline (the header mark) and
+% texlib-solutions.sty keys \workbox and \stretch off it, so a plain `solutions'
+% build collapses the reserved answer space and its page geometry stops matching
+% the student copy; `solutions-inline' is what keeps the two aligned.
+\TeXLibDeclareVariants{solutions,instructor,solutions-inline}
 
 \ExplSyntaxOn
 

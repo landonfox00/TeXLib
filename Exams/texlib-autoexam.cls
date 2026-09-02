@@ -90,7 +90,15 @@
 % Variants the builder may emit for an exam. No `student': autoexam reads no
 % \ifstudent -- the blank copy is what the default build already produces, and
 % the version loop emits it alongside the instructor copies in a `dual' build.
-\TeXLibDeclareVariants{solutions,instructor}
+%
+% `solutions-inline' is declared but never planned into a default set (see the
+% same note in texlib-quiz.cls): PLANNED_VARIANTS excludes it, so declaring it
+% costs no compile and only lets the planner say the mode exists on a document
+% that uses {partsolution}. It matters here for the same reason it matters for a
+% quiz -- texlib-solutions.sty keys \workbox and \stretch off \ifsolinline, so a
+% plain `solutions' build drops the reserved answer space and no longer matches
+% the blank copy's geometry.
+\TeXLibDeclareVariants{solutions,instructor,solutions-inline}
 
 % Versioning is autoexam-specific (not part of texlib-build).
 \newif\if@autoexam@versioned

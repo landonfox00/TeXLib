@@ -552,6 +552,53 @@ def main():
           disp.count("luamml mathml-SE bug") == 1,
           "%d times" % disp.count("luamml mathml-SE bug"))
 
+    # (k1c) solutions-inline has to be DISCOVERABLE. It is deliberately never
+    # planned into a default set -- it is a layout preference, and
+    # PLANNED_VARIANTS excludes it -- so the planner's one job here is to say
+    # the mode exists when the document uses {partsolution}. That notice is
+    # gated on the class DECLARING solutions-inline, and for a long time no
+    # class did, so it never fired: a quiz whose parts carry {partsolution}
+    # produced a `solutions' copy whose answer space had collapsed (
+    # texlib-solutions.sty keys \workbox and \stretch off \ifsolinline) and
+    # never mentioned the mode that keeps the geometry.
+    INLINE_META = ("variants=solutions,instructor,solutions-inline\n"
+                   "has-solutions=1\nhas-rubric=0\n"
+                   "has-commonerrors=0\nhas-partsolution=1\n")
+    QUIZ = r"\documentclass{quiz}\begin{document}x\end{document}"
+    cmds, disp = run_builder(QUIZ, options=["--texlib-mode=default"],
+                             aux_files={"doc.buildmeta": INLINE_META})
+    check("inline: a document using {partsolution} is TOLD the mode exists",
+          "solutions-inline" in disp, repr(disp[-300:]))
+    check("inline: and told it is a layout choice to build explicitly",
+          "layout preference" in disp, repr(disp[-300:]))
+    # Announced, not built: it must cost no compile.
+    check("inline: announcing it does NOT spend a compile",
+          not any("ShowKeyInline" in str(x) for c in cmds for x in c[0]),
+          [x for c in cmds for x in c[0] if "ShowKeyInline" in str(x)])
+    # And it stays quiet for a document that cannot use it.
+    NOINLINE_META = INLINE_META.replace("has-partsolution=1",
+                                        "has-partsolution=0")
+    _, disp2 = run_builder(QUIZ, options=["--texlib-mode=default"],
+                           aux_files={"doc.buildmeta": NOINLINE_META})
+    check("inline: silent when the document has no {partsolution}",
+          "solutions-inline" not in disp2, repr(disp2[-200:]))
+
+    # The declaration and the rendering must not drift apart: a class that keys
+    # anything off \ifsolinline should declare the variant, and one that does
+    # not should not claim it.
+    _here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for _cls, _want in (("Quizzes/texlib-quiz.cls", True),
+                        ("Exams/texlib-autoexam.cls", True),
+                        ("Notes/texlib-didactic.cls", False)):
+        _p = os.path.join(_here, *_cls.split("/"))
+        _src = open(_p, encoding="utf-8", errors="replace").read()
+        _decl = [l for l in _src.splitlines()
+                 if "\\TeXLibDeclareVariants" in l]
+        _has = any("solutions-inline" in l for l in _decl)
+        check("inline: %s %s solutions-inline"
+              % (os.path.basename(_cls), "declares" if _want else "does not claim"),
+              _has == _want, _decl)
+
     # (k2) a lualatex class in accessible mode: same pairing, one engine.
     cmds, _ = run_builder(
         r"\documentclass{quiz}\begin{document}x\end{document}",
@@ -2052,6 +2099,67 @@ def main():
     _unmapped = _areas - set(_mf.SCENARIO_AREA_MODULE)
     check("manifest: every scenario area maps to a module", not _unmapped,
           str(sorted(_unmapped)))
+
+    # Expectations are keyed by (module, template), so two examples sharing ONE
+    # module directory keep BOTH sets. Under the old module-only key the later
+    # declaration REPLACED the earlier one: the earlier document's assertions
+    # vanished and the survivor's tokens were checked against the earlier
+    # document's PDF -- silently, in a suite that stayed green. That is what a
+    # second fixture beside examples/fixtures/Notes/theorem-numbering.tex did
+    # on 2026-08-31. Exercised on a synthetic pair because the real corpus is
+    # (correctly) free of the collision, and a guard that only holds while the
+    # hazard is absent guards nothing.
+    _pair = [
+        _mf.Example("examples/fixtures/Shared", "first.tex", "fixture", ("smoke",),
+                    expect=["FIRSTMARK"], absent=["FIRSTLEAK"],
+                    artifact=["*_first_grid.tex"]),
+        _mf.Example("examples/fixtures/Shared", "second.tex", "fixture", ("smoke",),
+                    expect=["SECONDMARK"], absent=["SECONDLEAK"],
+                    artifact=["*_second_grid.tex"]),
+    ]
+    _k1 = ("examples/fixtures/Shared", "first.tex")
+    _k2 = ("examples/fixtures/Shared", "second.tex")
+    _real_examples = _mf.EXAMPLES
+    try:
+        _mf.EXAMPLES = _pair
+        _v_text = _mf.expect_text()
+        _v_absent = _mf.expect_absent()
+        _v_artifact = _mf.expect_artifact_nonempty()
+    finally:
+        _mf.EXAMPLES = _real_examples
+
+    check("manifest: two examples in one module keep both expect sets",
+          _v_text.get(_k1) == ["FIRSTMARK"] and _v_text.get(_k2) == ["SECONDMARK"],
+          str(_v_text))
+    check("manifest: two examples in one module keep both absent sets",
+          _v_absent.get(_k1) == ["FIRSTLEAK"] and _v_absent.get(_k2) == ["SECONDLEAK"],
+          str(_v_absent))
+    check("manifest: two examples in one module keep both artifact sets",
+          _v_artifact.get(_k1) == ["*_first_grid.tex"]
+          and _v_artifact.get(_k2) == ["*_second_grid.tex"],
+          str(_v_artifact))
+
+    # The same claim against the REAL corpus, as a conservation law: every
+    # declared assertion set survives into its view. This is the form that
+    # keeps holding as examples are added, without anyone re-reading this test.
+    _lost = [name for name, view, declared in (
+        ("expect", _mf.expect_text(), [e for e in _mf.EXAMPLES if e.expect]),
+        ("absent", _mf.expect_absent(), [e for e in _mf.EXAMPLES if e.absent]),
+        ("artifact", _mf.expect_artifact_nonempty(),
+         [e for e in _mf.EXAMPLES if e.artifact]),
+    ) if len(view) != len(declared)]
+    check("manifest: no declared assertion set is dropped by its view", not _lost,
+          "collapsed views: " + ", ".join(_lost))
+
+    # And the declaration self-check itself: two entries naming the SAME
+    # document would still overwrite, so the manifest refuses to import.
+    try:
+        _mf._check_unique_documents(list(_mf.EXAMPLES) + [_mf.EXAMPLES[0]])
+        _dupe_raised = False
+    except ValueError:
+        _dupe_raised = True
+    check("manifest: a duplicated (module, template) declaration is a hard error",
+          _dupe_raised)
 
     # -----------------------------------------------------------------------
     # (y) Accessibility report. The accessible build writes veraPDF's
