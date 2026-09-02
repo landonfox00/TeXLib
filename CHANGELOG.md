@@ -4,6 +4,43 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- **The variant fan-out builds in parallel, roughly halving `Ctrl+B`.** 0.8.0
+  turned one compile into a fan-out — base, one compile per variant, and a
+  tagged twin of each — and ran all of it in sequence. For a Notes or Problem
+  Sets document that is about sixteen engine passes where there used to be two
+  or three, and it is the whole of why builds got slow: measured on
+  `examples/Math181-Fall2026/lecture-01-limits.tex`, a base-only build takes
+  17s and the full fan-out 89s.
+
+  Nothing about that work was ever parallel, and nothing needed to be
+  sequential either. Each variant already compiles into its own output
+  directory and shares no aux state with any other — that is precisely why they
+  are two fixed passes rather than the convergence loop — so they are
+  independent processes, and the engine is single-threaded. On the same machine
+  and the same document (12 cores, six lanes): **104s serial, 55s at four jobs,
+  and 44–49s at six or more** — the width is capped at the number of lanes, so
+  past that the figures are the same run plus noise. All eight PDFs come out
+  identical to the serial build, page for page and word for word.
+
+  A host opts in by installing `run_parallel`; the core calls it only when it is
+  there, so the LaTeXTools adapter — driven by LaTeXTools' own serial runner —
+  builds exactly as before. `build_jobs` (or `TEXLIB_JOBS`) sets the width and
+  defaults to one less than the CPU count; `1` restores the serial path.
+
+  Two things stay sequential on purpose. The base compile, because it writes the
+  `.buildmeta` the plan is computed from. And the base tagged twin, because its
+  run 1 is the mathml-SE probe every other tagged lane needs the answer to
+  before it can be given a command line.
+
+  Lane output is buffered and replayed in planned order rather than streamed:
+  several engines writing at once produces a log in which no error can be
+  attributed to a document, and error classification must not depend on which
+  lane happened to finish first. Cancellation now reaches every live process —
+  the build registry holds a set rather than a single slot, so cancelling a
+  fan-out no longer kills one engine and leaves five running.
+
 ## [0.8.0] — 2026-08-31
 
 The release that makes TeXLib usable by someone who is not its author: a build

@@ -45,11 +45,13 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import os
 import re
 import shutil
 import subprocess
 import sys
+import threading
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -693,8 +695,13 @@ class CliHost:
         elif WARNING_RE.search(s) and len(self.warnings) < MAX_WARNINGS:
             self.warnings.append(s)
 
-    def run_argv(self, cmd):
+    def run_argv(self, cmd, emit=True):
         """One engine/biber pass. Returns the captured text for host.out.
+
+        emit=False captures without printing or classifying: a parallel lane
+        buffers its output and replays it through collect() afterwards, so
+        several engines running at once cannot interleave into an unreadable
+        log, nor make error classification depend on scheduling.
 
         TEXLIB_AUX_DIR goes into THIS subprocess's env rather than os.environ so
         two concurrent CLI builds of different documents cannot race a shared
@@ -718,16 +725,54 @@ class CliHost:
         try:
             for line in proc.stdout:
                 chunks.append(line)
-                self.collect(line)
+                if emit:
+                    self.collect(line)
         finally:
             if proc.stdout:
                 proc.stdout.close()
             proc.wait()
         return "".join(chunks)
 
+    def run_parallel(self, lanes, jobs):
+        """Run independent variant lanes concurrently, then replay their logs.
+
+        Buffered per lane and replayed in planned order rather than streamed:
+        several engines writing at once produces a log in which no error can be
+        attributed to a document, and collect() also classifies errors, which
+        has to stay deterministic rather than depend on scheduling.
+        """
+        done = [0]
+        lock = threading.Lock()
+
+        def one(label, cmds):
+            buf = []
+            for cmd in cmds:
+                buf.append(self.run_argv(cmd, emit=False))
+            with lock:
+                done[0] += 1
+                self.emit("texlib: %s done (%d/%d).\n"
+                          % (label, done[0], len(lanes)))
+            return "".join(buf)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+            futures = [pool.submit(one, label, cmds) for label, cmds in lanes]
+            outs = []
+            for (label, _c), fut in zip(lanes, futures):
+                try:
+                    outs.append((label, fut.result()))
+                except Exception as exc:  # noqa: BLE001 - one lane, not the build
+                    self.emit("texlib: %s failed to run: %s\n" % (label, exc))
+                    outs.append((label, ""))
+
+        for label, text in outs:
+            self.emit("\ntexlib: --- %s ---\n" % label)
+            for line in text.splitlines(True):
+                self.collect(line)
+
     def build(self):
         """Consume commands() to exhaustion. _postprocess runs inside it, so
         StopIteration means the build is genuinely finished."""
+        self.host.run_parallel = self.run_parallel
         gen = self.host.commands()
         try:
             item = next(gen)
