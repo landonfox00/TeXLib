@@ -115,6 +115,7 @@ BIBER = shutil.which("biber")
 ACCESSIBLE_DOCMETA = _spec.ACCESSIBLE_DOCMETA
 ACCESSIBLE_MACRO = _spec.ACCESSIBLE_MACRO
 accessible_macro_for = _spec.accessible_macro_for
+luamml_se_aborted = _spec.luamml_se_aborted
 
 # Committed reference images for visual regression (--visual). Generated with
 # --update-refs; environment-specific (font rendering differs across TeX Live
@@ -203,14 +204,20 @@ STUB_COURSEMETA = r"""% coursemeta.tex - auto-generated stub for TeXLib smoke te
 # ---------------------------------------------------------------------------
 #
 # After a successful build, the rendered PDF's text (via pdftotext) must
-# contain every substring listed for that module (case-insensitive). These
+# contain every substring listed for that document (case-insensitive). These
 # catch the "compiles green but renders blank/garbled" class that a build-only
 # check misses — e.g. the schedule grid that silently rendered zero rows.
 # Keep the strings to durable, content-level tokens (column headers, directive
 # output, instruction boilerplate), NOT layout/font-sensitive details.
+#
+# All three dicts are keyed by (module, template), NOT by module: one module
+# directory can hold several examples, and a module-only key made the last one
+# declared silently discard its predecessors' assertions while its own tokens
+# were checked against their PDFs. Look them up with the pair the build already
+# has in hand.
 EXPECT_TEXT = _manifest.expect_text()
 
-# Substrings that must NOT appear in a module's rendered PDF (case-insensitive).
+# Substrings that must NOT appear in a document's rendered PDF (case-insensitive).
 # The negative mirror of EXPECT_TEXT: asserts something was correctly suppressed.
 # MLHEADERLEAK lives only in a wrapped \begin{problem}[meta] header in
 # fix-bank.tex; it renders ONLY if the engine fails to skip the header
@@ -266,7 +273,7 @@ def extract_pdf_text(pdf_path: str) -> str | None:
         return None
 
 
-def check_content(module: str, tmp: str, pdf_path: str,
+def check_content(module: str, template: str, tmp: str, pdf_path: str,
                   check_text: bool = True) -> tuple[list[str], bool]:
     """
     Verify rendered content. Returns (problems, text_skipped).
@@ -274,19 +281,23 @@ def check_content(module: str, tmp: str, pdf_path: str,
     is unavailable (a soft skip, not a failure). `check_text=False` runs only
     the dependency-free artifact check — used by scenario builds, where the
     per-page visual diff (not a fixed substring list) is the content check and
-    EXPECT_TEXT's module tokens may not apply to every configuration.
+    EXPECT_TEXT's tokens may not apply to every configuration.
+
+    Expectations are looked up by the (module, template) pair, because a module
+    directory holds more than one document and each carries its own assertions.
     """
+    doc = (module, template)
     problems: list[str] = []
 
     # Artifact non-emptiness (dependency-free).
-    for pat in EXPECT_ARTIFACT_NONEMPTY.get(module, []):
+    for pat in EXPECT_ARTIFACT_NONEMPTY.get(doc, []):
         hits = glob.glob(os.path.join(tmp, pat))
         if not any(os.path.getsize(h) > 0 for h in hits):
             problems.append(f"artifact {pat} missing or empty")
 
     # Text substrings (needs pdftotext).
-    expects = EXPECT_TEXT.get(module, []) if check_text else []
-    absent  = EXPECT_ABSENT.get(module, []) if check_text else []
+    expects = EXPECT_TEXT.get(doc, []) if check_text else []
+    absent  = EXPECT_ABSENT.get(doc, []) if check_text else []
     text_skipped = False
     if expects or absent:
         text = extract_pdf_text(pdf_path)
@@ -724,20 +735,30 @@ def build_one(
         # document's \documentclass. \DocumentMetadata opens a support file before
         # the \input runs, so the jobname must be pinned explicitly -- otherwise
         # LuaTeX names the output after that support file, not the template.
-        prefix = (accessible_macro_for(os.path.join(tmp, template))
-                  if accessible else "") + (mode_macro or "")
-        if accessible:
-            cmd.append(f"--jobname={jobname}")
-        if prefix:
-            cmd.append(f"{prefix}\\input{{{template}}}")
-        else:
-            cmd.append(template)
+        def argv(se=True):
+            prefix = (accessible_macro_for(os.path.join(tmp, template), se=se)
+                      if accessible else "") + (mode_macro or "")
+            tail = ([f"--jobname={jobname}"] if accessible else []) + (
+                [f"{prefix}\\input{{{template}}}"] if prefix else [template])
+            return cmd + tail
 
         pdf = os.path.join(tmp, jobname + ".pdf")
         t0 = time.time()
         try:
             returncode, log_text, stdout_text, elapsed, _passes = _run_with_reruns(
-                cmd, tmp, env, timeout, jobname)
+                argv(), tmp, env, timeout, jobname)
+            # The luamml mathml-SE bug aborts a document with two nth-roots in
+            # one formula. The builder retries such a document with MathML
+            # associated files only, so the gate has to measure the same thing
+            # -- otherwise it validates a PDF no user is given.
+            if accessible and returncode != 0 and luamml_se_aborted(log_text):
+                for suffix in ("-luamml-mathml.html", "-mathml.html"):
+                    try:
+                        os.remove(os.path.join(tmp, jobname + suffix))
+                    except OSError:
+                        pass
+                returncode, log_text, stdout_text, elapsed, _passes = (
+                    _run_with_reruns(argv(se=False), tmp, env, timeout, jobname))
         except subprocess.TimeoutExpired as exc:
             return (False, time.time() - t0, f"timeout after {timeout}s",
                     _save_log(tmp, _decode(exc.stdout)), False)
@@ -759,7 +780,7 @@ def build_one(
                 problems += vp
                 skipped = skipped or vera_skipped
             if content:
-                cp, text_skipped = check_content(module, tmp, pdf)
+                cp, text_skipped = check_content(module, template, tmp, pdf)
                 problems += cp
                 skipped = skipped or text_skipped
             if visual and module in VISUAL_MODULES:
@@ -945,9 +966,16 @@ def build_scenario(scen: dict, timeout: int, verbose: bool,
         skipped = False
         if content:
             # Artifact check only (grid non-empty). The per-page visual diff is
-            # the real content check for visual scenarios; the module's
+            # the real content check for visual scenarios; a module's
             # EXPECT_TEXT tokens don't apply across every configuration.
-            cp, tskip = check_content(module, tmp, pdf, check_text=False)
+            #
+            # This lookup currently matches nothing, and has since the templates
+            # moved: a scenario's `module` is the bare class home ("Schedule"),
+            # while the manifest declares the grid artifact under
+            # "examples/templates/Schedule". So the grid's non-emptiness is not
+            # in fact asserted for scenarios. Pre-existing and untouched here —
+            # keying by document neither causes nor fixes it.
+            cp, tskip = check_content(module, template, tmp, pdf, check_text=False)
             problems += cp
             skipped = skipped or tskip
 

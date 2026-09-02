@@ -52,6 +52,11 @@ import texlib_build as _tb  # noqa: E402  (module handle: stubbing in case (y))
 
 # --- 2. Harness ------------------------------------------------------------
 
+# The builder object the last harness call drove, for the few assertions that
+# are about host-facing STATE rather than the command stream.
+_LAST_BUILDER = [None]
+
+
 def run_builder(doc_src, options=None, engine="pdflatex", aux_files=None):
     """Build a TexlibBuilder over a synthetic document; return (commands, display).
 
@@ -145,6 +150,7 @@ def drive_builder(doc_src, options=None, engine="pdflatex",
     b.options = list(options if options is not None
                      else ["--texlib-mode=base"])
     b.out = ""
+    _LAST_BUILDER[0] = b
 
     steps = steps or []
 
@@ -321,8 +327,12 @@ def main():
     # a time. The LaTeXTools adapter is driven by LaTeXTools' own serial runner
     # and never gets one, so the serial path has to stay exactly as it was --
     # which is the real risk here, and what most of these assert.
-    def run_parallel_builder(doc_src, options, aux, jobs=4):
-        """run_builder, but with a capturing run_parallel installed."""
+    def run_parallel_builder(doc_src, options, aux, jobs=4, out=""):
+        """run_builder, but with a capturing run_parallel installed.
+
+        `out` is fed back as the engine output after every pass, which is
+        how the mathml-SE abort is simulated.
+        """
         tmp = tempfile.mkdtemp(prefix="texlib_par_")
         with open(os.path.join(tmp, "doc.tex"), "w", encoding="utf-8") as fh:
             fh.write(doc_src)
@@ -332,7 +342,7 @@ def main():
         b = TexlibBuilder()
         b.tex_root = os.path.join(tmp, "doc.tex")
         b.tex_name, b.base_name, b.tex_dir = "doc.tex", "doc", tmp
-        b.engine, b.out = "pdflatex", ""
+        b.engine, b.out = "pdflatex", out
         b.options = list(options)
         b.builder_settings = {"build_jobs": jobs}
         seen = []
@@ -401,6 +411,38 @@ def main():
           "only in lanes: %s | only in serial: %s"
           % (sorted(map(str, lane_cmds - serial_variant_cmds))[:1],
              sorted(map(str, serial_variant_cmds - lane_cmds))[:1]))
+
+    # A parallel lane is a fixed list of commands with NO retry behind it, so
+    # the mathml-SE verdict has to be settled before the lanes are planned --
+    # that is why the base tagged twin runs on its own first. If a lane were
+    # planned with SE on a document that aborts under it, the fan-out would
+    # simply lose those PDFs, which is the regression this pins.
+    _SE_ABORT = ("! error:  (nodes): trying to delete an attribute refere\n"
+                 "nce of a non attribute node")
+    _, ab_batches, ab_disp = run_parallel_builder(
+        PSET, ["--texlib-mode=default"], {"doc.buildmeta": FULL_META},
+        out=_SE_ABORT)
+    ab_lanes = ab_batches[0][0] if ab_batches else []
+    ab_tagged = [(l, c) for l, c in ab_lanes if "-a11y" in l]
+    check("parallel+SE: tagged lanes exist to check", bool(ab_tagged),
+          [l for l, _ in ab_lanes])
+    check("parallel+SE: after the probe aborts NO lane asks for SE",
+          all("mathml-SE" not in c[0][-1] for _l, c in ab_tagged),
+          [c[0][-1][:60] for _l, c in ab_tagged if "mathml-SE" in c[0][-1]])
+    check("parallel+SE: the lanes still ask for AF",
+          all("mathml-AF" in c[0][-1] for _l, c in ab_tagged),
+          [c[0][-1][:60] for _l, c in ab_tagged if "mathml-AF" not in c[0][-1]])
+    check("parallel+SE: the fallback is reported once, not per lane",
+          ab_disp.count("luamml mathml-SE bug") == 1,
+          "%d times" % ab_disp.count("luamml mathml-SE bug"))
+    # And with a clean document the lanes keep SE.
+    _, ok_batches, _ = run_parallel_builder(
+        PSET, ["--texlib-mode=default"], {"doc.buildmeta": FULL_META})
+    ok_tagged = [(l, c) for l, c in (ok_batches[0][0] if ok_batches else [])
+                 if "-a11y" in l]
+    check("parallel+SE: a clean document keeps SE on every tagged lane",
+          bool(ok_tagged) and all("mathml-SE" in c[0][-1] for _l, c in ok_tagged),
+          [c[0][-1][:60] for _l, c in ok_tagged])
 
     # build_jobs=1 means "do not parallelise", even with a capable host.
     _, none_batches, _ = run_parallel_builder(
@@ -521,13 +563,13 @@ def main():
     check("accessible -> \\def\\TeXLibAccessibleMode injected",
           r"\def\TeXLibAccessibleMode{}" in aarg, aarg)
     # AF is what Firefox's viewer and Foxit read -- the in-browser path from an
-    # LMS link. SE (Acrobat's path) is deliberately absent: luamml 0.9.2 aborts
-    # the run on two \sqrt[n]{...} in one formula, and only SE reaches the code
-    # that does it. See ACCESSIBLE_DOCMETA; restore SE when upstream is fixed.
+    # LMS link -- and SE is Acrobat's. Run 1 asks for both; a document that
+    # trips the luamml mathml-SE bug is retried with AF alone. See
+    # ACCESSIBLE_DOCMETA.
     check("accessible -> MathML AF requested",
           "mathml-AF" in aarg, aarg)
-    check("accessible -> MathML SE withheld (luamml 0.9.2 use-after-free)",
-          "mathml-SE" not in aarg, aarg)
+    check("accessible -> MathML SE requested (Acrobat's path)",
+          "mathml-SE" in aarg, aarg)
     # The jobname must stay the REAL base name: autoexam reads its document body
     # from <jobname>.tex, so a suffixed jobname truncated the tagged exam. The
     # output is separated by directory (aux/a11y) instead, and _postprocess
@@ -548,6 +590,150 @@ def main():
           len(tagged) == 2, f"{len(tagged)} tagged passes")
     check("accessible -> --texlib-mode token NOT passed to engine",
           not any("--texlib-mode" in str(x) for c in cmds for x in c[0]), cmds)
+
+    # (k1) the mathml-SE fallback. luamml 0.9.2 aborts a document with two
+    # \sqrt[n]{...} in one formula, and only the SE path reaches the code that
+    # does it, so run 1 asks for both methods and is spent again on AF alone
+    # when that abort appears. The document is never edited; the builder just
+    # asks for less of the tagged output. See ACCESSIBLE_DOCMETA.
+    _ACC_DOC = r"\documentclass{syllabus}\begin{document}x\end{document}"
+    _ACC_OPT = ["--texlib-mode=accessible"]
+    _plan, _, _ = drive_builder(_ACC_DOC, options=_ACC_OPT)
+    _t1 = next((i for i, c in enumerate(_plan)
+                if r"\DocumentMetadata" in str(c[0][-1])), None)
+    check("accessible fallback: found the tagged run-1 slot to script",
+          _t1 is not None, [c[1] for c in _plan])
+
+    _ABORT = ("! error:  (nodes): trying to delete an attribute reference of "
+              "a non attribute node")
+    cmds, disp, _ = drive_builder(
+        _ACC_DOC, options=_ACC_OPT,
+        steps=[{} for _ in range(_t1 or 0)] + [{"out": _ABORT}])
+    tagged = [c for c in cmds if r"\DocumentMetadata" in str(c[0][-1])]
+    check("accessible fallback: SE abort spends one extra tagged pass",
+          len(tagged) == 3, [c[1] for c in tagged])
+    check("accessible fallback: run 1 asked for SE",
+          bool(tagged) and "mathml-SE" in tagged[0][0][-1],
+          tagged[0][0][-1] if tagged else "")
+    check("accessible fallback: every pass after the abort drops SE",
+          len(tagged) == 3
+          and all("mathml-SE" not in c[0][-1] and "mathml-AF" in c[0][-1]
+                  for c in tagged[1:]),
+          [c[0][-1] for c in tagged[1:]])
+    check("accessible fallback: the retry is otherwise the same command",
+          len(tagged) == 3 and tagged[1][0][:-1] == tagged[0][0][:-1],
+          tagged[1][0] if len(tagged) > 1 else "")
+    check("accessible fallback: the reason is shown, not silently swallowed",
+          "mathml-SE" in disp and "nth-root" in disp, repr(disp))
+
+    # The abort is deliberate and recovered from, so the host must not report
+    # the whole build as failed -- see TexlibBuildCore's _forget_last_pass.
+    check("accessible fallback: host told to forget the aborted pass",
+          getattr(_LAST_BUILDER[0], "_forget_last_pass", False) is True,
+          "flag never set")
+
+    #   a document that does NOT trip the bug keeps SE and spends no extra pass.
+    cmds, disp, _ = drive_builder(_ACC_DOC, options=_ACC_OPT)
+    check("accessible fallback: clean document never sets the forget flag",
+          getattr(_LAST_BUILDER[0], "_forget_last_pass", False) is False)
+    tagged = [c for c in cmds if r"\DocumentMetadata" in str(c[0][-1])]
+    check("accessible fallback: clean document keeps SE on both passes",
+          len(tagged) == 2
+          and all("mathml-SE" in c[0][-1] for c in tagged),
+          [c[0][-1] for c in tagged])
+    check("accessible fallback: clean document says nothing about MathML",
+          "mathml-SE" not in disp, repr(disp))
+
+    #   an ordinary LaTeX error must NOT trigger the retry.
+    cmds, _, _ = drive_builder(
+        _ACC_DOC, options=_ACC_OPT,
+        steps=[{} for _ in range(_t1 or 0)]
+        + [{"out": "! Undefined control sequence.\nl.7 \\nope"}])
+    tagged = [c for c in cmds if r"\DocumentMetadata" in str(c[0][-1])]
+    check("accessible fallback: an ordinary error does not spend a retry",
+          len(tagged) == 2
+          and all("mathml-SE" in c[0][-1] for c in tagged),
+          [c[0][-1] for c in tagged])
+
+    # (k1b) the SAME fallback in the Ctrl+B fan-out, which reaches the tagged
+    # twins by a different path than accessible mode. Getting this wrong is not
+    # "quieter math": the fan-out has no retry of its own, so a document that
+    # trips the bug would lose all four tagged PDFs outright.
+    _FAN_DOC = r"\documentclass{pset}\begin{document}x\end{document}"
+    _plan, _, _ = drive_builder(_FAN_DOC, options=["--texlib-mode=default"])
+    _tw = [i for i, c in enumerate(_plan)
+           if r"\DocumentMetadata" in str(c[0][-1])]
+    check("fan-out: tagged twins exist to test", len(_tw) >= 2,
+          "%d tagged passes" % len(_tw))
+
+    cmds, disp, _ = drive_builder(
+        _FAN_DOC, options=["--texlib-mode=default"],
+        steps=[{} for _ in range(_tw[0])] + [{"out": _ABORT}])
+    tw = [c for c in cmds if r"\DocumentMetadata" in str(c[0][-1])]
+    check("fan-out: first tagged twin asks for SE",
+          bool(tw) and "mathml-SE" in tw[0][0][-1],
+          tw[0][0][-1][:70] if tw else "")
+    check("fan-out: after the abort NO tagged pass still asks for SE",
+          all("mathml-SE" not in c[0][-1] for c in tw[1:]),
+          [c[0][-1][:48] for c in tw[1:] if "mathml-SE" in c[0][-1]])
+    check("fan-out: every tagged twin still gets AF",
+          all("mathml-AF" in c[0][-1] for c in tw[1:]),
+          [c[0][-1][:48] for c in tw[1:] if "mathml-AF" not in c[0][-1]])
+    # The verdict is a property of the document, so the whole fan-out pays for
+    # exactly ONE aborted probe -- not one per twin.
+    check("fan-out: the SE probe is spent once, not once per twin",
+          sum(1 for c in tw if "mathml-SE" in c[0][-1]) == 1,
+          "%d SE passes" % sum(1 for c in tw if "mathml-SE" in c[0][-1]))
+    check("fan-out: the reason is reported once",
+          disp.count("luamml mathml-SE bug") == 1,
+          "%d times" % disp.count("luamml mathml-SE bug"))
+
+    # (k1c) solutions-inline has to be DISCOVERABLE. It is deliberately never
+    # planned into a default set -- it is a layout preference, and
+    # PLANNED_VARIANTS excludes it -- so the planner's one job here is to say
+    # the mode exists when the document uses {partsolution}. That notice is
+    # gated on the class DECLARING solutions-inline, and for a long time no
+    # class did, so it never fired: a quiz whose parts carry {partsolution}
+    # produced a `solutions' copy whose answer space had collapsed (
+    # texlib-solutions.sty keys \workbox and \stretch off \ifsolinline) and
+    # never mentioned the mode that keeps the geometry.
+    INLINE_META = ("variants=solutions,instructor,solutions-inline\n"
+                   "has-solutions=1\nhas-rubric=0\n"
+                   "has-commonerrors=0\nhas-partsolution=1\n")
+    QUIZ = r"\documentclass{quiz}\begin{document}x\end{document}"
+    cmds, disp = run_builder(QUIZ, options=["--texlib-mode=default"],
+                             aux_files={"doc.buildmeta": INLINE_META})
+    check("inline: a document using {partsolution} is TOLD the mode exists",
+          "solutions-inline" in disp, repr(disp[-300:]))
+    check("inline: and told it is a layout choice to build explicitly",
+          "layout preference" in disp, repr(disp[-300:]))
+    # Announced, not built: it must cost no compile.
+    check("inline: announcing it does NOT spend a compile",
+          not any("ShowKeyInline" in str(x) for c in cmds for x in c[0]),
+          [x for c in cmds for x in c[0] if "ShowKeyInline" in str(x)])
+    # And it stays quiet for a document that cannot use it.
+    NOINLINE_META = INLINE_META.replace("has-partsolution=1",
+                                        "has-partsolution=0")
+    _, disp2 = run_builder(QUIZ, options=["--texlib-mode=default"],
+                           aux_files={"doc.buildmeta": NOINLINE_META})
+    check("inline: silent when the document has no {partsolution}",
+          "solutions-inline" not in disp2, repr(disp2[-200:]))
+
+    # The declaration and the rendering must not drift apart: a class that keys
+    # anything off \ifsolinline should declare the variant, and one that does
+    # not should not claim it.
+    _here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for _cls, _want in (("Quizzes/texlib-quiz.cls", True),
+                        ("Exams/texlib-autoexam.cls", True),
+                        ("Notes/texlib-didactic.cls", False)):
+        _p = os.path.join(_here, *_cls.split("/"))
+        _src = open(_p, encoding="utf-8", errors="replace").read()
+        _decl = [l for l in _src.splitlines()
+                 if "\\TeXLibDeclareVariants" in l]
+        _has = any("solutions-inline" in l for l in _decl)
+        check("inline: %s %s solutions-inline"
+              % (os.path.basename(_cls), "declares" if _want else "does not claim"),
+              _has == _want, _decl)
 
     # (k2) a lualatex class in accessible mode: same pairing, one engine.
     cmds, _ = run_builder(
@@ -1944,8 +2130,41 @@ def main():
           "thesis" in _bs.LUALATEX_CLASSES)
     check("buildspec: accessible macro carries MathML AF",
           "mathml-AF" in _bs.ACCESSIBLE_MACRO)
-    check("buildspec: accessible macro withholds MathML SE",
-          "mathml-SE" not in _bs.ACCESSIBLE_MACRO)
+    check("buildspec: accessible macro carries MathML SE",
+          "mathml-SE" in _bs.ACCESSIBLE_MACRO)
+    # The fallback prefix differs from the attempt in exactly one thing.
+    check("buildspec: AF-only fallback drops SE and nothing else",
+          "mathml-SE" not in _bs.ACCESSIBLE_MACRO_AF_ONLY
+          and _bs.ACCESSIBLE_MACRO_AF_ONLY
+          == _bs.ACCESSIBLE_MACRO.replace(",mathml-SE", ""),
+          _bs.ACCESSIBLE_MACRO_AF_ONLY)
+    # The retry fires on luamml's abort and on nothing else -- an ordinary
+    # LaTeX error must stay the document's own failure.
+    check("buildspec: luamml_se_aborted recognises the abort",
+          _bs.luamml_se_aborted(
+              "! error:  (nodes): trying to delete an attribute reference of "
+              "a non attribute node"))
+    check("buildspec: luamml_se_aborted ignores an ordinary error",
+          not _bs.luamml_se_aborted("! Undefined control sequence.\nl.7 \\foo")
+          and not _bs.luamml_se_aborted("")
+          and not _bs.luamml_se_aborted(None))
+    # The engine hard-wraps that message at 79 columns, and the break lands
+    # mid-word wherever the "<file>:<line>: " prefix puts it -- so it MOVES with
+    # the filename. These are the real wrapped forms from two documents whose
+    # names differ in length; a plain substring test passes the first and fails
+    # the second, which would leave the fallback dead for longer filenames.
+    check("buildspec: recognises the abort wrapped after 'of a'",
+          _bs.luamml_se_aborted(
+              "./radicals.tex:5: error:  (nodes): trying to delete an "
+              "attribute reference of a\nnon attribute node"))
+    check("buildspec: recognises the abort wrapped mid-word ('refere/nce')",
+          _bs.luamml_se_aborted(
+              "./nth-root-mathml.tex:31: error:  (nodes): trying to delete an "
+              "attribute refere\nnce of a non attribute node"))
+    check("buildspec: recognises it split at EVERY position",
+          all(_bs.luamml_se_aborted(
+              _bs.LUAMML_SE_ABORT[:i] + "\n" + _bs.LUAMML_SE_ABORT[i:])
+              for i in range(1, len(_bs.LUAMML_SE_ABORT))))
 
     # accessible_macro_for: a document with its OWN \DocumentMetadata (the
     # thesis template's layout) must get the marker only -- the TL2026 kernel
@@ -1970,6 +2189,14 @@ def main():
         check("buildspec: unreadable path falls back to the full prefix",
               _bs.accessible_macro_for(os.path.join(_amd, "missing.tex"))
               == _bs.ACCESSIBLE_MACRO)
+        check("buildspec: se=False asks for the AF-only prefix",
+              _bs.accessible_macro_for(_plain, se=False)
+              == _bs.ACCESSIBLE_MACRO_AF_ONLY)
+        # A document with its own \DocumentMetadata picks its own MathML
+        # methods, so the retry has nothing to change for it.
+        check("buildspec: se=False still yields marker only for an own declaration",
+              _bs.accessible_macro_for(_own, se=False)
+              == _bs.ACCESSIBLE_MARKER_ONLY)
 
     # -----------------------------------------------------------------------
     # The example corpus is declared once, and every declared file exists.
@@ -2008,6 +2235,67 @@ def main():
     _unmapped = _areas - set(_mf.SCENARIO_AREA_MODULE)
     check("manifest: every scenario area maps to a module", not _unmapped,
           str(sorted(_unmapped)))
+
+    # Expectations are keyed by (module, template), so two examples sharing ONE
+    # module directory keep BOTH sets. Under the old module-only key the later
+    # declaration REPLACED the earlier one: the earlier document's assertions
+    # vanished and the survivor's tokens were checked against the earlier
+    # document's PDF -- silently, in a suite that stayed green. That is what a
+    # second fixture beside examples/fixtures/Notes/theorem-numbering.tex did
+    # on 2026-08-31. Exercised on a synthetic pair because the real corpus is
+    # (correctly) free of the collision, and a guard that only holds while the
+    # hazard is absent guards nothing.
+    _pair = [
+        _mf.Example("examples/fixtures/Shared", "first.tex", "fixture", ("smoke",),
+                    expect=["FIRSTMARK"], absent=["FIRSTLEAK"],
+                    artifact=["*_first_grid.tex"]),
+        _mf.Example("examples/fixtures/Shared", "second.tex", "fixture", ("smoke",),
+                    expect=["SECONDMARK"], absent=["SECONDLEAK"],
+                    artifact=["*_second_grid.tex"]),
+    ]
+    _k1 = ("examples/fixtures/Shared", "first.tex")
+    _k2 = ("examples/fixtures/Shared", "second.tex")
+    _real_examples = _mf.EXAMPLES
+    try:
+        _mf.EXAMPLES = _pair
+        _v_text = _mf.expect_text()
+        _v_absent = _mf.expect_absent()
+        _v_artifact = _mf.expect_artifact_nonempty()
+    finally:
+        _mf.EXAMPLES = _real_examples
+
+    check("manifest: two examples in one module keep both expect sets",
+          _v_text.get(_k1) == ["FIRSTMARK"] and _v_text.get(_k2) == ["SECONDMARK"],
+          str(_v_text))
+    check("manifest: two examples in one module keep both absent sets",
+          _v_absent.get(_k1) == ["FIRSTLEAK"] and _v_absent.get(_k2) == ["SECONDLEAK"],
+          str(_v_absent))
+    check("manifest: two examples in one module keep both artifact sets",
+          _v_artifact.get(_k1) == ["*_first_grid.tex"]
+          and _v_artifact.get(_k2) == ["*_second_grid.tex"],
+          str(_v_artifact))
+
+    # The same claim against the REAL corpus, as a conservation law: every
+    # declared assertion set survives into its view. This is the form that
+    # keeps holding as examples are added, without anyone re-reading this test.
+    _lost = [name for name, view, declared in (
+        ("expect", _mf.expect_text(), [e for e in _mf.EXAMPLES if e.expect]),
+        ("absent", _mf.expect_absent(), [e for e in _mf.EXAMPLES if e.absent]),
+        ("artifact", _mf.expect_artifact_nonempty(),
+         [e for e in _mf.EXAMPLES if e.artifact]),
+    ) if len(view) != len(declared)]
+    check("manifest: no declared assertion set is dropped by its view", not _lost,
+          "collapsed views: " + ", ".join(_lost))
+
+    # And the declaration self-check itself: two entries naming the SAME
+    # document would still overwrite, so the manifest refuses to import.
+    try:
+        _mf._check_unique_documents(list(_mf.EXAMPLES) + [_mf.EXAMPLES[0]])
+        _dupe_raised = False
+    except ValueError:
+        _dupe_raised = True
+    check("manifest: a duplicated (module, template) declaration is a hard error",
+          _dupe_raised)
 
     # -----------------------------------------------------------------------
     # (y) Accessibility report. The accessible build writes veraPDF's

@@ -779,8 +779,16 @@ class CliHost:
             while True:
                 cmd, msg = item
                 self.emit(msg + "\n")
+                # Undo point for a pass the brain may declare a probe -- see
+                # TexlibBuildCore's _forget_last_pass contract.
+                mark = (len(self.errors), len(self.warnings), self.fatal)
                 self.host.out = self.run_argv(cmd)
                 item = next(gen)
+                if getattr(self.host, "_forget_last_pass", False):
+                    self.host._forget_last_pass = False
+                    del self.errors[mark[0]:]
+                    del self.warnings[mark[1]:]
+                    self.fatal = mark[2]
         except StopIteration:
             pass
         except KeyboardInterrupt:

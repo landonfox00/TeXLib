@@ -1,6 +1,14 @@
 % UNR accessible thesis / dissertation — TeXLib template.
 % Compile with lualatex. \DocumentMetadata MUST be the first line (it is what
 % switches on PDF tagging, and it can only do so before \documentclass).
+%
+% math/setup asks for MathML associated files only. Adding mathml-SE covers
+% Adobe Acrobat as well, and the rest of the library asks for both — but the
+% library can retry a document that trips the luamml nth-root bug (see
+% ACCESSIBILITY.md) with AF alone, and it cannot do that here, because a
+% document declaring its own \DocumentMetadata owns this choice. Add mathml-SE
+% if your mathematics never puts two \sqrt[n]{...} in one formula; if it does,
+% that build aborts with no PDF and no fallback.
 \DocumentMetadata{
 	lang          = en,
 	tagging       = on,

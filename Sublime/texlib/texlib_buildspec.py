@@ -27,6 +27,7 @@ subfolder, so adding a module here is import-only and cannot become a plugin.
 """
 
 import os
+import re
 import shutil
 
 # Document classes that MUST be compiled with lualatex.
@@ -68,37 +69,77 @@ LUALATEX_CLASSES = {
 # Readers split on which MathML method they understand. AF (associated files)
 # is what Firefox's viewer and Foxit read — the in-browser path from an LMS
 # link — and SE (structure elements) is what Adobe Acrobat reads, so emitting
-# both is what covers a class. We emit AF only, under protest, because SE is
-# currently unusable:
+# both is what covers a class. We ask for both, and fall back to AF alone on
+# the documents that trip a luamml bug, rather than withholding SE from every
+# document because some of them trip it:
 #
-#   luamml 0.9.2 (TeX Live 2026, 2026-06-20) keeps references to math *noad*
+#   luamml 0.9.2 (TeX Live 2026, 2026-06-20 — still the newest release as of
+#   2026-09-01; of the 18 issues upstream, open and closed, none reports this
+#   error or mentions \sqrt at all) keeps references to math *noad*
 #   nodes — a radical's delimiter and degree — and writes marked-content
-#   attributes to them from the structure-element writer after mlist_to_hlist
-#   has freed them. Two \sqrt[n]{...} in one formula is enough for a freed
-#   slot to be recycled, and LuaTeX aborts the run outright: "(nodes): trying
-#   to delete an attribute reference of a non attribute node", no PDF. It
-#   reproduces on a bare article + \DocumentMetadata, so it is not ours, and
-#   only the SE path reaches the writer — AF alone is unaffected.
+#   attributes to them from the structure-element writer (the node.set_attribute
+#   loop at the end of write_elem, luamml-structelemwriter.lua) after
+#   mlist_to_hlist has freed them. Two \sqrt[n]{...} in one math list is enough
+#   for a freed slot to be recycled, and LuaTeX aborts the run outright:
+#   "(nodes): trying to delete an attribute reference of a non attribute node",
+#   no PDF. It reproduces on a bare article + \DocumentMetadata, so it is not
+#   ours, and only the SE path reaches the writer — AF alone is unaffected.
 #
-# That is not an edge case here: 14 documents in the teaching tree carry 57
-# such formulas, most of them in the Notes section that teaches radical laws,
-# where \sqrt[n]{ab} = \sqrt[n]{a}\sqrt[n]{b} IS the content. Restore
-# mathml-SE the moment a fixed luamml ships; nothing else has to change.
+# The trigger is narrow. Of 26 math constructs exercised as sibling pairs under
+# SE, only the three involving \sqrt[n] abort; two nth-roots in separate
+# formulas, or in separate cells of one matrix, are fine. So the 14 documents in
+# the teaching tree that carry such formulas (57 of them, most in the Notes
+# section that teaches radical laws, where \sqrt[n]{ab} = \sqrt[n]{a}\sqrt[n]{b}
+# IS the content) fall back to AF, and every other document gets the Acrobat
+# path now instead of waiting on upstream. A builder runs the SE prefix first,
+# tests its log with luamml_se_aborted(), and re-runs with the AF-only prefix
+# when that fires. Drop the fallback once a fixed luamml ships.
 ACCESSIBLE_DOCMETA = (
     r"\DocumentMetadata{lang=en,tagging=on,"
-    r"tagging-setup={math/setup={mathml-AF},table/header-rows=1},"
+    r"tagging-setup={math/setup={mathml-AF,mathml-SE},table/header-rows=1},"
     r"pdfstandard={ua-2,a-4f}}"
 )
+
+# The fallback prefix, identical but for dropping mathml-SE.
+ACCESSIBLE_DOCMETA_AF_ONLY = ACCESSIBLE_DOCMETA.replace(
+    "{mathml-AF,mathml-SE}", "{mathml-AF}"
+)
+
+# LuaTeX's own wording for the abort above. Matched against a failed accessible
+# run's log to decide whether the AF-only retry is worth spending a pass on; any
+# other failure is the document's own and must surface as itself.
+LUAMML_SE_ABORT = "trying to delete an attribute reference of a non attribute node"
+
+
+def luamml_se_aborted(log_text):
+    """True when a failed accessible run died of the luamml mathml-SE bug.
+
+    Matched with the whitespace removed from BOTH sides, because the engine
+    hard-wraps this message at 79 columns and the wrap lands mid-word wherever
+    the line's "<file>:<line>: " prefix happens to put it -- so the break moves
+    with the length of the document's filename. A plain substring test on the
+    raw text therefore passes for a short filename and silently fails for a
+    longer one, which is exactly the sort of near-miss that would leave the
+    fallback dead for the documents it exists to rescue.
+    """
+    return (_FLATTEN(LUAMML_SE_ABORT) in _FLATTEN(log_text or ""))
+
+
+def _FLATTEN(s):
+    return re.sub(r"\s+", "", s)
 
 # The marker the classes gate their accessible branches on (\ifdefined
 # \TeXLibAccessibleMode). Defined on the command line, never in the source.
 ACCESSIBLE_MACRO = ACCESSIBLE_DOCMETA + r"\def\TeXLibAccessibleMode{}"
+ACCESSIBLE_MACRO_AF_ONLY = (
+    ACCESSIBLE_DOCMETA_AF_ONLY + r"\def\TeXLibAccessibleMode{}"
+)
 
 # The marker alone, for documents that carry their own \DocumentMetadata.
 ACCESSIBLE_MARKER_ONLY = r"\def\TeXLibAccessibleMode{}"
 
 
-def accessible_macro_for(tex_path):
+def accessible_macro_for(tex_path, se=True):
     """The accessible-build prefix appropriate for one document.
 
     The TeX Live 2026 kernel makes a second \\DocumentMetadata declaration a
@@ -109,17 +150,23 @@ def accessible_macro_for(tex_path):
     \\TeXLibAccessibleMode marker. Everything else gets the full injected
     metadata as before. An unreadable file gets the full prefix: the build
     itself will fail loudly on the missing file either way.
+
+    se=False asks for the AF-only fallback prefix, for the retry a caller makes
+    after luamml_se_aborted() fires. A document carrying its own
+    \\DocumentMetadata chooses its own MathML methods, so the retry cannot help
+    it and se is moot there.
     """
+    full = ACCESSIBLE_MACRO if se else ACCESSIBLE_MACRO_AF_ONLY
     try:
         with open(tex_path, "r", encoding="utf-8", errors="ignore") as f:
             source = f.read()
     except OSError:
-        return ACCESSIBLE_MACRO
+        return full
     for line in source.splitlines():
         head = line.split("%", 1)[0]
         if "\\DocumentMetadata" in head:
             return ACCESSIBLE_MARKER_ONLY
-    return ACCESSIBLE_MACRO
+    return full
 
 
 # --- veraPDF conformance reporting ------------------------------------------

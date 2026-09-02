@@ -11,12 +11,14 @@
 %
 % Two roots in SEPARATE formulas are fine. That is exactly why nothing else in
 % the corpus caught this: the full suite ran 36/36 green while the bug was live,
-% and the fix that dodges it (ACCESSIBLE_DOCMETA emitting mathml-AF alone) was
-% reverted by a branch switch without a single gate going red.
+% and an earlier fix (ACCESSIBLE_DOCMETA emitting mathml-AF alone) was reverted
+% by a branch switch without a single gate going red.
 %
-% This fixture is tagged accessible, so the accessible gate builds these four
-% formulas under whatever ACCESSIBLE_DOCMETA currently says. Restore mathml-SE
-% while luamml is still broken and this build dies instead of passing quietly.
+% The library now asks for mathml-SE and falls back to AF alone on the documents
+% that abort, so this fixture is the one document in the corpus that exercises
+% that fallback end to end. It is expected to PASS -- by falling back. A broken
+% fallback shows up here as a hard failure rather than as quieter mathematics,
+% which is the whole reason the fixture is tagged accessible.
 %
 % The formulas are the radical laws from Math 126's R.6 -- the section where two
 % nth-roots in one line is the lesson rather than an accident.
