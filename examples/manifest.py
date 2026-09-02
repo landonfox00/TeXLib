@@ -13,6 +13,13 @@ Everything is declared here now, once, tagged by what it is FOR. `smoke_test.py`
 derives its structures from this list; the gallery reads the same list, so what
 you can browse and what CI actually builds cannot drift apart.
 
+The declaration is per DOCUMENT, and so are the derived expectation views: a
+module directory may hold any number of examples, and each keeps its own
+assertions. Keying those views by module alone reintroduced the very failure
+above in a subtler form -- a second example in a directory silently replaced the
+first one's assertions and had its own tokens checked against the first one's
+PDF. `_check_unique_documents` guards what is left of that hazard.
+
 WHAT LIVES WHERE
 
     examples/templates/<Module>/    the canonical document a user copies to
@@ -133,7 +140,7 @@ EXAMPLES = [
                  "Contents, List of Tables, List of Figures), a body chapter, "
                  "and a theorem head. 'Rudin' asserts the BIBLIOGRAPHY "
                  "rendered: smoke now runs biber between passes, and without "
-                 "it \printbibliography emits an empty list while the build "
+                 "it \\printbibliography emits an empty list while the build "
                  "still reports success -- exactly the silent failure this "
                  "corpus exists to catch."),
 
@@ -202,7 +209,48 @@ SCENARIO_AREA_MODULE = {
 
 
 # ---------------------------------------------------------------------------
+# Declaration self-check
+# ---------------------------------------------------------------------------
+
+def _check_unique_documents(examples):
+    """Reject two entries declaring the same (module, template).
+
+    The expectation views below are keyed by that pair, so a duplicate would
+    silently overwrite the first entry's assertions with the second's -- the
+    same class of failure this file exists to eliminate, one level down.
+    Raising at import means a bad declaration is a hard error in smoke_test,
+    the gallery and the builder suite alike, rather than a green run that
+    checked less than it claimed to.
+    """
+    seen = set()
+    dupes = []
+    for e in examples:
+        key = (e.module, e.template)
+        if key in seen:
+            dupes.append("/".join(key))
+        seen.add(key)
+    if dupes:
+        raise ValueError(
+            "examples/manifest.py: duplicate example declaration(s): "
+            + ", ".join(sorted(set(dupes)))
+            + ". Each document is declared exactly once; merge the entries.")
+
+
+_check_unique_documents(EXAMPLES)
+
+
+# ---------------------------------------------------------------------------
 # Derived views. smoke_test.py consumes these so its build logic is untouched.
+#
+# The expectation views are keyed by (module, template) -- the DOCUMENT -- not
+# by module alone. A module directory holds however many documents it holds:
+# examples/Math181-Fall2026 has five, and a fixture directory grows a second
+# fixture the moment a second bug needs trapping. Under a module-only key the
+# later entry REPLACED the earlier one, so the first document's assertions
+# vanished and the survivor's tokens were asserted against the wrong PDF -- a
+# green suite checking something nobody wrote. This bit for real on 2026-08-31,
+# when a second fixture beside examples/fixtures/Notes/theorem-numbering.tex
+# silently disabled its five numbering assertions.
 # ---------------------------------------------------------------------------
 
 def modules(tag="smoke"):
@@ -211,16 +259,18 @@ def modules(tag="smoke"):
 
 
 def expect_text():
-    """{module: [substring]} -- modules with no assertions are omitted."""
-    return {e.module: list(e.expect) for e in EXAMPLES if e.expect}
+    """{(module, template): [substring]} -- documents with no assertions omitted."""
+    return {(e.module, e.template): list(e.expect) for e in EXAMPLES if e.expect}
 
 
 def expect_absent():
-    return {e.module: list(e.absent) for e in EXAMPLES if e.absent}
+    """{(module, template): [substring]} -- the negative mirror of expect_text."""
+    return {(e.module, e.template): list(e.absent) for e in EXAMPLES if e.absent}
 
 
 def expect_artifact_nonempty():
-    return {e.module: list(e.artifact) for e in EXAMPLES if e.artifact}
+    """{(module, template): [glob]} -- sidecars that must exist and be non-empty."""
+    return {(e.module, e.template): list(e.artifact) for e in EXAMPLES if e.artifact}
 
 
 def visual_modules():
