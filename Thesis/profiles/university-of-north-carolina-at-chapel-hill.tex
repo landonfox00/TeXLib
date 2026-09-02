@@ -1,0 +1,74 @@
+% profiles/university-of-north-carolina-at-chapel-hill.tex — UNC-Chapel Hill
+% ============================================================================
+% source: https://gradweb.unc.edu/content/academics/thesis-diss/guide/format.html
+% source: https://gradweb.unc.edu/content/academics/thesis-diss/guide/accessibility.html
+%         (The Graduate School, "Thesis and Dissertation Guide", sections II and
+%         III. The Guide states that where it disagrees with a style manual,
+%         "the regulations set forth in this Guide take precedence".)
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% VERIFIED and set here: geometry, chapter-opening margin, spacing, and the
+% accessibility requirements -- which are the most specific in this whole set.
+% LEFT TO THE NEUTRAL FALLBACK: title page and approval page (the Guide gives
+% them as sample pages, which were not read line by line on this pass).
+%
+% A TRAP FOR THE NEXT READER: the Guide's own "Print complete guide" link points
+% at pdf/ETDGuide2013.pdf -- a 2013 document that predates the entire
+% accessibility section. Use the live web pages, not that PDF.
+
+\thesisinstitution{University of North Carolina at Chapel Hill}
+
+% "All copies of a thesis or dissertation must have the following uniform
+% margins throughout the entire document: Left: 1" (or 1 1/4" to ensure
+% sufficient room for binding the work if desired); Right: 1"; Bottom: 1" (with
+% allowances for page numbers); Top: 1"."
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% The exception, quoted in full because it is the reason \thesissetchapteropening
+% exists: "The first page of each chapter (including the introduction, if any)
+% begins 2" from the top of the page. Also, the headings on the title page,
+% abstract, first page of the dedication/acknowledgments/preface (if any), and
+% first page of the table of contents begin 2" from the top of the page."
+%
+% This covers the chapter openings and the \chapter*-based front-matter pages.
+% It does NOT reach the title page, which UNC specifies through a sample page.
+\thesissetchapteropening{2in}
+
+% "The text must appear in a single column on each page and be double-spaced
+% throughout the document." Exceptions: "Blocked quotations, notes, captions,
+% legends, and long headings must be single-spaced throughout the document and
+% double-spaced between items."
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% UNC is the only school in this set that names a WCAG version and level, and it
+% states the obligation as legal rather than stylistic.
+\thesisrequiretagging
+\thesisrequiredocumentlanguage
+\thesisaccessibilityrequirement{Policy}
+	{"All students submitting theses or dissertations must ensure their work
+	 meets digital accessibility standards. This requirement is not only a
+	 matter of university policy, it's also a legal obligation under the updated
+	 ADA Title II web" accessibility rule.}
+\thesisaccessibilityrequirement{WCAG 2.2 AA}
+	{UNC has adopted WCAG 2.2 Level AA "for all digital materials", and the
+	 Guide names it as the standard a thesis is measured against.}
+\thesisaccessibilityrequirement{Headings}
+	{Real heading structure is required. "Do not use styled text (e.g., bold or
+	 large font) as a substitute for proper headings."}
+\thesisaccessibilityrequirement{Alt text}
+	{Required for all images and non-text content. Avoid "image of..." -- screen
+	 readers announce that already. For complex images such as charts, give
+	 brief alt text plus a long description near the image or in an appendix
+	 referenced from the alt text.}
+\thesisaccessibilityrequirement{Tables}
+	{Add alt text or place descriptions in adjacent cells; test with a screen
+	 reader such as NVDA or VoiceOver.}
+\thesisaccessibilityrequirement{Colour and contrast}
+	{Colour must not be the only carrier of meaning -- the Guide's worked
+	 example supplements colour with patterns -- and contrast must be measured
+	 at the intended font size.}
+\thesisaccessibilityrequirement{Typeface}
+	{A TrueType font recommended by ProQuest, at 10, 11 or 12 points.
+	 Superscripts and subscripts no more than 2 points smaller than the body.}

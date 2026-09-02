@@ -55,6 +55,7 @@ PROFILES = os.path.join(HERE, "Thesis", "profiles")
 WORKLIST = os.path.join(PROFILES, "institutions.csv")
 SOURCE   = os.path.join(PROFILES, "institutions.source")
 BLOCKED  = os.path.join(PROFILES, "institutions.blocked.csv")
+PRIORITY = os.path.join(PROFILES, "priority.csv")
 
 IPEDS_URL = "https://nces.ed.gov/ipeds/datacenter/data/HD{year}.zip"
 DEFAULT_YEAR = 2023
@@ -243,20 +244,63 @@ def cmd_list(args):
     return 0
 
 
-def cmd_next(args):
-    """The next institution alphabetically with no profile yet.
+def load_priority():
+    """The ranked head of the queue, as [(rank, slug)] in rank order.
 
-    Alphabetical, not by size: it is the only order that is stable as the
-    worklist changes underneath, and it makes "where did we get to" answerable
-    from the profiles directory alone with no separate cursor to lose.
+    Optional: a checkout with no priority.csv falls straight back to
+    alphabetical, which is what this tool did before the file existed.
+    """
+    if not os.path.exists(PRIORITY):
+        return []
+    out = []
+    with open(PRIORITY, encoding="utf-8", newline="") as f:
+        for row in csv.DictReader(f):
+            try:
+                out.append((int(row["rank"]), row["slug"]))
+            except (KeyError, ValueError):
+                continue          # a malformed row must not stall the queue
+    return sorted(out)
+
+
+def cmd_next(args):
+    """The next institution to work on: ranked head first, then alphabetical.
+
+    Two orders, in sequence, for two different reasons.
+
+    priority.csv comes first because alphabetical order starts at "A T Still
+    University of Health Sciences" and does not reach the institutions that
+    actually graduate the most doctorates for something like 1,900 rows. The
+    file is the NSF HERD research-expenditure ranking, and its provenance is in
+    priority.source.
+
+    Alphabetical is the fallback, and stays the fallback: it is the only order
+    that is stable as the worklist changes underneath, and it makes "where did
+    we get to" answerable from the profiles directory alone with no separate
+    cursor to lose. Nothing is skipped by ranking -- only reordered.
     """
     have = existing_profiles()
     skip = set(blocked_slugs())
+    rows = {r_["slug"]: r_ for r_ in load_worklist()}
+
+    def emit(r_, rank=None):
+        if args.quiet:
+            print(r_["slug"])
+        else:
+            where = "" if rank is None else "  (HERD R&D rank %d)" % rank
+            print("%s%s\n  %s (%s)\n  %s"
+                  % (r_["slug"], where, r_["name"], r_["state"],
+                     r_["web"] or "(no web address on file)"))
+
+    for rank, slug in load_priority():
+        # A priority slug that is not in the worklist is a stale row, not a
+        # reason to stop -- IPEDS renames and merges institutions every year.
+        if slug in rows and slug not in have and slug not in skip:
+            emit(rows[slug], rank)
+            return 0
+
     for r_ in load_worklist():
         if r_["slug"] not in have and r_["slug"] not in skip:
-            print(r_["slug"] if args.quiet else
-                  "%s\n  %s (%s)\n  %s" % (r_["slug"], r_["name"], r_["state"],
-                                           r_["web"] or "(no web address on file)"))
+            emit(r_)
             return 0
     n_blocked = len(blocked_slugs())
     print("no institution left to work on"

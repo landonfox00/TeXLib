@@ -1,0 +1,49 @@
+% profiles/university-of-pittsburgh-pittsburgh-campus.tex — University of Pittsburgh
+% ============================================================================
+% source: https://etd.pitt.edu/etd-format-guidelines
+%         (ETD Format Guidelines; the manual "sets forth the University of
+%         Pittsburgh's requirements for the preparation and electronic
+%         submission of graduate theses and dissertations")
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% VERIFIED and set here: geometry, spacing.
+% LEFT TO THE NEUTRAL FALLBACK: title page and approval page. Pitt specifies
+% heading placement throughout by distance from the top edge (abstract, table of
+% contents, each chapter and appendix heading are all "centered 1 inch from the
+% top edge of the page"), which the geometry below already produces, but the
+% title-page specimen was not read on this pass.
+
+\thesisinstitution{University of Pittsburgh}
+
+% "The top, bottom, left, and right margins should be 1". Tables and figures use
+% the same margins as text. The student's school or department must give written
+% approval for exceptions to margin size."
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "The text of the document may be double-spaced or one-and-one-half spaced with
+% the exception of long quotations, footnotes, bibliographical references, and
+% the index, which may be single-spaced."
+%
+% Pitt permits either, so double is a choice within the rule rather than the
+% rule itself; \thesissetspacing{onehalf} is equally in spec.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Pitt states accessibility as a first-order concern of the manual rather than
+% as an appendix, and publishes a checklist for it.
+\thesisrequiretagging
+\thesisaccessibilityrequirement{Stated as crucial}
+	{"Of crucial importance to each thesis or dissertation are the issues of
+	 legibility and accessibility. It is important that ETDs have high-quality
+	 illustrations that are clear and contain relevant alt-text descriptions."}
+\thesisaccessibilityrequirement{Alt text}
+	{Illustrations must carry relevant alt-text descriptions.}
+\thesisaccessibilityrequirement{ETD Accessibility Checklist}
+	{The ETD guidelines publish a separate accessibility checklist; work through
+	 it before submitting.}
+\thesisaccessibilityrequirement{Typeface}
+	{"Text must be set in 10 points or larger type size and of a fully legible
+	 font. Script fonts are not acceptable." Students are advised to confirm
+	 with their school that files "will meet University standards of legibility
+	 and accessibility".}

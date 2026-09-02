@@ -4,6 +4,51 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- **Thesis profiles for the twenty largest US research universities, and three
+  class hooks they turned out to need.** The institutions are the top twenty by
+  FY2024 R&D expenditure (NSF NCSES HERD, report NSF 26-304, Table 4); every
+  figure in every profile comes from a URL opened on 2026-09-02 and recorded in
+  that profile's header, per `Thesis/profiles/RESEARCHING.md`.
+
+  Researching twenty at once surfaced three rules that recur and that a profile
+  had no way to state, so it noted them in a comment and filed out of spec:
+
+  - `\thesissetchapteropening{2in}` — a deeper top margin on the first page of
+    each chapter and major section. Michigan, UNC-Chapel Hill and Georgia Tech
+    all require it while the body runs at 1in. It takes the **total** margin the
+    requirements name, not the difference, and subtracts the geometry's own
+    `top` key, so restating the geometry cannot leave the openings behind.
+  - `\thesisnoapprovalpage` — for schools whose filed document may not contain
+    a committee page. Washington says so outright and Johns Hopkins prescribes
+    none; both collect approval on a separate form, and emitting the class's
+    default leaf there is a filing error rather than a harmless extra.
+  - Accessibility declarations: `\thesisrequiretagging`,
+    `\thesisrequiredocumentlanguage`, `\thesisrequirepdfstandard{...}` warn at
+    build time when the document does not satisfy a rule the school actually
+    published; `\thesisaccessibilityrequirement{label}{text}` records one that
+    cannot be checked, and `\thesisaccessibilityreport` prints them as a
+    front-matter page — the accessibility statement several graduate schools
+    have begun asking for at filing.
+
+  Accessibility is where these twenty diverge most. UNC names WCAG 2.2 Level AA
+  and calls it a legal obligation; Michigan lists document title, headings,
+  language, structure and alt text as individually "(required)"; Wisconsin names
+  the ADA Title II date and states plainly that "LaTeX alone does not create an
+  accessible PDF"; Georgia Tech names an earlier Title II date than Wisconsin
+  and both are right, because the DOJ rule phases by public-entity size; Duke's
+  2020 guide still calls accessibility discretionary. Where a school publishes
+  nothing, the profile records the absence rather than borrowing a neighbour's
+  rule.
+
+- **`thesis_institutions.py next` serves a ranked queue first.**
+  `Thesis/profiles/priority.csv` (provenance in `priority.source`) is the HERD
+  ranking; alphabetical order remains the fallback once it is exhausted, so
+  nothing is skipped, only reordered. Alphabetical alone started at "A T Still
+  University of Health Sciences" and did not reach the institutions that
+  graduate the most doctorates for some 1,900 rows.
+
 ### Changed
 
 - **The variant fan-out builds in parallel, roughly halving `Ctrl+B`.** 0.8.0

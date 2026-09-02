@@ -18,11 +18,42 @@ Only what a named, dated source actually says:
 | `\thesisinstitution` | the institution's own name, as IPEDS records it |
 | `\thesissetgeometry` | the margin rule, quoted from the filing requirements |
 | `\thesissetspacing` | the line-spacing rule |
+| `\thesissetchapteropening` | a deeper top margin required on chapter/major-section openings |
 | `\thesistitlepage` | the required title-page layout and wording |
 | `\thesisapprovalpage` | the required committee/approval page |
+| `\thesisnoapprovalpage` | *only* where the school says the document must not contain one |
+| `\thesisrequiretagging` | the school requires an accessible/tagged PDF |
+| `\thesisrequiredocumentlanguage` | the school requires the document language to be set |
+| `\thesisrequirepdfstandard` | the school names a PDF standard (e.g. PDF/A) |
+| `\thesisaccessibilityrequirement` | one published accessibility rule, quoted |
 
 Nothing else. A profile is not the place for a department's preferences, a
 style guide's advice, or anything an advisor told you once.
+
+### The accessibility fields specifically
+
+Accessibility is now a filing rule at a growing number of schools, and it varies
+far more between them than the margin does — one names WCAG 2.2 Level AA,
+another names PDF/A, another lists document title and alt text as separate
+required items, and another says in as many words that it is optional. The
+fields split by whether the class can actually **check** the rule:
+
+- `\thesisrequiretagging`, `\thesisrequiredocumentlanguage` and
+  `\thesisrequirepdfstandard` cause a build-time warning when the document does
+  not satisfy them. Set them only where the school **requires** the thing. This
+  class emits a tagged PDF regardless; a profile that declares
+  `\thesisrequiretagging` for a school that never asked for it is putting words
+  in that graduate school's mouth, which is the same failure as inventing a
+  margin.
+- `\thesisaccessibilityrequirement{label}{text}` records a rule the class cannot
+  test. Quote the school; do not paraphrase toward what other schools require.
+  These print on `\thesisaccessibilityreport`, which some schools now want filed.
+
+**Record an absence as an absence.** If a school publishes no accessibility
+requirement, say so — `\thesisaccessibilityrequirement{Not published}{...}` — so
+a later reader can tell "this school asks for nothing" apart from "nobody
+looked". If you did not read the section, say *that* instead; they are different
+findings and the second one is an invitation to finish the job.
 
 ## The rule that matters
 
@@ -49,6 +80,20 @@ instead, the header records which parts are unverified, and a later pass can
 finish it. A half-verified profile that says so is useful; a whole one that
 guessed is not.
 
+**"No approval page" and "approval page not researched" are different, and the
+file must not confuse them.** Leaving `\thesisapprovalpage` alone means *not
+yet checked* and renders the neutral page. `\thesisnoapprovalpage` means the
+school states the filed document may not contain one — Washington says exactly
+that, and Johns Hopkins prescribes none — and it makes the page print nothing.
+Reach for it only on the strength of a quote, because emitting a forbidden page
+and omitting a required one are both filing errors, in opposite directions.
+
+**Which institution to work on** is `python thesis_institutions.py next`. It
+serves `priority.csv` (the NSF HERD research-expenditure ranking, provenance in
+`priority.source`) before falling back to alphabetical, so the profiles most
+likely to be used get written first. Nothing is skipped by that — only
+reordered.
+
 ## Sources, in order of preference
 
 1. The graduate school's own **thesis/dissertation filing requirements** page
@@ -70,9 +115,17 @@ After drafting, re-open each source and check the drafted values against it
 with a skeptical eye. Specifically:
 
 - Are the margins stated for **all four sides**, and do any exceptions apply
-  (first pages, landscape tables, appendices)? A profile cannot express
-  "except on chapter openings" — if the rule has exceptions, note them in the
-  header rather than silently picking one.
+  (first pages, landscape tables, appendices)? A chapter-opening exception —
+  "the first page of each chapter begins 2 inches from the top", which UNC,
+  Michigan and Georgia Tech all state — is now expressible:
+  `\thesissetchapteropening{2in}` takes the **total** top margin the
+  requirements name and the class subtracts the geometry's own `top` key. For
+  any other exception the rule stands: note it in the header rather than
+  silently picking one side of it.
+- Does the school offer a **choice** (Georgia Tech's 1in-or-2in major headings,
+  Pitt's double-or-1.5 spacing, Yale's wider left margin only if you order bound
+  copies)? Record the choice and say which one the profile takes and why. Do not
+  present one option as the requirement.
 - Is the spacing rule about the **body**, or the whole document? Front matter is
   often single-spaced.
 - Is the requirements page **current**? Many carry a revision date or an

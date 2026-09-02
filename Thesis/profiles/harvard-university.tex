@@ -1,0 +1,42 @@
+% profiles/harvard-university.tex — Harvard University
+% ============================================================================
+% source: https://gsas.harvard.edu/resource/dissertation-formatting-guidance
+%         (Griffin Graduate School of Arts and Sciences, "Dissertation
+%         Formatting Guidance")
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% VERIFIED and set here: geometry, spacing.
+% LEFT TO THE NEUTRAL FALLBACK: title page and approval page.
+
+\thesisinstitution{Harvard University}
+
+% "At least 1 inch for all margins", on a page of "8 1/2 x 11 inches, unless a
+% musical score is included". These are minima, so the class's exact 1in is in
+% spec.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Body of text: double-spacing. Block quotations, footnotes, and bibliographies:
+% single spacing within each entry but double spacing between each entry. Table
+% of contents, list of tables, list of figures or illustrations, and lengthy
+% tables: single spacing may be used."
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Harvard's stated concern is character rendering in the published DASH copy
+% rather than assistive technology, and it puts the duty on the student in
+% unusually plain terms.
+\thesisaccessibilityrequirement{Embedded fonts}
+	{Fonts "must be embedded in the PDF file to ensure all characters display
+	 correctly ... If fonts are not embedded, non-English characters may not
+	 appear as intended. Fonts embedded improperly will be published to DASH as
+	 is. It is the student's responsibility to make sure that fonts are embedded
+	 properly prior to submission."}
+\thesisaccessibilityrequirement{Typeface}
+	{10-12 point. Harvard publishes a table of faces with a minimum size each
+	 (Arial 10, Century 11, Courier New 10, Garamond 12, Georgia 11, Lucida
+	 Bright 10, Microsoft Sans Serif 10, Tahoma 10, Times New Roman 12,
+	 Trebuchet MS 10, Verdana 10) for anyone unsure their font will display.}
+\thesisaccessibilityrequirement{Not published}
+	{The formatting guidance states no assistive-technology requirement: no
+	 tagging, alt-text or WCAG obligation is given.}

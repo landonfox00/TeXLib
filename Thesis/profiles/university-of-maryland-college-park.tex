@@ -1,0 +1,51 @@
+% profiles/university-of-maryland-college-park.tex — University of Maryland
+% ============================================================================
+% source: https://gradschool.umd.edu/sites/default/files/2022-11/etd_style_guide_2021_v2.pdf
+%         (The Graduate School, "Electronic Thesis and Dissertation Style
+%         Guide", 2021 edition, v2)
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% WHICH MARYLAND: the HERD table that selected this institution reports the
+% University of Maryland as a single research unit combining College Park and
+% Baltimore, which have reported together since FY2019. They are separate
+% graduate schools with DIFFERENT filing rules -- Baltimore requires 1.25in left
+% and right margins, College Park requires 1in all round. This profile is COLLEGE
+% PARK, matching the IPEDS unitid in the worklist. A Baltimore student must not
+% use it.
+%
+% VERIFIED and set here: geometry, spacing.
+% LEFT TO THE NEUTRAL FALLBACK: title page and approval page.
+
+\thesisinstitution{University of Maryland}
+
+% "Left: 1"; Right: 1"; Top and Bottom: 1"." The guide adds that this "applies to
+% all material except page numbers, including figures, headers/footers,
+% footnotes/endnotes, and full-page images", with page numbers at least 3/4"
+% from the edge of the page.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Double-space: abstract, dedication, acknowledgements, table of contents, and
+% body ... Single-space: footnotes/endnotes, bibliographic entries, lists in"
+% appendices.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Maryland's requirements here are about the file surviving and rendering
+% correctly rather than about assistive technology, and the font rule is the
+% strictest in this set -- it is stated as a scale rather than as a point size.
+\thesisaccessibilityrequirement{Embedded fonts}
+	{"Embedded fonts REQUIRED. Post Script Type 1 fonts required." The guide
+	 warns that "manuscripts without embedded fonts can cause ALL punctuation
+	 and formatting to disappear". A lualatex build embeds every face.}
+\thesisaccessibilityrequirement{Typeface}
+	{"Any legible font except script, italic, or ornamental fonts equivalent in
+	 scale to 10pt. Arial or 12pt. Times New Roman accepted." Italic is allowed
+	 for non-English words and quotations. The rule applies to all text
+	 including captions, footnotes/endnotes and citations.}
+\thesisaccessibilityrequirement{No embedded media}
+	{"Do not embed media files in your PDF" -- supply them as supplemental
+	 files instead.}
+\thesisaccessibilityrequirement{Not published}
+	{The style guide states no assistive-technology requirement: no tagging,
+	 alt-text or WCAG obligation is given.}

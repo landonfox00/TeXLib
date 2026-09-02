@@ -1,0 +1,82 @@
+% profiles/johns-hopkins-university.tex — Johns Hopkins University
+% ============================================================================
+% source: https://www.library.jhu.edu/library-services/electronic-theses-dissertations/formatting-requirements/
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% ON THE SOURCE: this is a library URL, which RESEARCHING.md normally rejects.
+% It is used here because Johns Hopkins delegates ETD administration to the
+% Sheridan Libraries outright -- the page is the filing requirement, the ETD
+% office is at etd-support@jhu.edu, and there is no separate graduate-school
+% document that supersedes it. The page carries no revision date.
+%
+% VERIFIED and set here: geometry, spacing, title page, absence of an approval
+% page, accessibility. NOT set: nothing.
+
+\thesisinstitution{Johns Hopkins University}
+
+% "1 inch on all sides for digital-only documents. If you intend to produce
+% print copies, 1 1/2 inches are required on the left binding side." The filed
+% ETD is the digital-only document, so 1in is what belongs in this PDF; a bound
+% personal copy wants the wider gutter added at print time, not here. The rule
+% "applies to all portions of document including footnotes/endnotes, pages
+% containing charts, graphs, tables, photographs, etc. and appendices."
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Main text and abstract must be double-spaced except for footnotes or long
+% quotations." Everything else is at the author's discretion.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Hopkins is the only school in this set that requires a PDF/A file outright,
+% and the only one that gives an accessibility REASON for its font list.
+\thesisrequiretagging
+\thesisrequirepdfstandard{PDF/A}
+\thesisaccessibilityrequirement{PDF/A}
+	{The submitted file must be saved as PDF/A. The instructions given convert
+	 to PDF/A-1b. No audio or video, no JavaScript or executable files.}
+\thesisaccessibilityrequirement{Embedded fonts}
+	{Fonts must be embedded -- a stated consequence of the PDF/A requirement.}
+\thesisaccessibilityrequirement{Typeface}
+	{"Acceptable fonts include Arial, Calibri, Helvetica. This list is not
+	 exhaustive -- but sans serif fonts that are commonly found on most
+	 computers are preferred for accessibility." 10pt or larger; footnotes two
+	 sizes smaller but no smaller than 8pt.}
+
+% --- Title page --------------------------------------------------------------
+% The page is specified by distance from the paper edge rather than by rule, so
+% the vertical skips below are the figures the requirements name, not taste.
+% "Hide page number" -- hence the nopagenumber geometry and \thispagestyle.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		% "Approximately 1 1/2 inches from top of page", all capital letters.
+		\vspace*{1.5in}%
+		\thesis@tagtitle{Title}{{\large\bfseries\MakeUppercase{\@title}}}\par
+		% "Approximately 1 inch below the title and type the word 'by'".
+		\vspace{1in}%
+		by\par
+		\@author\par
+		% "Include approximately 1 1/2 inches below your name."
+		\vspace{1.5in}%
+		A \thesis@docnoun{} submitted to Johns Hopkins University in conformity\\
+		with the requirements for the degree of \thesis@degree\par
+		% "Include approximately 1/2 inch below the statement." The city is fixed
+		% "regardless of your campus location", and Maryland is not abbreviated.
+		\vspace{0.5in}%
+		Baltimore, Maryland\par
+		\thesis@date\par
+		\vfill
+		\textcopyright{} \thesis@date{} \@author\par
+		All Rights Reserved\par
+		\vspace{1in}%
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Hopkins prescribes no approval or signature leaf. The readers and advisors are
+% named after the abstract text instead, and approval runs through the Graduate
+% Board rather than through a page in the manuscript.
+\thesisnoapprovalpage

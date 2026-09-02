@@ -1,0 +1,106 @@
+% profiles/university-of-michigan-ann-arbor.tex — University of Michigan-Ann Arbor
+% ============================================================================
+% source: https://rackham.umich.edu/navigating-your-degree/formatting-guidelines/
+% source: https://rackham.umich.edu/wp-content/uploads/2025/05/dissertation-handbook.pdf
+%         (The Dissertation Handbook, Rackham Academic Records and Dissertations,
+%         dated July 2023 on its own title page)
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% VERIFIED and set here: geometry, chapter-opening margin, spacing, title page,
+% the absence of an approval page, and the accessibility requirements.
+% NOT set: nothing is left to the neutral fallback.
+%
+% Rackham states the requirement in four named goals -- "legible, accessible,
+% preservable, and uniform in presentation" -- and marks individual items
+% "(required)". Every item this file encodes carries that marking on the
+% guidelines page; the recommendations that do not (Times/Arial, using the
+% Library template) are deliberately left out.
+
+\thesisinstitution{University of Michigan}
+
+% "Use at least 1 inch margins (top, bottom, left, and right) on all pages.
+% (required)" -- the deeper openings are handled just below, not here.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Use either 1.5 line or double line spacing throughout for all body text.
+% (required)". Double is one of the two permitted values and is the class
+% default; \thesissetspacing{onehalf} is equally in spec.
+\thesissetspacing{double}
+
+% "Use a 2 inch top margin on the first page of every chapter and major section
+% (Acknowledgements, List of Figures, Bibliography, etc.)" -- which is why this
+% is a total, not an offset: 2in is the figure Rackham prints.
+\thesissetchapteropening{2in}
+
+% --- Accessibility -----------------------------------------------------------
+% Rackham is the most explicit of the twenty on this, listing accessibility
+% items individually as "(required)" rather than as general advice.
+\thesisrequiretagging
+\thesisrequiredocumentlanguage
+\thesisaccessibilityrequirement{Document title}
+	{The PDF's Document Title property must be set. It is not the filename, and
+	 it cannot be set until the PDF exists.}
+\thesisaccessibilityrequirement{Headings}
+	{Section and subsection titles must use real heading levels, in order.}
+\thesisaccessibilityrequirement{Document language}
+	{The document language must be set, and the language of any block quotation
+	 or section in another language must be set on that text.}
+\thesisaccessibilityrequirement{Structure}
+	{Lists, columns and tables must be built with the structural element, never
+	 spaced out with the space bar, tab or return key.}
+\thesisaccessibilityrequirement{Alt text}
+	{Descriptive alt text is required for all images and figures. A table must
+	 be a real table, not a picture of one.}
+\thesisaccessibilityrequirement{Embedded fonts}
+	{All fonts must be embedded in the PDF.}
+
+% --- Title page --------------------------------------------------------------
+% The handbook prints an annotated specimen and the annotations are prescriptive:
+% "Top margin is a minimum of 2 inches", "Title must be in title case", "Text
+% block must have lines broken up exactly as follows and be single line spaced".
+% The line breaks below are that block, reproduced.
+%
+% Rackham puts the committee ON the title page, so the roles read as plain text:
+% "Sole chair or co-chairs listed first, with role after name. Other members
+% listed in alpha order by last name with no roles listed." The class's default
+% \thesis@memberline draws a signature rule, which is wrong here -- Rackham
+% collects no signatures in the document -- so it is replaced for this page only.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{2in}%
+		\thesis@tagtitle{Title}{{\large\bfseries\@title}}\par
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{2\baselineskip}
+		A \thesis@docnoun{} submitted in partial fulfillment\\
+		of the requirements for the degree of\\
+		\thesis@degree\\
+		(\thesis@program)\\
+		in The University of Michigan\\
+		\thesis@date\par
+		\vfill
+		% Left-aligned block, single spaced, titles before names, no rules.
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par
+		}%
+		\raggedright
+		Doctoral Committee:\par
+		\vspace{0.5\baselineskip}
+		\begingroup\leftskip=2em\relax
+		\thesis@committee
+		\endgroup
+		\endgroup
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Rackham has none: the committee is named on the title page above, and the
+% degree is certified through Wolverine Access rather than by a signed leaf.
+\thesisnoapprovalpage
