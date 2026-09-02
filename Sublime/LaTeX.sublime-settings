@@ -1,23 +1,68 @@
 {
-	// LaTeX.sublime-settings -- syntax-specific overrides for .tex / .cls /
-	// .sty / .bib files. These stack ON TOP of Preferences.sublime-settings,
-	// so personal spell-check additions in your global Preferences (e.g.
-	// collaborators' names, lab-internal jargon) still apply when editing
-	// LaTeX.
+	// LaTeX.sublime-settings -- settings for the LaTeX syntax, i.e. .tex
+	// files. NOT .sty/.cls (those use the TeX syntax) and NOT .bib (Bibtex
+	// syntax): neither sees anything set here. See "Scope" at the end of
+	// this header.
 	//
 	// Maintained as part of the TeXLib bundle. Ships to coworkers via
 	// TeXLib-Installer; sourced from texlib/Sublime/LaTeX.sublime-settings
 	// in the TeXLib repo.
 	//
-	// Editing guidance:
+	// --- added_words REPLACES the global list; it does not stack ---------
+	//
+	// Sublime resolves each key from the last file in the cascade that
+	// defines it, and for an array that means REPLACEMENT, not union. The
+	// added_words below therefore shadow any added_words in your global
+	// Preferences.sublime-settings completely.
+	//
+	// Consequence: the "Add Word" command -- which writes to global
+	// Preferences -- HAS NO EFFECT while you are editing LaTeX. The word
+	// applies in every other syntax and silently does nothing in .tex.
+	//
+	// Measured on Sublime build 4200:
+	//     Packages/User/Preferences.sublime-settings ...    8 added_words
+	//     Packages/User/LaTeX.sublime-settings .........  637 added_words
+	//     what a .tex view actually resolved ...........  637  (not 640)
+	// The three words present only in Preferences were silently inactive in
+	// every .tex file.
+	//
+	// --- where personal words go instead ---------------------------------
+	//
+	//   * Shared math vocabulary (terminology, mathematician surnames,
+	//     journal names): add it to the array below in the REPO copy, then
+	//     deploy. Do not hand-edit the deployed Packages/User/ copy --
+	//     deploy.ps1 and TeXLib-Installer overwrite it, your edits with it.
+	//
+	//   * Personal vocabulary (collaborator names, lab or course-internal
+	//     jargon): use a separate dictionary package -- not added_words,
+	//     anywhere. Sublime 4's "dictionary" setting takes a LIST of .dic
+	//     paths and consults every entry, so a second dictionary is
+	//     genuinely additive (en_US stays in force), and it can be wired to
+	//     .bib and .sty/.cls too, which added_words cannot. Such a package
+	//     survives TeXLib re-deploys and never ships to coworkers.
+	//
+	//     !! Do NOT add a "dictionary" key to THIS file. Packages/User/
+	//     !! wins outright for any key it defines, so a "dictionary" here
+	//     !! would silently disable that package's list. If TeXLib ever
+	//     !! genuinely needs one, it must list both .dic files itself.
+	//
+	// --- editing guidance ------------------------------------------------
+	//
 	//   * Sections are alphabetized -- keep them that way for diff sanity.
-	//   * Don't add personal proper nouns here (collaborator names, lab
-	//     references, course-internal jargon). Those belong in your global
-	//     Preferences.sublime-settings under Packages/User/.
+	//   * Keep the list to vocabulary a coworker would want too; it ships to
+	//     everyone. Personal proper nouns belong in a dictionary (above).
 	//   * Stuck-suffix artifacts ("ness", "th", "ech", "lder") have been
 	//     intentionally excluded -- they mask real typos. If Sublime flags
 	//     "Cech" or "Holder", add the accented form ("Čech", "Hölder")
 	//     instead of the bare suffix.
+	//
+	// --- scope: .bib and .sty/.cls see none of this -----------------------
+	//
+	// added_words is per-syntax, and this file is the LaTeX syntax only.
+	// TeXLib deliberately ships no Bibtex.sublime-settings /
+	// TeX.sublime-settings: that would mean three copies of one array
+	// drifting apart, for two file types a dictionary serves better anyway.
+	// Sublime/README.md carries the full reasoning.
 
 	// Keep the autocomplete popup free of snippet entries. LaTeXTools bundles
 	// ~200 tab-trigger snippets (bf, frame, bca, Rar_upr, ...) that otherwise
