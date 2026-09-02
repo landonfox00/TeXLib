@@ -789,6 +789,9 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                 cmd, msg = item
                 entry["step"] = msg.rstrip(". …")  # current step for the spinner
                 emit(msg + "\n")
+                # Undo point for a pass the brain may declare a probe -- see
+                # TexlibBuildCore's _forget_last_pass contract.
+                mark = (len(error_lines), len(warning_lines), fatal[0])
                 host.out = _run_argv(cmd, tex_dir, collect, cancel, texinputs,
                                      getattr(host, "_aux_target", None), entry)
                 if cancel.is_set():
@@ -796,6 +799,11 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                     state = "cancelled"
                     break
                 item = next(gen)
+                if getattr(host, "_forget_last_pass", False):
+                    host._forget_last_pass = False
+                    del error_lines[mark[0]:]
+                    del warning_lines[mark[1]:]
+                    fatal[0] = mark[2]
         except StopIteration:
             state = "error" if fatal[0] else "ok"
         except Exception as exc:  # noqa: BLE001 - never let the worker die silently

@@ -115,6 +115,7 @@ BIBER = shutil.which("biber")
 ACCESSIBLE_DOCMETA = _spec.ACCESSIBLE_DOCMETA
 ACCESSIBLE_MACRO = _spec.ACCESSIBLE_MACRO
 accessible_macro_for = _spec.accessible_macro_for
+luamml_se_aborted = _spec.luamml_se_aborted
 
 # Committed reference images for visual regression (--visual). Generated with
 # --update-refs; environment-specific (font rendering differs across TeX Live
@@ -724,20 +725,30 @@ def build_one(
         # document's \documentclass. \DocumentMetadata opens a support file before
         # the \input runs, so the jobname must be pinned explicitly -- otherwise
         # LuaTeX names the output after that support file, not the template.
-        prefix = (accessible_macro_for(os.path.join(tmp, template))
-                  if accessible else "") + (mode_macro or "")
-        if accessible:
-            cmd.append(f"--jobname={jobname}")
-        if prefix:
-            cmd.append(f"{prefix}\\input{{{template}}}")
-        else:
-            cmd.append(template)
+        def argv(se=True):
+            prefix = (accessible_macro_for(os.path.join(tmp, template), se=se)
+                      if accessible else "") + (mode_macro or "")
+            tail = ([f"--jobname={jobname}"] if accessible else []) + (
+                [f"{prefix}\\input{{{template}}}"] if prefix else [template])
+            return cmd + tail
 
         pdf = os.path.join(tmp, jobname + ".pdf")
         t0 = time.time()
         try:
             returncode, log_text, stdout_text, elapsed, _passes = _run_with_reruns(
-                cmd, tmp, env, timeout, jobname)
+                argv(), tmp, env, timeout, jobname)
+            # The luamml mathml-SE bug aborts a document with two nth-roots in
+            # one formula. The builder retries such a document with MathML
+            # associated files only, so the gate has to measure the same thing
+            # -- otherwise it validates a PDF no user is given.
+            if accessible and returncode != 0 and luamml_se_aborted(log_text):
+                for suffix in ("-luamml-mathml.html", "-mathml.html"):
+                    try:
+                        os.remove(os.path.join(tmp, jobname + suffix))
+                    except OSError:
+                        pass
+                returncode, log_text, stdout_text, elapsed, _passes = (
+                    _run_with_reruns(argv(se=False), tmp, env, timeout, jobname))
         except subprocess.TimeoutExpired as exc:
             return (False, time.time() - t0, f"timeout after {timeout}s",
                     _save_log(tmp, _decode(exc.stdout)), False)

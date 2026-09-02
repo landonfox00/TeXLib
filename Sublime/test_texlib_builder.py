@@ -51,6 +51,11 @@ import texlib_build as _tb  # noqa: E402  (module handle: stubbing in case (y))
 
 # --- 2. Harness ------------------------------------------------------------
 
+# The builder object the last harness call drove, for the few assertions that
+# are about host-facing STATE rather than the command stream.
+_LAST_BUILDER = [None]
+
+
 def run_builder(doc_src, options=None, engine="pdflatex", aux_files=None):
     """Build a TexlibBuilder over a synthetic document; return (commands, display).
 
@@ -144,6 +149,7 @@ def drive_builder(doc_src, options=None, engine="pdflatex",
     b.options = list(options if options is not None
                      else ["--texlib-mode=base"])
     b.out = ""
+    _LAST_BUILDER[0] = b
 
     steps = steps or []
 
@@ -421,13 +427,13 @@ def main():
     check("accessible -> \\def\\TeXLibAccessibleMode injected",
           r"\def\TeXLibAccessibleMode{}" in aarg, aarg)
     # AF is what Firefox's viewer and Foxit read -- the in-browser path from an
-    # LMS link. SE (Acrobat's path) is deliberately absent: luamml 0.9.2 aborts
-    # the run on two \sqrt[n]{...} in one formula, and only SE reaches the code
-    # that does it. See ACCESSIBLE_DOCMETA; restore SE when upstream is fixed.
+    # LMS link -- and SE is Acrobat's. Run 1 asks for both; a document that
+    # trips the luamml mathml-SE bug is retried with AF alone. See
+    # ACCESSIBLE_DOCMETA.
     check("accessible -> MathML AF requested",
           "mathml-AF" in aarg, aarg)
-    check("accessible -> MathML SE withheld (luamml 0.9.2 use-after-free)",
-          "mathml-SE" not in aarg, aarg)
+    check("accessible -> MathML SE requested (Acrobat's path)",
+          "mathml-SE" in aarg, aarg)
     # The jobname must stay the REAL base name: autoexam reads its document body
     # from <jobname>.tex, so a suffixed jobname truncated the tagged exam. The
     # output is separated by directory (aux/a11y) instead, and _postprocess
@@ -448,6 +454,70 @@ def main():
           len(tagged) == 2, f"{len(tagged)} tagged passes")
     check("accessible -> --texlib-mode token NOT passed to engine",
           not any("--texlib-mode" in str(x) for c in cmds for x in c[0]), cmds)
+
+    # (k1) the mathml-SE fallback. luamml 0.9.2 aborts a document with two
+    # \sqrt[n]{...} in one formula, and only the SE path reaches the code that
+    # does it, so run 1 asks for both methods and is spent again on AF alone
+    # when that abort appears. The document is never edited; the builder just
+    # asks for less of the tagged output. See ACCESSIBLE_DOCMETA.
+    _ACC_DOC = r"\documentclass{syllabus}\begin{document}x\end{document}"
+    _ACC_OPT = ["--texlib-mode=accessible"]
+    _plan, _, _ = drive_builder(_ACC_DOC, options=_ACC_OPT)
+    _t1 = next((i for i, c in enumerate(_plan)
+                if r"\DocumentMetadata" in str(c[0][-1])), None)
+    check("accessible fallback: found the tagged run-1 slot to script",
+          _t1 is not None, [c[1] for c in _plan])
+
+    _ABORT = ("! error:  (nodes): trying to delete an attribute reference of "
+              "a non attribute node")
+    cmds, disp, _ = drive_builder(
+        _ACC_DOC, options=_ACC_OPT,
+        steps=[{} for _ in range(_t1 or 0)] + [{"out": _ABORT}])
+    tagged = [c for c in cmds if r"\DocumentMetadata" in str(c[0][-1])]
+    check("accessible fallback: SE abort spends one extra tagged pass",
+          len(tagged) == 3, [c[1] for c in tagged])
+    check("accessible fallback: run 1 asked for SE",
+          bool(tagged) and "mathml-SE" in tagged[0][0][-1],
+          tagged[0][0][-1] if tagged else "")
+    check("accessible fallback: every pass after the abort drops SE",
+          len(tagged) == 3
+          and all("mathml-SE" not in c[0][-1] and "mathml-AF" in c[0][-1]
+                  for c in tagged[1:]),
+          [c[0][-1] for c in tagged[1:]])
+    check("accessible fallback: the retry is otherwise the same command",
+          len(tagged) == 3 and tagged[1][0][:-1] == tagged[0][0][:-1],
+          tagged[1][0] if len(tagged) > 1 else "")
+    check("accessible fallback: the reason is shown, not silently swallowed",
+          "mathml-SE" in disp and "nth-root" in disp, repr(disp))
+
+    # The abort is deliberate and recovered from, so the host must not report
+    # the whole build as failed -- see TexlibBuildCore's _forget_last_pass.
+    check("accessible fallback: host told to forget the aborted pass",
+          getattr(_LAST_BUILDER[0], "_forget_last_pass", False) is True,
+          "flag never set")
+
+    #   a document that does NOT trip the bug keeps SE and spends no extra pass.
+    cmds, disp, _ = drive_builder(_ACC_DOC, options=_ACC_OPT)
+    check("accessible fallback: clean document never sets the forget flag",
+          getattr(_LAST_BUILDER[0], "_forget_last_pass", False) is False)
+    tagged = [c for c in cmds if r"\DocumentMetadata" in str(c[0][-1])]
+    check("accessible fallback: clean document keeps SE on both passes",
+          len(tagged) == 2
+          and all("mathml-SE" in c[0][-1] for c in tagged),
+          [c[0][-1] for c in tagged])
+    check("accessible fallback: clean document says nothing about MathML",
+          "mathml-SE" not in disp, repr(disp))
+
+    #   an ordinary LaTeX error must NOT trigger the retry.
+    cmds, _, _ = drive_builder(
+        _ACC_DOC, options=_ACC_OPT,
+        steps=[{} for _ in range(_t1 or 0)]
+        + [{"out": "! Undefined control sequence.\nl.7 \\nope"}])
+    tagged = [c for c in cmds if r"\DocumentMetadata" in str(c[0][-1])]
+    check("accessible fallback: an ordinary error does not spend a retry",
+          len(tagged) == 2
+          and all("mathml-SE" in c[0][-1] for c in tagged),
+          [c[0][-1] for c in tagged])
 
     # (k2) a lualatex class in accessible mode: same pairing, one engine.
     cmds, _ = run_builder(
@@ -1844,8 +1914,24 @@ def main():
           "thesis" in _bs.LUALATEX_CLASSES)
     check("buildspec: accessible macro carries MathML AF",
           "mathml-AF" in _bs.ACCESSIBLE_MACRO)
-    check("buildspec: accessible macro withholds MathML SE",
-          "mathml-SE" not in _bs.ACCESSIBLE_MACRO)
+    check("buildspec: accessible macro carries MathML SE",
+          "mathml-SE" in _bs.ACCESSIBLE_MACRO)
+    # The fallback prefix differs from the attempt in exactly one thing.
+    check("buildspec: AF-only fallback drops SE and nothing else",
+          "mathml-SE" not in _bs.ACCESSIBLE_MACRO_AF_ONLY
+          and _bs.ACCESSIBLE_MACRO_AF_ONLY
+          == _bs.ACCESSIBLE_MACRO.replace(",mathml-SE", ""),
+          _bs.ACCESSIBLE_MACRO_AF_ONLY)
+    # The retry fires on luamml's abort and on nothing else -- an ordinary
+    # LaTeX error must stay the document's own failure.
+    check("buildspec: luamml_se_aborted recognises the abort",
+          _bs.luamml_se_aborted(
+              "! error:  (nodes): trying to delete an attribute reference of "
+              "a non attribute node"))
+    check("buildspec: luamml_se_aborted ignores an ordinary error",
+          not _bs.luamml_se_aborted("! Undefined control sequence.\nl.7 \\foo")
+          and not _bs.luamml_se_aborted("")
+          and not _bs.luamml_se_aborted(None))
 
     # accessible_macro_for: a document with its OWN \DocumentMetadata (the
     # thesis template's layout) must get the marker only -- the TL2026 kernel
@@ -1870,6 +1956,14 @@ def main():
         check("buildspec: unreadable path falls back to the full prefix",
               _bs.accessible_macro_for(os.path.join(_amd, "missing.tex"))
               == _bs.ACCESSIBLE_MACRO)
+        check("buildspec: se=False asks for the AF-only prefix",
+              _bs.accessible_macro_for(_plain, se=False)
+              == _bs.ACCESSIBLE_MACRO_AF_ONLY)
+        # A document with its own \DocumentMetadata picks its own MathML
+        # methods, so the retry has nothing to change for it.
+        check("buildspec: se=False still yields marker only for an own declaration",
+              _bs.accessible_macro_for(_own, se=False)
+              == _bs.ACCESSIBLE_MARKER_ONLY)
 
     # -----------------------------------------------------------------------
     # The example corpus is declared once, and every declared file exists.
