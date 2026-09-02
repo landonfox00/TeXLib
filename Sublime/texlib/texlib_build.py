@@ -178,6 +178,14 @@ VARIANT_SUBDIR = "variants"
 VARIANT_SETTING = "default_variants"
 VARIANT_ENV = "TEXLIB_VARIANTS"
 
+# How many variant compiles may run at once. Each variant owns its output
+# directory and shares no aux state with any other, so they are independent
+# processes; the engine itself is single-threaded, so this is the only axis
+# where a fan-out can use more than one core. Capped at the CPU count and at
+# the number of lanes, and 1 disables parallelism entirely.
+JOBS_SETTING = "build_jobs"
+JOBS_ENV = "TEXLIB_JOBS"
+
 # Build mode  ->  the compile-time macro the TeXLib classes respond to.
 # texlib-build.sty turns these \def's into the \ifsolutions / \ifkey / ...
 # conditionals that every TeXLib class branches on.
@@ -1100,20 +1108,56 @@ class TexlibBuildCore:
         if override == []:
             return
 
-        for variant in variants:
-            macro = VARIANT_MACROS[variant]
-            yield from self._build_one_variant(
-                variant, macro, engine, tex_dir, engine_options, tagged=False)
-            self._variants_built.append((variant, False))
+        # The base tagged twin goes first, on its own, because its run 1 is the
+        # mathml-SE probe (see ACCESSIBLE_DOCMETA) and every other tagged lane
+        # needs that verdict before it can be given a command line. It is also
+        # the twin veraPDF reports on, so it is the one worth having early.
+        yield from self._build_one_variant(
+            "base", VARIANT_MACROS.get("base", ""), engine, tex_dir,
+            engine_options, tagged=True)
+        self._variants_built.append(("base", True))
 
-        # Tagged twins last: they are the slowest half (a second full compile
-        # each, forced to lualatex regardless of the class's own engine), so
-        # every normal PDF is on disk before the first one starts.
-        for variant in ["base"] + variants:
+        # Everything else is independent: each variant owns its output
+        # directory and shares no aux state with any other, which is exactly
+        # why these are two fixed passes rather than the convergence loop. So
+        # they can all run at once.
+        lanes = [(v, False) for v in variants] + [(v, True) for v in variants]
+        if not lanes:
+            return
+        # The base tagged twin above has already settled the mathml-SE verdict,
+        # so every lane is planned with the answer rather than probing for it.
+        # That matters more here than in the serial path: a lane is a fixed list
+        # of commands with no retry behind it, so asking for SE on a document
+        # known to abort under it would simply lose those PDFs.
+        se = self._mathml_se_ok is not False
+        plans = [(v, tagged) + self._variant_plan(
+                    v, VARIANT_MACROS[v], engine, tex_dir, engine_options,
+                    tagged, se=se)
+                 for v, tagged in lanes]
+
+        jobs = min(self._configured_jobs(), len(plans))
+        runner = getattr(self, "run_parallel", None)
+        if runner is not None and jobs > 1:
+            self.display(
+                f"TeXLib: building {len(plans)} variants, {jobs} at a time.\n")
+            # Two passes per lane, run in order within the lane; the lanes
+            # themselves are concurrent. The host owns the pool, so it also
+            # owns cancellation and output ordering.
+            runner([(label, [cmd, cmd]) for _v, _t, _tag, _out, cmd, label
+                    in plans], jobs)
+            for v, tagged, _tag, out_dir, _cmd, _label in plans:
+                self._copy_back_variant(tex_dir, v, tagged, out_dir)
+                self._variants_built.append((v, tagged))
+            return
+
+        # No parallel-capable host (the LaTeXTools adapter is driven by
+        # LaTeXTools' own runner), or parallelism turned off: the original
+        # serial order, normal PDFs before tagged twins so the ones a reader
+        # opens first land first.
+        for v, tagged in sorted(lanes, key=lambda p: p[1]):
             yield from self._build_one_variant(
-                variant, VARIANT_MACROS.get(variant, ""), engine, tex_dir,
-                engine_options, tagged=True)
-            self._variants_built.append((variant, True))
+                v, VARIANT_MACROS[v], engine, tex_dir, engine_options, tagged)
+            self._variants_built.append((v, tagged))
 
     def _build_one_variant(self, variant, macro, engine, tex_dir,
                            engine_options, tagged):
@@ -1125,33 +1169,15 @@ class TexlibBuildCore:
         unsettled. Two passes is what the accessible half has always used and
         settles the "page X of Y" footer and \\pageref the same way.
         """
-        tag = variant + ("-a11y" if tagged else "")
-        out_dir = self._variant_out_dir(tag)
-        engine_for = ACCESSIBLE_ENGINE if tagged else engine
-        cmd_base = self._base_engine_cmd(
-            engine_for, self._aux_target, tex_dir, engine_options)
-        cmd = [c for c in cmd_base
-               if not str(c).startswith("-output-directory=")]
+        def plan(se):
+            return self._variant_plan(variant, macro, engine, tex_dir,
+                                      engine_options, tagged, se=se)
 
-        def with_prefix(se):
-            head = macro or ""
-            if tagged:
-                head = accessible_macro_for(
-                    os.path.join(tex_dir, self.tex_name), se=se) + head
-            return cmd + [f"-output-directory={out_dir}",
-                          f"--jobname={self.base_name}",
-                          (f"{head}\\input{{{self.tex_name}}}" if head
-                           else self.tex_name)]
-
-        label = f"{engine_for} [{tag}]"
-        argv = with_prefix(self._mathml_se_ok is not False)
-        yield (argv, f"{label} run 1...")
+        tag, out_dir, cmd, label = plan(self._mathml_se_ok is not False)
+        yield (cmd, f"{label} run 1...")
         # Every tagged twin is the same source, so the mathml-SE verdict is a
         # property of the DOCUMENT, not of the variant: probe on the first twin
-        # and reuse the answer. Without that, a document that trips the luamml
-        # bug would waste an aborted pass on each of the four twins a fan-out
-        # builds -- and, worse, a fan-out has no accessible-mode retry to fall
-        # back on, so before this it simply lost those PDFs.
+        # and reuse the answer for the rest of the build. See ACCESSIBLE_DOCMETA.
         if tagged and self._mathml_se_ok is None:
             if luamml_se_aborted(self.out):
                 self._mathml_se_ok = False
@@ -1162,12 +1188,67 @@ class TexlibBuildCore:
                     "Acrobat falls back to the flattened text here.\n")
                 self._clear_luamml_sidecars(out_dir, tex_dir)
                 self._forget_last_pass = True
-                argv = with_prefix(False)
-                yield (argv, f"{label} run 1 (MathML-AF)...")
+                _t, _o, cmd, _l = plan(False)
+                yield (cmd, f"{label} run 1 (MathML-AF)...")
             else:
                 self._mathml_se_ok = True
-        yield (argv, f"{label} run 2 (settle)...")
+        yield (cmd, f"{label} run 2 (settle)...")
         self._copy_back_variant(tex_dir, variant, tagged, out_dir)
+
+    def _variant_plan(self, variant, macro, engine, tex_dir, engine_options,
+                      tagged, se=True):
+        """(tag, out_dir, argv, label) for one variant compile.
+
+        Split out of _build_one_variant so the same command can be either
+        yielded to the host one pass at a time or handed to a parallel runner
+        as a self-contained lane. The two must not drift: a lane that differed
+        from the serial build by so much as a flag would make "it works when I
+        build it normally" the hardest class of bug in this repo.
+
+        `se` is the mathml-SE verdict to build the command for. A parallel wave
+        passes the answer the base tagged twin already established, so the lanes
+        never re-probe -- and, more importantly, never ask for SE on a document
+        known to abort under it, which a lane has no way to recover from.
+        """
+        tag = variant + ("-a11y" if tagged else "")
+        out_dir = self._variant_out_dir(tag)
+        engine_for = ACCESSIBLE_ENGINE if tagged else engine
+        cmd_base = self._base_engine_cmd(
+            engine_for, self._aux_target, tex_dir, engine_options)
+        cmd = [c for c in cmd_base
+               if not str(c).startswith("-output-directory=")]
+        prefix = macro or ""
+        if tagged:
+            prefix = accessible_macro_for(
+                os.path.join(tex_dir, self.tex_name), se=se) + prefix
+        cmd += [f"-output-directory={out_dir}",
+                f"--jobname={self.base_name}",
+                (f"{prefix}\\input{{{self.tex_name}}}" if prefix
+                 else self.tex_name)]
+        return tag, out_dir, cmd, f"{engine_for} [{tag}]"
+
+    def _configured_jobs(self):
+        """How many variant lanes may run at once. 1 means build serially."""
+        raw = os.environ.get(JOBS_ENV)
+        if raw is None:
+            getter = getattr(self, "builder_settings", None) or {}
+            try:
+                raw = getter.get(JOBS_SETTING)
+            except AttributeError:
+                raw = None
+        if raw is None:
+            try:
+                return max(1, (os.cpu_count() or 2) - 1)
+            except Exception:  # noqa: BLE001 - cpu_count is advisory
+                return 2
+        try:
+            n = int(str(raw).strip())
+        except (TypeError, ValueError):
+            self.display(
+                f"TeXLib: ignoring non-numeric {JOBS_SETTING}={raw!r}; "
+                f"building variants serially.\n")
+            return 1
+        return max(1, n)
 
     def _copy_back_variant(self, tex_dir, variant, tagged, out_dir):
         """Copy one finished variant out as <base>_<variant>[_accessible].pdf."""

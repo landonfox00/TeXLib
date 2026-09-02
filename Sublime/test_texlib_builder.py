@@ -18,6 +18,7 @@ Run:  python test_texlib_builder.py     (exit code = number of failures)
 import hashlib
 import json
 import os
+import re
 import sys
 import types
 import tempfile
@@ -320,6 +321,141 @@ def main():
                  and str(c).endswith("-a11y")}
     check("fan-out -> tagged twin for the base and each variant",
           len(a11y_dirs) == 4, sorted(a11y_dirs))
+
+    # (k1p) PARALLEL LANES. A host may offer run_parallel; the core then hands
+    # it the independent variant compiles instead of yielding them one pass at
+    # a time. The LaTeXTools adapter is driven by LaTeXTools' own serial runner
+    # and never gets one, so the serial path has to stay exactly as it was --
+    # which is the real risk here, and what most of these assert.
+    def run_parallel_builder(doc_src, options, aux, jobs=4, out=""):
+        """run_builder, but with a capturing run_parallel installed.
+
+        `out` is fed back as the engine output after every pass, which is
+        how the mathml-SE abort is simulated.
+        """
+        tmp = tempfile.mkdtemp(prefix="texlib_par_")
+        with open(os.path.join(tmp, "doc.tex"), "w", encoding="utf-8") as fh:
+            fh.write(doc_src)
+        for name, contents in (aux or {}).items():
+            with open(os.path.join(tmp, name), "w", encoding="utf-8") as fh:
+                fh.write(contents)
+        b = TexlibBuilder()
+        b.tex_root = os.path.join(tmp, "doc.tex")
+        b.tex_name, b.base_name, b.tex_dir = "doc.tex", "doc", tmp
+        b.engine, b.out = "pdflatex", out
+        b.options = list(options)
+        b.builder_settings = {"build_jobs": jobs}
+        seen = []
+        b.run_parallel = lambda lanes, n: seen.append((lanes, n))
+        yielded = []
+        gen = b.commands()
+        try:
+            item = next(gen)
+            while True:
+                yielded.append(item)
+                item = gen.send(0)
+        except StopIteration:
+            pass
+        return yielded, seen, getattr(b, "_displayed", "")
+
+    serial, _ = run_builder(PSET, options=["--texlib-mode=default"],
+                            aux_files={"doc.buildmeta": FULL_META})
+    par, batches, pdisp = run_parallel_builder(
+        PSET, ["--texlib-mode=default"], {"doc.buildmeta": FULL_META})
+
+    check("parallel: the core handed the host exactly one batch",
+          len(batches) == 1, len(batches))
+    lanes, jobs = batches[0] if batches else ([], 0)
+    # student/solutions/instructor, each normal and tagged.
+    check("parallel: six lanes -- three variants, normal and tagged",
+          len(lanes) == 6, [l[0] for l in lanes])
+    check("parallel: every lane is the variant's two settle passes",
+          all(len(cmds) == 2 and cmds[0] == cmds[1] for _l, cmds in lanes),
+          [(l, len(c)) for l, c in lanes])
+    check("parallel: job count is passed through from build_jobs",
+          jobs == 4, jobs)
+
+    # The base compile and the base tagged twin stay in the serial stream: the
+    # twin's run 1 is the mathml-SE probe every other tagged lane depends on.
+    par_args = " ".join(str(x) for c in par for x in c[0])
+    check("parallel: base tagged twin still built serially (it is the probe)",
+          "base-a11y" in par_args, par_args[-200:])
+    check("parallel: no VARIANT compile left in the serial stream",
+          not any(t in par_args for t in ("student-a11y", "solutions-a11y",
+                                          "instructor-a11y")),
+          par_args[-300:])
+
+    # THE load-bearing one: a lane's command must be byte-identical to the one
+    # the serial path would have run. If these drift, "it works when I build it
+    # normally" becomes the hardest bug in the repo to see.
+    def _outdir(cmd):
+        for x in cmd:
+            if str(x).startswith("-output-directory="):
+                return os.path.basename(str(x))
+        return ""
+
+    # The two harness runs use different scratch directories, so compare the
+    # commands with that one difference normalised away -- everything else,
+    # including flags, engine and prefix, has to be identical.
+    def _norm(cmd):
+        return tuple(re.sub(r"texlib_(?:bt|par)_[A-Za-z0-9_]+", "<TMP>", str(x))
+                     for x in cmd)
+
+    lane_cmds = {_norm(cmds[0]) for _l, cmds in lanes}
+    # Everything the serial path builds EXCEPT the base and its tagged twin --
+    # those two stay serial in both modes.
+    serial_variant_cmds = {_norm(c[0]) for c in serial
+                           if _outdir(c[0]) not in ("", "base-a11y")}
+    check("parallel: lane commands match the serial ones exactly",
+          lane_cmds == serial_variant_cmds,
+          "only in lanes: %s | only in serial: %s"
+          % (sorted(map(str, lane_cmds - serial_variant_cmds))[:1],
+             sorted(map(str, serial_variant_cmds - lane_cmds))[:1]))
+
+    # A parallel lane is a fixed list of commands with NO retry behind it, so
+    # the mathml-SE verdict has to be settled before the lanes are planned --
+    # that is why the base tagged twin runs on its own first. If a lane were
+    # planned with SE on a document that aborts under it, the fan-out would
+    # simply lose those PDFs, which is the regression this pins.
+    _SE_ABORT = ("! error:  (nodes): trying to delete an attribute refere\n"
+                 "nce of a non attribute node")
+    _, ab_batches, ab_disp = run_parallel_builder(
+        PSET, ["--texlib-mode=default"], {"doc.buildmeta": FULL_META},
+        out=_SE_ABORT)
+    ab_lanes = ab_batches[0][0] if ab_batches else []
+    ab_tagged = [(l, c) for l, c in ab_lanes if "-a11y" in l]
+    check("parallel+SE: tagged lanes exist to check", bool(ab_tagged),
+          [l for l, _ in ab_lanes])
+    check("parallel+SE: after the probe aborts NO lane asks for SE",
+          all("mathml-SE" not in c[0][-1] for _l, c in ab_tagged),
+          [c[0][-1][:60] for _l, c in ab_tagged if "mathml-SE" in c[0][-1]])
+    check("parallel+SE: the lanes still ask for AF",
+          all("mathml-AF" in c[0][-1] for _l, c in ab_tagged),
+          [c[0][-1][:60] for _l, c in ab_tagged if "mathml-AF" not in c[0][-1]])
+    check("parallel+SE: the fallback is reported once, not per lane",
+          ab_disp.count("luamml mathml-SE bug") == 1,
+          "%d times" % ab_disp.count("luamml mathml-SE bug"))
+    # And with a clean document the lanes keep SE.
+    _, ok_batches, _ = run_parallel_builder(
+        PSET, ["--texlib-mode=default"], {"doc.buildmeta": FULL_META})
+    ok_tagged = [(l, c) for l, c in (ok_batches[0][0] if ok_batches else [])
+                 if "-a11y" in l]
+    check("parallel+SE: a clean document keeps SE on every tagged lane",
+          bool(ok_tagged) and all("mathml-SE" in c[0][-1] for _l, c in ok_tagged),
+          [c[0][-1][:60] for _l, c in ok_tagged])
+
+    # build_jobs=1 means "do not parallelise", even with a capable host.
+    _, none_batches, _ = run_parallel_builder(
+        PSET, ["--texlib-mode=default"], {"doc.buildmeta": FULL_META}, jobs=1)
+    check("parallel: build_jobs=1 keeps the serial path",
+          none_batches == [], none_batches)
+
+    # And a host with no run_parallel (the LaTeXTools adapter) is untouched.
+    check("parallel: without a capable host every variant is still yielded",
+          all(t in " ".join(_args(serial))
+              for t in (r"\def\StudentMode{}", r"\def\ShowKey{}",
+                        r"\def\InstructorMode{}")),
+          " ".join(_args(serial))[:200])
 
     # Same declaration, but the document turns out to hold no solutions: the
     # answer-bearing variants would be byte-identical to the base.

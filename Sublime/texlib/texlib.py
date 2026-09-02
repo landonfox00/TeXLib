@@ -20,6 +20,7 @@
 # on save; editing texlib_build.py (an imported helper) still needs a restart.
 # ============================================================================
 
+import concurrent.futures
 import hashlib
 import importlib
 import os
@@ -133,8 +134,12 @@ ROOT_RE = re.compile(r"(?im)^%\s*!\s*T[Ee]X\s+root\s*=\s*(.+?)\s*$")
 # its thread/cancel/proc/panel so cancel targeting and the aux env stay per-build
 # -- there is NO global TEXLIB_AUX_DIR to race (the runner injects each build's
 # own _aux_target into that build's subprocess env instead; see _run_argv).
-_builds = {}                    # root_path -> {"thread","cancel","proc","panel"}
+_builds = {}                    # root_path -> {"thread","cancel","procs","panel"}
 _builds_lock = threading.Lock()
+# Guards the per-build set of live subprocesses. Separate from _builds_lock: a
+# variant fan-out mutates it from several lanes at once, and it must not
+# contend with the registry lock the UI thread takes to list active builds.
+_procs_lock = threading.Lock()
 
 
 def _build_active(root):
@@ -409,7 +414,12 @@ def _run_argv(cmd, cwd, emit, cancel, texinputs, aux_dir, entry):
     except Exception as exc:  # noqa: BLE001 - surface launch failures to the panel
         emit("TeXLib: failed to launch %s: %s\n" % (cmd[0], exc))
         return ""
-    entry["proc"] = proc
+    # A variant fan-out runs several of these at once, so the registry holds a
+    # SET of live processes rather than one slot -- with one slot, cancelling a
+    # parallel build killed whichever process happened to have written to it
+    # last and left the rest running.
+    with _procs_lock:
+        entry.setdefault("procs", set()).add(proc)
     chunks = []
     try:
         for line in proc.stdout:
@@ -425,8 +435,51 @@ def _run_argv(cmd, cwd, emit, cancel, texinputs, aux_dir, entry):
         except Exception:  # noqa: BLE001
             pass
         proc.wait()
-        entry["proc"] = None
+        with _procs_lock:
+            entry.get("procs", set()).discard(proc)
     return "".join(chunks)
+
+
+def _run_lanes(lanes, jobs, tex_dir, collect, cancel, texinputs, aux_dir,
+               entry, emit):
+    """Run independent variant lanes concurrently; replay their logs in order.
+
+    Each lane is (label, [argv, ...]) and its commands run in sequence; the
+    lanes themselves run in a pool. Output is buffered per lane and replayed
+    through `collect` afterwards in the order the lanes were planned, because
+    interleaving several engines' output live produces a log in which no error
+    can be attributed to a document -- and `collect` also classifies errors,
+    which must stay deterministic regardless of which lane finished first.
+    """
+    done = [0]
+    lock = threading.Lock()
+
+    def one(label, cmds):
+        buf = []
+        for cmd in cmds:
+            if cancel.is_set():
+                break
+            _run_argv(cmd, tex_dir, buf.append, cancel, texinputs, aux_dir,
+                      entry)
+        with lock:
+            done[0] += 1
+            emit("TeXLib: %s finished (%d/%d).\n" % (label, done[0], len(lanes)))
+        return buf
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+        futures = [pool.submit(one, label, cmds) for label, cmds in lanes]
+        buffers = []
+        for (label, _cmds), fut in zip(lanes, futures):
+            try:
+                buffers.append((label, fut.result()))
+            except Exception as exc:  # noqa: BLE001 - a lane must not kill the build
+                emit("TeXLib: %s failed to run: %s\n" % (label, exc))
+                buffers.append((label, []))
+
+    for label, buf in buffers:
+        emit("\nTeXLib: --- %s ---\n" % label)
+        for line in buf:
+            collect(line)
 
 
 # --- Delegation to LaTeXTools (Tier C: complement, don't rebuild) ------------
@@ -737,7 +790,7 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             sublime.set_timeout(apply, 0)
 
         cancel = threading.Event()
-        entry = {"thread": None, "cancel": cancel, "proc": None,
+        entry = {"thread": None, "cancel": cancel, "procs": set(),
                  "panel": _panel_name(root), "view": view, "base": base,
                  "step": None, "frame": 0}
         th = threading.Thread(
@@ -782,6 +835,14 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             elif WARNING_RE.search(s) and len(warning_lines) < 500:
                 warning_lines.append(s)
 
+        # Opt the core into parallel variant lanes. The core calls this only if
+        # it is present, so the LaTeXTools adapter -- which is driven by
+        # LaTeXTools' own serial runner and never gets one -- keeps building
+        # exactly as before.
+        host.run_parallel = lambda lanes, jobs: _run_lanes(
+            lanes, jobs, tex_dir, collect, cancel, texinputs,
+            getattr(host, "_aux_target", None), entry, emit)
+
         state = "error"
         try:
             item = next(gen)
@@ -822,8 +883,11 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
 def _kill_entry(entry):
     if entry.get("cancel"):
         entry["cancel"].set()
-    proc = entry.get("proc")
-    if proc:
+    # Every live lane, not just the most recent process: a parallel fan-out has
+    # several engines running, and killing one left the rest to finish.
+    with _procs_lock:
+        procs = list(entry.get("procs") or ())
+    for proc in procs:
         try:
             proc.kill()
         except Exception:  # noqa: BLE001

@@ -186,6 +186,8 @@ Each tagged PDF is accompanied by `<base>_accessible-report.html` — veraPDF's 
 
 `default_variants` in `builder_settings` (or `TEXLIB_VARIANTS`) pins the set — e.g. `["student"]` to keep `Ctrl+B` to one extra PDF, or `["base"]` for the pre-0.8.0 single-PDF behaviour. A single document overrides everything with `\metasetup{build-variants = {student, instructor}}`, or `none` for the base PDF alone.
 
+The variants build in parallel. Each one compiles into its own output directory and shares no state with the others, so they run concurrently — measured at 104s serial against 55s at four jobs on a three-variant Notes document. `build_jobs` in `builder_settings` (or `TEXLIB_JOBS`) sets the width; it defaults to one less than the CPU count, and `1` builds them one at a time. The base compile and its tagged twin stay sequential: the first writes the sidecar the plan is read from, and the second answers a question the other tagged builds depend on.
+
 For a versioned exam each variant is sliced per version, so `\versions{A,B}` gives `exam_A.pdf` / `exam_B.pdf` (student), `exam_A_solutions.pdf` (the key) and `exam_A_instructor.pdf` (key plus rubric).
 
 Every class **except `thesis`** loads `texlib-build.sty` and responds to these; `thesis` loads no TeXLib package at all, so the flags do not exist in it. Source-level equivalents (`\solutions`, `\keys`, `\rubrics`, `\drafts`, `\studentmode`, `\instructormode`) can go in a document preamble instead. The Sublime build system surfaces the modes as palette entries; `smoke_test.py` injects the single-variant ones via the same compile-time mechanism.
