@@ -408,6 +408,12 @@ class TexlibBuildCore:
     # Set by the core, cleared by the host. See the class docstring.
     _forget_last_pass = False
 
+    # Whether mathml-SE survives THIS document: None until a tagged pass has
+    # answered it, then True/False for the rest of the build. The verdict is a
+    # property of the source, so a fan-out's four tagged twins probe once
+    # between them instead of each paying for the same aborted pass.
+    _mathml_se_ok = None
+
     # ------------------------------------------------------------------ #
     # Entry point: a coroutine that yields (command, message) pairs and
     # receives each command's exit status back from the build back-end.
@@ -876,9 +882,10 @@ class TexlibBuildCore:
             return head + [accessible_macro_for(doc, se=se)
                            + f"\\input{{{self.tex_name}}}"]
 
-        cmd = tagged_cmd(True)
+        cmd = tagged_cmd(self._mathml_se_ok is not False)
         yield (cmd, f"{ACCESSIBLE_ENGINE} [accessible] run 1...")
         if luamml_se_aborted(self.out):
+            self._mathml_se_ok = False
             self.display(
                 "TeXLib: this document trips the luamml mathml-SE bug (two "
                 "nth-roots in one formula); retrying the tagged half with "
@@ -1125,17 +1132,41 @@ class TexlibBuildCore:
             engine_for, self._aux_target, tex_dir, engine_options)
         cmd = [c for c in cmd_base
                if not str(c).startswith("-output-directory=")]
-        prefix = macro or ""
-        if tagged:
-            prefix = accessible_macro_for(
-                os.path.join(tex_dir, self.tex_name)) + prefix
-        cmd += [f"-output-directory={out_dir}",
-                f"--jobname={self.base_name}",
-                (f"{prefix}\\input{{{self.tex_name}}}" if prefix
-                 else self.tex_name)]
+
+        def with_prefix(se):
+            head = macro or ""
+            if tagged:
+                head = accessible_macro_for(
+                    os.path.join(tex_dir, self.tex_name), se=se) + head
+            return cmd + [f"-output-directory={out_dir}",
+                          f"--jobname={self.base_name}",
+                          (f"{head}\\input{{{self.tex_name}}}" if head
+                           else self.tex_name)]
+
         label = f"{engine_for} [{tag}]"
-        yield (cmd, f"{label} run 1...")
-        yield (cmd, f"{label} run 2 (settle)...")
+        argv = with_prefix(self._mathml_se_ok is not False)
+        yield (argv, f"{label} run 1...")
+        # Every tagged twin is the same source, so the mathml-SE verdict is a
+        # property of the DOCUMENT, not of the variant: probe on the first twin
+        # and reuse the answer. Without that, a document that trips the luamml
+        # bug would waste an aborted pass on each of the four twins a fan-out
+        # builds -- and, worse, a fan-out has no accessible-mode retry to fall
+        # back on, so before this it simply lost those PDFs.
+        if tagged and self._mathml_se_ok is None:
+            if luamml_se_aborted(self.out):
+                self._mathml_se_ok = False
+                self.display(
+                    "TeXLib: this document trips the luamml mathml-SE bug (two "
+                    "nth-roots in one formula); the tagged copies use MathML "
+                    "associated files only. Firefox and Foxit are unaffected; "
+                    "Acrobat falls back to the flattened text here.\n")
+                self._clear_luamml_sidecars(out_dir, tex_dir)
+                self._forget_last_pass = True
+                argv = with_prefix(False)
+                yield (argv, f"{label} run 1 (MathML-AF)...")
+            else:
+                self._mathml_se_ok = True
+        yield (argv, f"{label} run 2 (settle)...")
         self._copy_back_variant(tex_dir, variant, tagged, out_dir)
 
     def _copy_back_variant(self, tex_dir, variant, tagged, out_dir):

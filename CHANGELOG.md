@@ -14,8 +14,9 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   accessible build now asks for both MathML methods, recognises that abort in
   the log, and spends run 1 again with associated files alone; only the
   documents that trip it lose the Acrobat path, and they report why. `luamml`
-  0.9.2 is still the newest release (2026-06-20) and no upstream issue is open,
-  so the wait had no end in sight.
+  0.9.2 is still the newest release (2026-06-20), and of the 18 issues upstream
+  — open and closed — none reports this error or mentions `\sqrt` at all, so the
+  wait had no end in sight.
 
   The trigger is narrower than "nth-roots": of 26 math constructs exercised as
   sibling pairs under SE, only the three involving `\sqrt[n]` abort — two

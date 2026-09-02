@@ -27,6 +27,7 @@ subfolder, so adding a module here is import-only and cannot become a plugin.
 """
 
 import os
+import re
 import shutil
 
 # Document classes that MUST be compiled with lualatex.
@@ -73,7 +74,8 @@ LUALATEX_CLASSES = {
 # document because some of them trip it:
 #
 #   luamml 0.9.2 (TeX Live 2026, 2026-06-20 — still the newest release as of
-#   2026-09-01, with no upstream issue open) keeps references to math *noad*
+#   2026-09-01; of the 18 issues upstream, open and closed, none reports this
+#   error or mentions \sqrt at all) keeps references to math *noad*
 #   nodes — a radical's delimiter and degree — and writes marked-content
 #   attributes to them from the structure-element writer (the node.set_attribute
 #   loop at the end of write_elem, luamml-structelemwriter.lua) after
@@ -106,12 +108,25 @@ ACCESSIBLE_DOCMETA_AF_ONLY = ACCESSIBLE_DOCMETA.replace(
 # LuaTeX's own wording for the abort above. Matched against a failed accessible
 # run's log to decide whether the AF-only retry is worth spending a pass on; any
 # other failure is the document's own and must surface as itself.
-LUAMML_SE_ABORT = "trying to delete an attribute reference"
+LUAMML_SE_ABORT = "trying to delete an attribute reference of a non attribute node"
 
 
 def luamml_se_aborted(log_text):
-    """True when a failed accessible run died of the luamml mathml-SE bug."""
-    return LUAMML_SE_ABORT in (log_text or "")
+    """True when a failed accessible run died of the luamml mathml-SE bug.
+
+    Matched with the whitespace removed from BOTH sides, because the engine
+    hard-wraps this message at 79 columns and the wrap lands mid-word wherever
+    the line's "<file>:<line>: " prefix happens to put it -- so the break moves
+    with the length of the document's filename. A plain substring test on the
+    raw text therefore passes for a short filename and silently fails for a
+    longer one, which is exactly the sort of near-miss that would leave the
+    fallback dead for the documents it exists to rescue.
+    """
+    return (_FLATTEN(LUAMML_SE_ABORT) in _FLATTEN(log_text or ""))
+
+
+def _FLATTEN(s):
+    return re.sub(r"\s+", "", s)
 
 # The marker the classes gate their accessible branches on (\ifdefined
 # \TeXLibAccessibleMode). Defined on the command line, never in the source.

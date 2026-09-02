@@ -519,6 +519,39 @@ def main():
           and all("mathml-SE" in c[0][-1] for c in tagged),
           [c[0][-1] for c in tagged])
 
+    # (k1b) the SAME fallback in the Ctrl+B fan-out, which reaches the tagged
+    # twins by a different path than accessible mode. Getting this wrong is not
+    # "quieter math": the fan-out has no retry of its own, so a document that
+    # trips the bug would lose all four tagged PDFs outright.
+    _FAN_DOC = r"\documentclass{pset}\begin{document}x\end{document}"
+    _plan, _, _ = drive_builder(_FAN_DOC, options=["--texlib-mode=default"])
+    _tw = [i for i, c in enumerate(_plan)
+           if r"\DocumentMetadata" in str(c[0][-1])]
+    check("fan-out: tagged twins exist to test", len(_tw) >= 2,
+          "%d tagged passes" % len(_tw))
+
+    cmds, disp, _ = drive_builder(
+        _FAN_DOC, options=["--texlib-mode=default"],
+        steps=[{} for _ in range(_tw[0])] + [{"out": _ABORT}])
+    tw = [c for c in cmds if r"\DocumentMetadata" in str(c[0][-1])]
+    check("fan-out: first tagged twin asks for SE",
+          bool(tw) and "mathml-SE" in tw[0][0][-1],
+          tw[0][0][-1][:70] if tw else "")
+    check("fan-out: after the abort NO tagged pass still asks for SE",
+          all("mathml-SE" not in c[0][-1] for c in tw[1:]),
+          [c[0][-1][:48] for c in tw[1:] if "mathml-SE" in c[0][-1]])
+    check("fan-out: every tagged twin still gets AF",
+          all("mathml-AF" in c[0][-1] for c in tw[1:]),
+          [c[0][-1][:48] for c in tw[1:] if "mathml-AF" not in c[0][-1]])
+    # The verdict is a property of the document, so the whole fan-out pays for
+    # exactly ONE aborted probe -- not one per twin.
+    check("fan-out: the SE probe is spent once, not once per twin",
+          sum(1 for c in tw if "mathml-SE" in c[0][-1]) == 1,
+          "%d SE passes" % sum(1 for c in tw if "mathml-SE" in c[0][-1]))
+    check("fan-out: the reason is reported once",
+          disp.count("luamml mathml-SE bug") == 1,
+          "%d times" % disp.count("luamml mathml-SE bug"))
+
     # (k2) a lualatex class in accessible mode: same pairing, one engine.
     cmds, _ = run_builder(
         r"\documentclass{quiz}\begin{document}x\end{document}",
@@ -1932,6 +1965,23 @@ def main():
           not _bs.luamml_se_aborted("! Undefined control sequence.\nl.7 \\foo")
           and not _bs.luamml_se_aborted("")
           and not _bs.luamml_se_aborted(None))
+    # The engine hard-wraps that message at 79 columns, and the break lands
+    # mid-word wherever the "<file>:<line>: " prefix puts it -- so it MOVES with
+    # the filename. These are the real wrapped forms from two documents whose
+    # names differ in length; a plain substring test passes the first and fails
+    # the second, which would leave the fallback dead for longer filenames.
+    check("buildspec: recognises the abort wrapped after 'of a'",
+          _bs.luamml_se_aborted(
+              "./radicals.tex:5: error:  (nodes): trying to delete an "
+              "attribute reference of a\nnon attribute node"))
+    check("buildspec: recognises the abort wrapped mid-word ('refere/nce')",
+          _bs.luamml_se_aborted(
+              "./nth-root-mathml.tex:31: error:  (nodes): trying to delete an "
+              "attribute refere\nnce of a non attribute node"))
+    check("buildspec: recognises it split at EVERY position",
+          all(_bs.luamml_se_aborted(
+              _bs.LUAMML_SE_ABORT[:i] + "\n" + _bs.LUAMML_SE_ABORT[i:])
+              for i in range(1, len(_bs.LUAMML_SE_ABORT))))
 
     # accessible_macro_for: a document with its OWN \DocumentMetadata (the
     # thesis template's layout) must get the marker only -- the TL2026 kernel
