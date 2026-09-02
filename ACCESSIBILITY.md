@@ -75,9 +75,20 @@ readers; emitting one silently flattens the mathematics for the other half.
 Which methods are emitted is declared once, in `ACCESSIBLE_DOCMETA` in
 [`Sublime/texlib/texlib_buildspec.py`](Sublime/texlib/texlib_buildspec.py).
 Check the current value there — it has changed to work around a toolchain bug
-and may change back. SE emission is presently constrained by a `luamml` defect
-that aborts the run on two `\sqrt[n]{...}` in a single formula; the reasoning is
-recorded at the declaration.
+and may change again.
+
+Builds ask for both and fall back per document. A `luamml` defect aborts the run
+outright — no PDF — when one formula contains two or more `\sqrt[n]{...}`, and
+only the SE path reaches the code responsible. A build that hits it re-runs the
+tagged half with AF alone and says so. So a document with two nth-roots in one
+formula reads as flattened text in Acrobat, while every other document is
+covered in both readers. The trigger is narrow: of 26 math constructs tested as
+sibling pairs under SE, only those involving `\sqrt[n]` abort, and two nth-roots
+in separate formulas — or in separate cells of one matrix — are fine.
+
+If you need SE on a document that falls back, the workaround is editorial rather
+than technical: split the formula so no two nth-roots share it. The defect is
+upstream, not in TeXLib, and it reproduces on a bare `article`.
 
 **`\tagpdfsetup{math/alt/use}` is deliberately not set.** It raises the score an
 Ally- or UDOIT-style checker reports by replacing the MathML with flat alt text,

@@ -258,7 +258,13 @@ ACCESSIBLE_DOCMETA = _spec.ACCESSIBLE_DOCMETA
 # preferred_pdf_path tells the two kinds of copy apart by this and nothing else.
 SOLUTION_COPY_SUFFIX = "_solutions.pdf"
 ACCESSIBLE_MACRO = _spec.ACCESSIBLE_MACRO
+ACCESSIBLE_MACRO_AF_ONLY = _spec.ACCESSIBLE_MACRO_AF_ONLY
 accessible_macro_for = _spec.accessible_macro_for
+luamml_se_aborted = _spec.luamml_se_aborted
+
+# The luamml sidecars a crashed tagged run can leave truncated; removed before
+# the AF-only retry so it does not read back a half-written file.
+LUAMML_SIDECARS = ("-luamml-mathml.html", "-mathml.html")
 
 # veraPDF conformance reporting for the accessible build. Located via the shared
 # finder rather than shutil.which: the installer does not put veraPDF on PATH.
@@ -389,7 +395,24 @@ class TexlibBuildCore:
     before resuming (rerun/biber checks read it). Two hosts supply that
     contract: the native TexlibBuild (below, via __init__) and the LaTeXTools
     TexlibBuilder (texlib_builder.py, via PdfBuilder). One core -> no drift.
+
+    One signal travels the other way. When the core sets self._forget_last_pass
+    on resuming, the pass just run was a probe whose failure the core has
+    already handled, and the host must roll its error state back to what it was
+    before that pass -- otherwise a deliberate, recovered-from abort (the
+    mathml-SE retry in _build_accessible) leaves the whole build reported as
+    failed. A host that ignores the flag still builds correctly; it just
+    misreports that one case, so the flag is read with getattr.
     """
+
+    # Set by the core, cleared by the host. See the class docstring.
+    _forget_last_pass = False
+
+    # Whether mathml-SE survives THIS document: None until a tagged pass has
+    # answered it, then True/False for the rest of the build. The verdict is a
+    # property of the source, so a fan-out's four tagged twins probe once
+    # between them instead of each paying for the same aborted pass.
+    _mathml_se_ok = None
 
     # ------------------------------------------------------------------ #
     # Entry point: a coroutine that yields (command, message) pairs and
@@ -829,6 +852,12 @@ class TexlibBuildCore:
         Two fixed passes settle cross-references and the "page X of Y" footer;
         no biber loop on the tagged half yet, so a bibliography-bearing class may
         need one when the rollout reaches it.
+
+        Run 1 asks for both MathML methods. A document that trips the luamml
+        mathml-SE bug (see ACCESSIBLE_DOCMETA) aborts there without a PDF, and
+        run 1 is spent again on the AF-only prefix, which is unaffected. That
+        costs one wasted pass on the few documents with two nth-roots in a
+        formula, and gives every other document the Acrobat path.
         """
         yield from self._build_once(base, engine, None)
 
@@ -844,13 +873,50 @@ class TexlibBuildCore:
             ACCESSIBLE_ENGINE, self._aux_target, tex_dir, engine_options
         )
         out_dir = self._accessible_out_dir()
-        cmd = [c for c in tagged_base
-               if not str(c).startswith("-output-directory=")]
-        cmd += [f"-output-directory={out_dir}", f"--jobname={self.base_name}",
-                accessible_macro_for(os.path.join(tex_dir, self.tex_name))
-                + f"\\input{{{self.tex_name}}}"]
+        head = [c for c in tagged_base
+                if not str(c).startswith("-output-directory=")]
+        head += [f"-output-directory={out_dir}", f"--jobname={self.base_name}"]
+        doc = os.path.join(tex_dir, self.tex_name)
+
+        def tagged_cmd(se):
+            return head + [accessible_macro_for(doc, se=se)
+                           + f"\\input{{{self.tex_name}}}"]
+
+        cmd = tagged_cmd(self._mathml_se_ok is not False)
         yield (cmd, f"{ACCESSIBLE_ENGINE} [accessible] run 1...")
+        if luamml_se_aborted(self.out):
+            self._mathml_se_ok = False
+            self.display(
+                "TeXLib: this document trips the luamml mathml-SE bug (two "
+                "nth-roots in one formula); retrying the tagged half with "
+                "MathML associated files only. Screen readers that read AF "
+                "(Firefox, Foxit) are unaffected; Acrobat falls back to the "
+                "flattened text for this document.\n"
+            )
+            self._clear_luamml_sidecars(out_dir, tex_dir)
+            self._forget_last_pass = True
+            cmd = tagged_cmd(False)
+            yield (cmd, f"{ACCESSIBLE_ENGINE} [accessible] run 1 (MathML-AF)...")
         yield (cmd, f"{ACCESSIBLE_ENGINE} [accessible] run 2 (settle)...")
+
+    def _clear_luamml_sidecars(self, *dirs):
+        """Remove the luamml MathML sidecars from each directory.
+
+        luamml writes <jobname>-luamml-mathml.html as it typesets and reads the
+        previous run's copy back at \\begin{document}. A run that died mid-write
+        leaves it cut inside an element, and the next run fails at
+        \\begin{document} on a runaway argument -- which would make the AF-only
+        retry look like a second, unrelated failure.
+        """
+        for d in dirs:
+            if not d:
+                continue
+            for suffix in LUAMML_SIDECARS:
+                path = os.path.join(d, self.base_name + suffix)
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
 
     # ------------------------------------------------------------------ #
     # Variant planning + fan-out
@@ -1066,17 +1132,41 @@ class TexlibBuildCore:
             engine_for, self._aux_target, tex_dir, engine_options)
         cmd = [c for c in cmd_base
                if not str(c).startswith("-output-directory=")]
-        prefix = macro or ""
-        if tagged:
-            prefix = accessible_macro_for(
-                os.path.join(tex_dir, self.tex_name)) + prefix
-        cmd += [f"-output-directory={out_dir}",
-                f"--jobname={self.base_name}",
-                (f"{prefix}\\input{{{self.tex_name}}}" if prefix
-                 else self.tex_name)]
+
+        def with_prefix(se):
+            head = macro or ""
+            if tagged:
+                head = accessible_macro_for(
+                    os.path.join(tex_dir, self.tex_name), se=se) + head
+            return cmd + [f"-output-directory={out_dir}",
+                          f"--jobname={self.base_name}",
+                          (f"{head}\\input{{{self.tex_name}}}" if head
+                           else self.tex_name)]
+
         label = f"{engine_for} [{tag}]"
-        yield (cmd, f"{label} run 1...")
-        yield (cmd, f"{label} run 2 (settle)...")
+        argv = with_prefix(self._mathml_se_ok is not False)
+        yield (argv, f"{label} run 1...")
+        # Every tagged twin is the same source, so the mathml-SE verdict is a
+        # property of the DOCUMENT, not of the variant: probe on the first twin
+        # and reuse the answer. Without that, a document that trips the luamml
+        # bug would waste an aborted pass on each of the four twins a fan-out
+        # builds -- and, worse, a fan-out has no accessible-mode retry to fall
+        # back on, so before this it simply lost those PDFs.
+        if tagged and self._mathml_se_ok is None:
+            if luamml_se_aborted(self.out):
+                self._mathml_se_ok = False
+                self.display(
+                    "TeXLib: this document trips the luamml mathml-SE bug (two "
+                    "nth-roots in one formula); the tagged copies use MathML "
+                    "associated files only. Firefox and Foxit are unaffected; "
+                    "Acrobat falls back to the flattened text here.\n")
+                self._clear_luamml_sidecars(out_dir, tex_dir)
+                self._forget_last_pass = True
+                argv = with_prefix(False)
+                yield (argv, f"{label} run 1 (MathML-AF)...")
+            else:
+                self._mathml_se_ok = True
+        yield (argv, f"{label} run 2 (settle)...")
         self._copy_back_variant(tex_dir, variant, tagged, out_dir)
 
     def _copy_back_variant(self, tex_dir, variant, tagged, out_dir):

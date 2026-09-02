@@ -15,6 +15,13 @@
 % (\DocumentMetadata can only enable tagging BEFORE \documentclass.) The class
 % warns if it was not tagged. Compile with lualatex.
 %
+% That declaration asks for MathML associated files only. Adding mathml-SE
+% covers Adobe Acrobat too, and the rest of the library asks for both — but the
+% library retries a document that trips the luamml nth-root bug (ACCESSIBILITY.md)
+% with AF alone, and it cannot retry for a document that brings its own
+% \DocumentMetadata. Two \sqrt[n]{...} in one formula under mathml-SE aborts the
+% run with no PDF, so the choice is left to the author.
+%
 % WHAT IS AND IS NOT INSTITUTION-SPECIFIC
 %
 % Everything here — the tagged-PDF stack, the trivlist-free theorem

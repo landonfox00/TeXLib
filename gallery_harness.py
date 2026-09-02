@@ -119,17 +119,27 @@ def build(item: Item, work: str, mode: str, timeout: int):
     cmd = [engine, "-interaction=nonstopmode", "-halt-on-error"]
     if engine == "lualatex":
         cmd.append("-shell-escape")
-    if accessible:
-        cmd.append(f"--jobname={jobname}")
-        cmd.append(f"{S.accessible_macro_for(os.path.join(dest, item.template))}"
-                   f"\\input{{{item.template}}}")
-    else:
-        cmd.append(item.template)
+    def argv(se=True):
+        if not accessible:
+            return cmd + [item.template]
+        prefix = S.accessible_macro_for(
+            os.path.join(dest, item.template), se=se)
+        return cmd + [f"--jobname={jobname}",
+                      f"{prefix}\\input{{{item.template}}}"]
 
     pdf = os.path.join(dest, jobname + ".pdf")
     try:
         rc, log_text, stdout_text, _elapsed, _passes = S._run_with_reruns(
-            cmd, dest, env, timeout, jobname)
+            argv(), dest, env, timeout, jobname)
+        # Same mathml-SE fallback the builder makes; see ACCESSIBLE_DOCMETA.
+        if accessible and rc != 0 and S.luamml_se_aborted(log_text):
+            for suffix in ("-luamml-mathml.html", "-mathml.html"):
+                try:
+                    os.remove(os.path.join(dest, jobname + suffix))
+                except OSError:
+                    pass
+            rc, log_text, stdout_text, _elapsed, _passes = S._run_with_reruns(
+                argv(se=False), dest, env, timeout, jobname)
     except subprocess.TimeoutExpired:
         return None, f"timeout after {timeout}s"
     if rc != 0 or not os.path.exists(pdf):

@@ -17,6 +17,11 @@ course-metadata_old.sty
 # Generated gallery: ~9 MB of base64-embedded page renders, rebuilt from
 # the manifest on demand. Never committed.
 /class_gallery.html
+# veraPDF's per-document conformance report, written beside the tagged PDF on
+# every accessible build. The PDF it describes is already ignored below, so
+# without this an accessible build leaves one tracked file behind and a
+# `git add -A` commits it -- which is how one reached a PR.
+*_accessible-report.html
 
 # LaTeX build artifacts
 *.aux
