@@ -1,0 +1,46 @@
+% profiles/university-of-pennsylvania.tex — University of Pennsylvania
+% ============================================================================
+% source: https://provost.upenn.edu/wp-content/uploads/PhD-Candidate-Formatting-Checklist_0-1.pdf
+%         (Office of the Provost, "Pre-Deposit Checklist for PhD Students";
+%         the PDF's own metadata gives 2023-01-30 as its creation date)
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% VERIFIED and set here: geometry, spacing.
+% LEFT TO THE NEUTRAL FALLBACK: the title page and the approval page. Penn
+% prescribes the CONTENT of the title page -- the committee roles below -- but
+% the checklist does not give its layout, and the separate Dissertation
+% Formatting Guide it refers to was not reachable at a Provost URL on the access
+% date. Encoding a plausible arrangement would be exactly the guess this library
+% forbids, so the institution-neutral page renders instead.
+
+\thesisinstitution{University of Pennsylvania}
+
+% "In the entire document, left, top, right, and bottom margins are all 1 inch
+% of blank space." The checklist is emphatic that the margin stays empty:
+% "Page numbers, footnotes, or any part of an illustration or table cannot go in
+% the blank margin area" -- which rules out the footer-in-margin arrangement
+% several other schools in this set permit.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "For readability, the document should be double-spaced (2x), except for long
+% quotations, footnotes, and the lists of tables, which should be single-spaced."
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% The Provost's checklist states no accessibility requirement. That is recorded
+% as an absence, not filled in from what comparable schools require: a reader of
+% this profile should be able to tell "Penn does not publish one here" apart
+% from "nobody looked".
+\thesisaccessibilityrequirement{Not published}
+	{The Office of the Provost's pre-deposit checklist states no accessibility
+	 requirement for a filed dissertation. Check the Dissertation Formatting
+	 Guide and with grad-degree@provost.upenn.edu before relying on that.}
+
+% --- Title page ---------------------------------------------------------------
+% NOT overridden -- see the header. What Penn does specify, for whoever finishes
+% this profile: the title page carries no page number but "counts as invisible
+% page number i"; the committee is listed with full faculty titles, in the order
+% Supervisor of Dissertation, Co-supervisor of Dissertation (if applicable),
+% Graduate Group Chairperson, then other members of the dissertation committee;
+% and the dissertation title and author must match the abstract exactly.

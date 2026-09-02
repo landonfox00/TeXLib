@@ -1,0 +1,41 @@
+% profiles/ohio-state-university-main-campus.tex — The Ohio State University
+% ============================================================================
+% source: https://gradsch.osu.edu/current-students/dissertations-and-theses/document-preparation
+%         (Graduate School, "Document Preparation")
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% VERIFIED and set here: the accessibility requirements.
+% NOT SET: geometry and spacing. The Document Preparation page states exactly
+% one margin figure -- format features "must be identified with a major heading
+% that is centered below at least a one-inch top margin" -- and gives no left,
+% right or bottom margin and no body spacing rule; those live in the Graduate
+% School's format guidelines and template, which were not read on this pass.
+%
+% The class default happens to be 1in on all four sides, which satisfies the one
+% figure Ohio State does state. \thesissetgeometry is deliberately NOT called
+% anyway: the default is the library's, and a reader must be able to tell a
+% verified figure from a default that coincides with one.
+
+\thesisinstitution{The Ohio State University}
+
+% --- Accessibility -----------------------------------------------------------
+% Ohio State has had required digital-accessibility features since Spring 2023
+% and publishes a Graduate School ETD Accessibility Plan. It is also blunt about
+% who does the work: "The Graduate School cannot provide hands on training or
+% editing of a document to meet formatting and digital accessibility standards."
+\thesisrequiretagging
+\thesisrequiredocumentlanguage
+\thesisaccessibilityrequirement{Required since Spring 2023}
+	{Digital accessibility features are a stated requirement of a filed
+	 document, governed by the Graduate School's Electronic Thesis and
+	 Dissertation Accessibility Plan.}
+\thesisaccessibilityrequirement{Permission flag}
+	{"PDF accessibility permission flag is checked" -- the PDF must not be
+	 secured against the text extraction a screen reader depends on. A tagged
+	 build from this class sets no security handler, so this holds unless
+	 something downstream re-encrypts the file.}
+\thesisaccessibilityrequirement{Checked by you}
+	{Students are directed to run a digital accessibility checker themselves
+	 (Adobe Acrobat Pro, available through the university), not to rely on the
+	 Graduate School's format review to catch it.}

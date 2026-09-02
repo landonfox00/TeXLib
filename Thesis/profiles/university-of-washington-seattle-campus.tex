@@ -1,0 +1,43 @@
+% profiles/university-of-washington-seattle-campus.tex — University of Washington
+% ============================================================================
+% source: https://grad.uw.edu/current-students/enrollment-through-graduation/thesis-dissertation/
+%         (Graduate School, "Thesis/Dissertation")
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% VERIFIED and set here: the ABSENCE of a margin, spacing and typeface rule, and
+% the prohibition on an approval page.
+% LEFT TO THE NEUTRAL FALLBACK: the title page. UW supplies it as a fillable PDF
+% template rather than as prose, and requires that it be followed "precisely",
+% which is not something this file can reproduce from a description.
+%
+% This is the unusual one in the set. Washington regulates exactly three pages
+% and nothing else:
+%
+%   "Apart from these first three pages, the Graduate School does not adhere to
+%    any specific formatting or publishing requirements unless explicitly stated
+%    by the ProQuest Author Guide."
+%
+% So this profile deliberately calls NEITHER \thesissetgeometry NOR
+% \thesissetspacing. The class defaults still apply and still produce a good
+% document -- but they are the library's defaults, not Washington's rules, and
+% restating them here would manufacture a requirement that does not exist. A
+% future reader comparing profiles should be able to see that difference.
+
+\thesisinstitution{University of Washington}
+
+% --- Accessibility -----------------------------------------------------------
+\thesisaccessibilityrequirement{Not published}
+	{The Graduate School's thesis/dissertation page states no accessibility
+	 requirement, and states no formatting requirement at all beyond the title,
+	 copyright and abstract pages.}
+
+% --- Committee approval page --------------------------------------------------
+% Explicit, and the reason this hook exists at all:
+%   "Don't include a committee signature or approval page in the body of your
+%    thesis."
+% Master's approval is a separate signed PDF uploaded through the Administrative
+% Documents section of ProQuest; doctoral approval is recorded electronically by
+% the reading committee in MyGrad. Emitting the class's default approval leaf
+% here would be a filing error, so the page is taken away.
+\thesisnoapprovalpage

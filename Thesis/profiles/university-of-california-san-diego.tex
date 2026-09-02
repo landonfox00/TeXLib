@@ -1,0 +1,48 @@
+% profiles/university-of-california-san-diego.tex — UC San Diego
+% ============================================================================
+% source: https://grad.ucsd.edu/_files/academics/formattingmanual.pdf
+%         (Graduate Division, "Preparation and Submission Manual for Doctoral
+%         Dissertations and Master's Theses")
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% VERIFIED and set here: geometry, spacing.
+% LEFT TO THE NEUTRAL FALLBACK: title page and approval page. UCSD DOES require
+% an approval page -- the manual carries four specimen layouts of it, one per
+% degree path (PhD/DMA, joint EdD with CSUSM, joint PhD with SDSU, and the
+% master's) -- so the neutral page stands in rather than a guess at which. The
+% class's fallback is a plain approval leaf, which is the safer wrong answer
+% than a confidently mislabelled one.
+
+\thesisinstitution{University of California San Diego}
+
+% "Minimum Margins ... TOP LINE OF TYPE = 1" from top of paper; BOTTOM LINE OF
+% TYPE = 1" from bottom of paper; LEFT = 1" from left side of paper; RIGHT = 1"
+% from right side of paper." The manual adds that "Students may set slightly
+% larger margins but must be sure that the final text lies well within these
+% guidelines" -- these are minima, so the class's exact 1in conforms.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "All text must be double spaced, except as indicated below." (The exceptions
+% are the usual long quotations, notes and table matter.)
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% The manual frames its purpose in terms of access -- "to make it as accessible
+% as possible to future scholars and researchers who seek to consult it" -- but
+% that is about archival availability, not assistive technology, and it is not
+% recorded here as though it were a digital-accessibility rule.
+\thesisaccessibilityrequirement{Not published}
+	{The formatting manual states no digital-accessibility requirement for the
+	 filed manuscript.}
+\thesisaccessibilityrequirement{Typeface}
+	{A font "that is highly legible, dark enough to reproduce clearly, and large
+	 enough to be readily" read.}
+
+% --- Committee approval page --------------------------------------------------
+% NOT overridden, and deliberately not suppressed: UCSD requires the page. It is
+% titled "Dissertation/Thesis Approval Page", was previously called the
+% Signature Page, and carries the committee's signatures -- the manual notes the
+% committee gives final approval "as indicated by their signatures on the Final
+% Report". Whoever completes this profile should copy the specimen for the right
+% degree path out of the manual's appendix.

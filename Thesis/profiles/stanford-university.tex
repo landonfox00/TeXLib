@@ -1,0 +1,47 @@
+% profiles/stanford-university.tex — Stanford University
+% ============================================================================
+% source: https://studentservices.stanford.edu/my-academics/earn-my-degree/graduate-degree-progress/dissertations-and-theses/prepare-your-work-1
+%         (Student Services, "Title Page for Ph.D. Dissertation")
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% PARTIAL, and the gap is the important part of this file.
+%
+% VERIFIED and set here: nothing that changes the page. Only the institution
+% name and the title-page style rules below were confirmed from a Stanford URL.
+%
+% NOT SET, because it was NOT FOUND: margins, spacing and typeface. Three
+% registrar/student-services URLs were tried on the access date and none carried
+% a format-requirements page. Third-party sites state figures for Stanford
+% confidently -- 1.5in binding edge, 10-12pt, double-spaced -- and those figures
+% are NOT reproduced here, because none of them was read on a stanford.edu page.
+% Under RESEARCHING.md an unverified figure must stay unset: the class's neutral
+% geometry renders instead, which is a conformant document that makes no claim
+% about Stanford's rules.
+%
+% TO FINISH THIS PROFILE: find the current dissertation format requirements on
+% studentservices.stanford.edu or registrar.stanford.edu, or ask the Student
+% Services dissertation desk for the document they enforce, and set the geometry
+% and spacing from it.
+
+\thesisinstitution{Stanford University}
+
+% --- Accessibility -----------------------------------------------------------
+\thesisaccessibilityrequirement{Not found}
+	{No Stanford accessibility requirement for a filed dissertation was located
+	 on the access date. Treat that as "not looked up successfully", not as
+	 "none exists".}
+
+% --- Title page ---------------------------------------------------------------
+% VERIFIED, but recorded rather than implemented: the page is specified as three
+% style standards plus per-degree sample pages, and the samples were not read.
+% "All title pages for a Ph.D. Dissertation should follow these three style
+% standards: Use uppercase letters centered within the margins both vertically
+% and horizontally; No bold type and no pagination on the title page."
+%
+% Note the conflict with this class's neutral title page, which sets the title
+% in bold: Stanford forbids bold there. Anyone filing at Stanford must override
+% \thesistitlepage rather than rely on the fallback. That is a formatting rule,
+% not an accessibility one, so it is recorded here in prose rather than through
+% \thesisaccessibilityrequirement -- the report page must stay a record of what
+% a school asks for on accessibility, or it stops meaning anything.

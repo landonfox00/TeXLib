@@ -1,0 +1,34 @@
+source: https://ncses.nsf.gov/pubs/nsf26304/assets/nsf26304.pdf
+accessed: 2026-09-02
+survey: NSF NCSES, Higher Education Research and Development (HERD), FY 2024
+report: NSF 26-304
+table: Table 4 -- higher education R&D expenditures at institutions in the
+       standard form and short form survey populations, ranked by all R&D
+       expenditures, by source of funds: FY 2024
+ranks: 1-33 transcribed in order; slugs resolved against institutions.csv by
+       IPEDS name, one row each, no institution mapped by guess
+
+WHY A RANKED QUEUE EXISTS AT ALL
+
+`next` is otherwise alphabetical, which is stable and answerable from the
+profiles directory alone, but it starts at "A T Still University of Health
+Sciences" and reaches the institutions that graduate the most doctorates
+somewhere around row 1,900. Ranking by research expenditure puts the profiles
+that will be used first, first. The alphabetical order is still the fallback
+once this list is exhausted, so nothing is skipped -- only reordered.
+
+TWO CAVEATS ON THE RANKING
+
+* HERD reports the University of Maryland as ONE research unit combining
+  College Park and Baltimore, which have reported together since FY2019. They
+  are separate graduate schools with different filing rules. The slug here is
+  College Park.
+
+* HERD ranks institutions by dollars, which is not the same as by number of
+  dissertations filed, and several entries here are medical centres whose
+  doctoral output is small relative to their spend (MD Anderson at rank 23 is
+  the clearest case). Rank is a proxy for "whose students are likely to need
+  this", not a measure of it.
+
+regenerate: transcribe Table 4 of the current HERD report; there is no API for
+            this table, and the ranking changes yearly

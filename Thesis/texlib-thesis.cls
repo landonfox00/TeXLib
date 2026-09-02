@@ -406,7 +406,150 @@
 }
 
 % ---------------------------------------------------------------------------
-% 11. Institution profile
+% 11. Filing rules the page macros cannot express
+% ---------------------------------------------------------------------------
+% Surveying the twenty largest US research universities turned up three rules
+% that recur and that a profile previously had no way to state, leaving it to
+% note them in a comment and file out of spec anyway.
+%
+% (a) A DEEPER TOP MARGIN ON CHAPTER OPENINGS. Michigan, UNC-Chapel Hill and
+%     Georgia Tech all want 2in at the top of the first page of each chapter and
+%     major section while the body runs at 1in.
+%
+% \thesissetchapteropening takes the TOTAL top margin the requirements state,
+% not the difference from the body margin, because the difference is the number
+% a profile author gets wrong. The class subtracts the `top' key of the current
+% \thesissetgeometry itself, so re-stating the geometry cannot silently leave
+% the chapter openings behind at the old depth.
+\newlength{\thesis@chapteropening}
+\setlength{\thesis@chapteropening}{0pt}
+\ExplSyntaxOn
+\dim_new:N \l__thesis_topmargin_dim
+\cs_new_protected:Npn \__thesis_top_kv:nn #1#2
+	{ \tl_if_eq:nnT {#1} { top } { \dim_set:Nn \l__thesis_topmargin_dim {#2} } }
+% geometry's argument is a keyval list, so read it with the keyval parser: a
+% hand-rolled split on `=' derails on the valueless keys (includefoot) that sit
+% in the same list.
+\cs_new_protected:Npn \thesis_set_chapteropening:n #1
+	{
+		\dim_set:Nn \l__thesis_topmargin_dim { 1in }
+		\tl_set:Nx \l_tmpa_tl { \thesis@margins }
+		\exp_args:NnnV \keyval_parse:nnn { \use_none:n } { \__thesis_top_kv:nn }
+			\l_tmpa_tl
+		\dim_set:Nn \l_tmpa_dim { #1 - \l__thesis_topmargin_dim }
+		\dim_compare:nNnTF { \l_tmpa_dim } > { 0pt }
+			{ \skip_set:Nn \thesis@chapteropening { \l_tmpa_dim } }
+			{ \skip_zero:N \thesis@chapteropening }
+	}
+% Declared inside \ExplSyntaxOn: outside it, `_' and `:' are not letters and the
+% body would tokenise as \thesis followed by junk.
+\NewDocumentCommand \thesissetchapteropening { m }
+	{ \thesis_set_chapteropening:n {#1} }
+\ExplSyntaxOff
+% Both chapter heads, because the schools that ask for this say "chapter AND
+% major section": \chapter* builds the front-matter pages and the bibliography.
+\let\thesis@orig@makechapterhead\@makechapterhead
+\def\@makechapterhead#1{%
+	\vspace*{\thesis@chapteropening}\thesis@orig@makechapterhead{#1}%
+}
+\let\thesis@orig@makeschapterhead\@makeschapterhead
+\def\@makeschapterhead#1{%
+	\vspace*{\thesis@chapteropening}\thesis@orig@makeschapterhead{#1}%
+}
+
+% (b) NO APPROVAL PAGE AT ALL. Washington says it outright -- "Don't include a
+%     committee signature or approval page in the body of your thesis" -- and
+%     Johns Hopkins simply has none; both collect approval on a separate form.
+%     Emitting one there is a filing error, not a harmless extra, so a profile
+%     has to be able to take the page away. Calling \thesisapprovalpage after
+%     this warns and prints nothing, which keeps an existing template building
+%     while still filing correctly.
+\newcommand{\thesisnoapprovalpage}{%
+	\renewcommand{\thesisapprovalpage}{%
+		\ClassWarningNoLine{texlib-thesis}{\thesis@whose\space does not accept a committee^^J%
+			approval page inside the filed document -- approval is collected on a^^J%
+			separate form. \string\thesisapprovalpage{} printed nothing}%
+	}%
+}
+
+% (c) ACCESSIBILITY, which is now as much a filing rule as the margin and varies
+%     far more: Johns Hopkins names a PDF standard, UNC-Chapel Hill names WCAG
+%     2.2 Level AA, Michigan enumerates document title, language, headings and
+%     alt text as separate requirements, Wisconsin points at the ADA Title II
+%     date and says outright that LaTeX alone will not produce a conformant file.
+%
+% Only part of that is machine-checkable, and the split is deliberate. The class
+% checks what it can actually see and records the rest verbatim rather than
+% inventing a test that would pass without meaning anything.
+\newif\ifthesis@access@tagging
+\newif\ifthesis@access@lang
+\newcommand{\thesis@access@standard}{}
+\newcommand{\thesis@access@list}{}
+\newcommand{\thesisrequiretagging}{\thesis@access@taggingtrue}
+\newcommand{\thesisrequiredocumentlanguage}{\thesis@access@langtrue}
+\newcommand{\thesisrequirepdfstandard}[1]{\renewcommand{\thesis@access@standard}{#1}}
+\newcommand{\thesisaccessibilityrequirement}[2]{%
+	\g@addto@macro\thesis@access@list{\thesis@access@item{#1}{#2}}%
+}
+\AtBeginDocument{%
+	\ifthesis@access@tagging
+		\@ifundefined{tag_struct_begin:n}{%
+			\ClassWarningNoLine{texlib-thesis}{\thesis@whose\space REQUIRES an accessible^^J%
+				(tagged) PDF, and this build has tagging off. It will not be^^J%
+				accepted. Put \string\DocumentMetadata{lang=en,tagging=on,...} as^^J%
+				the first line and compile with lualatex}%
+		}{}%
+	\fi
+	% \GetDocumentProperties exists only once \DocumentMetadata has run, which is
+	% exactly the case where these two checks can say anything.
+	\ifdefined\GetDocumentProperties
+		\ifthesis@access@lang
+			\edef\thesis@access@tmp{\GetDocumentProperties{document/lang}}%
+			\ifx\thesis@access@tmp\@empty
+				\ClassWarningNoLine{texlib-thesis}{\thesis@whose\space requires the document^^J%
+					language to be set, and no lang= was given to \string\DocumentMetadata}%
+			\fi
+		\fi
+		\ifx\thesis@access@standard\@empty\else
+			\edef\thesis@access@tmp{\GetDocumentProperties{document/pdfstandard}}%
+			\ifx\thesis@access@tmp\@empty
+				\ClassWarningNoLine{texlib-thesis}{\thesis@whose\space requires \thesis@access@standard,^^J%
+					and this build declared no pdfstandard at all}%
+			\else
+				% Deliberately NOT an equality test. The kernel reports the PDF/A part
+				% alone ("A-4F"); a school's prose may name PDF/A-1b, or UA, or both.
+				% Matching those strings would manufacture an agreement that has not
+				% been checked, so both are stated and the reader decides.
+				\ClassWarningNoLine{texlib-thesis}{\thesis@whose\space requires \thesis@access@standard.^^J%
+					This build declares \thesis@access@tmp. Confirm that satisfies them}%
+			\fi
+		\fi
+	\fi
+}
+% The report page. Several graduate schools have begun asking for a statement of
+% what was done for accessibility at filing time; this prints the requirements
+% the profile recorded, which is the honest half of that answer -- it says what
+% the school asked for, not that the document achieved it.
+\newcommand{\thesis@access@item}[2]{\item[#1]#2}
+\newcommand{\thesisaccessibilityreport}{%
+	\begin{frontmatterpage}{Accessibility Report}
+		\ifx\thesis@access@list\@empty
+			No accessibility requirements are recorded for \thesis@whose{} in this
+			profile. That means none were found when the profile was written, not
+			that none apply.\par
+		\else
+			The following are the accessibility requirements
+			\thesis@whose{} publishes for a filed \thesis@docnoun, as recorded in
+			this document's institution profile.\par
+			\begin{description}
+				\thesis@access@list
+			\end{description}
+		\fi
+	\end{frontmatterpage}%
+}
+
+% ---------------------------------------------------------------------------
+% 12. Institution profile
 % ---------------------------------------------------------------------------
 % Loaded LAST, on purpose: a profile redefines the two page macros and may call
 % \thesissetgeometry / \thesissetspacing / \thesisinstitution, all of which must

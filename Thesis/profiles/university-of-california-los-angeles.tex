@@ -1,0 +1,51 @@
+% profiles/university-of-california-los-angeles.tex — UCLA
+% ============================================================================
+% source: https://grad.ucla.edu/gasaa/etd/filingrequirements.pdf
+%         (Division of Graduate Education, "Thesis and Dissertation Filing
+%         Requirements"; the document states its regulations "supersede any
+%         style manual instructions regarding format")
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% VERIFIED and set here: geometry, spacing.
+% LEFT TO THE NEUTRAL FALLBACK: title page and approval page. UCLA prescribes
+% these through sample pages in its Appendix A/B and warns that "departures from
+% the standard format are not acceptable" -- reproducing them faithfully needs
+% the specimens read line by line, which this pass did not do.
+%
+% WORTH KNOWING: a widely repeated third-party claim that UCLA wants a 1.5in
+% left margin for binding is WRONG as of this reading. The filing requirements
+% say LEFT, RIGHT, TOP: 1". That discrepancy is exactly why this library only
+% takes figures from the institution's own document.
+
+\thesisinstitution{University of California, Los Angeles}
+
+% "Minimum margin size: LEFT, RIGHT, TOP: 1". BOTTOM TEXT MARGIN: 1". FOOTER
+% MARGIN: 0.75" from bottom of the page for page number." Aside from the page
+% number, everything -- tables, figures, graphs -- must fit inside.
+%
+% The class's includefoot keeps the folio within the 1in text band rather than
+% out at 0.75in. That is inside UCLA's minimum, so it conforms; the 0.75in
+% figure is a floor, not a required position.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Unless otherwise noted, the manuscript must be double-spaced throughout.
+% Footnotes, bibliographic entries, long quoted passages, figure and table
+% captions, and items in lists and tables may be single-spaced."
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% UCLA states no accessibility requirement as such. It does require embedded
+% fonts, and -- unusually, and usefully for this library -- it names the LaTeX
+% default face in its own table of acceptable fonts.
+\thesisaccessibilityrequirement{Embedded fonts}
+	{"Embedded fonts are required." UCLA points at ProQuest's conversion tool
+	 to do it; a lualatex build embeds every face already.}
+\thesisaccessibilityrequirement{Typeface}
+	{The acceptable-font table lists "CMR (Tex/LaTex) 12 point" alongside Times
+	 and Arial, so this class's Latin Modern at 12pt is explicitly in spec.
+	 Body text may not be smaller than 10-point, and italic body faces are not
+	 accepted.}
+\thesisaccessibilityrequirement{Not published}
+	{Beyond embedded fonts, the filing requirements state no accessibility
+	 obligation for the manuscript.}

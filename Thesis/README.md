@@ -25,17 +25,29 @@ shipped template.
 ```
 
 A profile is one file, `Thesis/profiles/<name>.tex`, loaded last so it can use
-anything the class loaded. It owns exactly three things:
+anything the class loaded. It owns the parts a graduate school dictates:
 
 | What | How |
 |---|---|
 | The institution name | `\thesisinstitution{...}` |
 | The two pages | `\renewcommand{\thesistitlepage}{...}`, `\renewcommand{\thesisapprovalpage}{...}` |
+| No approval page at all | `\thesisnoapprovalpage` — where the school forbids one in the document |
 | The filing figures | `\thesissetgeometry{left=1in, ...}`, `\thesissetspacing{double\|onehalf\|single}` |
+| A deeper chapter opening | `\thesissetchapteropening{2in}` — the **total** top margin on chapter/major-section first pages |
+| Accessibility rules | `\thesisrequiretagging`, `\thesisrequiredocumentlanguage`, `\thesisrequirepdfstandard{...}`, `\thesisaccessibilityrequirement{label}{text}` |
 
 Everything else — the tagged-PDF stack, the trivlist-free theorem
 environments, `\ThesisMathIntent`, the front-matter machinery, the
 degree/committee metadata model, biblatex — is shared and needs no profile.
+
+The accessibility declarations split by whether the class can check the rule.
+The first three produce a build-time warning when the document does not satisfy
+them; `\thesisaccessibilityrequirement` records a rule that cannot be tested and
+prints it on `\thesisaccessibilityreport`, a front-matter page for the
+accessibility statement several graduate schools now ask for at filing. Set the
+checkable ones only where the school **requires** the thing — this class emits a
+tagged PDF either way, and a profile claiming a requirement its school never
+published is as wrong as an invented margin.
 
 **Writing one.** Copy [`profiles/unr.tex`](profiles/unr.tex), which is
 commented as the reference, and replace the two page bodies. The committee list

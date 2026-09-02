@@ -1,0 +1,41 @@
+% profiles/columbia-university-in-the-city-of-new-york.tex — Columbia University
+% ============================================================================
+% source: https://gsas.columbia.edu/student-guide/dissertation/formatting-guidelines-and-dissertation-template
+%         (Graduate School of Arts and Sciences, "Formatting Guidelines and
+%         Dissertation Template")
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% VERIFIED and set here: geometry, spacing.
+% LEFT TO THE NEUTRAL FALLBACK: title page and approval page. GSAS specifies
+% both in accordion sections of the same page that were not read on this pass.
+%
+% GSAS publishes its own LaTeX template and says a dissertation "formatted
+% improperly will be returned to the student for revisions", so check this
+% profile against that template before filing.
+
+\thesisinstitution{Columbia University in the City of New York}
+
+% "All four margins of the page must be at least one inch, and the left and
+% right margins should be equal. All material, including figures, tables,
+% headers/footers, footnotes/endnotes, and images, must appear within the
+% margins of the manuscript. Page numbers are the only exception; these must
+% appear at least three quarters of an inch (3/4") from the edge of the page,
+% but can appear in the one-inch margin."
+%
+% The equal-left-and-right rule is the one to watch: it rules out the asymmetric
+% binding margin that Duke and Georgia Tech require, so this geometry must not
+% be "improved" by copying one of those.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "The text, abstract, dedication, acknowledgments, and table of contents are
+% double spaced. Normally, quotations of eight lines or more are indented and
+% single spaced. Footnotes, endnotes, and bibliographic entries should be single
+% spaced with double spacing between each entry."
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+\thesisaccessibilityrequirement{Not published}
+	{The GSAS formatting guidelines state no accessibility requirement for a
+	 filed dissertation. The page's Font section was not read on this pass, so
+	 confirm before assuming there is no typeface rule either.}

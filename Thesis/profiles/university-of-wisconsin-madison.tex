@@ -1,0 +1,53 @@
+% profiles/university-of-wisconsin-madison.tex — University of Wisconsin-Madison
+% ============================================================================
+% source: https://grad.wisc.edu/academics/doctoral-guide/
+%         (Graduate School, "Completing Your Doctoral Degree")
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% VERIFIED and set here: the accessibility requirements, which are the most
+% developed of any school in this set, and the file requirements.
+% LEFT TO THE NEUTRAL FALLBACK: geometry, spacing, title page, approval page.
+% That is not an omission. Wisconsin's doctoral guide states no margin, no body
+% spacing rule and no typeface rule; it defers formatting to the student's
+% program and style. The class defaults (1in all round, double-spaced) are a
+% reasonable document, not a Wisconsin requirement, and this file does not
+% pretend otherwise by restating them as though they were.
+
+\thesisinstitution{University of Wisconsin-Madison}
+
+% --- Accessibility -----------------------------------------------------------
+% Wisconsin is the school in this set that says the quiet part out loud: it
+% names the ADA Title II compliance date, it tells students the Graduate
+% School's own prechecks will NOT catch accessibility problems, and it states
+% plainly that LaTeX alone does not produce a conformant file. That last point
+% is the reason this class exists, so it is quoted rather than summarised.
+\thesisrequiretagging
+\thesisrequiredocumentlanguage
+\thesisaccessibilityrequirement{ADA Title II}
+	{"New digital accessibility requirements under the Americans with
+	 Disabilities Act go into effect April 26, 2027. Because dissertations are
+	 published and made available to the public digitally, you must plan and
+	 take steps to ensure the PDF of your dissertation submitted to ProQuest
+	 meets accessibility" standards.}
+\thesisaccessibilityrequirement{Not checked for you}
+	{"Prechecks will not include a digital accessibility check." The
+	 responsibility, and the automated and manual testing, are the student's.}
+\thesisaccessibilityrequirement{Alt text}
+	{Alt text and image descriptions are required. "For complex images like
+	 graphics or charts, incorporate a long description into a caption or nearby
+	 text in your document."}
+\thesisaccessibilityrequirement{LaTeX is not enough}
+	{"LaTeX alone does not create an accessible PDF, but additional tools like
+	 PreTeXt or LaTeX extension packages can help." Building this document with
+	 tagging on is what answers that; it is not automatic.}
+\thesisaccessibilityrequirement{File}
+	{One PDF, fonts embedded, no security settings, under 1000 MB, and no period
+	 in the filename except before the extension.}
+
+% --- Committee approval page --------------------------------------------------
+% "Committee signatures = dissertation approval", collected electronically, and
+% the signed PhD warrant is uploaded to ProQuest as an administrative document
+% rather than bound into the manuscript. Nothing in the doctoral guide asks for
+% an approval leaf inside the PDF.
+\thesisnoapprovalpage

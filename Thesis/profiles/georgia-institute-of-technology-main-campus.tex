@@ -1,0 +1,61 @@
+% profiles/georgia-institute-of-technology-main-campus.tex — Georgia Tech
+% ============================================================================
+% source: https://grad.gatech.edu/sites/default/files/documents/thesisDissertationManual-%20April%202026%201%20(1).pdf
+%         (Office of Graduate Education, "Thesis and Dissertation Manual")
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% VERIFIED and set here: geometry, spacing.
+% LEFT TO THE NEUTRAL FALLBACK: title page and approval page. Georgia Tech
+% collects approval through Vireo/ETD -- "You and your committee members will
+% receive an approval notice via Vireo/ETD" -- rather than by a signed leaf, but
+% the manual's specimen front matter was not read closely enough on this pass to
+% say the document carries no approval page at all, so it is NOT suppressed.
+
+\thesisinstitution{Georgia Institute of Technology}
+
+% "Right Margin: Always 1"; Bottom Margin: Always 1"; Left Margin: Always 1.5"
+% (because copies still may be printed and bound)."
+%
+% Note the asymmetry is UNCONDITIONAL for a dissertation. The manual grants one
+% exception and only to master's students: "If you are sure that your thesis
+% will not be bound, then a 1" left margin is permissible." A master's candidate
+% filing electronically may therefore use
+%     \thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+% after loading this profile. A doctoral candidate may not.
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% AMBIGUITY, recorded rather than resolved. The manual offers a genuine choice
+% for the top of a major heading and requires only that you keep it:
+%   "Option 1: 1" top margin for all pages including major headings (standard
+%    APA format). Option 2: Major headings begin 2" from the top of the page.
+%    Whichever you choose, you must be consistent."
+% This profile takes Option 1, because it is the one the geometry above already
+% produces and the one that needs no further action. To file under Option 2, add
+%     \thesissetchapteropening{2in}
+% after loading this profile; the class then applies it to every chapter and
+% \chapter*-based major section, which is what "consistent" requires.
+
+% "The text of the thesis or dissertation should generally be double-spaced."
+% Line spacing of 1.5 is permitted subject to a measured minimum ("the distance
+% between two lines measured from bottoms of vowels in each line is at least
+% 5/16""), which is not a rule this class can check. "All footnotes must be
+% single-spaced, and conform to margin and font requirements."
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Georgia Tech names an earlier ADA Title II date than Wisconsin does, and both
+% are right: the Department of Justice rule phases by public-entity size, so a
+% large public university's date is April 2026 and a smaller entity's is April
+% 2027. Do not "correct" one profile against the other.
+\thesisrequiretagging
+\thesisaccessibilityrequirement{ADA Title II}
+	{"ADA Title II Accessibility Requirements (Effective April 2026).
+	 Beginning in April 2026, all web content produced by public entities must
+	 comply with federal accessibility mandates."}
+\thesisaccessibilityrequirement{Student's responsibility}
+	{"Students are responsible for ensuring that their thesis or dissertation is
+	 accessible to the best of their ability before uploading it to the ETD
+	 submission portal."}
+\thesisaccessibilityrequirement{Embedded fonts}
+	{"All fonts used should be embedded in the document."}

@@ -1,0 +1,48 @@
+% profiles/university-of-california-san-francisco.tex — UC San Francisco
+% ============================================================================
+% source: https://graduate.ucsf.edu/students/dissertation-thesis-guidelines/format-dissertation
+%         (Graduate Division, "Formatting Your Dissertation or Thesis")
+% accessed: 2026-09-02
+% checked:  top-20 research-institution pass
+%
+% VERIFIED and set here: geometry, spacing.
+% LEFT TO THE NEUTRAL FALLBACK: title page and approval page. UCSF hosts its
+% title pages as separate ETD templates rather than describing a layout in
+% prose, and the page giving them was not read on the access date.
+
+\thesisinstitution{University of California, San Francisco}
+
+% "Every page of your thesis or dissertation must have a one-inch margin on all
+% sides, top, bottom, left, and right. The only element that may be placed
+% outside of the one-inch margin is the page number, which should print no
+% closer than one-half inch from the edge of the paper."
+%
+% The class's `normal' geometry uses includefoot, so the folio sits inside the
+% one-inch band rather than out in the margin. That is stricter than UCSF asks
+% and therefore in spec; a profile only has to avoid going the other way.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Double spacing should be used except in those places where conventional usage
+% calls for single spacing such as long quotes, footnotes, indented quotations,
+% figures, and tables. Abstract and dedication pages should also be
+% double-spaced."
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Nothing on the formatting page states an accessibility requirement. The one
+% adjacent rule worth recording is a legibility rule that will bite anyone
+% reading it as an accessibility rule, so it is quoted rather than paraphrased.
+\thesisaccessibilityrequirement{Not published}
+	{The Graduate Division's formatting page states no accessibility
+	 requirement for the filed manuscript.}
+\thesisaccessibilityrequirement{Colour}
+	{"Native digital manuscripts will appear in color when viewed
+	 electronically. Microfilm and print reproductions will NOT preserve color."
+	 Do not let colour alone carry meaning.}
+
+% --- Title page ---------------------------------------------------------------
+% NOT overridden -- see the header. Two facts recorded for whoever finishes it:
+% the title page counts as page "i" with the number not printed, and UCSF
+% requires a SIGNED title page as a separate deliverable on its own deadline
+% ("Signed title page due"), distinct from the manuscript uploaded to ProQuest.
+% There is no committee approval leaf inside the document.
