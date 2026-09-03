@@ -62,4 +62,4 @@ no approval page, and accessibility recorded as **Not published** — an absence
 read, not a section skipped. Builds clean; tagged output veraPDF UA-2 clean
 (`failedRules="0"`). Flagged for the reviewer: a superseded 2013/2021 edition of
 the same guidelines is still served from `assets.asr.umn.edu` and prescribes an
-in-document signature page the current edition does not. PR #TBD.
+in-document signature page the current edition does not. PR #117.
