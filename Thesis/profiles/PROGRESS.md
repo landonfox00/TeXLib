@@ -52,3 +52,29 @@ give UCLA a 1.5in left margin for binding. UCLA's own filing requirements say
 hook, a way for a profile to state that no approval page is permitted, and the
 accessibility declarations — all three were things a profile previously had to
 note in a comment and then file out of spec anyway.
+
+## 2026-09-04 - texas-a-and-m-university-college-station
+
+`profile` - HERD rank 22. `next` served Minnesota (rank 21) again, because that
+profile lives on the open PR #117 and not on `main`; it was **skipped, not
+redone** - #117 is complete and reaches the same conclusions from the same
+sources - so this round took rank 22 instead. Expect Minnesota to keep coming
+back until #117 merges.
+
+Set from the Graduate and Professional School's *Guidelines for Theses,
+Dissertations, and Records of Study*, dated **Updated 6/3/2026**, with the
+title-page layout taken from the example manuscript the Grad School generates
+from its own LaTeX template (version 20260717): geometry (1in minimum, 2in
+ceiling), spacing (double, a single value not a choice), the seven-element title
+page with its two-column committee block, no approval page (signatures are
+digital, in ARCS), and four accessibility rules. Builds clean; tagged output
+veraPDF UA-2 `isCompliant="true"`.
+
+Two things flagged for the reviewer rather than decided. TDS says its accessible
+templates and fonts are "strongly encouraged" and never that a filed PDF must be
+tagged, so `\thesisrequiretagging` is NOT set - but one sentence ("While use of
+the templates is optional, the formatting and structural conventions they
+reflect are required") can be read the other way. And `\thesisnoapprovalpage`
+rests on where the signatures are collected, not on a sentence forbidding the
+page. Also worth knowing: `grad.tamu.edu` refuses plain fetches (403/404) and
+needs a browser User-Agent plus a Referer header. PR #118.

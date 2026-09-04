@@ -1,0 +1,224 @@
+% profiles/texas-a-and-m-university-college-station.tex — Texas A&M University-College Station
+% ============================================================================
+% source: https://grad.tamu.edu/degree-completion/thesis-and-dissertation/writing-tools/20260603-tamu-tds-guidelines.pdf
+%         ("Guidelines for Theses, Dissertations, and Records of Study",
+%          Graduate and Professional School, Thesis and Dissertation Services;
+%          the document's own second line reads "Updated 6/3/2026")
+% source: https://grad.tamu.edu/degree-completion/thesis-and-dissertation/writing-tools/latex-templates-and-instructions-for-theses-dissertations-and-records-of-study.html
+%         (the LaTeX template page, which names the current template version
+%          20260717 and links the example manuscript below)
+% source: https://grad.tamu.edu/degree-completion/thesis-and-dissertation/writing-tools/20260717-tamu_thesis_overleaf-template.pdf
+%         (the example manuscript the Grad School generates from its own LaTeX
+%          template — used here only as EVIDENCE OF TITLE-PAGE LAYOUT, which is
+%          what RESEARCHING.md allows an official template to be)
+% accessed: 2026-09-04
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, the absence of an
+% approval page, and four published accessibility rules.
+% NOT set, and deliberately:
+%   * \thesissetchapteropening — TDS prescribes no deeper margin on chapter
+%     openings; the margin rule is flat and applies throughout.
+%   * \thesisrequiretagging and the other checkable declarations — see the
+%     accessibility note below, which is the one genuinely ambiguous point in
+%     this profile and is left to a reviewer rather than resolved silently.
+%
+% CURRENCY. This is the freshest source any profile in this directory rests on:
+% the guidelines are dated 6/3/2026 and the template 20260717, both within three
+% months of the access date. No stale-source caveat applies.
+%
+% NAMING. IPEDS records "Texas A & M University-College Station". The Grad
+% School, the guidelines and the prescribed title page all write "Texas A&M
+% University", and that is what \thesisinstitution carries, since it is the
+% string the class prints in warnings and on the neutral pages.
+%
+% ONE REQUIREMENT THIS PROFILE CANNOT EXPRESS, met by luck rather than design:
+% "Use a single font (typeface) and 12-point type size throughout the
+% manuscript." There is no profile field for type size, and none is invented
+% here — but texlib-thesis loads report at 12pt, so a document built with this
+% class already satisfies it. If the class's base size ever changes, this
+% institution's requirement breaks silently, which is why it is written down.
+
+\thesisinstitution{Texas A\&M University}
+
+% "Students must use 8.5" x 11" page size, with minimum 1" margins; TDS
+% templates are preset with these specifications."
+%
+% This is a MINIMUM with a stated CEILING, not a fixed figure: "Variations from
+% standard margins or orientation may be used when necessary (e.g., landscape
+% pages for large tables or figures, or expanded left margins for binding
+% purposes), as long as margins do not exceed 2" on any side. Margins and
+% formatting must be applied consistently throughout the document."
+%
+% The profile takes the 1in minimum, which is what the TDS templates are preset
+% to. Anything from 1in to 2in is in spec, so a student who wants a binding
+% allowance may set \thesissetgeometry{left=1.5in, right=1in, top=1in,
+% bottom=1in} without leaving the requirement — but note the consistency clause:
+% whatever is chosen has to hold throughout the document.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Text must be double-spaced." Unlike most schools in this directory TDS states
+% one value rather than a choice, so there is nothing to pick here.
+%
+% The exceptions are named and are all handled by the class or the templates
+% rather than by this setting: "The Title Page, Table of Contents, List of
+% Figures, and List of Tables have special formatting preset in the templates
+% and are exceptions to this requirement. Table captions and figure legends are
+% single-spaced". In the References section "each reference entry may be
+% single-spaced, but a blank line must be inserted between references."
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Texas A&M publishes more on this than most, and it is the reason this profile
+% is worth having — but READ THE MODAL VERBS. TDS says "strongly encouraged",
+% not "required", of both the accessible templates and the accessible fonts.
+%
+% Nothing is therefore declared to \thesisrequiretagging,
+% \thesisrequiredocumentlanguage or \thesisrequirepdfstandard: TDS nowhere
+% states that a filed PDF must be tagged, name a PDF standard, or carry a
+% document language, and those three declarations produce build-time warnings
+% in this institution's name.
+%
+% THE AMBIGUITY, stated rather than resolved. One sentence cuts the other way:
+% "While use of the templates is optional, the formatting and structural
+% conventions they reflect are required." The templates are described as meeting
+% "current digital accessibility tagging standards", so a reader could take
+% "structural conventions ... are required" to make tagging itself required.
+% This profile does not read it that way — the sentence is about document
+% structure (headings, front matter, chapter organisation), which is what the
+% surrounding Style section is about, and reading a tagging mandate into it
+% would be inferring a requirement rather than quoting one. A reviewer who
+% concludes otherwise should add \thesisrequiretagging; that is a judgement
+% about TDS's words, not a fact this pass could settle.
+%
+% This class emits a tagged PDF regardless, so nothing below is lost either way.
+\thesisaccessibilityrequirement{Accessible templates}
+	{The Grad School provides LaTeX and Word templates "that meet accessibility
+	 standards upon conversion to PDF". Their use is encouraged, not mandated:
+	 "Students are strongly encouraged to use these templates", and "While use
+	 of the templates is optional, the formatting and structural conventions
+	 they reflect are required."}
+\thesisaccessibilityrequirement{Accessible fonts}
+	{"Fonts that are considered digitally accessible are strongly encouraged.
+	 TDS templates are preset with accessible fonts: Arial in the Word template
+	 and EB Garamond in the LaTeX template." Encouraged, not required; this
+	 class sets Latin Modern and embeds every face.}
+\thesisaccessibilityrequirement{Headings}
+	{"Preliminary, Chapter, and other main headings are preset in the TDS
+	 manuscript templates to support digital accessibility." Real heading
+	 levels, in order, are what this means in a LaTeX document.}
+\thesisaccessibilityrequirement{Corrections}
+	{Tagging must survive revision: "Corrections must not be made directly to
+	 the PDF, as doing so may disrupt accessibility tagging." Requested changes
+	 go into the source and the document is recompiled and re-uploaded.}
+
+% --- Title page --------------------------------------------------------------
+% The guidelines fix the CONTENT: "The title page must include the (1) Title,
+% (2) Author Statement, (3) Committee Member Names and Positions, (4) Department
+% Head Name, (5) Graduation Date, (6) Major Subject, and (7) Copyright Notice.
+% The font and point size must match text within the document. This is the only
+% page of the manuscript that does not include a page number." The title itself
+% "is limited to 240 characters for downstream database management."
+%
+% The guidelines do NOT print a specimen. The wording and arrangement below come
+% from the example manuscript the Grad School generates from its own LaTeX
+% template (source 3 above), which is what RESEARCHING.md means by a template
+% being evidence of layout. The seven required elements appear there in exactly
+% the order the manual lists them.
+%
+% The committee block is the distinctive part: a two-column, LEFT-ALIGNED list
+% whose left column carries the role and a comma ("Chair of Committee,",
+% "Committee Members,", "Head of Department,") and whose right column carries
+% the name, with continuation members leaving the role blank. \thesis@memberline
+% is redefined for this page only to produce that; the class default draws a
+% signature rule, which is wrong here because Texas A&M collects no signatures
+% inside the document (see the approval-page note below).
+%
+% So a Texas A&M document declares its committee like this:
+%     \committeemember{Chair Name}{Chair of Committee}
+%     \committeemember{Member One}{Committee Members}
+%     \committeemember{Member Two}{}
+%     \committeemember{Member Three}{}
+%     \committeemember{Head Name}{Head of Department}
+%
+% \graddate supplies the Graduation Date and \gradprogram the Major Subject.
+% The copyright year is its own element and the class has no year field, so
+% \thesiscopyrightyear is provided here; left unset it falls back to \graddate,
+% which is right whenever that value is a month and year in the conferral year.
+% Set it explicitly (\renewcommand{\thesiscopyrightyear}{2027}) to print a bare
+% year, as the Grad School's own example does.
+%
+% Vertical placement is not prescribed in either source, so the gaps below are a
+% reading of the example's proportions, not a quoted figure. Single spacing on
+% this page is required: the title page is a named exception to double spacing.
+\providecommand{\thesiscopyrightyear}{}
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{1in}%
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{4\baselineskip}
+		A \thesis@DocNoun\\
+		by\\
+		\MakeUppercase{\@author}\par
+		\vspace{4\baselineskip}
+		Submitted to the Graduate and Professional School of\\
+		Texas A\&M University\\
+		in partial fulfillment of the requirements for the degree of\par
+		\vspace{\baselineskip}
+		\MakeUppercase{\thesis@degree}\par
+		\vspace{4\baselineskip}
+		% Left-aligned two-column committee block, roles in the left column.
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			\makebox[1.85in][l]{\ifx\relax##2\relax\else##2,\fi}##1\par
+		}%
+		\raggedright
+		\thesis@committee
+		\endgroup
+		\vspace{3\baselineskip}
+		{\centering
+		\thesis@date\par
+		\vspace{2\baselineskip}
+		Major Subject: \thesis@program\par
+		\vspace{2\baselineskip}
+		Copyright \ifx\thesiscopyrightyear\@empty\thesis@date\else\thesiscopyrightyear\fi\ \@author\par
+		}%
+		\vfill
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% The filed document contains none. Texas A&M does collect approval, and does
+% collect signatures, but both happen on a separate electronic form:
+%
+%   "To graduate in a given semester, students must have their Written
+%    Thesis/Dissertation Approval Form in ARCS (Academic Requirements Completion
+%    System) digitally signed by all committee members and the department by the
+%    posted deadline."
+%
+% and, of the department, "The Department Head, or an approved signer ... must
+% also sign the Written Thesis/Dissertation Approval Form." Review by TDS begins
+% only after "completion of the Written Thesis/Dissertation Approval Form,
+% signed by all committee members and the department in ARCS."
+%
+% Signatures are therefore DIGITAL and live in ARCS, not on a leaf of the
+% manuscript — and the committee's names already appear on the title page, which
+% is where the guidelines require them. The manual's list of document content
+% runs Title Page, Abstract, Dedication, Acknowledgments, Contributors and
+% Funding Sources, Nomenclature, Table of Contents, List of Tables, List of
+% Figures, References, Appendices; no approval page appears in it.
+%
+% Leaving this hook unset would print the neutral approval page with signature
+% rules — a page TDS does not ask for, in a document where TDS review is
+% explicitly a formatting compliance check. As at Johns Hopkins and Michigan,
+% the page is taken away rather than left to the fallback.
+%
+% Note this rests on where the signatures are collected, not on a sentence
+% forbidding the page: TDS does not say "do not include an approval page" the
+% way Washington does. A reviewer who wants that exact sentence before accepting
+% \thesisnoapprovalpage should downgrade this to unset — the neutral page is the
+% conservative failure.
+\thesisnoapprovalpage
