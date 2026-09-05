@@ -1,0 +1,187 @@
+% profiles/university-of-southern-california.tex — University of Southern California
+% ============================================================================
+% source: https://graduateschool.usc.edu/current-students/thesis-dissertation-submission/manuscript-formatting-guidelines/
+%         (the Graduate School's Manuscript Formatting Guidelines page — the
+%          signature-page rule below is stated here and not in the PDF)
+% source: https://graduateschool.usc.edu/wp-content/uploads/2020/11/Manuscript_Formatting_and_Documentation_Styles.pdf
+%         ("Thesis and Dissertation Guidelines", USC Graduate School, 13 pp.
+%          The page above links it as "the USC Graduate School Thesis and
+%          Dissertation Formatting Guidelines". Title-page specimens are its
+%          Appendix A, pp. 8-13 of the file.)
+% accessed: 2026-09-05
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, and the title page. NOT set:
+% chapter-opening margin (no such rule), and the approval page, which is left as
+% the class's neutral fallback ON PURPOSE — see the note at the foot of the file.
+%
+% AGE OF THE SOURCE. The guidelines PDF carries no revision date in its text;
+% its embedded CreationDate is 2020-03-11 and it is served from a /2020/11/
+% upload path, so it is about six years old. The live Graduate School page links
+% it as the current guidelines and no newer edition was found on the server, so
+% it is followed — but a six-year-old document is worth re-checking before a
+% real filing, and RESEARCHING.md asks that this be said rather than assumed
+% away.
+%
+% A DISTINCTION THAT IS EASY TO GET BACKWARDS. USC leaves the STYLE MANUAL to
+% the discipline — "Please consult with your staff graduate advisor, or
+% committee chair, regarding an acceptable manuscript style, such as MLA, APA,
+% or Chicago" — while prescribing the GENERAL FORMATTING itself. Third-party
+% summaries collapse the two and report that USC "does not require any specific
+% set of formatting guidelines". That is true of the citation style and false of
+% the margins, which are stated flatly below.
+
+\thesisinstitution{University of Southern California}
+
+% --- Filing figures ----------------------------------------------------------
+% "All margins must be 1""  -- stated once, for all four sides, with no range,
+% no minimum/maximum and no exception.
+%
+% The companion rule is a footer rule, not a margin: "Footer margin for page
+% numbers must be 0.5" from bottom of page", and "With the exception of page
+% numbers, all other manuscript material must fit within the margin
+% requirements." The class's geometry carries `includefoot', so the page number
+% lives inside the 1in text block rather than 0.5in from the paper edge. That is
+% CONSERVATIVE, not out of spec -- USC's rule places the number at 0.5in as an
+% allowance below the text, and material sitting further inside the margin
+% breaks nothing. It is recorded here because it is the one figure on this page
+% the class does not reproduce exactly, and a reviewer may prefer to chase it.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Double space text throughout manuscript and indent paragraphs". A requirement,
+% not a menu. The single-spaced exceptions USC names -- footnotes, long quoted
+% passages, figure and table captions, items in lists and tables -- are
+% per-element and not expressible in a profile.
+\thesissetspacing{double}
+
+% No chapter-opening rule is published, so \thesissetchapteropening stays unset.
+
+% --- Accessibility -----------------------------------------------------------
+% NOTHING IS DECLARED REQUIRED. The 13-page guidelines PDF contains ZERO
+% occurrences of "accessib", "alt text", "WCAG", "tagged", "PDF/A" or "screen
+% read"; the Manuscript Formatting Guidelines page has none; and neither does
+% "Guidelines to Submission" or "Required Documents". USC is a private
+% institution, so the April 2026 ADA Title II date that drives several public
+% universities' rules does not reach it in the same way.
+\thesisaccessibilityrequirement{Not published}
+	{USC's Graduate School publishes no accessibility requirement for a filed
+	 thesis or dissertation, in the formatting guidelines or on any of the three
+	 submission pages, as read on 2026-09-05. A finding, not a licence -- and
+	 one to re-check, since the governing PDF dates from 2020.}
+
+% --- Copyright year (used by the title page below) -----------------------------
+% USC's title page carries a copyright line, and the class has no year macro.
+% Set it in the document preamble:  \thesiscopyrightyear{2027}
+% If it is unset the line is omitted and the title page says so at build time,
+% because USC's instruction is to "format exactly as shown" and every specimen
+% in Appendix A carries the line.
+\newcommand{\thesis@copyrightyear}{}
+\newcommand{\thesiscopyrightyear}[1]{\renewcommand{\thesis@copyrightyear}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% "See Appendix A for title page templates and format exactly as shown", "Text
+% surrounded by [...] on the templates indicate information unique to each
+% student and should be revised accordingly", and -- note this one --
+% "Do not bold text or add any extraneous information."
+%
+% THE TITLE IS THEREFORE NOT BOLD, unlike the class's neutral title page and
+% unlike most of the other profiles in this directory. Do not "fix" it.
+%
+% Reproduced from the PhD specimen (Appendix A, p. 8 of the PDF), rendered at 90
+% dpi and read as an image. Its shape: title and subtitle at the top; "by" and
+% the author below them; then a single tight seven-line block; then the
+% conferral date; then, at the very foot, a two-column line with "Copyright
+% [Year]" flush left and the author flush right.
+%
+% The seven-line block is quoted exactly and must not be reflowed:
+%
+%   A Dissertation Presented to the
+%   FACULTY OF THE USC GRADUATE SCHOOL
+%   UNIVERSITY OF SOUTHERN CALIFORNIA
+%   In Partial Fulfillment of the
+%   Requirements for the Degree
+%   DOCTOR OF PHILOSOPHY
+%   [(MAJOR or DEGREE PROGRAM NAME)]
+%
+% A NOTE ON THE SPECIMEN SET, because a filer needs it. Appendix A holds SIX
+% specimens, and they do not all say the same thing. The PhD one names "FACULTY
+% OF THE USC GRADUATE SCHOOL" and spells the degree "DOCTOR OF PHILOSOPHY"; the
+% other doctorates name "FACULTY OF THE USC [SCHOOL NAME]" and read "DOCTOR OF
+% [MAJOR OR DEGREE PROGRAM NAME]"; the master's ones read "A Thesis Presented to
+% the ... FACULTY OF THE USC [SCHOOL NAME] ... MASTER OF ARTS". This profile
+% follows the PhD/Graduate School specimen, because that is the one addressed to
+% the Graduate School itself. A filer in a named school should replace the
+% FACULTY line accordingly; the profile cannot know which school.
+%
+% The date: "Degrees are conferred three times per year: December (for fall),
+% May (for spring), August (for summer)" and "Only the month and year are
+% required; the day is not." So \graddate{May 2027} is the right shape here.
+%
+% "Every page in the manuscript, except the title page, must have a page number"
+% -- hence the no-footer geometry and \thispagestyle{empty}.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{1.5in}
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{3\baselineskip}
+		by\par
+		\vspace{2\baselineskip}
+		\@author\par
+		\vspace{5\baselineskip}
+		A \thesis@DocNoun{} Presented to the\\
+		FACULTY OF THE USC GRADUATE SCHOOL\\
+		UNIVERSITY OF SOUTHERN CALIFORNIA\\
+		In Partial Fulfillment of the\\
+		Requirements for the Degree\\
+		\MakeUppercase{\thesis@degree}\\
+		(\MakeUppercase{\thesis@program})\par
+		\vspace{4\baselineskip}
+		\thesis@date\par
+		\vfill
+		% The specimen's foot: Copyright + year flush left, author flush right.
+		\ifx\thesis@copyrightyear\@empty
+			\ClassWarningNoLine{texlib-thesis}{USC's title-page specimens all carry a^^J%
+				copyright line, and \string\thesiscopyrightyear{} is unset, so it was^^J%
+				omitted. Put \string\thesiscopyrightyear{<year>} in the preamble}%
+		\else
+			\noindent\makebox[\textwidth][s]{%
+				\parbox[t]{0.45\textwidth}{\raggedright Copyright \thesis@copyrightyear}%
+				\hfill
+				\parbox[t]{0.45\textwidth}{\raggedleft \@author}%
+			}\par
+		\fi
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% DELIBERATELY LEFT AS THE CLASS'S NEUTRAL FALLBACK, and this is the one
+% judgement in the file worth arguing with.
+%
+% USC's rule, quoted in full:
+%
+%   "A signature page is not required by the University for thesis or
+%    dissertation submission. Students who are required by their school,
+%    department or program to include a signature page should consult their
+%    committee chairperson and include the signature page in the uploaded PDF
+%    version of the thesis/dissertation manuscript."
+%
+% That is neither of the two cases the class has a hook for. It is not a
+% prescribed page, so \renewcommand{\thesisapprovalpage}{...} would be inventing
+% a layout USC does not publish. But it is also NOT a prohibition, so
+% \thesisnoapprovalpage would be wrong in the opposite direction: it makes
+% \thesisapprovalpage print nothing, which would silently drop the page for
+% exactly the student whose department requires one -- the person USC's sentence
+% is addressed to.
+%
+% So the neutral page renders. It is not USC's page, because USC has none; it is
+% a plausible signature page for a student whose department asks for one, and
+% that student's chairperson is the authority on its wording, which is what USC
+% says. \thesisapprovalpage is simply not called by a student whose department
+% does not require it.
+%
+% PHYSICAL SIGNATURES: not by the University. Where a department does require
+% the page, USC asks for it inside the uploaded PDF rather than as a separate
+% administrative file, which is the opposite of Vanderbilt's arrangement.
