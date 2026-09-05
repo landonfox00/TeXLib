@@ -79,14 +79,39 @@
 % Documents supply their bib file via \addbibresource{...} (typically in
 % the course's preamble.tex). Citations use the normal biblatex \cite, e.g.
 % \cite[1.2]{beardsley} renders as "[Bea21, 1.2]" under the alphabetic style.
-\RequirePackage[backend=biber, style=alphabetic, maxbibnames=10, giveninits=true]{biblatex}
-% Postnotes in this library are exercise / section numbers, not pages, so
-% suppress the default "p." / "pp." prefix that biblatex prepends.
-\DeclareFieldFormat{postnote}{#1}
-\DeclareFieldFormat{multipostnote}{#1}
-\NewDocumentCommand{\printreferences}{}{%
-	\bigskip
-	\printbibliography[title={References}]%
+%
+% biblatex is the most expensive load in the whole bundle (+1.21s on every
+% engine pass) and most problem sets never cite anything. \TeXLibNoBib skips it;
+% see \TeXLibDefer in texlib-corepkg.sty. The build tooling sets the flag on its
+% own when a document's source tree contains no bibliography command at all, so
+% this is normally invisible to the author.
+%
+% The ## is required, not a typo. The loader body becomes the replacement text
+% of a \def, so a single # would be read as a parameter of THAT definition
+% ("Illegal parameter number"); ## survives as the single # that
+% \DeclareFieldFormat needs when the loader actually runs.
+\TeXLibDefer{Bib}{%
+	\RequirePackage[backend=biber, style=alphabetic, maxbibnames=10, giveninits=true]{biblatex}%
+	% Postnotes in this library are exercise / section numbers, not pages, so
+	% suppress the default "p." / "pp." prefix that biblatex prepends.
+	\DeclareFieldFormat{postnote}{##1}%
+	\DeclareFieldFormat{multipostnote}{##1}%
+}
+
+% \printreferences stays defined either way -- see the note in
+% Notes/texlib-didactic.cls, which carries the identical pair.
+\@ifundefined{TeXLibNoBib}{%
+	\NewDocumentCommand{\printreferences}{}{%
+		\bigskip
+		\printbibliography[title={References}]%
+	}%
+}{%
+	\NewDocumentCommand{\printreferences}{}{%
+		\ClassWarning{texlib-pset}{%
+			\string\printreferences\space ignored: this document was built with
+			\string\TeXLibNoBib, so biblatex was never loaded%
+		}%
+	}%
 }
 
 % ==============================================================================

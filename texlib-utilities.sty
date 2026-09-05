@@ -8,22 +8,45 @@
 % are bundled in texlib-corepkg.sty.  basic-utilities adds the extras that
 % only the heavier classes (didactic, pset, report-card) actually want.
 \RequirePackage{texlib-corepkg}
-\RequirePackage{siunitx}
-\RequirePackage{caption}
-\RequirePackage{tasks}        % grid layout for exercise parts:  \begin{tasks}(N) \task ... \end{tasks}
+
+% siunitx (+0.18s), caption (+0.20s) and tasks (+0.32s) are deferrable -- see
+% \TeXLibDefer in texlib-corepkg.sty for the mechanism and the measurements.
+% Each carries its own configuration INSIDE its loader, so a document that
+% defers one never executes that configuration either: \sisetup without siunitx,
+% or \settasks without tasks, is an undefined control sequence, and running them
+% at load time would make the deferral fatal instead of free.
+%
+% enumitem is deliberately NOT deferrable and stays eager below. {parts} is
+% \newlist'd from it at load time and is the base exercise idiom every heavy
+% class inherits, and [shortlabels] changes what \begin{enumerate}[(a)] means
+% library-wide -- a document deferring it would break in ways that read as the
+% document's own fault. At +0.26s that is not a trade worth offering.
+\TeXLibDefer{Units}{%
+	\RequirePackage{siunitx}%
+	\sisetup{table-number-alignment=center, mode=math}%
+}
+
+\TeXLibDefer{Caption}{\RequirePackage{caption}}
+
+% tasks: grid layout for exercise parts, \begin{tasks}(N) \task ... \end{tasks}
+% Defaults: bold lowercase letter + period, e.g. "a."
+\TeXLibDefer{Tasks}{%
+	\RequirePackage{tasks}%
+	\settasks{
+		label        = \textbf{\alph*.},
+		label-align  = right,
+		label-width  = 1.5em,
+		item-indent  = 2.5em,
+		column-sep   = 1em,
+		after-item-skip = 6pt plus 2pt minus 2pt,
+	}%
+}
 
 % -- TikZ Config: extend the core library set with the visualisation ones --
-\usetikzlibrary{datavisualization, fit, calc, backgrounds}
-
-% -- tasks defaults: bold lowercase letter + period, e.g. "a." --
-\settasks{
-	label        = \textbf{\alph*.},
-	label-align  = right,
-	label-width  = 1.5em,
-	item-indent  = 2.5em,
-	column-sep   = 1em,
-	after-item-skip = 6pt plus 2pt minus 2pt,
-}
+% Routed through \TeXLibAtTikz so this survives \TeXLibNoTikz: the libraries
+% load now if tikz is already here, and otherwise ride along with a later
+% \TeXLibLoadTikz.
+\TeXLibAtTikz{\usetikzlibrary{datavisualization, fit, calc, backgrounds}}
 
 % -- parts: dedicated env for vertical exercise parts (no shortlabel needed) --
 % Usage:  \begin{parts} \item ... \item ... \end{parts}
@@ -60,10 +83,10 @@
 % 1. MATH MACROS
 % =========================================================
 % Math macros (\mbb, \abs, \lrp, \lrb, \lrcb, \lrsb, \dd, \deriv, \inte,
-% \todo, ...) now live in texlib-mathutils.sty, loaded above. Only the
-% siunitx table/mode configuration remains here, since it depends on the
-% siunitx package that basic-utilities pulls in.
-\sisetup{table-number-alignment=center, mode=math}
+% \todo, ...) now live in texlib-mathutils.sty, loaded above. The siunitx
+% table/mode configuration that used to sit here moved into the \TeXLibDefer
+% {Units} loader at the top of this file: it depends on siunitx, so it has to
+% run if and only if siunitx is actually loaded.
 
 % =========================================================
 % 2. AUTOMATION HELPERS

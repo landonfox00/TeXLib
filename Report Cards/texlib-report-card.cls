@@ -38,7 +38,13 @@
 % texlib-mathutils, graphicx, tikz/pgfplots, hyperref + canonical hypersetup)
 % plus heavy-class extras (siunitx, caption, tasks, extra tikz libraries).
 \RequirePackage{basic-utilities}
-\captionsetup{skip=3pt}  % runtime override of caption's default vskip
+% Runtime override of caption's default vskip. Guarded because caption is
+% deferrable (\TeXLibNoCaption -- see \TeXLibDefer in texlib-corepkg.sty), and an
+% unguarded \captionsetup is an undefined control sequence when it is deferred.
+% Same shape as texlib-autoexam.cls's \ifdefined\sisetup guard.
+\ifdefined\captionsetup
+	\captionsetup{skip=3pt}
+\fi
 \RequirePackage{adjustbox, changepage}
 \RequirePackage{fancyhdr, lastpage}
 \RequirePackage{needspace}
