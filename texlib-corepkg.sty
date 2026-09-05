@@ -35,6 +35,45 @@
 \RequirePackage{ifthen}
 \RequirePackage{etoolbox}
 
+% ==============================================================================
+% Deferrable components
+% ==============================================================================
+% Package loading is the dominant cost of a TeXLib build. On a 6-page notes
+% document, class loading is ~3.5s of a ~5.5s engine pass and the document's own
+% content is ~0.25s -- so what the bundle loads matters far more than anything
+% the author writes. Measured marginal costs (lualatex, TeX Live 2026):
+%
+%     biblatex  +1.21s    tikz    +0.47s    enumitem  +0.26s
+%     pgfplots  +0.88s    tasks   +0.32s    caption   +0.20s
+%     hyperref  +0.49s                      siunitx   +0.18s
+%
+% \TeXLibDefer{<Name>}{<loader>} makes one component skippable. It always
+% defines \TeXLibLoad<Name> (idempotent -- a second call is a no-op), and runs it
+% immediately UNLESS \TeXLibNo<Name> was defined before \documentclass.
+%
+% The default is therefore unchanged: every component still loads, and no
+% existing document is affected. What the macro adds is a way to say "this
+% document does not use plots" and get the second back. The build tooling emits
+% these flags automatically -- see texlib_preamble_scan.py, which reads a
+% document (and its \input tree) and defers only what provably never appears --
+% so in practice an author never writes one by hand.
+%
+% \TeXLibNo<Name> must be set BEFORE \documentclass, because the class loads
+% this bundle. \TeXLibLoad<Name> can be called any time in the preamble, and
+% must be: \RequirePackage is an error after \begin{document}, so a deferred
+% component cannot be resurrected from the body.
+%
+% The \expandafter chain is load-bearing. \global\let\csname...\endcsname would
+% fail -- TeX rejects a prefix on \expandafter -- so the two \expandafters are
+% ordered to leave exactly \global\let\<cs>\relax on the input stack.
+\newcommand{\TeXLibDefer}[2]{%
+	\@namedef{TeXLibLoad#1}{%
+		#2%
+		\expandafter\global\expandafter\let\csname TeXLibLoad#1\endcsname\relax
+	}%
+	\@ifundefined{TeXLibNo#1}{\@nameuse{TeXLibLoad#1}}{}%
+}
+
 % --- Color (load before tikz so tikz uses the right colour table) ---
 \RequirePackage{xcolor}
 
@@ -48,23 +87,47 @@
 \RequirePackage{texlib-mathutils}
 
 % --- Graphics + TikZ ---
+% graphicx is cheap and universally needed; it stays eager.
 \RequirePackage{graphicx}
-\RequirePackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
 
-% pgfplots is the single most expensive package in this bundle (~1s to load) and
-% only documents that actually draw \begin{axis} plots need it. It still loads by
-% default (backward compatible: existing documents are unaffected). A plot-free
-% document can OPT OUT -- reclaiming that ~1s on every engine pass -- by putting
+% tikz (+0.47s) carries the three libraries every TeXLib diagram uses. Deferring
+% it is worth less than the raw number suggests on the boxed classes -- didactic,
+% pset and report-card load tcolorbox, which pulls the pgf core in regardless, so
+% only the ~0.1s tikz layer is reclaimed there. On the unboxed classes (syllabus,
+% schedule) the full 0.47s comes back. \TeXLibNoTikz to opt out.
+\TeXLibDefer{Tikz}{%
+	\RequirePackage{tikz}%
+	\usetikzlibrary{arrows.meta, positioning, shapes.geometric}%
+}
+
+% pgfplots is the single most expensive package in this bundle (+0.88s on top of
+% tikz) and only documents that actually draw \begin{axis} plots need it. It
+% still loads by default (backward compatible: existing documents are
+% unaffected). A plot-free document can OPT OUT -- reclaiming that time on every
+% engine pass -- by putting
 %     \def\TeXLibNoPlots{}
 % BEFORE \documentclass. If such a document later does need a plot, call
 % \TeXLibLoadPlots in its preamble to pull pgfplots in on demand.
-\newcommand{\TeXLibLoadPlots}{%
-  \RequirePackage{pgfplots}%
-  \pgfplotsset{compat=1.18}%
-  \global\let\TeXLibLoadPlots\relax    % idempotent: a second call is a no-op
+%
+% pgfplots \RequirePackage{tikz}es on its own, so a document that defers Tikz but
+% keeps Plots still gets a working tikz -- minus the three libraries above, which
+% is why \TeXLibLoadTikz is called here rather than left to chance.
+\TeXLibDefer{Plots}{%
+	\TeXLibLoadTikz
+	\RequirePackage{pgfplots}%
+	\pgfplotsset{compat=1.18}%
 }
-\@ifundefined{TeXLibNoPlots}{\TeXLibLoadPlots}{}
+
+% \TeXLibAtTikz{<code>} runs <code> as soon as tikz exists: immediately if it is
+% already loaded, otherwise appended to \TeXLibLoadTikz so it arrives with a
+% later \TeXLibLoadTikz (whether called by hand or by \TeXLibLoadPlots). A module
+% wanting extra tikz libraries must use this rather than calling
+% \usetikzlibrary at load time, which is an undefined control sequence under
+% \TeXLibNoTikz. Under \TeXLibNoTikz with no later load, <code> never runs --
+% correct, since nothing in the document draws.
+\newcommand{\TeXLibAtTikz}[1]{%
+	\@ifpackageloaded{tikz}{#1}{\g@addto@macro\TeXLibLoadTikz{#1}}%
+}
 
 % --- Hyperref + canonical setup ---
 % Five of the existing TeXLib classes ship the exact same hypersetup call.

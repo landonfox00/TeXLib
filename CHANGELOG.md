@@ -51,6 +51,55 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Changed
 
+- **A build loads only the packages the document uses, and quick mode reuses a
+  precompiled preamble.** Profiling a six-page Notes document found that
+  typesetting is not what a build spends its time on. Class loading is ~3.5s of
+  a ~4.5s pass; the document's own 25 KB of content is ~0.25s — smaller than the
+  run-to-run noise. Nothing an author writes moves that, and it is paid on every
+  pass. Measured marginal costs (TeX Live 2026): biblatex +1.21s, pgfplots
+  +0.88s, hyperref +0.49s, tikz +0.47s, tasks +0.32s, enumitem +0.26s, caption
+  +0.20s, siunitx +0.18s.
+
+  `texlib-corepkg.sty` gains `\TeXLibDefer{<Name>}{<loader>}`, which generalises
+  the `\TeXLibNoPlots` / `\TeXLibLoadPlots` pair that pgfplots already had.
+  Bib, Plots, Units, Tasks, Caption and Tikz are now deferrable: define
+  `\TeXLibNo<Name>` before `\documentclass` and the component never loads;
+  `\TeXLibLoad<Name>` pulls it in on demand, idempotently. Defaults are
+  unchanged — everything still loads, and no existing document is affected.
+
+  Authors do not write these flags. `texlib_preamble_scan.py` reads a document
+  and its whole `\input` tree and defers only what provably never appears, and
+  the builder injects the result ahead of `\documentclass`. The safety rule runs
+  one way: loading is correct, deferring is the optimisation, so an unresolvable
+  `\input`, a macro-built path, or any unreadable file defers **nothing** — a
+  partial scan is worthless, because the evidence could be in the part that was
+  not read. tikz is deferrable but never auto-deferred: it pays badly on the
+  boxed classes (tcolorbox pulls the pgf core in regardless) and is reached from
+  library internals a source scan cannot see, notably `\encircle` in
+  `texlib-itemfmt.sty` and the vendored `quiver.sty`.
+
+  On top of that, quick mode now compiles against a `mylatexformat` image of the
+  preamble (`texlib_format_cache.py`). The cache key covers the engine, the
+  injected prefix, the full source tree, every texlib `.sty`/`.cls`, and the
+  document's path, so a change anywhere is a different key and therefore a miss
+  — there is no invalidation logic to get wrong. Any failure at all falls back
+  to an ordinary build. Only quick mode uses it; a final build depends on no
+  cache.
+
+  End to end on one real document: **6.02s → 0.97s**. Splitting the causes:
+  6.02s was lualatex, 4.60s is pdflatex (didactic was never a lua-only class —
+  `LUALATEX_CLASSES` already said so, and a hand-written build script was
+  overriding it), 3.82s with scanner-chosen deferrals, 0.97s against a cached
+  format. Every example template was built both ways and compared: text
+  identical, thirteen for thirteen.
+
+  Two guards came out of the same pass. `texlib-report-card.cls` called
+  `\captionsetup` unguarded, which a deferred caption would have made fatal; it
+  now carries the same `\ifdefined` guard `texlib-autoexam.cls` already used for
+  `\sisetup`. `TEXLIB_NO_DEFER=1` and `TEXLIB_NO_FORMAT_CACHE=1` turn each half
+  off, so a confusing build can be compared against the unoptimised one without
+  editing anything.
+
 - **The variant fan-out builds in parallel, roughly halving `Ctrl+B`.** 0.8.0
   turned one compile into a fan-out — base, one compile per variant, and a
   tagged twin of each — and ran all of it in sequence. For a Notes or Problem

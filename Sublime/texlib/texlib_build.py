@@ -120,7 +120,31 @@ try:
 except ImportError:  # plain import outside the Sublime package (tests, CLI)
     import texlib_buildspec as _spec
 
+# Same two-shape import: the deferral scanner and the format cache are the two
+# halves of the build-time work. The scanner decides what this document can skip
+# loading; the cache remembers the result of loading what is left.
+try:
+    from TeXLib import texlib_preamble_scan as _scan
+except ImportError:
+    import texlib_preamble_scan as _scan
+
+try:
+    from TeXLib import texlib_format_cache as _fmtcache
+except ImportError:
+    import texlib_format_cache as _fmtcache
+
 LUALATEX_CLASSES = _spec.LUALATEX_CLASSES
+
+# Set TEXLIB_NO_DEFER=1 to build with everything loaded, and
+# TEXLIB_NO_FORMAT_CACHE=1 to skip the precompiled preamble. Both exist so a
+# confusing build can be compared against the unoptimised one in a single run,
+# without editing anything.
+def _defer_enabled():
+    return os.environ.get("TEXLIB_NO_DEFER", "") not in ("1", "true", "yes")
+
+
+def _format_cache_enabled():
+    return os.environ.get("TEXLIB_NO_FORMAT_CACHE", "") not in ("1", "true", "yes")
 
 # Document classes whose gradebook.xlsx is auto-converted to a report-view CSV
 # before the build (see _convert_gradebooks). The report-view tab name tried in
@@ -763,12 +787,58 @@ class TexlibBuildCore:
     # ------------------------------------------------------------------ #
     # Build steps (each is a sub-coroutine delegated to via `yield from`)
     # ------------------------------------------------------------------ #
+    def _tex_path(self):
+        """Absolute path of the document being built."""
+        return os.path.join(self._tex_dir(), self.tex_name)
+
+    def _library_root(self):
+        r"""The TeXLib checkout, or None when it cannot be located.
+
+        Only the format cache needs this, and it needs it to be RIGHT: the
+        library fingerprint is what makes editing a .cls invalidate a dumped
+        preamble. Guessing wrong would leave a stale format in place across a
+        class edit -- the one failure this cache must not have -- so a failure
+        to locate the tree disables the cache rather than proceeding without it.
+
+        This module lives at <root>/Sublime/texlib/, but the DEPLOYED copy sits
+        in Sublime's Packages/User, detached from the tree; TEXLIB_ROOT is the
+        override for that case.
+        """
+        override = os.environ.get("TEXLIB_ROOT")
+        if override and os.path.isdir(override):
+            return override
+        here = os.path.dirname(os.path.abspath(__file__))
+        candidate = os.path.dirname(os.path.dirname(here))
+        if os.path.isfile(os.path.join(candidate, "texlib-corepkg.sty")):
+            return candidate
+        return None
+
+    def _defer_prefix(self):
+        r"""The \def\TeXLibNo... prefix for this document, or "".
+
+        Computed once per build and memoised: the scan reads the whole \input
+        tree, which is cheap but not free, and every build path asks for it.
+        Any failure yields "" -- the unoptimised build, which is only slower.
+        """
+        cached = getattr(self, "_defer_prefix_memo", None)
+        if cached is not None:
+            return cached
+        prefix = ""
+        if _defer_enabled():
+            try:
+                prefix = _scan.defer_prefix_for(self._tex_path())
+            except Exception:       # noqa: BLE001 -- never fail a build over an
+                prefix = ""         # optimisation; fall back to loading it all
+        self._defer_prefix_memo = prefix
+        return prefix
+
     def _build_once(self, base, engine, mode):
         """One document, one mode, with biblatex+cross-reference rerun loop."""
         macro = MODE_MACROS.get(mode, "")
-        if macro:
-            arg = f"{macro}\\input{{{self.tex_name}}}"
-            label = f"{engine} [{mode}]"
+        prefix = self._defer_prefix()
+        if macro or prefix:
+            arg = f"{prefix}{macro}\\input{{{self.tex_name}}}"
+            label = f"{engine} [{mode}]" if macro else engine
         else:
             arg = self.tex_name
             label = engine
@@ -823,9 +893,52 @@ class TexlibBuildCore:
         Cross-references and the bibliography may be stale (a ?? or an
         unresolved citation can show up); run a normal build to settle them
         before sharing. Builds in the default visual mode (no \\Show... flag).
+
+        This is also the one path that uses a precompiled preamble. Class
+        loading is ~3.5s of a ~4.5s pass, and quick mode exists precisely to cut
+        the edit-recompile loop, so it is where the cache is worth having; a
+        final build stays on the ordinary path and depends on no cache at all.
+        The dumped image already contains the deferral flags, so the compile
+        must not repeat them -- see texlib_format_cache.
         """
-        cmd = base + [self.tex_name]
+        prefix = self._defer_prefix()
+        key = self._quick_format_key(engine, prefix)
+        if key:
+            cmd = [base[0], "-fmt=" + key] + list(base[1:]) + [self.tex_name]
+            yield (cmd, f"{engine} [quick] single pass, cached preamble "
+                        "(refs may be stale)...")
+            return
+
+        arg = f"{prefix}\\input{{{self.tex_name}}}" if prefix else self.tex_name
+        cmd = base + [arg]
         yield (cmd, f"{engine} [quick] single pass (refs may be stale)...")
+
+    def _quick_format_key(self, engine, prefix):
+        """Key of a usable precompiled preamble, or None to build normally.
+
+        Dumping one costs about as much as a full pass, so the first quick build
+        after any change to the document, its inputs, or the library is no
+        faster; every one after it is. None on any failure at all -- an
+        unsupported engine, no locatable library, a mylatexformat that is not
+        installed, a dump that errors -- because the fallback is simply the
+        build that would have happened anyway.
+        """
+        if not _format_cache_enabled():
+            return None
+        root = self._library_root()
+        if not root:
+            return None
+        try:
+            key = _fmtcache.ensure(self._tex_path(), engine, prefix, root)
+        except Exception:           # noqa: BLE001 -- see _defer_prefix
+            return None
+        if key:
+            # The engine finds the dumped image through TEXFORMATS, and the
+            # runner inherits this process's environment.
+            os.environ.update(
+                {"TEXFORMATS": _fmtcache.env_with_cache()["TEXFORMATS"]}
+            )
+        return key
 
     def _build_accessible(self, base, engine, tex_dir, engine_options):
         """Build the document twice -- normal, then tagged -- and keep both.

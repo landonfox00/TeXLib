@@ -19,6 +19,7 @@ Run:  python Sublime/test_texlib_runner.py
 """
 import hashlib
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -444,8 +445,17 @@ out_dir = next(a.split("=", 1)[1] for a in argv
                if a.startswith("-output-directory="))
 # The jobname the engine is given: pinned as --jobname= on the modes that pin one
 # (bank catalog, accessible), else derived by TeX from the file argument.
+#
+# That last argument is not always a bare filename. A build carrying injected
+# macros -- a mode flag, or the deferral prefix the preamble scanner produces --
+# passes `<macros>\input{doc.tex}` instead, and TeX takes the jobname from the
+# file it \inputs. Deriving it here with a plain basename() would read the whole
+# macro string as a filename, which is what this helper used to do: it happened
+# to work only while plain builds passed a bare name.
+_last = argv[-1]
+_m = re.search(r"\\input\{([^}]*)\}", _last)
 jobname = next((a.split("=", 1)[1] for a in argv if a.startswith("--jobname=")),
-               os.path.splitext(os.path.basename(argv[-1]))[0])
+               os.path.splitext(os.path.basename(_m.group(1) if _m else _last))[0])
 engine_log = os.path.join(out_dir, jobname + ".log")
 ok &= check(texlib._aux_log_path(root) == engine_log,
             "aux log path: resolves to the engine's own <jobname>.log")

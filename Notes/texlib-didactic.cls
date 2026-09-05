@@ -61,14 +61,43 @@
 %
 % Documents supply their bib file via \addbibresource{...} (typically in
 % the course's preamble.tex). Citations use the normal biblatex \cite.
-\RequirePackage[backend=biber, style=alphabetic, maxbibnames=10, giveninits=true]{biblatex}
-% Postnotes in this library are exercise / section numbers, not pages, so
-% suppress the default "p." / "pp." prefix that biblatex prepends.
-\DeclareFieldFormat{postnote}{#1}
-\DeclareFieldFormat{multipostnote}{#1}
-\NewDocumentCommand{\printreferences}{}{%
-	\bigskip
-	\printbibliography[title={References}]%
+%
+% biblatex is the most expensive load in the whole bundle (+1.21s on every
+% engine pass) and a large share of this class's documents -- worksheets, review
+% sheets, board notes -- never cite anything. \TeXLibNoBib skips it; see
+% \TeXLibDefer in texlib-corepkg.sty. The build tooling sets the flag on its own
+% when a document's source tree contains no bibliography command at all, so this
+% is normally invisible to the author.
+%
+% The ## is required, not a typo. The loader body becomes the replacement text
+% of a \def, so a single # would be read as a parameter of THAT definition
+% ("Illegal parameter number"); ## survives as the single # that
+% \DeclareFieldFormat needs when the loader actually runs.
+\TeXLibDefer{Bib}{%
+	\RequirePackage[backend=biber, style=alphabetic, maxbibnames=10, giveninits=true]{biblatex}%
+	% Postnotes in this library are exercise / section numbers, not pages, so
+	% suppress the default "p." / "pp." prefix that biblatex prepends.
+	\DeclareFieldFormat{postnote}{##1}%
+	\DeclareFieldFormat{multipostnote}{##1}%
+}
+
+% \printreferences stays defined either way. Under \TeXLibNoBib it prints
+% nothing and says so in the log rather than failing on an undefined
+% \printbibliography: the flag is only ever set for a document with no
+% bibliography commands, so reaching this branch means the scanner was wrong,
+% and a warning naming the cause beats an error naming \printbibliography.
+\@ifundefined{TeXLibNoBib}{%
+	\NewDocumentCommand{\printreferences}{}{%
+		\bigskip
+		\printbibliography[title={References}]%
+	}%
+}{%
+	\NewDocumentCommand{\printreferences}{}{%
+		\ClassWarning{texlib-didactic}{%
+			\string\printreferences\space ignored: this document was built with
+			\string\TeXLibNoBib, so biblatex was never loaded%
+		}%
+	}%
 }
 
 % ==============================================================================

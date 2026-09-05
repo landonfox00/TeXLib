@@ -74,7 +74,16 @@ def run_builder(doc_src, options=None, engine="pdflatex", aux_files=None):
     variant set, which would drown those assertions in unrelated commands.
     The fan-out has its own cases below (see the variant-plan section); do not
     "fix" a fan-out test by relying on this helper's default.
+
+    The precompiled-preamble cache is switched OFF for every case here. These
+    are logic tests over the command list, and texlib_format_cache.ensure()
+    shells out to `pdftex -ini` to dump a real ~8 MB format -- which made the
+    quick-mode case pass for the wrong reason (the cache absorbs the deferral
+    flags into the image, so the argument went back to a bare filename) and put
+    a multi-second engine run inside a suite that otherwise starts no engine at
+    all. The cache has its own dedicated cases further down.
     """
+    os.environ["TEXLIB_NO_FORMAT_CACHE"] = "1"
     tmp = tempfile.mkdtemp(prefix="texlib_bt_")
     tex_path = os.path.join(tmp, "doc.tex")
     with open(tex_path, "w", encoding="utf-8") as fh:
@@ -220,6 +229,30 @@ def check(label, condition, detail=""):
             print(f"        {detail}")
 
 
+# A document argument carries a deferral prefix whenever the preamble scanner
+# found something this document never uses -- which, for the synthetic one-line
+# documents in this file, is everything. That prefix is not a MODE macro, and
+# the cases below are about mode macros, so they compare against the argument
+# with any prefix stripped.
+_DEFER_PREFIX_RE = re.compile(r"^(?:\\def\\TeXLibNo[A-Za-z]+\{\})+")
+
+
+def without_defer(arg):
+    r"""`arg` minus its \def\TeXLibNo... prefix, unwrapped from \input{...}.
+
+    "doc.tex" -> "doc.tex"
+    "\def\TeXLibNoBib{}\input{doc.tex}" -> "doc.tex"
+    "\def\ShowKey{}\input{doc.tex}" -> "\def\ShowKey{}\input{doc.tex}"  (a mode
+    macro survives, which is exactly what these assertions must still catch.)
+    """
+    arg = str(arg)
+    stripped = _DEFER_PREFIX_RE.sub("", arg)
+    if stripped == arg:
+        return arg                      # nothing was stripped; leave it alone
+    match = re.fullmatch(r"\\input\{(.*)\}", stripped)
+    return match.group(1) if match else stripped
+
+
 # --- 3. Test cases ---------------------------------------------------------
 
 def main():
@@ -229,7 +262,7 @@ def main():
     cmds, _ = run_builder(r"\documentclass{article}\begin{document}x\end{document}")
     check("article -> pdflatex", bool(cmds) and cmds[0][0][0] == "pdflatex", cmds)
     check("article -> plain filename arg, no mode macro",
-          bool(cmds) and cmds[0][0][-1] == "doc.tex", cmds)
+          bool(cmds) and without_defer(cmds[0][0][-1]) == "doc.tex", cmds)
     check("article -> exactly one build", len(cmds) == 1, f"{len(cmds)} builds")
 
     # (b) autoexam with no magic comment -> forced lualatex + -shell-escape
@@ -279,7 +312,7 @@ def main():
     cmds, disp = run_builder(r"\documentclass{article}\begin{document}x\end{document}",
                              options=["--texlib-mode=bogus"])
     check("unknown mode -> no macro injected (plain filename)",
-          bool(cmds) and cmds[0][0][-1] == "doc.tex", cmds)
+          bool(cmds) and without_defer(cmds[0][0][-1]) == "doc.tex", cmds)
     check("unknown mode -> warning shown", "unknown build mode" in disp, repr(disp))
 
     # (j1b) The variant fan-out. `default' is no longer one compile: it builds
@@ -520,7 +553,7 @@ def main():
         aux_files={"doc.bcf": "<bcf/>"})  # would trigger biber in a normal build
     check("quick -> exactly one build", len(cmds) == 1, f"{len(cmds)} builds")
     check("quick -> plain filename arg, no mode macro",
-          bool(cmds) and cmds[0][0][-1] == "doc.tex", cmds)
+          bool(cmds) and without_defer(cmds[0][0][-1]) == "doc.tex", cmds)
     check("quick -> no biber despite .bcf present",
           not any(c[0][0] == "biber" for c in cmds), cmds)
     check("quick -> single-pass message shown",
@@ -545,7 +578,7 @@ def main():
           bool(normal) and normal[0][0][0] == "pdflatex",
           normal[0][0] if normal else "")
     check("accessible -> normal half gets a plain filename arg (untagged)",
-          bool(normal) and normal[0][0][-1] == "doc.tex",
+          bool(normal) and without_defer(normal[0][0][-1]) == "doc.tex",
           normal[0][0] if normal else "")
     check("accessible -> normal half NOT written into a11y",
           bool(normal) and not any(str(c).endswith("a11y") for c in normal[0][0]),
@@ -1814,7 +1847,7 @@ def main():
         r"\end{document}"
     )
     check("real document with inline \\begin{problem} -> normal build",
-          bool(cmds) and cmds[0][0][-1] == "doc.tex", cmds)
+          bool(cmds) and without_defer(cmds[0][0][-1]) == "doc.tex", cmds)
 
     # ====================================================================== #
     # (x) Publish step: shareable copies + desktop shortcut, driven by the
@@ -2411,6 +2444,113 @@ def main():
     check("a11y report: report name pairs with the tagged PDF",
           _bs.VERAPDF_REPORT_SUFFIX.startswith("_accessible"),
           _bs.VERAPDF_REPORT_SUFFIX)
+
+    # ====================================================================== #
+    # (y) Preamble deferral + the precompiled-preamble cache.
+    #
+    # Loading is always correct and deferring is the optimisation, so nearly
+    # every case here is about the scanner REFUSING to defer. A false positive
+    # costs a package load; a false negative costs a broken build.
+    # ====================================================================== #
+    print("\n-- preamble deferral --")
+    import texlib_preamble_scan as _ps
+
+    def scan_tmp(files, entry="doc.tex"):
+        """Write `files` to a temp dir and scan `entry`; returns the name list."""
+        tmp = tempfile.mkdtemp(prefix="texlib_scan_")
+        for name, body in files.items():
+            path = os.path.join(tmp, name)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(body)
+        return _ps.deferrable_for(os.path.join(tmp, entry))
+
+    PLAIN = r"\documentclass{didactic}\begin{document}x\end{document}"
+    names = scan_tmp({"doc.tex": PLAIN})
+    check("scan: a document using nothing defers everything",
+          set(names) == set(_ps.DEFERRABLE), names)
+
+    check("scan: tikz is never auto-deferred (library internals reach it)",
+          "Tikz" not in _ps.DEFERRABLE)
+
+    for cmd, kept in ((r"\cite{x}", "Bib"),
+                      (r"\addbibresource{r.bib}", "Bib"),
+                      (r"\printreferences", "Bib"),
+                      (r"\begin{axis}\end{axis}", "Plots"),
+                      (r"\addplot{x}", "Plots"),
+                      (r"\SI{3}{\metre}", "Units"),
+                      (r"\begin{tasks}\task a\end{tasks}", "Tasks"),
+                      (r"\caption{c}", "Caption"),
+                      (r"\fig{f}", "Caption")):
+        names = scan_tmp({"doc.tex": r"\documentclass{didactic}\begin{document}"
+                                     + cmd + r"\end{document}"})
+        check(f"scan: {cmd!r} keeps {kept}", kept not in names, names)
+
+    names = scan_tmp({"doc.tex": r"\documentclass{didactic}\begin{document}"
+                                 r"% \cite{x} is commented out" "\n"
+                                 r"\end{document}"})
+    check("scan: a commented-out \\cite does not pin biblatex",
+          "Bib" in names, names)
+
+    names = scan_tmp({"doc.tex": r"\documentclass{didactic}"
+                                 r"\input{shared}\begin{document}x\end{document}",
+                      "shared.tex": r"\addbibresource{r.bib}"})
+    check("scan: evidence inside an \\input'd file still counts",
+          "Bib" not in names, names)
+
+    names = scan_tmp({"doc.tex": r"\documentclass{didactic}"
+                                 r"\input{missing}\begin{document}x\end{document}"})
+    check("scan: an unresolvable \\input defers NOTHING",
+          names == [], names)
+
+    names = scan_tmp({"doc.tex": r"\documentclass{didactic}"
+                                 r"\input{\coursedir/p}\begin{document}x\end{document}"})
+    check("scan: a macro-built \\input path defers NOTHING",
+          names == [], names)
+
+    check("scan: the prefix is \\def-shaped and ordered",
+          _ps.defer_macros(["Bib", "Plots"])
+          == r"\def\TeXLibNoBib{}\def\TeXLibNoPlots{}",
+          _ps.defer_macros(["Bib", "Plots"]))
+    check("scan: no components -> empty prefix", _ps.defer_macros([]) == "")
+
+    print("\n-- format cache --")
+    import texlib_format_cache as _fc
+
+    HERE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    tmp = tempfile.mkdtemp(prefix="texlib_fc_")
+    doc = os.path.join(tmp, "doc.tex")
+    with open(doc, "w", encoding="utf-8") as fh:
+        fh.write(PLAIN)
+
+    k_base = _fc.format_key(doc, "pdflatex", "", HERE_ROOT)
+    check("cache: the key is deterministic",
+          k_base == _fc.format_key(doc, "pdflatex", "", HERE_ROOT))
+    check("cache: a different engine is a different key",
+          k_base != _fc.format_key(doc, "lualatex", "", HERE_ROOT))
+    check("cache: a different prefix is a different key",
+          k_base != _fc.format_key(doc, "pdflatex", r"\def\TeXLibNoBib{}",
+                                   HERE_ROOT))
+    check("cache: a different library fingerprint is a different key",
+          k_base != _fc.format_key(doc, "pdflatex", "", tmp))
+
+    with open(doc, "a", encoding="utf-8") as fh:
+        fh.write("\n% edited\n")
+    check("cache: editing the document is a different key",
+          k_base != _fc.format_key(doc, "pdflatex", "", HERE_ROOT))
+
+    check("cache: an unsupported engine yields no format",
+          _fc.ensure(doc, "xelatex", "", HERE_ROOT) is None)
+    check("cache: TEXFORMATS keeps a fallback entry",
+          _fc.env_with_cache({"TEXFORMATS": ""})["TEXFORMATS"].endswith(
+              ";" if os.name == "nt" else ":"))
+    check("cache: compile_argv does NOT repeat the prefix",
+          not any("TeXLibNo" in a
+                  for a in _fc.compile_argv("pdflatex", "k", "doc.tex")),
+          _fc.compile_argv("pdflatex", "k", "doc.tex"))
+    check("cache: dump_argv DOES apply the prefix",
+          any(r"\def\TeXLibNoBib{}" in a
+              for a in _fc.dump_argv(doc, "pdflatex", r"\def\TeXLibNoBib{}", "k")))
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL
