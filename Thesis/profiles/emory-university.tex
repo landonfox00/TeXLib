@@ -1,0 +1,218 @@
+% profiles/emory-university.tex — Emory University
+% ============================================================================
+% source: https://gs.emory.edu/academics/completion/submit/phd-completion.html
+%         (Laney Graduate School, Doctoral Students completion page — the page
+%          that links the CURRENT guidelines)
+% source: https://gs.emory.edu/_includes/documents/sections/academics/completion/submitting-your-thesis-or-dissertation-guidelines-and-template_word-documents-new-dean_revised-10-3-23.docx
+%         ("Submitting Your Thesis or Dissertation: Guidelines and Template
+%          Pages", REVISED 2023-10-03. This is the governing edition -- see the
+%          two-editions note below.)
+% source: https://gs.emory.edu/_includes/documents/sections/academics/policies-progress/submitting-your-thesis-or-dissertation-guidelines-and-template-pages1.pdf
+%         (the SUPERSEDED 2019 PDF of the same document, 15 pp. Used ONLY to
+%          render the two specimen pages as images, since the layouts are
+%          unchanged between editions and a .docx cannot be rendered here. Its
+%          text was compared clause by clause against the 2023 edition first.)
+% source: https://gs.emory.edu/academics/completion/submit/etd.html
+%         (ETD repository page; read for accessibility and found to carry none)
+% accessed: 2026-09-05
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the cover page, and the approval
+% page. NOT set: chapter-opening margin (no such rule).
+%
+% ============================================================================
+% TWO EDITIONS ARE ON THE SERVER AND THEY DIFFER. Do not "correct" this file
+% back to the older one.
+%
+%   * The 2019 PDF is still served and still turns up first in search. It names
+%     LISA A. TEDESCO as Dean on the approval sheet.
+%   * The 2023-10-03 .docx is what the Laney Graduate School's own doctoral
+%     completion page links, and its filename says "new-dean". It names
+%     KIMBERLY JACOB ARRIOLA, Ph.D, MPH.
+%
+% The margin, spacing, font and page-number rules are IDENTICAL in both, checked
+% clause by clause. The Dean's name is the substantive difference, and this file
+% follows the 2023 edition. That name is also the one thing here guaranteed to
+% rot -- it changed once already -- so re-check it before a real filing rather
+% than trusting this line's age.
+% ============================================================================
+
+\thesisinstitution{Emory University}
+
+% --- Filing figures ----------------------------------------------------------
+% "Margins: All materials (including text, illustrations, graphs, figures, etc.)
+% must be within the margins (all margins = 1"). A dissertation/thesis cannot be
+% accepted if any of the text falls outside the margins."
+%
+% Note the second sentence: Emory says outright that a margin violation is
+% grounds for rejection, and the rule is reasserted for the special pages --
+% "Remember that the page margin rules apply to all pages, including the special
+% pages, like the Approval Sheet."
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Spacing and Font: Double spacing is required." A requirement, flatly.
+% The exceptions Emory names are per-page, not per-element, and are listed here
+% rather than encoded: "Two of the special pages may be single-spaced: the
+% Distribution Agreement and the Abstract", and the font-size rule excludes
+% "foot notes, abstracts, and acknowledgements".
+\thesissetspacing{double}
+
+% No chapter-opening rule is published, so \thesissetchapteropening stays unset.
+
+% --- Accessibility -----------------------------------------------------------
+% NOTHING IS DECLARED REQUIRED. Across the 2023 guidelines, the 2019 PDF and the
+% ETD repository page, the string "accessib" occurs exactly twice and neither is
+% a document rule: once in the Distribution Agreement's licence grant ("the
+% non-exclusive license to archive, make accessible, and display my thesis or
+% dissertation"), and once about publishers regarding "an electronically
+% accessible dissertation as a prior publication". There is no occurrence of
+% "alt text", "WCAG", "tagged" or "PDF/A" anywhere. Emory is private, so the
+% April 2026 ADA Title II date does not reach it as it does the public
+% universities in this directory.
+\thesisaccessibilityrequirement{Not published}
+	{Emory's Laney Graduate School publishes no accessibility requirement for a
+	 filed thesis or dissertation, in either edition of the guidelines or on the
+	 ETD page, as read on 2026-09-05. The word "accessible" appears only in the
+	 Distribution Agreement's licence grant and in a note about prior
+	 publication. A finding, not a licence.}
+
+% --- Cover page (Emory's name for the title page) -------------------------------
+% "The cover page should be designed according to the plan below." Reproduced
+% from that plan (2019 PDF p. 15, rendered at 85 dpi and read as an image; the
+% 2023 edition carries the same block).
+%
+% Everything is centred and plain -- no uppercasing, no bold. The line breaks in
+% the closing statement are the specimen's own and must not be reflowed:
+%
+%   A [thesis/dissertation] submitted to the Faculty of the
+%   James T. Laney School of Graduate Studies of Emory University
+%   in partial fulfillment of the requirements for the degree of
+%   [Doctor of Philosophy/Master of Arts/Science/etc.]
+%   in [field]
+%   [year]
+%
+% Details from Emory's own comments on that page:
+%
+%   * "Previous academic degree: List your degree, the name of the university,
+%     and the year you received the degree. For example, 'B.A., Yale University,
+%     2004'". It sits on its OWN LINE under the author's name, so a document
+%     filing here should write \author{Ada N. Student\\B.A., Yale University,
+%     2004} -- the class has one author field and Emory wants two lines.
+%   * "Your degree does not include a subject matter: your degree is not 'Doctor
+%     of Philosophy, Sociology' or any such combination." So \graddegree{Doctor
+%     of Philosophy} alone.
+%   * "Field: Generally, your field is the subject-matter name of your program
+%     ... The field does not include the word 'program', and does not include
+%     any sub-field you specialize in." That is \gradprogram.
+%   * "Year: Write the calendar year you receive your degree (not the academic
+%     year)." The cover page shows the YEAR ALONE, so \graddate{2027}.
+%   * "Advisor: If your committee had co-chairs, list both, each noted as
+%     'Advisor.'" and "Ask your advisor/s how he or she or they should be
+%     listed."
+%
+% The cover page is one of the "special pages", which "should not be numbered,
+% but must otherwise follow the formatting instructions" -- hence the no-footer
+% geometry and \thispagestyle{empty}, with the 1in margins unchanged.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{1in}
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{3\baselineskip}
+		By\par
+		\vspace{3\baselineskip}
+		\@author\par
+		\vspace{3\baselineskip}
+		Advisor: \thesis@advisor\par
+		\vspace{6\baselineskip}
+		A \thesis@docnoun{} submitted to the Faculty of the\\
+		James T. Laney School of Graduate Studies of Emory University\\
+		in partial fulfillment of the requirements for the degree of\\
+		\thesis@degree\\
+		in \thesis@program\\
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Approval page --------------------------------------------------------------
+% Emory calls it the APPROVAL PAGE (the specimen heading says "Approval Sheet")
+% and it IS part of the filed manuscript: "A signed Approval Page -- signed by
+% all members of your committee" is a checklist item, and "If you make this page
+% for the ETD manuscript, include an unsigned version."
+%
+% THE RULES ARE BLANK ON PURPOSE. "Do NOT include real signatures in the
+% electronic copy of your full dissertation/thesis that you upload into the ETD"
+% and "No real signatures should be included in the ETD submission". So this
+% page draws empty signature rules, which is exactly right for the ETD copy --
+% it is not an oversight, and nothing should be filled in.
+%
+% PHYSICAL SIGNATURES ARE STILL COLLECTED, SEPARATELY, AND ELECTRONICALLY. The
+% signed version comes from a DocuSign Power Form ("These two pages are a single
+% combined DocuSign Power Form -- you will receive a pdf of all signatures once
+% completed") and goes to the Laney Graduate School with the completion packet,
+% not into the ETD upload. Emory also permits the signed DocuSign pages to be
+% placed in front of the manuscript, at the student's option.
+%
+% Structure, from the specimen: title, "By", author + degree, field; then one
+% centred signature rule per member with the typed name and role beneath;
+% then "Accepted:", the Dean's rule, name and title, and a separate shorter rule
+% over the word "Date". The Dean's rule stays blank too -- "You Do Not need to
+% get the Dean's signature on this form before you submit your graduation forms."
+%
+% Ordering rules Emory states and this class cannot enforce: "Advisor: If your
+% committee had co-chairs, refer to each of them as Co-Advisor, and list them in
+% alphabetical order" and "Committee Members: List the members in alphabetical
+% order." A document must supply \committeemember in that order.
+%
+% NOT REPRODUCED, and flagged rather than guessed: "with committees of 5 or 6
+% members, you may use a two-column layout for the committee members." That is
+% permissive, and a committee of four fits the single column, so the single
+% column is used. A filer with six members whose page overruns the 1in bottom
+% margin must build the two-column variant by hand -- and Emory is explicit that
+% overrunning is grounds for rejection.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\thesis@tagtitle{H1}{{\color{white}\tiny Approval Page}}\par
+	% VERTICAL SPACING IS DELIBERATELY TIGHT. Emory says a page whose material
+	% falls outside the margins "cannot be accepted", and this page grows by four
+	% lines per committee member. A first draft with roomier gaps pushed the Date
+	% rule off the bottom of the page with a committee of only three. The gaps
+	% below are sized so a committee of FIVE still fits inside the 1in bottom
+	% margin -- which is the size Emory says the single-column layout should
+	% "likely accommodate". At six, use Emory's permitted two-column layout.
+	\begin{center}
+		\@title\par
+		\vspace{\baselineskip}
+		By\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{\baselineskip}
+		\thesis@program\par
+		% One blank rule per member, typed name and role beneath it.
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			\vskip 1.4em
+			\rule{4in}{0.4pt}\par
+			##1\par
+			\ifx\relax##2\relax\else ##2\par\fi
+		}%
+		\thesis@committee
+		\endgroup
+		\vspace{\baselineskip}
+		Accepted:\par
+		\vskip 1.4em
+		\rule{4in}{0.4pt}\par
+		% The Dean's name is from the 2023-10-03 edition and is the one line in
+		% this file that is certain to go stale -- it changed once already.
+		Kimberly Jacob Arriola, Ph.D, MPH\par
+		Dean of the James T. Laney School of Graduate Studies\par
+		\vskip 1.4em
+		\rule{2in}{0.4pt}\par
+		Date\par
+	\end{center}%
+	\loadgeometry{normal}\doublespacing\clearpage
+}
