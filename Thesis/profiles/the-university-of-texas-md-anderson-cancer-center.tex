@@ -1,0 +1,170 @@
+% profiles/the-university-of-texas-md-anderson-cancer-center.tex
+% — The University of Texas MD Anderson Cancer Center
+% ============================================================================
+% source: https://gsbs.uth.edu/academics/graduation
+%         ("Formatting requirements", "Arrangement of the Thesis or
+%          Dissertation", and "Instructions for Preparation of the Thesis or
+%          Dissertation" — the Graduate School's own filing requirements)
+% source: https://gsbs.uth.edu/academics/assets/forms/Template-for-the-Thesis-or-Dissertation-03212023.docx
+%         (the Graduate School's official Word template, linked from the page
+%          above; its filename carries its revision date, 2023-03-21)
+% accessed: 2026-09-05
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the approval
+% page. NOT set: chapter-opening margin (GSBS states no deeper opening margin),
+% and no accessibility check-flag is raised — see the accessibility note below.
+%
+% WHICH GRADUATE SCHOOL THIS IS. IPEDS records the degree-granting institution
+% as "The University of Texas MD Anderson Cancer Center", but the graduate
+% school that sets and enforces these rules is the joint MD Anderson Cancer
+% Center UTHealth Houston Graduate School of Biomedical Sciences (GSBS), which
+% is where the requirements live. \thesisinstitution below is the IPEDS name,
+% per RESEARCHING.md; the pages themselves print the GSBS name, because that is
+% the name the template puts on them.
+%
+% ORDERING NOTE FOR ANYONE FILING HERE. GSBS puts the Approval Page FIRST, ahead
+% of the Title Page: "Arrangement of the Thesis or Dissertation: Approval Page,
+% Title Page, Copyright*, Dedication*, ...". Most templates in this library call
+% \thesistitlepage before \thesisapprovalpage. Call them the other way round for
+% a GSBS filing. The profile cannot enforce the order — that is the document's.
+
+\thesisinstitution{The University of Texas MD Anderson Cancer Center}
+
+% --- Filing figures ----------------------------------------------------------
+% "MARGINS- Left margin must be 1.25 inches or greater. Top, bottom, and right
+% margins must be 0.8 inches or greater."
+%
+% Note this is stated as MINIMA, not as exact figures, which is unusual. The
+% left minimum is binding and is set exactly. For the other three the rule
+% permits anything from 0.8in up, so this profile follows the school's own
+% template, whose section properties set top/right/bottom to 1440 twips = 1in
+% (and left to 1800 twips = 1.25in, agreeing with the prose). 1in is therefore
+% both in spec and the figure GSBS itself ships; 0.8in would also be in spec.
+\thesissetgeometry{left=1.25in, right=1in, top=1in, bottom=1in}
+
+% "TEXT- The text must be double-spaced." Stated of the text; the bibliography
+% is called out separately as double-spaced too ("References must be
+% double-spaced just like the rest of the thesis"). The one exception GSBS
+% names is quoted matter from others' publications, which is "indented 1/2 inch
+% from the left margin, single-spaced" — a per-quotation rule, not a document
+% one, so it is not expressible here and is noted rather than encoded.
+\thesissetspacing{double}
+
+% No chapter-opening rule: GSBS states one margin rule and no deeper top margin
+% for chapter or major-section openings, so \thesissetchapteropening is left
+% unset and openings run at the body's 1in.
+
+% --- Accessibility -----------------------------------------------------------
+% NOTHING IS DECLARED REQUIRED HERE, deliberately. The full text of the
+% graduation page (the filing requirements) contains no occurrence of
+% "accessible", "accessibility", "alt text", "WCAG", "tagged" or "PDF/A"; the
+% forms page carries none either; and a site search of gsbs.uth.edu for
+% "accessibility" returns only disability-accommodation and event-access
+% contacts, not a document requirement. So no \thesisrequiretagging,
+% \thesisrequiredocumentlanguage or \thesisrequirepdfstandard is raised —
+% declaring one would put a rule in GSBS's mouth that GSBS has not published.
+\thesisaccessibilityrequirement{Not published}
+	{No accessibility requirement for a filed thesis or dissertation is
+	 published in the MD Anderson UTHealth Houston GSBS filing requirements as
+	 read on 2026-09-05. This is a finding, not a licence: an untagged PDF is
+	 still an inaccessible one, and other UT-system graduate schools have begun
+	 adding such rules. Re-check before filing.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduced from the official template, whose title-page paragraphs are all
+% centred. The line breaks below are the template's own; the bracketed
+% alternatives in the template ("Thesis [or Dissertation]", "Master of Science
+% [or Doctor of Philosophy]") are resolved from the document's \doctype.
+%
+% Two template details worth keeping: the article "A" sits alone on its own
+% line above the document noun, and the author line asks for "Student's Full
+% Name (given name first) and Previous Degrees" — so \author should carry the
+% prior degrees, e.g. \author{Ada N. Student, B.S.}.
+%
+% GSBS forbids a page number here ("No page number should appear on the Approval
+% Page or the Title Page, although both should be included in the count"), which
+% is what \loadgeometry{nopagenumber} plus \thispagestyle{empty} give.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{{\large\bfseries\@title}}\par
+		\vfill
+		A\\
+		\thesis@DocNoun\par
+		\vfill
+		Presented to the Faculty of\\
+		The University of Texas\\
+		MD Anderson Cancer Center UTHealth Houston\\
+		Graduate School of Biomedical Sciences\par
+		\vfill
+		in Partial Fulfillment\\
+		of the Requirements\\
+		for the Degree of\\
+		\thesis@degree\par
+		\vfill
+		by\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{\baselineskip}
+		Houston, Texas\par
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Also reproduced from the official template. Its shape: the title, "by", and
+% the author centred at the top; then a LEFT-ALIGNED block headed "APPROVED:"
+% carrying one signature rule per committee member with the name typed beneath;
+% then a second "APPROVED:" with a rule for the Dean.
+%
+% PHYSICAL SIGNATURES ARE STILL COLLECTED. "Submit the original thesis approval
+% page signed by your committee, the results of your defense forms ... to Bunny
+% Perez in Academic Affairs", and before that "a separate copy of just the
+% approval page with your advisory committee members' signatures. Please note
+% that the Dean's signature will be added to your approval page later". So the
+% rules below are real signature lines, not decoration, and the Dean's rule is
+% left blank on purpose — the Dean signs it after the student submits.
+%
+% The role, where a document gives one, is typed UNDER the name rather than
+% after it: the template shows "Supervisor Name, Degree(s)" on one line and
+% "Advisory Professor" on the next, and gives the other members no role line at
+% all. \thesis@memberline is redefined for this page to match, so a document
+% that writes \committeemember{Pat D. Advisor, Ph.D.}{Advisory Professor} and
+% \committeemember{Sam K. Reader, Ph.D.}{} lands exactly on the template.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\thesis@tagtitle{H1}{{\color{white}\tiny Approval Page}}\par
+	\begin{center}
+		{\bfseries\@title}\par
+		\vspace{\baselineskip}
+		by\par
+		\vspace{\baselineskip}
+		\@author\par
+	\end{center}
+	\vspace{2\baselineskip}
+	\begingroup
+	\raggedright
+	\renewcommand{\thesis@memberline}[2]{%
+		\vskip 3em
+		\rule{2.75in}{0.4pt}\par
+		##1\par
+		\ifx\relax##2\relax\else ##2\par\fi
+	}%
+	APPROVED:\par
+	\thesis@committee
+	\vspace{3\baselineskip}
+	APPROVED:\par
+	\vskip 3em
+	\rule{2.75in}{0.4pt}\par
+	Dean, The University of Texas\par
+	MD Anderson Cancer Center UTHealth Houston\par
+	Graduate School of Biomedical Sciences\par
+	\endgroup
+	\loadgeometry{normal}\doublespacing\clearpage
+}
