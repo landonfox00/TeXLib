@@ -1,0 +1,200 @@
+% profiles/pennsylvania-state-university-main-campus.tex
+% — Pennsylvania State University-Main Campus
+% ============================================================================
+% source: https://gradschool.psu.edu/academics/theses-and-dissertations
+%         (the Fox Graduate School's Theses and Dissertations page)
+% source: https://gradschool.psu.edu/assets/uploads/documents/Thesis-and-Dissertation-Handbook08272026.pdf
+%         ("THESIS AND DISSERTATION HANDBOOK — Requirements and Guidelines for
+%          the Preparation of Master's Theses and Doctoral Dissertations",
+%          Office of Theses and Dissertations, J. Jeffrey and Ann Marie Fox
+%          Graduate School. The filename carries its date: 2026-08-27, eight
+%          days before this profile was written. 37 pp.)
+% source: https://gradschool.psu.edu/academics/theses-and-dissertations/thesis-and-dissertation-templates
+%         (the Graduate School's templates page — read for the accessibility
+%          language quoted below, and for "Copyright ... This field is optional")
+% accessed: 2026-09-05
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the committee
+% page. NOT set: chapter-opening margin (no such rule). No accessibility
+% check-flag is raised — see the accessibility note, which is the Texas A&M
+% pattern, not the Michigan one.
+%
+% READ THE MARGIN FIGURE FROM THE RENDERED PAGE, NOT THE EXTRACTED TEXT.
+% `pdftotext` renders the handbook's vulgar fractions as U+FFFD, so p. 9 comes
+% out as "A ?-inch or 1-inch margin", which reads naturally — and wrongly — as
+% one-half. The page was rendered at 150 dpi and read as an image: the figure is
+% THREE-QUARTERS. Anyone re-checking this profile must do the same.
+
+\thesisinstitution{The Pennsylvania State University}
+
+% --- Filing figures ----------------------------------------------------------
+% "A 3/4-inch or 1-inch margin on all sides is acceptable, but keep in mind that
+% a wider left margin (e.g., 1 1/2-inch) may be more appropriate for binding
+% purposes."
+%
+% Two figures are acceptable and 1in is the larger, the class default, and the
+% one an electronically filed eTD wants; 0.75in on all sides is equally in spec.
+% The 1.5in left margin is explicitly a suggestion for BINDING ("may be more
+% appropriate"), not a requirement, and is deliberately not encoded — Penn State
+% files electronically, so a filed PDF should not carry a binding allowance.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "The text of an eTD may be single-, double- or one-and-a-half-spaced." All
+% three are permitted and none is required, so this is a default, not a rule.
+\thesissetspacing{double}
+
+% No chapter-opening rule is published. Penn State does require "Begin each
+% chapter on a new page", which the class already does, but states no deeper top
+% margin there, so \thesissetchapteropening stays unset.
+
+% --- Accessibility -----------------------------------------------------------
+% NO CHECK-FLAG IS RAISED, deliberately. Penn State has clearly thought about
+% this — but what it publishes is a statement about its own Word templates, in
+% the indicative, with no modal verb anywhere: no "must", no "required", no
+% named standard, no checker report to file. That is encouragement, not a
+% filing rule, and \thesisrequiretagging is for rules. The handbook itself (37
+% pp.) contains no document-accessibility requirement at all; its only
+% "accessible" strings are about eTD access ("becomes accessible worldwide").
+%
+% The language is recorded verbatim so a later pass can see it was read and
+% weighed, and can notice if the modal verb ever changes.
+\thesisaccessibilityrequirement{Templates, not a mandate}
+	{"Our templates were created with accessibility in mind. Predefined Styles
+	 are applied to all headings, captions, and body text to ensure your
+	 document meets accessibility standards." "Applying these Styles
+	 consistently keeps your document accessible and professionally formatted."
+	 Penn State names no standard, requires no tagged PDF and asks for no
+	 checker report, so nothing here is enforced by this class.}
+
+% --- Copyright line on the title page ------------------------------------------
+% Penn State puts the copyright notice ON the title page, not on a page of its
+% own, and the class has no macro for the year. \thesiscopyrightyear supplies it
+% and defaults to empty, in which case the line is omitted entirely — which is
+% correct, because the notice is optional twice over: "Copyright ... This field
+% is optional" (templates page) and "You own the copyright on your work whether
+% you choose to include this notice or not" (handbook).
+%
+% Set it in the document preamble, after \documentclass:  \thesiscopyrightyear{2027}
+% The handbook's rule for the line: "use the word 'Copyright' or the symbol (c)
+% (not both), followed by the year and your name." The symbol form is used, as
+% in the handbook's own example page ("(c) 2023 John J. Doe").
+\newcommand{\thesis@copyrightyear}{}
+\newcommand{\thesiscopyrightyear}[1]{\renewcommand{\thesis@copyrightyear}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% "The title page must appear exactly as the example title page of this guide."
+% Reproduced from that example (handbook p. 30/31, rendered and read as an
+% image), with the prose rules applied on top of it:
+%
+%   * "Type the title of the thesis/dissertation using capital letters
+%     throughout. If it occupies more than one-line, double space between
+%     lines."  -> \MakeUppercase, and the title block is double-spaced.
+%   * "Master's candidates should use 'Thesis,' and doctoral candidates should
+%     use 'Dissertation' on the title page."  -> \thesis@DocNoun, from \doctype.
+%   * "On the date line, indicate the month and year of degree conferral, not
+%     the date of the defense or the date you submit."  -> \graddate must be the
+%     CONFERRAL date. Degrees are conferred only in May, August and December.
+%   * "The title page does not show a page number, although it is actually page
+%     i."  -> \thispagestyle{empty} with the no-footer geometry.
+%
+% The title is set bold because the example page sets it bold; the handbook only
+% PERMITS bold there ("Boldface type may also be used on the title page"), so a
+% document that wants it plain is not out of spec.
+%
+% AN ERROR IN THE HANDBOOK, left for the reviewer rather than papered over: the
+% page headed "Doctoral Title Page Example" shows a MASTER'S title page — "A
+% Thesis in ... Master of Science" — identical in substance to the page headed
+% "Master's Title Page Example" on the next leaf. There is therefore no doctoral
+% specimen. The doctoral wording below follows the handbook's PROSE rule quoted
+% above, not the mislabelled example.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		The Pennsylvania State University\par
+		The J. Jeffrey and Ann Marie Fox Graduate School\par
+		\vspace{4\baselineskip}
+		% Double-spaced, per "If it occupies more than one-line, double space
+		% between lines" -- so a two-line title breaks correctly by itself.
+		\begingroup\doublespacing
+		\thesis@tagtitle{Title}{{\bfseries\MakeUppercase{\@title}}}\par
+		\endgroup
+		\vspace{3\baselineskip}
+		A \thesis@DocNoun{} in\par
+		\vspace{\baselineskip}
+		\thesis@program\par
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{\baselineskip}
+		\@author\par
+		\ifx\thesis@copyrightyear\@empty\else
+			\vspace{2\baselineskip}
+			\copyright\ \thesis@copyrightyear\ \@author\par
+		\fi
+		\vspace{3\baselineskip}
+		Submitted in Partial Fulfillment\\
+		of the Requirements\\
+		for the Degree of\par
+		\vspace{2\baselineskip}
+		\thesis@degree\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee page ------------------------------------------------------------
+% Penn State calls it the COMMITTEE PAGE, not an approval page, and it is part of
+% the filed document: "The committee page is page ii and appears immediately
+% before the Abstract." "The committee page must appear exactly as example
+% committee page of this guide."
+%
+% NO SIGNATURE LINES, AND NO PHYSICAL SIGNATURES. The page carries typed names
+% and titles only; approval is collected electronically through the eTD system
+% ("All electronic signatories on a doctoral dissertation must be members of
+% Penn State's Graduate Faculty..."). Drawing a rule here would be wrong.
+%
+% Opening sentence, from the example: "The dissertation of John J. Doe was
+% reviewed and approved by the following:" — so it takes the document noun,
+% lowercase, and the author's name.
+%
+% Per-member shape, from the example plus the prose: the name, then the
+% professorial title, then any role(s), each on its own line, left-aligned.
+% "Be sure that all committee members are identified by their correct
+% professorial titles. ... Do not use such designations as 'Ph.D.' or 'Dr.' on
+% the committee page." So a document filing here writes, e.g.,
+%   \committeemember{Charles L. Merkle}{Professor of Mechanical Engineering}
+% and puts the ROLE ("Dissertation Advisor", "Chair of Committee") on the same
+% second argument, separated by \\ if there are two — the class's committee list
+% carries exactly two fields.
+%
+% NOTE ON THE EXAMPLE'S OWN TYPOGRAPHY: in the handbook's rendered example the
+% advisor's first entry reads "Professor of Mechanical Engineering Dissertation
+% Advisor" on ONE line, with "Chair of Committee" beneath. The prose says roles
+% go "under the professorial title", so that run-on is treated as a slip in the
+% specimen and the roles are set on their own lines here.
+%
+% THE PAGE IS NUMBERED. Unlike the title page, the committee page shows "ii", so
+% this page keeps the normal geometry and page style rather than suppressing the
+% number. For it to come out as a lowercase roman numeral the document must call
+% \thesisapprovalpage inside the front matter -- i.e. after \frontmatter -- which
+% is the document's business, not the profile's.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage
+	\loadgeometry{normal}\singlespacing
+	\thesis@tagtitle{H1}{{\color{white}\tiny Committee Page}}\par
+	\begingroup
+	\raggedright
+	The \thesis@docnoun{} of \@author{} was reviewed and approved by the
+	following:\par
+	\renewcommand{\thesis@memberline}[2]{%
+		\vskip 1.5em
+		##1\par
+		\ifx\relax##2\relax\else ##2\par\fi
+	}%
+	\thesis@committee
+	\endgroup
+	\doublespacing\clearpage
+}
