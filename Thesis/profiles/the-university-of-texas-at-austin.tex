@@ -1,0 +1,231 @@
+% profiles/the-university-of-texas-at-austin.tex
+% — The University of Texas at Austin
+% ============================================================================
+% source: https://graduate.utexas.edu/navigating/graduation/digital-submission
+%         (Office of Graduate and Postdoctoral Studies, Digital Submission
+%          Requirement — the page that links the guidelines below)
+% source: "Format Guidelines.pdf" — "Graduate School Format Guidelines for
+%         Dissertations, Treatises, Theses, and Reports", 18 pp., internal PDF
+%         title "Graduate School Format Guidelines - Proposed Revisions[2]",
+%         embedded ModDate 2025-02-14, linked from that page as "Format
+%         Guidelines":
+%         https://utexas.box.com/s/ffag6al7b0eaaqcheml6dcot9u3z6zit
+% source: https://graduate.utexas.edu/navigating/graduation/digital-submission/latex
+%         and the "LaTex Dissertation/Thesis package (ZIP Format)" it links,
+%         https://utexas.box.com/s/tfzk7cjur5zbnblnpcf1l8m884t03786
+%         (UT's OFFICIAL LaTeX package; the page says "The styling contained in
+%          these packages meets the requirements of the Graduate School as of
+%          April 2023". Read for the margin note below — NOT used to set one.)
+% accessed: 2026-09-05
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: spacing, the title page, and the committee membership
+% page. NOT SET, deliberately: \thessissetgeometry — see immediately below. It
+% is the important part of this file.
+%
+% Box access recipe, same as the Washington University profile: the /s/<hash>
+% pages are JavaScript viewers curl cannot read. Open in a browser, take the
+% f_<digits> file id out of the DOM, then fetch
+%   https://utexas.app.box.com/index.php?rm=box_download_shared_file&shared_name=<hash>&file_id=f_<digits>
+%
+% ============================================================================
+% UT AUSTIN PUBLISHES NO MARGIN FIGURE. THE GEOMETRY IS UNSET ON PURPOSE.
+%
+% The Format Guidelines' entire margin section, quoted in full, is:
+%
+%   "b. Margins
+%    Margins should be consistent throughout the document, including the
+%    appendix."
+%
+% That is a CONSISTENCY rule, not a measurement. It was checked exhaustively:
+% across all 18 pages the word "inch" occurs exactly once, and it is about
+% oversized plates ("more than 11x14 inches"); no figure with an inch mark
+% appears anywhere near the margin section. So there is no published number to
+% record, and under RESEARCHING.md an unverified figure stays unset. The class's
+% neutral geometry renders, which satisfies UT's only stated rule (it is
+% consistent) while making no claim about a figure UT did not publish.
+%
+% WHAT UT'S OWN LaTeX PACKAGE USES, recorded because it is genuinely useful and
+% NOT because it is a requirement. styles/utformat.sty sets:
+%
+%   \oddsidemargin 0.25in  \evensidemargin 0.25in   -> 1.25in left and right
+%   \textwidth 6in            % its own comment: "8.5 inches, with 1.25 inch
+%                             %  margins = 8.5 - 2 * 1.25 = 6"
+%   \topmargin 0.25in                                -> 1.25in top
+%   \textheight 8.5in                                -> 1.25in bottom
+%
+% i.e. 1.25in on all four sides. A filer who wants to match what the Graduate
+% School's own package produces can write, in the document preamble:
+%
+%   \thesissetgeometry{left=1.25in, right=1.25in, top=1.25in, bottom=1.25in}
+%
+% This profile does NOT do that for them. Setting it would state as UT's
+% requirement a figure UT declined to state, and 1in is equally in spec because
+% the only rule is consistency. The evidence is laid out here so the choice is
+% the filer's and the reviewer's, not this file's.
+% ============================================================================
+
+\thesisinstitution{The University of Texas at Austin}
+
+% --- Filing figures ----------------------------------------------------------
+% \thesissetgeometry is deliberately absent -- see above.
+
+% "Spacing should be consistent throughout the text. 1.5 or double spacing is
+% recommended for ease of reading."
+%
+% RECOMMENDED, not required, and this line is therefore a default rather than a
+% rule -- the same shape as the margin finding, one step less severe. Double is
+% one of the two values UT names and is the class default; onehalf is equally
+% within the recommendation. The call is made explicitly so that a later change
+% to the class's neutral default cannot silently move a UT filing off one of the
+% two recommended values.
+\thesissetspacing{double}
+
+% No chapter-opening rule beyond "Each new chapter or major section (i.e.,
+% Chapter 1, Chapter 2, Appendix, Bibliography, Vita) must begin on a new page",
+% which the class already does. No deeper top margin is specified, so
+% \thesissetchapteropening stays unset.
+
+% --- Accessibility -----------------------------------------------------------
+% NOTHING IS DECLARED REQUIRED, and at UT Austin that is worth a second look
+% rather than a shrug. The 18-page Format Guidelines contain ZERO occurrences of
+% "accessib", "alt text", "WCAG", "tagged" or "PDF/A"; the Digital Submission
+% Requirement page has none; the LaTeX & Overleaf page has none.
+%
+% UT Austin does publish a university-wide Digital Accessibility Policy
+% (utexas.edu/digital-accessibility-policy, linked from the footer of every page
+% including these), and as a large public entity it falls under the April 2026
+% ADA Title II compliance date. But the Graduate School has not applied either to
+% a filed ETD in its published filing requirements, and this class must not
+% invent the bridge. Compare the University of Florida profile, where the
+% graduate school DID make that link explicitly and the flags are raised.
+\thesisaccessibilityrequirement{Not published}
+	{The UT Austin Graduate School publishes no accessibility requirement for a
+	 filed ETD in its Format Guidelines, its Digital Submission Requirement page
+	 or its LaTeX page, as read on 2026-09-05. The university does have a
+	 separate, site-wide Digital Accessibility Policy that the Graduate School
+	 does not cite in its filing requirements. A finding, not a licence, and one
+	 to re-check: UT Austin is a large public entity under the April 2026 ADA
+	 Title II date.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduced from Sample D (Format Guidelines p. 16, rendered at 85 dpi and read
+% as an image). Everything is centred.
+%
+% ON THE BOLD IN THE SPECIMEN: the sample sets the title, the student name, the
+% document type and the degree in bold, and sets nothing else in bold. Those are
+% exactly the four placeholders a student replaces, so the bold marks FILL-IN
+% FIELDS, not a typographic requirement -- the surrounding prose asks for bold
+% nowhere and says only that headings "may be bolded". Everything here is
+% therefore plain. Flagged because it is the kind of thing a later pass might
+% "correct" from the picture.
+%
+% The title is set double-spaced: the specimen's own placeholder text reads
+% "Title of ETD Centered / and Double-Spaced", which is an instruction wearing
+% the costume of a title.
+%
+% "Month (May, August, or December only) Year" -- so \graddate{May 2027}, and
+% only those three months.
+%
+% "The degree sought must be worded in the form given in the Graduate Catalog.
+% If dual degree, list both degrees on a separate line separated by the word
+% And." A document supplies that through \graddegree.
+%
+% The parenthetical lines on the specimen ("(The degree sought must be worded
+% ...)") are instructions to the student and are not part of the page.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\begingroup\doublespacing
+		\thesis@tagtitle{Title}{\@title}\par
+		\endgroup
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{2\baselineskip}
+		\thesis@DocNoun\par
+		\vspace{\baselineskip}
+		Presented to the Faculty of the Graduate School\\
+		of the University of Texas at Austin\\
+		in Partial Fulfillment\\
+		of the Requirements\\
+		for the Degree(s) of\par
+		\vspace{\baselineskip}
+		\thesis@degree\par
+		\vspace{2\baselineskip}
+		The University of Texas at Austin\\
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee membership page ---------------------------------------------------
+% UT calls this the COMMITTEE MEMBERSHIP PAGE (also "Committee Listing Page"),
+% and it IS part of the filed document -- it is item 2 in the required order,
+% ahead of the title page. Reproduced from Sample C (Format Guidelines p. 15).
+%
+% NO SIGNATURES, AND THAT IS EXPLICIT: "The committee membership page in the pdf
+% file that is uploaded for archiving and publication must not contain committee
+% signatures." So no rules are drawn -- typed names only. This is the strongest
+% such statement of any institution in this round.
+%
+% PHYSICAL SIGNATURES ARE STILL COLLECTED, on a separate form, and UT is unusually
+% specific about them: doctoral students submit the "report of dissertation
+% committee" signed by ALL committee members and a GSC representative, "no proxy
+% signatures allowed"; "Signatures should all be on a single page"; "Scanned or
+% electronic signatures will be accepted as long as they are legible and dark
+% enough to be imaged"; "Typed names as a signature are not allowed"; and
+% "Extensions will not be granted because a committee member was not available
+% to sign."
+%
+% Layout, from the specimen: a centred certification sentence naming the author;
+% the title, centred and double-spaced; then a RIGHT-ALIGNED block headed
+% "Committee:" with one name per line.
+%
+% "Educational or professional titles (Ph.D. or Dr.) are not included for
+% committee members, but the titles indicating committee supervisory status
+% ('Supervisor' or 'Co-supervisor') must follow the names of committee members
+% who have been officially designated in these roles." So \committeemember takes
+% a bare name and, where applicable, exactly "Supervisor" or "Co-Supervisor" --
+% and NO post-nominals, the same trap as Washington University in St. Louis and
+% the opposite of most other profiles here.
+%
+% A NUMBERING AMBIGUITY, left rather than resolved: UT says "Pages should be
+% numbered sequentially starting with 1 on the first page of the document (the
+% Copyright Page or Committee Listing Page)" and that numbers are "centered at
+% the bottom of the page throughout the document" -- but Samples C and D show no
+% page number on either page. This profile follows the SAMPLES and leaves both
+% unnumbered, reading the prose as fixing where the COUNT starts. A reviewer who
+% reads it as "print 1 on the committee page" should say so.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\thesis@tagtitle{H1}{{\color{white}\tiny Committee Membership Page}}\par
+	\begin{center}
+		\vspace*{0.5in}
+		The \thesis@DocNoun{} Committee for \@author\\
+		certifies that this is the approved version of the following
+		\thesis@docnoun:\par
+		\vspace{2\baselineskip}
+		\begingroup\doublespacing
+		\@title\par
+		\endgroup
+	\end{center}
+	\vspace{2\baselineskip}
+	% Right-aligned committee block, per the specimen.
+	\begingroup
+	\raggedleft
+	\renewcommand{\thesis@memberline}[2]{%
+		\vskip 0.8\baselineskip
+		##1\ifx\relax##2\relax\else, ##2\fi\par
+	}%
+	\textbf{Committee}:\par
+	\thesis@committee
+	\par
+	\endgroup
+	\loadgeometry{normal}\doublespacing\clearpage
+}
