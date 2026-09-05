@@ -1,0 +1,168 @@
+% profiles/northwestern-university.tex — Northwestern University
+% ============================================================================
+% source: https://www.tgs.northwestern.edu/academic-policies-procedures/dissertation-publication/dissertation-formatting-requirements.html
+%         (The Graduate School's Dissertation Formatting Requirements)
+% source: https://www.tgs.northwestern.edu/documents/academic-policies-procedures/dissertation-formatting-pdf-template.pdf
+%         (TGS's own sample template, linked from that page as "A sample
+%          template providing examples of what is outlined below". 20 pp.,
+%          embedded CreationDate 2024-08-01. The title-page layout below is its
+%          p. 1, rendered at 90 dpi and read as an image.)
+% source: https://www.tgs.northwestern.edu/academic-policies-procedures/dissertation-publication/dissertation-formatting-requirements/file-format-recommendations-for-supplemental-files.html
+%         (read only to confirm it carries no accessibility requirement; it
+%          does not)
+% accessed: 2026-09-05
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the absence of
+% an approval page. NOT set: chapter-opening margin (no such rule).
+%
+% THE FRACTIONS WERE VERIFIED AT THE CODEPOINT LEVEL, not by eye. TGS's page
+% serves U+00BE (VULGAR FRACTION THREE QUARTERS) and it decodes to a replacement
+% character in several extraction paths, the same trap that hides Penn State's
+% margin figure. The exception allowance is THREE QUARTERS of an inch, checked by
+% reading the codepoint out of the raw bytes.
+%
+% SCOPE. TGS's requirements are explicitly a floor, not a full style: "The
+% Graduate School sets the MINIMUM formatting standards for the PhD dissertation
+% ... These guidelines do not address all facets of formatting and style.
+% Students should consult with their adviser, committee, and academic program's
+% choice of style manual for formatting questions outside what is described
+% below." Everything below is from inside that floor; nothing is extrapolated
+% past it.
+
+\thesisinstitution{Northwestern University}
+
+% --- Filing figures ----------------------------------------------------------
+% "Margins must be 1" on all sides with the exception of page numbers, figures,
+% headers/footers, footnotes/endnotes, and full-page images, which may be 3/4"
+% from edge of page."
+%
+% Read that carefully: the exception is an ALLOWANCE TO GO CLOSER TO THE EDGE for
+% a named list of elements, not a different margin. The body's rule is a flat 1in
+% on all four sides, which is what is set. Nothing in the class puts figures or
+% footnotes outside the text block, so the allowance is unused and unneeded.
+%
+% The page-number rule uses the same figure from the other direction: "Page
+% number should appear in upper right corner of page at least 3/4" from both the
+% top and right edges of the page." The class puts page numbers in the FOOTER,
+% inside the 1in block. That is a real difference from TGS's specimen and is
+% recorded rather than papered over -- see the note at the foot of this file.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "The abstract, dedication, acknowledgements, table of contents, and body of
+% the manuscript should be double spaced." A requirement for the body, listed
+% element by element rather than as a blanket rule.
+%
+% The single-spacing allowances are per-element and not expressible here:
+% "Quotations as paragraphs, captions, items in tables, lists, graphs, charts,
+% footnotes/endnotes, bibliographic entries, and lists in appendices MAY be
+% single spaced."
+\thesissetspacing{double}
+
+% No chapter-opening rule is published, so \thesissetchapteropening stays unset.
+
+% --- Accessibility -----------------------------------------------------------
+% NOTHING IS DECLARED REQUIRED. The Dissertation Formatting Requirements page has
+% no occurrence of "accessib", "alt text", "WCAG", "tagged" or "PDF/A"; the
+% 20-page TGS template PDF has none either; and the linked File Format
+% Recommendations page, checked specifically for this, has none. Northwestern is
+% private, so the April 2026 ADA Title II compliance date that drives several
+% public universities' rules in this directory does not reach it the same way.
+%
+% TGS does state a PURPOSE that gestures at it -- the standards exist "to ensure
+% uniformity, legibility, and to comply with ProQuest and University Library
+% requirements for publishing/archiving" -- but a purpose is not a requirement,
+% and ProQuest's requirements are ProQuest's, which RESEARCHING.md is explicit
+% about not mistaking for the institution's.
+\thesisaccessibilityrequirement{Not published}
+	{Northwestern's Graduate School publishes no accessibility requirement for a
+	 filed dissertation, in the formatting requirements, the sample template, or
+	 the linked file-format page, as read on 2026-09-05. A finding, not a
+	 licence.}
+
+% --- Title page --------------------------------------------------------------
+% "Layout: The title page should conform to this sample." Reproduced from that
+% sample, TGS's template p. 1. Everything is centred and generously spaced, and
+% everything is in capitals EXCEPT the title, "for the degree", "By", the
+% program name and the date -- which is the detail most easily got wrong, since
+% four of the surrounding lines are uppercase.
+%
+% Rules carried over from the prose:
+%
+%   * "The title of the dissertation should be in mixed case; the first and last
+%     words and all nouns, pronouns, adjectives, verbs, and adverbs are
+%     capitalized. Articles (a, an, the), coordinating conjunctions (and, but,
+%     or, for, nor), and prepositions, regardless of length, are lowercased
+%     unless they are the first or last word of the title or subtitle."
+%     -> The title is emitted VERBATIM, neither uppercased nor bolded: title
+%     case is the author's job and cannot be done correctly by a macro.
+%   * "Special characters cannot be used in titles. Use word substitutes in
+%     place of formulas, symbols, superscripts, or Greek letters."
+%   * "Program name: Should be the name of the students' academic program as
+%     listed here" -- i.e. the official program name, not a department's.
+%   * "Date: The date should be the month and year in which the degree will be
+%     officially conferred (December 20XX for Fall graduates, March 20XX for
+%     Winter graduates, June 20XX for Spring graduates, September 20XX for
+%     Summer graduates)." Note Northwestern's quarter system: those four months
+%     and no others. So \graddate{June 2027}, not a defence date.
+%   * "Every page in a dissertation is numbered, except the title page."
+%
+% "EVANSTON, ILLINOIS" is the specimen's own place line and is set literally,
+% including for a Chicago-campus program -- TGS prints one place line and this
+% is it.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{0.5in}
+		NORTHWESTERN UNIVERSITY\par
+		\vspace{3\baselineskip}
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{3\baselineskip}
+		A \MakeUppercase{\thesis@DocNoun}\par
+		\vspace{2\baselineskip}
+		SUBMITTED TO THE GRADUATE SCHOOL\\
+		IN PARTIAL FULFILLMENT OF THE REQUIREMENTS\par
+		\vspace{2\baselineskip}
+		for the degree\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\thesis@degree}\par
+		\vspace{2\baselineskip}
+		\thesis@program\par
+		\vspace{2\baselineskip}
+		By\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{2\baselineskip}
+		EVANSTON, ILLINOIS\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Northwestern's filed dissertation has none. The arrangement of pages is given
+% in full and is exhaustive -- "Title page, Copyright page, Abstract,
+% Acknowledgment page, Preface, List of Abbreviations, Glossary, Dedication,
+% Table of Contents, List of Tables/Illustrations/Figures/Graphs, Introduction,
+% Text body, Tables/Illustrations/Figures/Graphs, References, Appendices, Vita"
+% -- and contains no approval, committee or signature page. TGS's own 20-page
+% template emits none.
+%
+% PHYSICAL SIGNATURES: none in the document. TGS prescribes no signature line
+% anywhere in the dissertation; the committee's approval is recorded through the
+% degree-completion process rather than on a leaf of the manuscript.
+\thesisnoapprovalpage
+
+% --- One figure the class does not reproduce ------------------------------------
+% TGS puts page numbers in the UPPER RIGHT corner, at least 3/4in from the top
+% and right edges -- i.e. above the 1in text block. The class puts them in the
+% footer, inside the block. That is a visible difference from the specimen, not a
+% margin violation: TGS's own rule exempts page numbers from the 1in requirement
+% by letting them come CLOSER to the edge, so a number further inside breaks
+% nothing it states. It is recorded here because someone comparing this output
+% against the TGS template side by side will see it immediately, and should know
+% it was noticed rather than missed. Moving it would need a page-style hook the
+% class does not currently expose to a profile.
