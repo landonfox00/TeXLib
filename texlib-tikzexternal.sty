@@ -1,0 +1,107 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-tikzexternal}[2026/09/04 v0.8.0 TeXLib cached tikz pictures]
+
+% ==============================================================================
+% texlib-tikzexternal.sty — compile each tikzpicture once, then reuse it
+% ==============================================================================
+%
+% Every tikzpicture in a document is re-typeset on every pass. pgf's `external'
+% library compiles each one to its own PDF instead and \includegraphics-es the
+% result on later runs, so a picture is rebuilt only when its own code changes
+% and an edit to the prose around it costs nothing.
+%
+% WHETHER IT PAYS DEPENDS ON COST PER PICTURE, NOT PICTURE COUNT
+%
+% This is the whole decision, and counting pictures gets it backwards. Inline, a
+% picture costs its own pgf time. Externalised, it costs a WHOLE LATEX RUN --
+% class load and all. So externalisation wins only when a picture is more
+% expensive than starting LaTeX, which cheap pictures are not. Measured here
+% (pdflatex, TeX Live 2026, didactic class):
+%
+%   24 simple pictures (axes, a curve, two nodes)
+%       inline 4.61s/pass -> cached 3.74s/pass   saves 0.87s
+%       first build 92.93s instead of 4.61s      costs 88s once
+%       break-even: about 101 passes  -- DO NOT externalise this document
+%
+%   6 dense pgfplots axes (samples=400, three plots each)
+%       inline 10.12s/pass -> cached 3.84s/pass  saves 6.28s
+%       first build 30.99s instead of 10.12s     costs 21s once
+%       break-even: 3 passes          -- externalise this one
+%
+% The rule of thumb that follows: reach for this when a document's pictures are
+% pgfplots axes, dense `samples=', decorations, or anything you notice taking
+% time -- not merely because there are a lot of them.
+%
+% USAGE. Opt in per document, after the class:
+%
+%     \usepackage{texlib-tikzexternal}
+%
+% and build normally -- the TeXLib builder notices the package and adds the
+% -shell-escape the external library needs. Cached figures land in
+% `texlib-figures/' beside the document; delete that directory to force a full
+% rebuild. Override the location before loading:
+%
+%     \newcommand{\TeXLibExternalDir}{build/figs/}   % keep the trailing slash
+%
+% WHY THIS IS OPT-IN RATHER THAN ON
+%
+% Three reasons, in order of how much they should worry you.
+%
+% 1. It requires -shell-escape, which lets a document run arbitrary commands.
+%    That is a real privilege, and handing it to every TeXLib build so that the
+%    one document with many pictures gets faster is the wrong trade. A document
+%    asks for it, and the ask is visible in its preamble.
+%
+% 2. It is OFF in accessible builds, unconditionally (see below). A document
+%    that externalised everything would quietly produce a worse tagged PDF.
+%
+% 3. The first build is slower, not faster -- every picture is compiled AND the
+%    document is compiled. The win starts on the second build. For a document
+%    that is written once and never revised, externalising is a pure loss.
+%
+% WHY IT IS DISABLED UNDER \TeXLibAccessibleMode
+%
+% An externalised picture is no longer content: it is an \includegraphics of a
+% PDF. In a tagged build that turns a figure the tagging engine could describe
+% into an untagged image with no alternative text, which is precisely the defect
+% the accessibility gates exist to catch. The tagged half of an accessible build
+% therefore always typesets pictures inline, and pays for it. Speed is not worth
+% a conformance regression with a compliance deadline attached.
+% ==============================================================================
+
+% tikz itself may have been deferred (\TeXLibNoTikz -- see texlib-corepkg.sty).
+% Asking for it explicitly is the point of loading this package, so revive it.
+\@ifundefined{TeXLibLoadTikz}{}{\TeXLibLoadTikz}
+\RequirePackage{tikz}
+\usetikzlibrary{external}
+
+\providecommand{\TeXLibExternalDir}{texlib-figures/}
+
+\ifdefined\TeXLibAccessibleMode
+	% Tagged build: inline every picture, and say why in the log so a slow
+	% accessible build is not a mystery.
+	\tikzexternaldisable
+	\PackageInfo{texlib-tikzexternal}{%
+		Accessible build detected -- externalisation disabled so pictures stay
+		tagged content rather than untagged images%
+	}
+\else
+	% pgf writes the cached PDFs into the prefix directory but will not create
+	% it, and a missing directory fails the run rather than falling back. The
+	% write18 is guarded on shell escape actually being available: without it
+	% externalisation cannot work at all, so warn and stay inline rather than
+	% failing.
+	\ifnum\pdfshellescape=1
+		\immediate\write18{mkdir "\TeXLibExternalDir"}%
+		\tikzexternalize[prefix=\TeXLibExternalDir]%
+	\else
+		\tikzexternaldisable
+		\PackageWarning{texlib-tikzexternal}{%
+			-shell-escape is not enabled, so tikz pictures cannot be cached and
+			will be typeset inline. Build through the TeXLib builder, which adds
+			the flag when this package is loaded%
+		}
+	\fi
+\fi
+
+\endinput

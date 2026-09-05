@@ -4,7 +4,82 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- **`benchmark.py` — the library had no benchmarks, for any class.** The only
+  timing code in the repository was in the galleries. That was survivable while
+  nothing here claimed to manage build time, and stopped being survivable the
+  moment the deferral scanner and the format cache landed: those exist purely to
+  make builds faster, and nothing would have noticed a later change putting the
+  cost back.
+
+  It does not time whole builds, because a whole-build number measures the class
+  and calls it the document. It times three documents per class — a near-empty
+  `article` (the engine floor), a near-empty document *of that class*, and the
+  real example — and reports `class_load = class − floor` alongside
+  `content = full − class`.
+
+  The regression gate is a **ratio**, `(class − floor) / floor`: "how many engine
+  floors does loading this class cost". Absolute seconds are a property of the
+  machine, so a threshold in seconds is either flaky on CI or so loose it catches
+  nothing. The baseline lives in `tests/benchmark-baseline.json`; `--check` fails
+  on a drift past 25%, which catches a package creeping back into the bundle
+  without policing noise.
+
+  Staging is `smoke_test`'s, imported rather than reimplemented — the
+  comma-in-`TEXINPUTS` workaround and the class-home fallback are subtle enough
+  that a second copy would drift and start measuring a build nobody performs.
+
+  One caveat is recorded in the file and worth repeating: the committed baseline
+  is measured over `examples/`, which contains **one** `tikzpicture` while a real
+  teaching tree contains over a thousand. Anything whose cost scales with picture
+  count is invisible to it. `--corpus DIR` points the harness at real documents.
+
+- **`texlib-tikzexternal.sty` — compile each `tikzpicture` once, then reuse it.**
+  Every picture is otherwise re-typeset on every pass. Opt in per document with
+  `\usepackage{texlib-tikzexternal}`; cached figures land in `texlib-figures/`
+  and a picture is rebuilt only when its own code changes.
+
+  **Whether it pays turns on cost per picture, not picture count** — and
+  counting gets it backwards. Inline, a picture costs its own pgf time;
+  externalised, it costs a whole LaTeX run. Measured both ends: 24 simple
+  pictures go 4.61s → 3.74s per pass but cost 88s once, breaking even after
+  about **101 passes** (do not do this); 6 dense pgfplots axes go 10.12s → 3.84s
+  and cost 21s once, breaking even after **3**. Reach for it when the pictures
+  are expensive, not when there are many.
+
+  Deliberately opt-in, for three reasons. It needs `-shell-escape`, which lets a
+  document run arbitrary commands — the builder grants that flag only to a
+  document that loads this package, never by default. The first build is always
+  slower. And it is disabled unconditionally under `\TeXLibAccessibleMode`: an
+  externalised picture is an `\includegraphics` with no alternative text, which
+  turns tagged content into an untagged image — not a trade to make with a
+  conformance deadline attached.
+
 ### Changed
+
+- **A build that would change nothing does not run.** Pressing Ctrl+B after
+  changing nothing — to bring the PDF forward, to forward-sync the viewer, out of
+  habit — cost a full engine pass. The engine now runs with `-recorder`, which
+  writes a `.fls` listing every file it actually read (317 unique inputs for a
+  six-page Notes document, including the `.bbl` and every texlib `.sty`/`.cls`).
+  That is an *observed* dependency list, better than anything a source scan could
+  infer. Measured against it: **6.8 ms** for the stat fingerprint, **107 ms** to
+  hash all 17.5 MB, versus **~4000 ms** for the pass being skipped.
+
+  Two fingerprints, because one of them is wrong here. OneDrive rewrites mtimes
+  when it syncs, so a teaching tree stored there produces stat mismatches on
+  files whose bytes never changed. A stat mismatch therefore means "look
+  properly", not "stale": the content fingerprint decides, and a byte match still
+  skips the build and refreshes the stat fingerprint so the next check is fast
+  again.
+
+  Every uncertainty resolves toward building — no stamp, no `.fls`, no PDF, a PDF
+  that changed underneath, a different engine/mode/prefix, or any exception at
+  all. A stamp is written only after a **clean** pass, since a run that errored
+  may never have reached an `\input` or an `\includegraphics` and its input list
+  cannot be trusted. Only single-compile modes are eligible; the accessible pair
+  and the variant fan-out always build. `TEXLIB_NO_FRESHNESS=1` disables it.
 
 - **A build loads only the packages the document uses, and quick mode reuses a
   precompiled preamble.** Profiling a six-page Notes document found that

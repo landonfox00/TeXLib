@@ -1,0 +1,23 @@
+{
+  "_comment": [
+    "Baseline for benchmark.py --check. The gate is class_cost =",
+    "(class - floor) / floor, i.e. how many engine-floors loading this",
+    "class costs -- a ratio, because absolute seconds are a property of",
+    "the machine and would make the gate either flaky or useless.",
+    "Regenerate deliberately with: python benchmark.py --update-baseline"
+  ],
+  "classes": {
+    "article": 0.067,
+    "autoexam": 1.912,
+    "bank": 1.809,
+    "bingo": 1.074,
+    "didactic": 3.799,
+    "pset": 4.633,
+    "quiz": 2.071,
+    "report-card": 2.454,
+    "schedule": 0.983,
+    "syllabus": 1.2,
+    "thesis": 2.842
+  },
+  "tolerance": 0.25
+}
