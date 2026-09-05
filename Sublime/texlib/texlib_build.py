@@ -133,6 +133,14 @@ try:
 except ImportError:
     import texlib_format_cache as _fmtcache
 
+# The third of the build-time trio: the scanner decides what to skip loading,
+# the cache remembers the result of loading the rest, and this decides whether
+# the whole pass can be skipped because nothing changed.
+try:
+    from TeXLib import texlib_freshness as _fresh
+except ImportError:
+    import texlib_freshness as _fresh
+
 LUALATEX_CLASSES = _spec.LUALATEX_CLASSES
 
 # Set TEXLIB_NO_DEFER=1 to build with everything loaded, and
@@ -482,6 +490,9 @@ class TexlibBuildCore:
         self._state_warned = False
 
         mode, engine_options = self._extract_mode(self.options or [])
+        # Kept on the instance so the freshness key can include them: the same
+        # source built with different engine options is a different output.
+        self._engine_options = tuple(engine_options)
 
         # Problem-bank fragments (bank.tex, chN.tex, ...) have no root document
         # of their own -- \documentclass never matches, but \begin{problem}
@@ -528,11 +539,35 @@ class TexlibBuildCore:
         # .bcf (recording mid-build would capture a .bcf the post-biber pass
         # then rewrites -> a spurious biber re-run on the next build).
         self._biber_ran = []
+
+        # tikz externalisation needs -shell-escape, which the base command adds
+        # only for the Unicode engines. Grant it to a pdflatex document too, but
+        # ONLY when that document loads texlib-tikzexternal: shell escape lets a
+        # document run arbitrary commands, so it is granted on an explicit ask
+        # that is visible in the source, never by default.
+        if self._wants_shell_escape() and "-shell-escape" not in engine_options:
+            engine_options = tuple(engine_options) + ("-shell-escape",)
+            self._engine_options = engine_options
+
         base = self._base_engine_cmd(
             engine, self._aux_target, tex_dir, engine_options
         )
 
         self._accessible_build = (mode == ACCESSIBLE_MODE)
+
+        # Nothing changed since the last build of this exact target? Then don't
+        # run one. The check costs 7-107ms against an engine pass of seconds
+        # (see texlib_freshness), and the host opens/forward-syncs the viewer
+        # afterwards exactly as it would have.
+        #
+        # Only the single-compile modes are eligible. The accessible pair and
+        # the variant fan-out produce a set of PDFs with their own slicing and
+        # sidecars, and proving that whole set current is a different and much
+        # weaker claim than proving one file is -- so they always build.
+        if (mode not in (ACCESSIBLE_MODE,) and mode not in MULTI_VARIANT_MODES
+                and self._skip_if_fresh(engine, mode, tex_dir)):
+            return
+
         if mode == MODE_QUICK:
             yield from self._count_passes(self._build_quick(base, engine))
         elif mode == ACCESSIBLE_MODE:
@@ -552,6 +587,12 @@ class TexlibBuildCore:
             yield from self._count_passes(self._build_once(base, engine, mode))
 
         self._postprocess()
+
+        # Record the inputs this build actually read, so an unchanged rebuild
+        # can be skipped. After _postprocess, because that is what puts the PDF
+        # in its final place -- the stamp records the file the next build would
+        # be asked to reproduce.
+        self._stamp_freshness(engine, mode, tex_dir)
 
     def _count_passes(self, inner):
         """Pass-through generator that tallies engine passes and biber runs for
@@ -776,7 +817,14 @@ class TexlibBuildCore:
         _build_quick) starts from. Adds -output-directory only when routing to a
         distinct aux dir; appends any genuine engine options last.
         """
-        cmd = [engine, "-interaction=nonstopmode", "-synctex=1", "-file-line-error"]
+        # -recorder makes the engine write a .fls listing every file it actually
+        # READ. That is what the freshness check compares against to decide a
+        # rebuild would change nothing (texlib_freshness), and it is an observed
+        # dependency list rather than an inferred one -- it catches the .bbl, the
+        # images, the class files and every package, which no source scan does.
+        # It costs one small file per build and nothing measurable in time.
+        cmd = [engine, "-interaction=nonstopmode", "-synctex=1", "-file-line-error",
+               "-recorder"]
         if engine in ("lualatex", "xelatex"):
             cmd.append("-shell-escape")
         if aux_target and aux_target != tex_dir:
@@ -912,6 +960,82 @@ class TexlibBuildCore:
         arg = f"{prefix}\\input{{{self.tex_name}}}" if prefix else self.tex_name
         cmd = base + [arg]
         yield (cmd, f"{engine} [quick] single pass (refs may be stale)...")
+
+    def _wants_shell_escape(self):
+        r"""True when this document loads texlib-tikzexternal.
+
+        Read from the same gathered source tree the deferral scanner uses, so a
+        \usepackage sitting in an \input'd preamble.tex counts. Memoised, and
+        false on any failure -- failing to grant the flag makes externalisation
+        warn and typeset inline, which is merely slow.
+        """
+        cached = getattr(self, "_shell_escape_memo", None)
+        if cached is not None:
+            return cached
+        wants = False
+        try:
+            source, _complete = _scan.gather_source(self._tex_path())
+            wants = "texlib-tikzexternal" in source
+        except Exception:           # noqa: BLE001 -- see _defer_prefix
+            wants = False
+        self._shell_escape_memo = wants
+        return wants
+
+    def _freshness_key(self, engine, mode):
+        """Identity of the build being asked for, for the freshness stamp."""
+        return _fresh.build_key(engine, mode, self._defer_prefix(),
+                                getattr(self, "_engine_options", ()) or ())
+
+    def _skip_if_fresh(self, engine, mode, tex_dir):
+        """True when the PDF is already current and this build can be skipped.
+
+        Deliberately narrow. The PDF has to be the one beside the source, so
+        there is nothing to copy back and no post-processing to redo -- a build
+        routed to a separate aux directory still runs, because proving the
+        copy-back state current is a claim this check does not make.
+
+        TEXLIB_NO_FRESHNESS=1 turns it off.
+        """
+        if os.environ.get("TEXLIB_NO_FRESHNESS", "") in ("1", "true", "yes"):
+            return False
+        if getattr(self, "_aux_target", None) and self._aux_target != tex_dir:
+            return False
+        pdf = os.path.join(tex_dir, self.base_name + ".pdf")
+        try:
+            if not _fresh.is_fresh(pdf, self._freshness_key(engine, mode)):
+                return False
+        except Exception:               # noqa: BLE001 -- doubt means build
+            return False
+        self.display(
+            "TeXLib: %s.pdf is already current -- nothing to rebuild.\n"
+            % self.base_name
+        )
+        self.produced_pdfs = []
+        return True
+
+    def _stamp_freshness(self, engine, mode, tex_dir):
+        """Record what the PDF was built from, so the next build can skip.
+
+        Only after a CLEAN pass: a run that emitted errors may never have
+        reached an \\input or an \\includegraphics, so its .fls is not a
+        trustworthy dependency list. Cheap to skip and expensive to get wrong.
+        """
+        if os.environ.get("TEXLIB_NO_FRESHNESS", "") in ("1", "true", "yes"):
+            return
+        if getattr(self, "_aux_target", None) and self._aux_target != tex_dir:
+            return
+        log = os.path.join(tex_dir, self.base_name + ".log")
+        try:
+            with open(log, encoding="utf-8", errors="replace") as fh:
+                if any(line.startswith("!") for line in fh):
+                    return
+        except OSError:
+            return
+        pdf = os.path.join(tex_dir, self.base_name + ".pdf")
+        try:
+            _fresh.write_stamp(pdf, self._freshness_key(engine, mode))
+        except Exception:               # noqa: BLE001 -- best-effort
+            pass
 
     def _quick_format_key(self, engine, prefix):
         """Key of a usable precompiled preamble, or None to build normally.

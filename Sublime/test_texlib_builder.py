@@ -2552,6 +2552,132 @@ def main():
           any(r"\def\TeXLibNoBib{}" in a
               for a in _fc.dump_argv(doc, "pdflatex", r"\def\TeXLibNoBib{}", "k")))
 
+    # ====================================================================== #
+    # (z) Freshness: skipping a build that would change nothing.
+    #
+    # Skipping a build that WAS needed is far worse than running one that was
+    # not, so almost every case here checks that a doubt produces False.
+    # ====================================================================== #
+    print("\n-- freshness --")
+    import texlib_freshness as _fr
+
+    KEY = _fr.build_key("pdflatex", "base", "")
+
+    def make_project():
+        """A temp dir with a fake PDF, .fls and one real input. Returns paths."""
+        tmp = tempfile.mkdtemp(prefix="texlib_fresh_")
+        src = os.path.join(tmp, "input.tex")
+        with open(src, "w", encoding="utf-8") as fh:
+            fh.write("hello\n")
+        pdf = os.path.join(tmp, "doc.pdf")
+        with open(pdf, "wb") as fh:
+            fh.write(b"%PDF-1.7\n")
+        with open(os.path.join(tmp, "doc.fls"), "w", encoding="utf-8") as fh:
+            fh.write("PWD %s\nINPUT %s\nOUTPUT doc.pdf\nINPUT doc.aux\n"
+                     % (tmp, src))
+        return tmp, src, pdf
+
+    tmp, src, pdf = make_project()
+    check("fresh: no stamp -> not fresh", not _fr.is_fresh(pdf, KEY))
+    check("fresh: write_stamp succeeds with a .fls and a PDF",
+          _fr.write_stamp(pdf, KEY))
+    check("fresh: unchanged -> fresh", _fr.is_fresh(pdf, KEY))
+    check("fresh: a different build key -> not fresh",
+          not _fr.is_fresh(pdf, _fr.build_key("pdflatex", "quick", "")))
+    check("fresh: a different deferral prefix -> not fresh",
+          not _fr.is_fresh(pdf, _fr.build_key("pdflatex", "base",
+                                              r"\def\TeXLibNoBib{}")))
+
+    with open(src, "w", encoding="utf-8") as fh:
+        fh.write("hello, edited\n")
+    check("fresh: an edited input -> not fresh", not _fr.is_fresh(pdf, KEY))
+
+    _fr.write_stamp(pdf, KEY)
+    with open(pdf, "ab") as fh:
+        fh.write(b"changed\n")
+    check("fresh: a PDF changed underneath -> not fresh",
+          not _fr.is_fresh(pdf, KEY))
+
+    _fr.write_stamp(pdf, KEY)
+    os.remove(pdf)
+    check("fresh: a deleted PDF -> not fresh", not _fr.is_fresh(pdf, KEY))
+
+    # mtime churn without a content change (what OneDrive sync does) must take
+    # the content path and still say fresh -- the whole reason both exist.
+    tmp2, src2, pdf2 = make_project()
+    _fr.write_stamp(pdf2, KEY)
+    stamp_before = _fr.read_stamp(pdf2)
+    os.utime(src2, (1_000_000_000, 1_000_000_000))
+    check("fresh: mtime churn alone is still fresh (content path)",
+          _fr.is_fresh(pdf2, KEY))
+    check("fresh: the stat fingerprint is refreshed after that",
+          _fr.read_stamp(pdf2)["stat"] != stamp_before["stat"])
+
+    check("fresh: .fls artifacts (.aux) are excluded from the input set",
+          not any(p.endswith(".aux")
+                  for p in _fr.fls_inputs(os.path.join(tmp2, "doc.fls"))))
+    check("fresh: a missing .fls -> not fresh",
+          (os.remove(os.path.join(tmp2, "doc.fls")) or True)
+          and not _fr.is_fresh(pdf2, KEY))
+
+    check("fresh: the builder passes -recorder",
+          "-recorder" in TexlibBuilder._base_engine_cmd("pdflatex"))
+
+    # The skip itself, on a real builder instance: a stamped, unchanged document
+    # must yield NO commands at all, and the host must still be pointed at the
+    # PDF (produced_pdfs empty -> preferred_pdf_path falls back to <base>.pdf).
+    tmp3, src3, pdf3 = make_project()
+    os.rename(pdf3, os.path.join(tmp3, "doc.pdf"))
+    b = TexlibBuilder()
+    b.tex_root = os.path.join(tmp3, "doc.tex")
+    b.tex_name = "doc.tex"
+    b.base_name = "doc"
+    b.tex_dir = tmp3
+    b._aux_target = tmp3
+    b.display = lambda *a, **k: None
+    with open(b.tex_root, "w", encoding="utf-8") as fh:
+        fh.write(r"\documentclass{article}\begin{document}x\end{document}")
+    _fr.write_stamp(os.path.join(tmp3, "doc.pdf"),
+                    b._freshness_key("pdflatex", "base"))
+    check("fresh: a stamped, unchanged document is skipped",
+          b._skip_if_fresh("pdflatex", "base", tmp3))
+    check("fresh: the skip leaves produced_pdfs empty (host opens <base>.pdf)",
+          b.produced_pdfs == [])
+    os.environ["TEXLIB_NO_FRESHNESS"] = "1"
+    check("fresh: TEXLIB_NO_FRESHNESS=1 disables the skip",
+          not b._skip_if_fresh("pdflatex", "base", tmp3))
+    del os.environ["TEXLIB_NO_FRESHNESS"]
+
+    b._aux_target = os.path.join(tmp3, "aux")
+    check("fresh: a build routed to a separate aux dir is never skipped",
+          not b._skip_if_fresh("pdflatex", "base", tmp3))
+
+    print("\n-- tikz externalisation --")
+    b2 = TexlibBuilder()
+    b2.tex_root = os.path.join(tmp3, "plain.tex")
+    b2.tex_name = "plain.tex"
+    b2.tex_dir = tmp3
+    with open(b2.tex_root, "w", encoding="utf-8") as fh:
+        fh.write(r"\documentclass{didactic}\begin{document}x\end{document}")
+    check("extern: a document not asking for it gets no shell escape",
+          not b2._wants_shell_escape())
+
+    b3 = TexlibBuilder()
+    b3.tex_root = os.path.join(tmp3, "ext.tex")
+    b3.tex_name = "ext.tex"
+    b3.tex_dir = tmp3
+    with open(b3.tex_root, "w", encoding="utf-8") as fh:
+        fh.write(r"\documentclass{didactic}\usepackage{texlib-tikzexternal}"
+                 r"\begin{document}x\end{document}")
+    check("extern: loading texlib-tikzexternal asks for shell escape",
+          b3._wants_shell_escape())
+
+    check("extern: the package disables itself in accessible builds",
+          "tikzexternaldisable" in open(
+              os.path.join(os.path.dirname(os.path.dirname(
+                  os.path.abspath(__file__))), "texlib-tikzexternal.sty"),
+              encoding="utf-8").read())
+
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return _FAIL
 
