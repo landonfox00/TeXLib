@@ -52,14 +52,3 @@ give UCLA a 1.5in left margin for binding. UCLA's own filing requirements say
 hook, a way for a profile to state that no approval page is permitted, and the
 accessibility declarations — all three were things a profile previously had to
 note in a comment and then file out of spec anyway.
-
-## 2026-09-03 — university-of-minnesota-twin-cities
-
-`profile` — HERD rank 21, the first of the ranked queue past the top-20 batch.
-Set from GSSP's January 2023 *Thesis Formatting & Submission Guidelines* (linked
-from the One Stop submission page): geometry, spacing, the specimen title page,
-no approval page, and accessibility recorded as **Not published** — an absence
-read, not a section skipped. Builds clean; tagged output veraPDF UA-2 clean
-(`failedRules="0"`). Flagged for the reviewer: a superseded 2013/2021 edition of
-the same guidelines is still served from `assets.asr.umn.edu` and prescribes an
-in-document signature page the current edition does not. PR #117.
