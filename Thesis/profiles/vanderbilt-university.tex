@@ -1,0 +1,148 @@
+% profiles/vanderbilt-university.tex — Vanderbilt University
+% ============================================================================
+% source: https://gradschool.vanderbilt.edu/academics/thesis-dissertation-guidelines/
+%         (the Graduate School's current Thesis & Dissertation Guidelines page)
+% source: https://cdn.vanderbilt.edu/vu-sub/wp-content/uploads/sites/284/2023/09/29213943/Format_Guidelines_08_2021.pdf
+%         ("THESIS AND DISSERTATION GUIDELINES, VANDERBILT UNIVERSITY GRADUATE
+%          SCHOOL", the complete document linked from the page above; the "Title
+%          Page Format" specimen on its p. 16 is where the exact layout comes
+%          from)
+% source: https://cdn.vanderbilt.edu/vu-sub/wp-content/uploads/sites/284/2023/09/29213942/ETDTitlePageDissertationSamplePDF.pdf
+%         (the ETD title-page sample — the version that goes IN the manuscript)
+% source: https://cdn.vanderbilt.edu/vu-sub/wp-content/uploads/sites/284/2023/09/29213942/SampleTitlePageDissertation.pdf
+%         (the signature version, circulated separately — NOT the filed page)
+% accessed: 2026-09-05
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the absence of
+% a separate approval page. NOT set: chapter-opening margin (no such rule).
+%
+% ON THE TWO EDITIONS. The PDF's filename says 08_2021 and the live page carries
+% no revision date, so on filename alone the PDF looks stale. It is not a
+% conflict: the live page and the PDF state the margin and spacing rules in
+% IDENTICAL words, and the live page is the one that links the PDF as its own
+% complete text. They were compared clause by clause on the access date. The
+% live page is additionally NEWER in one respect — it links three sample pages
+% marked "NEW" (abstract, ETD title page, title page with signatures) that the
+% PDF's own specimens predate. Where they differ in that way, the linked samples
+% win, and this file follows them.
+
+\thesisinstitution{Vanderbilt University}
+
+% --- Filing figures ----------------------------------------------------------
+% "Page margins should be a minimum of one-half inch from top, bottom, left, and
+% right and a maximum of one inch from top, bottom, left, and right."
+%
+% A RANGE, not a figure — anything from 0.5in to 1in on each side is in spec,
+% which is the reverse of the usual "at least" rule and means a WIDER margin can
+% be out of spec here. 1in is chosen because it is the maximum the rule allows,
+% it is what the title-page specimen independently requires ("One inch from top
+% of page to top of title"), and it is the class default. 0.5in would be equally
+% in spec. This is a choice inside a permitted range, not Vanderbilt's figure.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "The entire text may be single-spaced, one and one-half spaced, or
+% double-spaced." All three are permitted; Vanderbilt requires none of them, so
+% this line is a default, not a rule. Double is one of the three and is the
+% class default; \thesissetspacing{single} and {onehalf} are equally in spec.
+% The named single-spacing exceptions — block quotations, footnotes, endnotes,
+% table and figure captions, titles longer than one line, individual reference
+% entries — are per-element and are not expressible here.
+\thesissetspacing{double}
+
+% No chapter-opening rule is published, so \thesissetchapteropening stays unset
+% and openings run at the body's top margin.
+
+% --- Accessibility -----------------------------------------------------------
+% NOTHING IS DECLARED REQUIRED. The guidelines page has no occurrence of
+% "accessib", "alt text", "WCAG", "tagged" or "PDF/A"; the 1,183-line Format
+% Guidelines PDF has exactly one occurrence of the string "accessib", and it is
+% "the SED survey accessible at https://sed-ncses.org" — not a document rule.
+% So no check-flag is raised.
+\thesisaccessibilityrequirement{Not published}
+	{Vanderbilt's Graduate School publishes no accessibility requirement for a
+	 filed thesis or dissertation, in either the guidelines page or the complete
+	 Format Guidelines document, as read on 2026-09-05. A finding, not a
+	 licence.}
+
+% --- Title page --------------------------------------------------------------
+% This is the ETD version — "the first page of primary document. It is left
+% unnumbered." The other sample, with signature rules, is the copy circulated to
+% the committee and uploaded to VIREO as an administrative file; it does not go
+% in the manuscript, so it is not what this hook produces.
+%
+% The five lines after the author are quoted verbatim and MUST NOT be reflowed:
+% "(The following five lines must be included in this exact format)", and on the
+% live page, "The five lines following your name must be formatted exactly as
+% found on the sample title page." They are, in order:
+%
+%   Dissertation (or Thesis)
+%   Submitted to the Faculty of the
+%   Graduate School of Vanderbilt University
+%   in partial fulfillment of the requirements
+%   for the degree of
+%
+% Other specimen annotations honoured below: the title is "upper/lower case,
+% single-spaced, centered" with "One inch from top of page to top of title"
+% (hence no \vfill above it — it starts at the top margin, which is 1in); the
+% degree is all caps; the date is the CONFERRAL date, "not your thesis or
+% defense date"; and the place line is "Nashville, Tennessee".
+%
+% The committee is typed under "Approved:" with no rules, because the ETD sample
+% shows typed names only — the rules belong to the signature copy. So
+% \thesis@memberline is replaced for this page; a role, if a document sets one,
+% is dropped, since the sample carries none.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{2\baselineskip}
+		By\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{2\baselineskip}
+		% The five prescribed lines, exactly as the specimen sets them.
+		\thesis@DocNoun\\
+		Submitted to the Faculty of the\\
+		Graduate School of Vanderbilt University\\
+		in partial fulfillment of the requirements\\
+		for the degree of\par
+		\vspace{\baselineskip}
+		\MakeUppercase{\thesis@degree}\par
+		\vspace{\baselineskip}
+		in\par
+		\thesis@program\par
+		\vspace{\baselineskip}
+		\thesis@date\par
+		Nashville, Tennessee\par
+		% NOT \vfill. The ETD specimen flows the whole block from the top margin
+		% and ends the committee list around three quarters down the page; it
+		% does not push "Approved:" to the page foot. The gap sizes themselves
+		% are not prescribed -- "Spacing on the title page will vary according to
+		% the length of the title" -- so they are approximated to the specimen.
+		\vspace{2\baselineskip}
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{##1\par}%
+		Approved:\par
+		\vspace{\baselineskip}
+		\thesis@committee
+		\endgroup
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Vanderbilt's manuscript has none. Its required arrangement is "Title Page
+% (required), Copyright (optional), Dedication (optional), Acknowledgments
+% (optional), Table of Contents (required), ..." — no approval or signature page
+% appears anywhere in it. Approval is expressed ON the title page, by the typed
+% committee names above.
+%
+% PHYSICAL SIGNATURES ARE STILL COLLECTED, but on a separate sheet: "Committee
+% member signatures on the title page must be originals", and the signature
+% version of the title page is "Use this format when circulating this page to
+% your committee for signatures", then uploaded to VIREO as an administrative
+% file alongside the signed abstract. Printing a committee approval page inside
+% the manuscript would add a page the arrangement does not have.
+\thesisnoapprovalpage
