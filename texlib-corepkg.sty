@@ -25,8 +25,53 @@
 % true intersection of every class's needs.
 
 % --- Font + geometry ---
-\RequirePackage[T1]{fontenc}
-\RequirePackage{lmodern}
+% Font setup is engine-conditional, and it has to be: under a Unicode engine a
+% T1-encoded 8-bit font silently corrupts text. LuaTeX has no UTF-8 -> LICR
+% layer at all (\DeclareUnicodeCharacter is not even defined there), so a
+% literal "§" in the source is never translated to \textsection. It is handed to
+% ec-lmr10 as codepoint 0xA7, and T1 slot 0xA7 is `gbreve' -- the document
+% typesets "ğ". The same accident hits every character whose codepoint lands in
+% the T1 upper half: "¡" sets `aogonek', "¿" sets `ccaron', "ß" sets "SS", "×"
+% sets an OE ligature. Characters above U+00FF have no 8-bit slot at all -- "Ł",
+% "ř", the en dash, curly quotes -- and are dropped from the page outright,
+% leaving only a "Missing character" line in the log.
+%
+% None of that is visible without reading the log or the PDF text layer, which
+% is how it survived this long: on a 139-character non-ASCII probe, lualatex got
+% 79 wrong (11 mis-set, 68 dropped) and pdflatex got 0 wrong. The accessible
+% build forces lualatex for EVERY class, so this hit precisely the builds the
+% accessibility program exists to protect. test_text_layer.py (repo root, run
+% by smoke.yml) is the regression gate; it generates its own probe document and
+% round-trips it through this bundle under both engines.
+%
+% Under pdfTeX the inputenc LICR layer does the translation and T1 is correct,
+% so that path is unchanged.
+%
+% This is not a design change: Latin Modern is the same typeface either way --
+% lmodern's Type1 EC fonts under pdfTeX, the OpenType originals under fontspec.
+% lmodern is still loaded on both paths for the 8-bit math symbol fonts, and
+% fontspec's [no-math] leaves that math setup alone, so math output is
+% byte-identical and only the text faces change.
+%
+% texlib-thesis.cls does not route through this bundle; it already loads
+% fontspec directly, for this same reason.
+%
+% The pdfTeX branch keeps fontenc BEFORE lmodern, which is the order this
+% bundle has always used. That is not cosmetic: loading lmodern first changes
+% which .fd is in play when the encoding is set, and it moves glyphs on the
+% page -- it cost a visual-reference diff on notes__worked-gated (a pdflatex
+% scenario that this fix must not touch at all) before the order was restored.
+\RequirePackage{iftex}
+\ifPDFTeX
+	\RequirePackage[T1]{fontenc}
+	\RequirePackage{lmodern}
+\else
+	\RequirePackage{lmodern}
+	\RequirePackage[no-math]{fontspec}
+	\setmainfont{Latin Modern Roman}
+	\setsansfont{Latin Modern Sans}
+	\setmonofont{Latin Modern Mono}
+\fi
 \RequirePackage[margin=1in]{geometry}
 
 % --- LaTeX3 core ---
