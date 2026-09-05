@@ -1,0 +1,214 @@
+% profiles/university-of-california-berkeley.tex
+% — University of California-Berkeley
+% ============================================================================
+% source: https://grad.berkeley.edu/academics/degree-progress/dissertation/
+%         (Berkeley Graduate Division, "Dissertation Writing and Filing" — the
+%          filing guide itself, carrying the Accessibility, Formatting your
+%          manuscript, Special Page Formats and Organizing your manuscript
+%          sections quoted throughout this file)
+% source: https://docs.google.com/document/d/1qGrxd-rnFRasK1HTDLfQOT0Y_X6iSFx9ni1xJRIDrUg/
+%         (the Graduate Division's own "Sample Title Page", linked from that
+%          page. Read both as text and as a rendered page. It carries its own
+%          authoritative "Notes on How to Have an Effective Title Page", quoted
+%          below.)
+% accessed: 2026-09-05
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, the absence of an
+% approval page, and two accessibility check-flags. NOT set: chapter-opening
+% margin (no such rule).
+%
+% ============================================================================
+% BERKELEY REQUIRES SINGLE SPACING. READ THAT AGAIN BEFORE EDITING THIS FILE.
+%
+%   "Spacing: Your manuscript must be single-spaced throughout, including the
+%    abstract, dedication, acknowledgments, and introduction."
+%
+% Every other institution in this directory either requires double spacing or
+% permits it. Berkeley requires the opposite, for the whole manuscript, and says
+% so flatly. A well-meaning pass that "fixes" \thesissetspacing{single} to
+% {double} for consistency with its neighbours would put a filer out of spec on
+% every page. This is exactly the cross-contamination the round instructions
+% warn about, and it is why the warning is at the top of the file rather than
+% beside the setting.
+% ============================================================================
+
+\thesisinstitution{University of California, Berkeley}
+
+% --- Filing figures ----------------------------------------------------------
+% "Margins: For the manuscript material, including headers, footers, tables,
+% illustrations, and photographs, all margins must be at least 1 inch from the
+% edges of the paper. Page numbers must be 3/4 of an inch from the edge."
+%
+% A MINIMUM, so 1in is the floor and is set. Note how wide the scope is —
+% headers, footers, tables, illustrations and photographs are all named, and
+% elsewhere: "Tables, charts, and graphs ... must fit within the required
+% margins", with permission to "reduce the size of a page to fit within the
+% required margins".
+%
+% The page-number figure is also a minimum, stated in the pagination section as
+% "must be positioned either in the upper right corner, lower right corner, or
+% the bottom center and must be at least 3/4 of an inch from the edges". This
+% class's `includefoot' geometry keeps the number inside the 1in text block,
+% i.e. at least 1in from the edge, which satisfies "at least 3/4 of an inch"
+% with room to spare. Conservative, and in spec.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% See the banner above. This is a REQUIREMENT, and it is single.
+\thesissetspacing{single}
+
+% No chapter-opening rule is published, so \thesissetchapteropening stays unset.
+
+% --- Accessibility -----------------------------------------------------------
+% THE MOST EXPLICIT ACCESSIBILITY MANDATE OF ANY INSTITUTION IN THIS DIRECTORY,
+% and unlike Florida's it is stated entirely in the graduate school's own prose
+% rather than read off a template:
+%
+%   "As of April 2026, all electronic theses and dissertations (ETDs) must
+%    conform to WCAG 2.1 Level AA web accessibility requirements before
+%    submission to comply with nondiscrimination provisions outlined in Title II
+%    of the Americans with Disabilities Act."
+%
+% NOTE THE DATE: April 2026, the large-public-entity ADA Title II deadline.
+% Other profiles in this directory legitimately carry April 2027, which is the
+% date for smaller public entities. Both are right. Do not reconcile them.
+%
+% \thesisrequiretagging is raised on: "PDFs should contain code or markup
+% language (also known as tags) that ensures that the content is navigable and
+% readable by screen readers or other assistive technology."
+%
+% \thesisrequiredocumentlanguage is raised on the Key Components list:
+% "Metadata (file properties): Add document description such as author, title,
+% and language."
+%
+% \thesisrequirepdfstandard is NOT raised, deliberately. Berkeley names WCAG 2.1
+% Level AA, which is a WEB CONTENT standard, not a PDF standard — it is not the
+% kind of thing \GetDocumentProperties{document/pdfstandard} reports, and
+% declaring it there would make the class compare two incomparable strings and
+% emit an advisory that could not be acted on. It is recorded verbatim below
+% instead. A reviewer who wants the build-time nag anyway should say so.
+\thesisrequiretagging
+\thesisrequiredocumentlanguage
+\thesisaccessibilityrequirement{WCAG 2.1 Level AA}
+	{"As of April 2026, all electronic theses and dissertations (ETDs) must
+	 conform to WCAG 2.1 Level AA web accessibility requirements before
+	 submission to comply with nondiscrimination provisions outlined in Title II
+	 of the Americans with Disabilities Act."}
+\thesisaccessibilityrequirement{Tags}
+	{"PDFs should contain code or markup language (also known as tags) that
+	 ensures that the content is navigable and readable by screen readers or
+	 other assistive technology." Tags named: "Headings, Lists, Links, Tables,
+	 Paragraphs, and other document elements".}
+\thesisaccessibilityrequirement{Tables}
+	{"PDF must have table headers for columns and rows."}
+\thesisaccessibilityrequirement{Reading order}
+	{"Ensure that tags and headings are ordered to support the logical reading
+	 order."}
+\thesisaccessibilityrequirement{Alt text}
+	{"Ensures that all images, figures, or other visual elements are described."
+	 Berkeley points at the Section 508 guide to authoring meaningful
+	 alternative text.}
+\thesisaccessibilityrequirement{Colour}
+	{"Choose colors with sufficient contrast, and do not rely on color alone to
+	 convey information."}
+\thesisaccessibilityrequirement{Metadata}
+	{"Add document description such as author, title, and language."}
+\thesisaccessibilityrequirement{Whose job it is}
+	{"It is the responsibility of the students to ensure their ETDs meet
+	 accessibility requirements. Graduate Division staff are not experts in
+	 manuscript accessibility formatting and authoring tools." Berkeley expects
+	 the manuscript to pass the Adobe Acrobat Pro Accessibility Checker, and
+	 says its reviewers use that tool.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduced from the Graduate Division's own Sample Title Page. Its notes are
+% prescriptive and are followed here:
+%
+%   * "Line Breaks: Line breaks must match this example." The eight-line block
+%     below is the sample's, verbatim, and MUST NOT be reflowed — note that
+%     "in", "in the" and "of the" each occupy a line of their own, which looks
+%     like an accident and is not.
+%   * "Title: Use full title of dissertation, must be in mixed capitalization."
+%     So the title is emitted verbatim — not uppercased.
+%   * "Do not bold any text on your title page" (filing guide, Special Page
+%     Formats). Nothing here is bold, unlike the class's neutral page.
+%   * "The title page does not contain page numbers."
+%   * "Name: You must use your registered student name as it is currently
+%     recorded with the Office of the Registrar."
+%   * "Degree: List the specific degree you are filing to receive, spelled out
+%     in full. Do not use abbreviations (e.g., list Doctor of Philosophy, not
+%     Ph.D.). Do not list previous degrees on your title page." — so \author
+%     carries the name ALONE here, with no ", B.S." tail. That is the opposite
+%     of Emory and MD Anderson in this same round.
+%   * "University: Write out fully 'University of California, Berkeley' do not
+%     abbreviate to UC Berkeley or just University of California." Hard-coded
+%     below for that reason.
+%   * "Major: List the major in which your degree will be awarded. Do not list
+%     your specialization or area of emphasis." Also: "All majors in the College
+%     of Engineering, except Bioengineering and Computer Science, must put
+%     Engineering- or Engineering Science- before the name of the major."
+%     A document supplies that through \gradprogram.
+%   * "Committee members: List the committee in charge of your manuscript, with
+%     the chair or Co-Chairs listed first. If you have Co-Chairs, use a separate
+%     line for each name. Co-Chair must be hyphenated and capitalized exactly as
+%     'Co-Chair'." The sample prefixes each name with "Professor", so a document
+%     should write \committeemember{Professor First I. Last}{Co-Chair}.
+%   * "Semester and year: Degrees are conferred in Fall, Spring, and Summer.
+%     List the semester and year in which your degree will be conferred."
+%     So \graddate{Spring 2027} — a SEMESTER, not a month. Berkeley is the only
+%     institution in this round that wants a semester name there.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{0.5in}
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{2\baselineskip}
+		By\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{3\baselineskip}
+		% The sample's line breaks, verbatim. Do not reflow.
+		A \thesis@docnoun{} submitted in partial satisfaction of the\\
+		requirements for the degree of\\
+		\thesis@degree\\
+		in\\
+		\thesis@program\\
+		in the\\
+		Graduate Division\\
+		of the\\
+		University of California, Berkeley\par
+		\vspace{3\baselineskip}
+		Committee in charge:\par
+		\vspace{\baselineskip}
+		\begingroup
+		% "Professor First I. Last, Co-Chair" -- role after the name, one per
+		% line, no rules.
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par
+		}%
+		\thesis@committee
+		\endgroup
+		\vspace{3\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Berkeley's filed manuscript has none. "Organizing your manuscript" gives the
+% page order in full — "Title Page, Copyright page or a blank page, Abstract,
+% Optional preliminary pages such as Dedication page, Table of contents, List of
+% figures ..., Preface or introduction, Acknowledgments, Curriculum Vitae, Main
+% text, References, Bibliography, Appendices" — and contains no approval,
+% committee or signature page. The committee is named on the title page above.
+%
+% PHYSICAL SIGNATURES: none, anywhere. Approval is collected through the FINAL
+% SIGNATURE eFORM in CalCentral, which is step 1 of filing and lives entirely
+% outside the manuscript. Berkeley cross-checks it against the title page: "the
+% committee listed on your title page (and on the final signature eForm you will
+% submit) must match your currently approved committee reflected in your
+% CalCentral" record — so the committee list above is not decoration, and a
+% mismatch will stop a filing.
+\thesisnoapprovalpage
