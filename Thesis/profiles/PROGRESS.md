@@ -1,8 +1,18 @@
 # Profile progress log
 
-One dated line per research pass: slug, outcome, and the PR it went out in.
-`texlib-thesis-profile-round` appends to this on every run; a batch done by hand
-records itself the same way.
+**This file is the archive, not the current log.** From 2026-09-04 each research
+pass writes its own file in [`progress/`](progress/) instead of appending here —
+one file per institution per round, named `<YYYY-MM-DD>-<slug>.md`. See
+[`progress/README.md`](progress/README.md) for why.
+
+The short version: the routine now researches ten institutions a round and opens
+one PR per institution, so ten branches were all appending to the end of this
+one file. Every sibling conflicted the moment the first merged. A per-institution
+file cannot conflict, and it travels with the profile it describes — if a PR is
+rejected, its log entry goes with it instead of claiming work that never landed.
+
+What follows is the record up to that change, kept as written. Nothing new is
+appended below.
 
 ## 2026-09-02 — NSF HERD top-20 batch
 
