@@ -10,13 +10,22 @@
 %   * \thesistitlepage / \thesisapprovalpage — the two page layouts
 %   * optionally \thesissetgeometry / \thesissetspacing — the filing figures
 %
-% Loaded LAST by the class, so everything it needs (fontspec faces, tikz,
-% graphicx, the metadata macros) already exists.
+% Loaded LAST by the class, so everything it needs (fontspec faces, graphicx,
+% the metadata macros) already exists -- and, being still in the preamble, a
+% profile may \RequirePackage anything else it needs.
+%
+% tikz is the one thing this profile has to ask for. The class stopped loading
+% it by default because this is the ONLY profile of twenty-one that draws, and
+% the other twenty were paying ~0.34s a pass for a frame they never render.
 %
 % PROTOTYPE, and the wording is the part that rots: check the committee-page
 % text and the margin rule against the current Graduate School filing
 % guidelines before a real submission. Built on Paul Hurtado's accessible
 % template (v0.5, pauljhurtado.com/latex).
+
+% Idempotent, and it brings tikzpagenodes with it -- that is what supplies
+% `current page text area' in \thesisapprovalpage below.
+\TeXLibLoadTikz
 
 \thesisinstitution{University of Nevada, Reno}
 

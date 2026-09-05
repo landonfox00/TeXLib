@@ -1,0 +1,79 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-defer}[2026/09/05 v0.8.0 TeXLib deferrable component loader]
+
+% ==============================================================================
+% texlib-defer.sty — load a component only if the document needs it
+% ==============================================================================
+%
+% Package loading, not typesetting, is what a TeXLib build spends its time on:
+% on a six-page Notes document the class costs ~2.5s of a ~3.5s pass and the
+% document's own content costs ~0.25s. The only lever that moves a build is
+% loading less, and this is the mechanism for it.
+%
+% \TeXLibDefer{<Name>}{<loader>} defines \TeXLibLoad<Name> (idempotent -- a
+% second call is a no-op) and runs it immediately UNLESS \TeXLibNo<Name> was
+% defined before \documentclass. The default is therefore unchanged: everything
+% still loads, and no existing document is affected.
+%
+% \TeXLibDeferOff{<Name>}{<loader>} is the opposite default: it defines the
+% loader and does NOT run it. For a component only one caller in the library
+% actually needs -- the thesis class's tikz, wanted by one institution profile
+% out of twenty-one -- where loading by default is the wrong way round.
+%
+% \TeXLibNo<Name> must be set BEFORE \documentclass, because the class is what
+% loads the bundle. \TeXLibLoad<Name> may be called any time up to
+% \begin{document} and must be: \RequirePackage is an error after that, so a
+% deferred component cannot be resurrected from the body.
+%
+% WHY THIS IS ITS OWN PACKAGE
+%
+% It began inside texlib-corepkg.sty, which is the right home for the classes
+% that load that bundle. texlib-thesis.cls does not: it deliberately loads no
+% TeXLib package at all, so that a thesis is not coupled to the teaching
+% library, and pulling corepkg in to reach one macro would hand it lmodern,
+% geometry at the wrong margins, pgfplots and a different hypersetup -- a much
+% larger change than the one being made, and one that would make the class
+% slower rather than faster.
+%
+% So the macro lives here instead, with NO dependencies of its own beyond the
+% kernel. corepkg requires it, thesis requires it, and neither acquires the
+% other.
+%
+% The \expandafter chain in \TeXLibDefer is load-bearing.
+% \global\let\csname...\endcsname would fail -- TeX rejects a prefix on
+% \expandafter -- so the two \expandafters are ordered to leave exactly
+% \global\let\<cs>\relax on the input stack.
+% ==============================================================================
+
+\newcommand{\texlib@defer@define}[2]{%
+	\@namedef{TeXLibLoad#1}{%
+		#2%
+		\expandafter\global\expandafter\let\csname TeXLibLoad#1\endcsname\relax
+	}%
+}
+
+% Loaded by default; \TeXLibNo<Name> opts out.
+\newcommand{\TeXLibDefer}[2]{%
+	\texlib@defer@define{#1}{#2}%
+	\@ifundefined{TeXLibNo#1}{\@nameuse{TeXLibLoad#1}}{}%
+}
+
+% NOT loaded by default; a caller opts in with \TeXLibLoad<Name>.
+\newcommand{\TeXLibDeferOff}[2]{%
+	\texlib@defer@define{#1}{#2}%
+}
+
+% \TeXLibAtTikz{<code>} runs <code> as soon as tikz exists: immediately if it is
+% already loaded, otherwise appended to \TeXLibLoadTikz so it arrives with a
+% later \TeXLibLoadTikz (whether called by hand, by a profile, or by
+% \TeXLibLoadPlots). A module wanting extra tikz libraries must use this rather
+% than calling \usetikzlibrary at load time, which is an undefined control
+% sequence when tikz has been deferred. Under a deferral with no later load,
+% <code> never runs -- correct, since nothing then draws.
+\newcommand{\TeXLibAtTikz}[1]{%
+	\@ifpackageloaded{tikz}{#1}{%
+		\@ifundefined{TeXLibLoadTikz}{}{\g@addto@macro\TeXLibLoadTikz{#1}}%
+	}%
+}
+
+\endinput

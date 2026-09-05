@@ -63,16 +63,13 @@
 % must be: \RequirePackage is an error after \begin{document}, so a deferred
 % component cannot be resurrected from the body.
 %
-% The \expandafter chain is load-bearing. \global\let\csname...\endcsname would
-% fail -- TeX rejects a prefix on \expandafter -- so the two \expandafters are
-% ordered to leave exactly \global\let\<cs>\relax on the input stack.
-\newcommand{\TeXLibDefer}[2]{%
-	\@namedef{TeXLibLoad#1}{%
-		#2%
-		\expandafter\global\expandafter\let\csname TeXLibLoad#1\endcsname\relax
-	}%
-	\@ifundefined{TeXLibNo#1}{\@nameuse{TeXLibLoad#1}}{}%
-}
+% The macro itself lives in texlib-defer.sty, which has no dependencies of its
+% own. It was inline here until texlib-thesis.cls needed it: that class
+% deliberately loads no TeXLib package, and pulling this whole bundle in to
+% reach one macro would have handed it lmodern, the wrong geometry, pgfplots and
+% a different hypersetup -- slower, not faster. \TeXLibDeferOff (same mechanism,
+% opposite default) lives there too.
+\RequirePackage{texlib-defer}
 
 % --- Color (load before tikz so tikz uses the right colour table) ---
 \RequirePackage{xcolor}
@@ -118,16 +115,7 @@
 	\pgfplotsset{compat=1.18}%
 }
 
-% \TeXLibAtTikz{<code>} runs <code> as soon as tikz exists: immediately if it is
-% already loaded, otherwise appended to \TeXLibLoadTikz so it arrives with a
-% later \TeXLibLoadTikz (whether called by hand or by \TeXLibLoadPlots). A module
-% wanting extra tikz libraries must use this rather than calling
-% \usetikzlibrary at load time, which is an undefined control sequence under
-% \TeXLibNoTikz. Under \TeXLibNoTikz with no later load, <code> never runs --
-% correct, since nothing in the document draws.
-\newcommand{\TeXLibAtTikz}[1]{%
-	\@ifpackageloaded{tikz}{#1}{\g@addto@macro\TeXLibLoadTikz{#1}}%
-}
+% \TeXLibAtTikz is defined in texlib-defer.sty alongside \TeXLibDefer.
 
 % --- Hyperref + canonical setup ---
 % Five of the existing TeXLib classes ship the exact same hypersetup call.

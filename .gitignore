@@ -40,6 +40,13 @@ course-metadata_old.sty
 *.vrb
 *.dvi
 *.pdf
+# biblatex/biber and the TeXLib variant sidecar. These were missing, and a
+# command-line build in a module directory (which does not route aux out of the
+# tree the way the Sublime builder does) leaves all three behind -- they were
+# caught on their way into a commit, not by the ignore list.
+*.bcf
+*.run.xml
+*.buildmeta
 
 # TeXLib schedule class scaffolding (now written to the aux dir, but a
 # stale copy may linger from a command-line build that bypassed the

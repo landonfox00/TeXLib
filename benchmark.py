@@ -92,10 +92,26 @@ import texlib_format_cache as _fmtcache     # noqa: E402
 
 BASELINE_PATH = os.path.join(TEXLIB_ROOT, "tests", "benchmark-baseline.json")
 
+
+def _manifest_modules(tag):
+    """(module, template) pairs carrying `tag`, straight from the manifest."""
+    sys.path.insert(0, os.path.join(TEXLIB_ROOT, "examples"))
+    import manifest as _manifest      # noqa: E402
+    return _manifest.modules(tag)
+
 # How far class_cost may drift above its baseline before --check fails.
 # Generous on purpose: this gate exists to catch a package creeping back into
 # the bundle (which shows up as tens of percent), not to police noise.
 TOLERANCE = 0.25
+
+# The per-picture figure gets its own, much looser tolerance, because it is a
+# DIFFERENCE of two timings (full - class) and inherits the noise of both. Two
+# consecutive clean runs of the same fixture measured 82 and 54 ms per picture,
+# so a 25% gate on it would flake constantly and be turned off within a week,
+# which is worse than a loose gate that stays on. What it exists to catch is a
+# pathology -- externalisation silently disabled, a pgf regression, a picture
+# path that stopped caching -- and those are multiples, not percentages.
+PICTURE_TOLERANCE = 1.00
 
 # Below this many seconds a measurement is noise on any machine, and a ratio
 # built from it is meaningless. Used to suppress a division that would otherwise
@@ -112,6 +128,59 @@ CLASS_STUB_BODY = {
     "report-card": "",
     "bank": "",
 }
+
+
+# Below this many pictures, (full - class) is dominated by measurement noise and
+# dividing it by a picture count produces a confident-looking number that means
+# nothing. The Perf fixture carries twelve.
+MIN_PICTURES_FOR_METRIC = 6
+
+_PICTURE_RE = re.compile(r"\\begin\{tikzpicture\}")
+
+
+def count_pictures(tex_path):
+    r"""Literal \begin{tikzpicture} occurrences in a document and its inputs.
+
+    Deliberately naive. A document that draws through a macro of its own counts
+    as one picture per macro BODY rather than per call, and that is accepted
+    rather than special-cased: the alternative is teaching this counter about
+    each document's private wrappers, which makes a shared metric depend on the
+    documents it measures. The Perf fixture is written with twelve literal
+    environments for exactly that reason.
+    """
+    try:
+        text, _complete = _scan.gather_source(tex_path)
+    except Exception:               # noqa: BLE001 -- a metric, never a build
+        return 0
+    return len(_PICTURE_RE.findall(text))
+
+
+def texinputs(existing=""):
+    r"""An EXPLICIT, non-recursive search path over the checkout.
+
+    `smoke_test` uses `<root>//`, and a correctness harness is right to: the
+    recursive form finds a class wherever it moves, and costs that harness
+    nothing it measures. A benchmark cannot use it. kpathsea walks every
+    directory the pattern covers, and this repo has 512 of them against 99 real
+    ones -- the rest are `.git` and `.claude/worktrees`. Measured on the thesis
+    class: `//` adds +1.41s to a 2.17s class load (a 65% overstatement) while
+    adding only +0.06s to the engine floor, so it does not even cancel in the
+    ratio. The harness would be reporting the search path as if it were the
+    class, and CLAUDE.md warns about exactly this pattern for the same reason.
+
+    The explicit list below is what a real build uses. Staging already copies
+    the shared files into the build directory, so `.` resolves nearly
+    everything; this is the fallback that catches the rest.
+    """
+    sep = ";" if os.name == "nt" else ":"
+    parts = [".", TEXLIB_ROOT]
+    for name in sorted(os.listdir(TEXLIB_ROOT)):
+        path = os.path.join(TEXLIB_ROOT, name)
+        if os.path.isdir(path) and not name.startswith((".", "_", "@")):
+            parts.append(path)
+    if existing:
+        parts.append(existing)
+    return sep.join(parts) + sep
 
 
 def _stub_source(docclass, body=""):
@@ -174,9 +243,7 @@ class Staged:
                 fh.write(_smoke.STUB_COURSEMETA)
 
         self.env = os.environ.copy()
-        sep = ";" if os.name == "nt" else ":"
-        self.env["TEXINPUTS"] = ".%s%s//%s%s" % (
-            sep, TEXLIB_ROOT, sep, self.env.get("TEXINPUTS", ""))
+        self.env["TEXINPUTS"] = texinputs(self.env.get("TEXINPUTS", ""))
         return self
 
     def __exit__(self, *exc):
@@ -199,6 +266,23 @@ class Staged:
         if self.engine == "lualatex":
             cmd.append("-shell-escape")
         return cmd + list(extra)
+
+
+def log_is_clean(staged, jobname):
+    """True when <jobname>.log carries no TeX error lines.
+
+    The return code is not enough. Under -interaction=nonstopmode the engine
+    recovers from most errors and exits 0, so a document that is quietly failing
+    still produces a timing -- and a failing build is FASTER, which is the worst
+    possible direction for a benchmark to be wrong in. A missing log is treated
+    as unclean for the same reason.
+    """
+    path = os.path.join(staged.dir, jobname + ".log")
+    try:
+        with io.open(path, encoding="utf-8", errors="replace") as fh:
+            return not any(line.startswith("!") for line in fh)
+    except OSError:
+        return False
 
 
 def timed(staged, argv, reps):
@@ -228,8 +312,13 @@ def timed(staged, argv, reps):
     return best, ok
 
 
-def measure(module, template, reps, variants, floors):
-    """Every measurement for one document. Returns a dict, or None if unusable."""
+def measure(module, template, reps, variants, floors, bench_doc=False):
+    """Every measurement for one document. Returns a dict, or None if unusable.
+
+    `bench_doc` marks a document present for its content rather than its class
+    (see the Perf fixture): it contributes the per-picture figure and is kept out
+    of the per-class baseline.
+    """
     with Staged(module, template) as st:
         if not os.path.exists(st.tex_src):
             return None
@@ -248,9 +337,22 @@ def measure(module, template, reps, variants, floors):
         st.write(stub_name, _stub_source(
             st.docclass, CLASS_STUB_BODY.get(st.docclass, "")))
         class_time, class_ok = timed(st, st.engine_cmd([stub_name]), reps)
+        class_ok = class_ok and log_is_clean(st, "_bench_stub")
 
         # 3. The real document, one pass, exactly as it is today.
         full, full_ok = timed(st, st.engine_cmd([template]), reps)
+        full_ok = full_ok and log_is_clean(st, os.path.splitext(template)[0])
+
+        # Per-picture cost. Content time is noise on an ordinary document -- it
+        # is smaller than the run-to-run spread -- so this is only meaningful
+        # where there are enough pictures for them to BE the content, which is
+        # what examples/fixtures/Perf exists to provide. Below the threshold the
+        # figure is deliberately not reported rather than reported as noise.
+        pictures = count_pictures(os.path.join(st.dir, template))
+        content = full - class_time
+        per_picture = ((content / pictures * 1000.0)
+                       if pictures >= MIN_PICTURES_FOR_METRIC and content > 0
+                       else None)
 
         row = {
             "module": module,
@@ -261,9 +363,12 @@ def measure(module, template, reps, variants, floors):
             "class_s": class_time,
             "full_s": full,
             "class_load_s": class_time - floor,
-            "content_s": full - class_time,
+            "content_s": content,
             "class_cost": ((class_time - floor) / floor
                            if floor and floor > NOISE_FLOOR_SECONDS else None),
+            "pictures": pictures,
+            "ms_per_picture": per_picture,
+            "bench": bench_doc,
             "ok": bool(class_ok and full_ok),
         }
 
@@ -349,6 +454,11 @@ def print_table(rows, variants):
         print("class load costs %.1f-%.1f engine floors (median %.1f)"
               % (min(costs), max(costs), statistics.median(costs)))
 
+    drawn = [r for r in rows if r.get("ms_per_picture")]
+    for r in drawn:
+        print("%s: %d pictures, %.0f ms each"
+              % (r["module"].split("/")[-1], r["pictures"], r["ms_per_picture"]))
+
 
 def load_baseline():
     try:
@@ -369,9 +479,26 @@ def save_baseline(rows):
             "Regenerate deliberately with: python benchmark.py --update-baseline",
         ],
         "tolerance": TOLERANCE,
+        "picture_tolerance": PICTURE_TOLERANCE,
+        # Bench rows are excluded here. They are chosen for their CONTENT, and
+        # the Perf fixture happens to be a didactic document -- so keying by
+        # class alone let it overwrite the Notes template's didactic figure with
+        # its own, arbitrarily, depending on declaration order. The class cost
+        # comes from the smoke corpus; bench documents contribute the
+        # per-picture figure below and nothing else.
         "classes": {
             r["class"]: round(r["class_cost"], 3)
-            for r in rows if r["ok"] and r["class_cost"] is not None
+            for r in rows
+            if r["ok"] and r["class_cost"] is not None and not r.get("bench")
+        },
+        # Per-picture typesetting cost, in milliseconds, from whichever bench
+        # documents carry enough pictures to measure it. This is the half of the
+        # workload the class-cost figures cannot see: examples/ has one picture,
+        # a real teaching tree has over a thousand. Keyed by module so adding a
+        # second bench document does not overwrite the first.
+        "ms_per_picture": {
+            r["module"]: round(r["ms_per_picture"], 1)
+            for r in rows if r["ok"] and r.get("ms_per_picture")
         },
     }
     with io.open(BASELINE_PATH, "w", encoding="utf-8") as fh:
@@ -394,6 +521,11 @@ def check_against_baseline(rows):
     failures, unmeasured = [], []
     for r in rows:
         name = r["class"]
+        # Bench documents are not priced by class -- see save_baseline. Checking
+        # them here would report the same class twice, from two documents that
+        # were never meant to agree on anything but the class they share.
+        if r.get("bench"):
+            continue
         if name not in expected:
             unmeasured.append(name)
             continue
@@ -409,6 +541,25 @@ def check_against_baseline(rows):
             failures.append(name)
         print("  %-14s %s  %.2f -> %.2f  (%+.0f%%)"
               % (name, verdict, was, now, drift * 100))
+
+    # Per-picture cost, gated the same way and for the same reason. This is the
+    # half of the workload the class figures cannot see, so a regression here --
+    # pictures getting more expensive to typeset -- would otherwise be invisible
+    # to CI entirely.
+    expected_pic = baseline.get("ms_per_picture", {})
+    pic_tolerance = baseline.get("picture_tolerance", PICTURE_TOLERANCE)
+    for r in rows:
+        now = r.get("ms_per_picture")
+        was = expected_pic.get(r["module"])
+        if not now or was is None:
+            continue
+        limit = was * (1 + pic_tolerance)
+        verdict = "ok  " if now <= limit else "FAIL"
+        if now > limit:
+            failures.append(r["module"] + " (ms/picture)")
+        print("  %-14s %s  %.1f -> %.1f ms/picture  (%+.0f%%)"
+              % (os.path.basename(r["module"])[:14], verdict, was, now,
+                 100 * (now - was) / was if was else 0))
 
     if unmeasured:
         print("  not in baseline: %s" % ", ".join(sorted(set(unmeasured))))
@@ -439,14 +590,28 @@ def main(argv=None):
                         help="Rewrite the committed baseline from this run.")
     args = parser.parse_args(argv)
 
-    documents = list(_smoke.MODULES)
+    # The smoke corpus prices the classes; the `bench' corpus prices what the
+    # smoke corpus cannot see. examples/ carries ONE tikzpicture against a real
+    # teaching tree's thousand, so without a bench document the per-picture
+    # figure has nothing to measure. Nothing else reads the `bench' tag, which is
+    # why adding it costs no CI build time.
+    documents = list(_smoke.MODULES) + list(_manifest_modules("bench"))
     if args.modules:
         documents = [(m, t) for (m, t) in documents
                      if any(f.lower() in m.lower() for f in args.modules)]
     # One document per class is enough to price the class, and the corpus has
     # several per class. Keep the first of each; --corpus adds real ones.
+    #
+    # A `bench' document is exempt from that de-duplication. The Perf fixture is
+    # a didactic document and didactic is already priced by the Notes template,
+    # so the filter would drop precisely the document that exists to measure
+    # something the others cannot -- it is here for its CONTENT, not its class.
+    bench = set(_manifest_modules("bench"))
     seen, unique = set(), []
     for module, template in documents:
+        if (module, template) in bench:
+            unique.append((module, template))
+            continue
         docclass = _smoke.detect_class(os.path.join(TEXLIB_ROOT, module, template))
         if docclass and docclass not in seen:
             seen.add(docclass)
@@ -472,7 +637,8 @@ def main(argv=None):
         sys.stdout.flush()
         started = time.perf_counter()
         try:
-            row = measure(module, template, args.reps, args.variants, floors)
+            row = measure(module, template, args.reps, args.variants, floors,
+                          bench_doc=((module, template) in bench))
         except Exception as exc:              # noqa: BLE001 - report and continue
             print("ERROR %s" % exc)
             continue

@@ -1,0 +1,153 @@
+% picture-density.tex -- a benchmark fixture, not a showcase and not a smoke test.
+% =============================================================================
+% WHY THIS FILE EXISTS
+%
+% The committed benchmark baseline is measured over examples/, and examples/
+% contains exactly ONE tikzpicture. A real teaching tree contains over a
+% thousand. So the gate could catch a package creeping back into the class
+% bundle and was completely blind to anything whose cost scales with the number
+% of pictures on the page -- which is the other half of what a TeXLib build
+% actually spends its time on.
+%
+% This document supplies that half: twelve pictures of the kind lecture notes
+% really carry -- axes, a curve, a labelled point. Deliberately NOT pgfplots, an
+% axis being several times the cost of one of these, which would turn the metric
+% into a pgfplots benchmark rather than a picture one.
+%
+% The pictures are written out literally rather than through a \newcommand,
+% because benchmark.py counts \begin{tikzpicture} and a shared metric should not
+% have to know about any one document's private wrappers.
+%
+% Tagged `bench' ALONE in examples/manifest.py, so smoke.yml, visual.yml,
+% accessible.yml and the class gallery never see it: it showcases nothing, and
+% adding twelve pictures to every CI build to serve one benchmark would be a
+% poor trade. benchmark.py is the only consumer.
+%
+% Changing the picture COUNT invalidates the committed per-picture baseline --
+% regenerate with `benchmark.py --update-baseline' and say so in the commit.
+% =============================================================================
+\documentclass{didactic}
+
+\meta{
+	unit  = Bench,
+	title = {Picture density},
+	toc   = false,
+}
+
+\begin{document}
+
+\maketitle
+
+\section{Twelve pictures}
+
+Prose between the pictures, so the document is not a bare picture list: the
+measurement wants them sitting in a page the engine also has to break.
+
+\begin{tikzpicture}[scale=0.85]
+	\draw[->] (-2.2,0) -- (2.2,0) node[right] {$x$};
+	\draw[->] (0,-1.4) -- (0,2.2) node[above] {$y$};
+	\draw[thick, domain=-1.5:1.5, smooth, samples=40]
+		plot (\x, {0.7*(\x)*(\x) - 0.00});
+	\node[circle, fill, inner sep=1.4pt] at (-0.80, 0.35) {};
+	\node[anchor=west, font=\footnotesize] at (0.7, 1.7) {case 1};
+\end{tikzpicture}\quad
+\begin{tikzpicture}[scale=0.85]
+	\draw[->] (-2.2,0) -- (2.2,0) node[right] {$x$};
+	\draw[->] (0,-1.4) -- (0,2.2) node[above] {$y$};
+	\draw[thick, domain=-1.5:1.5, smooth, samples=40]
+		plot (\x, {0.7*(\x)*(\x) - 0.08});
+	\node[circle, fill, inner sep=1.4pt] at (-0.72, 0.35) {};
+	\node[anchor=west, font=\footnotesize] at (0.7, 1.7) {case 2};
+\end{tikzpicture}\quad
+\begin{tikzpicture}[scale=0.85]
+	\draw[->] (-2.2,0) -- (2.2,0) node[right] {$x$};
+	\draw[->] (0,-1.4) -- (0,2.2) node[above] {$y$};
+	\draw[thick, domain=-1.5:1.5, smooth, samples=40]
+		plot (\x, {0.7*(\x)*(\x) - 0.17});
+	\node[circle, fill, inner sep=1.4pt] at (-0.63, 0.35) {};
+	\node[anchor=west, font=\footnotesize] at (0.7, 1.7) {case 3};
+\end{tikzpicture}
+
+More prose, of no particular interest, separating the rows.
+
+\begin{tikzpicture}[scale=0.85]
+	\draw[->] (-2.2,0) -- (2.2,0) node[right] {$x$};
+	\draw[->] (0,-1.4) -- (0,2.2) node[above] {$y$};
+	\draw[thick, domain=-1.5:1.5, smooth, samples=40]
+		plot (\x, {0.7*(\x)*(\x) - 0.25});
+	\node[circle, fill, inner sep=1.4pt] at (-0.55, 0.35) {};
+	\node[anchor=west, font=\footnotesize] at (0.7, 1.7) {case 4};
+\end{tikzpicture}\quad
+\begin{tikzpicture}[scale=0.85]
+	\draw[->] (-2.2,0) -- (2.2,0) node[right] {$x$};
+	\draw[->] (0,-1.4) -- (0,2.2) node[above] {$y$};
+	\draw[thick, domain=-1.5:1.5, smooth, samples=40]
+		plot (\x, {0.7*(\x)*(\x) - 0.33});
+	\node[circle, fill, inner sep=1.4pt] at (-0.47, 0.35) {};
+	\node[anchor=west, font=\footnotesize] at (0.7, 1.7) {case 5};
+\end{tikzpicture}\quad
+\begin{tikzpicture}[scale=0.85]
+	\draw[->] (-2.2,0) -- (2.2,0) node[right] {$x$};
+	\draw[->] (0,-1.4) -- (0,2.2) node[above] {$y$};
+	\draw[thick, domain=-1.5:1.5, smooth, samples=40]
+		plot (\x, {0.7*(\x)*(\x) - 0.42});
+	\node[circle, fill, inner sep=1.4pt] at (-0.38, 0.35) {};
+	\node[anchor=west, font=\footnotesize] at (0.7, 1.7) {case 6};
+\end{tikzpicture}
+
+The third row follows, with another paragraph ahead of it.
+
+\begin{tikzpicture}[scale=0.85]
+	\draw[->] (-2.2,0) -- (2.2,0) node[right] {$x$};
+	\draw[->] (0,-1.4) -- (0,2.2) node[above] {$y$};
+	\draw[thick, domain=-1.5:1.5, smooth, samples=40]
+		plot (\x, {0.7*(\x)*(\x) - 0.50});
+	\node[circle, fill, inner sep=1.4pt] at (-0.30, 0.35) {};
+	\node[anchor=west, font=\footnotesize] at (0.7, 1.7) {case 7};
+\end{tikzpicture}\quad
+\begin{tikzpicture}[scale=0.85]
+	\draw[->] (-2.2,0) -- (2.2,0) node[right] {$x$};
+	\draw[->] (0,-1.4) -- (0,2.2) node[above] {$y$};
+	\draw[thick, domain=-1.5:1.5, smooth, samples=40]
+		plot (\x, {0.7*(\x)*(\x) - 0.58});
+	\node[circle, fill, inner sep=1.4pt] at (-0.22, 0.35) {};
+	\node[anchor=west, font=\footnotesize] at (0.7, 1.7) {case 8};
+\end{tikzpicture}\quad
+\begin{tikzpicture}[scale=0.85]
+	\draw[->] (-2.2,0) -- (2.2,0) node[right] {$x$};
+	\draw[->] (0,-1.4) -- (0,2.2) node[above] {$y$};
+	\draw[thick, domain=-1.5:1.5, smooth, samples=40]
+		plot (\x, {0.7*(\x)*(\x) - 0.67});
+	\node[circle, fill, inner sep=1.4pt] at (-0.13, 0.35) {};
+	\node[anchor=west, font=\footnotesize] at (0.7, 1.7) {case 9};
+\end{tikzpicture}
+
+And the last row.
+
+\begin{tikzpicture}[scale=0.85]
+	\draw[->] (-2.2,0) -- (2.2,0) node[right] {$x$};
+	\draw[->] (0,-1.4) -- (0,2.2) node[above] {$y$};
+	\draw[thick, domain=-1.5:1.5, smooth, samples=40]
+		plot (\x, {0.7*(\x)*(\x) - 0.75});
+	\node[circle, fill, inner sep=1.4pt] at (-0.05, 0.35) {};
+	\node[anchor=west, font=\footnotesize] at (0.7, 1.7) {case 10};
+\end{tikzpicture}\quad
+\begin{tikzpicture}[scale=0.85]
+	\draw[->] (-2.2,0) -- (2.2,0) node[right] {$x$};
+	\draw[->] (0,-1.4) -- (0,2.2) node[above] {$y$};
+	\draw[thick, domain=-1.5:1.5, smooth, samples=40]
+		plot (\x, {0.7*(\x)*(\x) - 0.83});
+	\node[circle, fill, inner sep=1.4pt] at (0.03, 0.35) {};
+	\node[anchor=west, font=\footnotesize] at (0.7, 1.7) {case 11};
+\end{tikzpicture}\quad
+\begin{tikzpicture}[scale=0.85]
+	\draw[->] (-2.2,0) -- (2.2,0) node[right] {$x$};
+	\draw[->] (0,-1.4) -- (0,2.2) node[above] {$y$};
+	\draw[thick, domain=-1.5:1.5, smooth, samples=40]
+		plot (\x, {0.7*(\x)*(\x) - 0.92});
+	\node[circle, fill, inner sep=1.4pt] at (0.12, 0.35) {};
+	\node[anchor=west, font=\footnotesize] at (0.7, 1.7) {case 12};
+\end{tikzpicture}
+
+
+\end{document}

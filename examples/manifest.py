@@ -98,6 +98,15 @@ _SMOKE_VISUAL = _SMOKE + ("visual",)
 # them under class headings ("Metadata") that are not classes at all.
 _FIXTURE = ("smoke", "accessible")
 
+# Benchmark-only. `bench' is carried by NOTHING else -- not smoke, not
+# accessible, not visual, not showcase -- so a document tagged with it alone is
+# invisible to every CI gate and to the gallery, and is seen only by
+# benchmark.py. That is the point: the picture-density fixture exists to give
+# the benchmark a workload examples/ otherwise lacks (one tikzpicture in the
+# whole corpus, against a thousand in a real teaching tree), and paying for it on
+# every smoke build would be a poor trade for a document that showcases nothing.
+_BENCH = ("bench",)
+
 
 EXAMPLES = [
     # -- Module templates: the canonical copy-me documents --------------------
@@ -153,6 +162,11 @@ EXAMPLES = [
                  "\\begin{problem}[meta] header rendered its stem, MLHEADERLEAK "
                  "proves the header continuation lines were skipped rather "
                  "than leaked into it."),
+    Example("examples/fixtures/Perf", "picture-density.tex", "fixture", _BENCH,
+            note="Benchmark workload, not a test: twelve ordinary lecture-notes "
+                 "tikzpictures, so benchmark.py can measure per-picture cost. "
+                 "Tagged `bench' alone, so no CI gate builds it. Changing the "
+                 "picture count invalidates the committed per-picture baseline."),
     Example("examples/fixtures/Metadata", "metadata-test.tex", "fixture", _FIXTURE,
             expect=["CMOFFICEHOURSMARK", "CMLECTHALLMARK", "CMTANAMEMARK",
                     "SETCMDMARK", "METAALIASMARK"],

@@ -2470,8 +2470,30 @@ def main():
     check("scan: a document using nothing defers everything",
           set(names) == set(_ps.DEFERRABLE), names)
 
-    check("scan: tikz is never auto-deferred (library internals reach it)",
+    check("scan: tikz is not a general deferrable (internals reach it)",
           "Tikz" not in _ps.DEFERRABLE)
+
+    # Tikz IS auto-deferrable for texlib-thesis, and only for it: that class
+    # loads no tcolorbox and nothing in it draws, so a source scan sees every
+    # use. Both halves of that asymmetry are asserted, because losing either one
+    # is a silent regression -- deferring too widely breaks documents, deferring
+    # nowhere quietly gives back the saving.
+    THESIS = r"\documentclass{texlib-thesis}\begin{document}x\end{document}"
+    check("scan: thesis with no drawing defers Tikz",
+          "Tikz" in scan_tmp({"doc.tex": THESIS}), scan_tmp({"doc.tex": THESIS}))
+    check("scan: didactic with no drawing still does NOT defer Tikz",
+          "Tikz" not in scan_tmp({"doc.tex": PLAIN}))
+    for drawing in (r"\begin{tikzpicture}\end{tikzpicture}", r"\tikz\draw(0,0);",
+                    r"\usetikzlibrary{calc}", r"\encircle{3}",
+                    r"\begin{tikzcd}\end{tikzcd}"):
+        names = scan_tmp({"doc.tex": r"\documentclass{texlib-thesis}"
+                                     r"\begin{document}" + drawing +
+                                     r"\end{document}"})
+        check(f"scan: thesis using {drawing[:24]!r} keeps Tikz",
+              "Tikz" not in names, names)
+    check("scan: the thesis wrapper class counts too",
+          "Tikz" in scan_tmp({"doc.tex": r"\documentclass{thesis}"
+                                         r"\begin{document}x\end{document}"}))
 
     for cmd, kept in ((r"\cite{x}", "Bib"),
                       (r"\addbibresource{r.bib}", "Bib"),
@@ -2651,6 +2673,42 @@ def main():
     b._aux_target = os.path.join(tmp3, "aux")
     check("fresh: a build routed to a separate aux dir is never skipped",
           not b._skip_if_fresh("pdflatex", "base", tmp3))
+
+    print("\n-- benchmark corpus --")
+    sys.path.insert(0, os.path.join(HERE_ROOT, "examples"))
+    import manifest as _mf
+
+    _bench = _mf.modules("bench")
+    check("bench: the picture-density fixture is registered",
+          any("Perf" in m for m, _t in _bench), _bench)
+
+    # The whole point of the `bench' tag is that NO gate sees it. A fixture with
+    # twelve pictures that quietly joined smoke/visual/accessible would slow
+    # every CI build to serve one benchmark, and would be caught only by someone
+    # noticing the build got slower.
+    for tag in ("smoke", "accessible"):
+        check(f"bench: Perf is NOT in the {tag} corpus",
+              not any("Perf" in m for m, _t in _mf.modules(tag)))
+    check("bench: Perf is NOT pixel-diffed",
+          not any("Perf" in m for m in _mf.visual_modules()))
+    check("bench: Perf is NOT in the gallery",
+          not any("Perf" in e.module for e in _mf.showcase()))
+
+    sys.path.insert(0, HERE_ROOT)
+    import benchmark as _bm
+
+    _perf = os.path.join(HERE_ROOT, "examples", "fixtures", "Perf",
+                         "picture-density.tex")
+    check("bench: the fixture carries twelve countable pictures",
+          _bm.count_pictures(_perf) == 12, _bm.count_pictures(_perf))
+    check("bench: a comment mentioning tikzpicture is not counted",
+          _bm.count_pictures(_perf) < open(_perf, encoding="utf-8").read()
+          .count("\\begin{tikzpicture}"))
+    check("bench: the per-picture gate is looser than the class gate",
+          _bm.PICTURE_TOLERANCE > _bm.TOLERANCE,
+          (_bm.PICTURE_TOLERANCE, _bm.TOLERANCE))
+    check("bench: the harness does NOT use a recursive TEXINPUTS",
+          "//" not in _bm.texinputs(""), _bm.texinputs("")[:120])
 
     print("\n-- tikz externalisation --")
     b2 = TexlibBuilder()

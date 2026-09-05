@@ -4,6 +4,30 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Fixed
+
+- **`benchmark.py` was measuring the search path as if it were the class.** It
+  inherited `smoke_test`'s recursive `TEXINPUTS` (`<root>//`). A correctness
+  harness is right to use that — it finds a class wherever it moves and costs
+  that harness nothing it measures — but a benchmark cannot: kpathsea walks every
+  directory the pattern covers, and this repo has **512** of them against 99 real
+  ones, the rest being `.git` and `.claude/worktrees`.
+
+  Measured on the thesis class, `//` added **+1.41s to a 2.17s class load** (a
+  65% overstatement) while adding only +0.06s to the engine floor — so it did not
+  even cancel in the ratio the gate uses. Every figure in the first baseline was
+  inflated, unevenly. The harness now builds the explicit, non-recursive path
+  `CLAUDE.md` prescribes, and the baseline is regenerated: didactic **3.80 →
+  2.75** floors, thesis **2.84 → 1.98**, and so on down the table.
+
+- **A failing build could be reported as a fast one.** The harness took its
+  pass/fail signal from the return code, and under `-interaction=nonstopmode` the
+  engine recovers from most errors and exits 0 — so a document that was quietly
+  failing still produced a timing, and a failing build is *faster*, which is the
+  worst direction for a benchmark to be wrong in. It now reads the log for error
+  lines, the same way the freshness stamp does. It immediately caught a quiz
+  build the return code had called clean.
+
 ### Added
 
 - **Thesis profiles for the twenty largest US research universities, and three
@@ -48,6 +72,37 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   nothing is skipped, only reordered. Alphabetical alone started at "A T Still
   University of Health Sciences" and did not reach the institutions that
   graduate the most doctorates for some 1,900 rows.
+- **`texlib-defer.sty` — the deferral mechanism, with no dependencies of its
+  own.** `\TeXLibDefer` began inside `texlib-corepkg.sty`, which is the right
+  home for the classes that load that bundle. `texlib-thesis.cls` does not:
+  it deliberately loads no TeXLib package at all, and pulling corepkg in to reach
+  one macro would have handed it lmodern, the wrong geometry, pgfplots and a
+  different `\hypersetup` — a far larger change than the one being made, and one
+  that would make the class slower rather than faster. The macro moved here;
+  corepkg requires it, thesis requires it, and neither acquires the other.
+  `\TeXLibDeferOff` is the same mechanism with the opposite default, for a
+  component that should load only when someone asks.
+
+- **The thesis class no longer loads tikz for twenty-one institutions to serve
+  one.** Nothing in `texlib-thesis.cls` draws: the only tikz in the entire Thesis
+  tree is the decorative committee-page frame in `profiles/unr.tex`, and
+  `tikzpagenodes` exists solely to give that frame the current page's text area.
+  Both are now `\TeXLibDeferOff`, and `unr` asks for them itself with
+  `\TeXLibLoadTikz` — profiles are input at the very end of the class, still in
+  the preamble, so `\RequirePackage` is legal there.
+
+  Measured: the generic profile goes **3.78s → 3.43s per pass (−9%)**; `unr` is
+  unchanged, as it must be. A thesis whose own body draws still gets tikz, from
+  the build tooling — `texlib_preamble_scan.py` now auto-defers tikz for this
+  class *only*, because both of the usual objections are false here (no tcolorbox
+  pulling pgf in regardless, and no library internals reaching tikz where a
+  source scan cannot follow). The profile's request wins over the tooling's
+  deferral, so the committee frame cannot be lost.
+
+  `biblatex` (+0.78s, the largest single load in the class) and `caption` became
+  deferrable in the same pass. Bib nearly always loads — a thesis cites — but the
+  flag earns its place while a single chapter is being drafted.
+
 - **`benchmark.py` — the library had no benchmarks, for any class.** The only
   timing code in the repository was in the galleries. That was survivable while
   nothing here claimed to manage build time, and stopped being survivable the
@@ -72,10 +127,21 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   comma-in-`TEXINPUTS` workaround and the class-home fallback are subtle enough
   that a second copy would drift and start measuring a build nobody performs.
 
-  One caveat is recorded in the file and worth repeating: the committed baseline
-  is measured over `examples/`, which contains **one** `tikzpicture` while a real
-  teaching tree contains over a thousand. Anything whose cost scales with picture
-  count is invisible to it. `--corpus DIR` points the harness at real documents.
+  **The blind spot that caveat named is now covered.**
+  `examples/fixtures/Perf/picture-density.tex` carries twelve ordinary
+  lecture-notes pictures, and the harness reports **ms per picture** alongside
+  the class figures — currently 82 ms each. That is the half of the workload the
+  class numbers cannot see: `examples/` otherwise contains one `tikzpicture`
+  against a real teaching tree's thousand, so a regression in picture handling
+  would have been invisible to CI.
+
+  The fixture is tagged `bench` **alone** in `examples/manifest.py`, a tag
+  nothing else reads, so `smoke.yml`, `visual.yml`, `accessible.yml` and the
+  class gallery never build it: it showcases nothing, and adding twelve pictures
+  to every CI build to serve one benchmark would be a poor trade. It is also
+  exempt from the one-document-per-class de-duplication, since it is there for
+  its content and its class (didactic) is already priced by the Notes template.
+  `--corpus DIR` still points the harness at real documents for a local run.
 
 - **`texlib-tikzexternal.sty` — compile each `tikzpicture` once, then reuse it.**
   Every picture is otherwise re-typeset on every pass. Opt in per document with
