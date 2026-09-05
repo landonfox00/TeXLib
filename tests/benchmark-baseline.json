@@ -7,17 +7,21 @@
     "Regenerate deliberately with: python benchmark.py --update-baseline"
   ],
   "classes": {
-    "article": 0.067,
-    "autoexam": 1.912,
-    "bank": 1.809,
-    "bingo": 1.074,
-    "didactic": 3.799,
-    "pset": 4.633,
-    "quiz": 2.071,
-    "report-card": 2.454,
-    "schedule": 0.983,
-    "syllabus": 1.2,
-    "thesis": 2.842
+    "article": -0.073,
+    "autoexam": 1.441,
+    "bank": 1.224,
+    "bingo": 0.762,
+    "didactic": 2.804,
+    "pset": 2.501,
+    "quiz": 1.388,
+    "report-card": 1.424,
+    "schedule": 0.702,
+    "syllabus": 0.48,
+    "thesis": 1.951
   },
+  "ms_per_picture": {
+    "examples/fixtures/Perf": 33.2
+  },
+  "picture_tolerance": 1.0,
   "tolerance": 0.25
 }

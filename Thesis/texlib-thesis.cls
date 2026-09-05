@@ -180,10 +180,32 @@
 % 3. Graphics, tables, references
 % ---------------------------------------------------------------------------
 \RequirePackage{graphicx}
-\RequirePackage{tikz}
-\RequirePackage{tikzpagenodes}   % current page text area — committee-page frame
+
+% The deferral mechanism. texlib-defer.sty has NO dependencies of its own, which
+% is the point: this class deliberately loads no other TeXLib package, so that a
+% thesis is not coupled to the teaching library, and that stays true.
+\RequirePackage{texlib-defer}
+
+% tikz (+0.34s here) is NOT loaded by default -- \TeXLibDeferOff, not
+% \TeXLibDefer. Nothing in this class draws: the only tikz in the whole Thesis
+% tree is the decorative committee-page frame in profiles/unr.tex, ONE of the
+% twenty-one profiles, and tikzpagenodes exists solely to give that frame the
+% current page's text area. Every other institution was paying for both.
+%
+% A profile that draws asks for it (`\TeXLibLoadTikz'); profiles are input at
+% the very end of this class, still in the preamble, so \RequirePackage is
+% legal there. A DOCUMENT that draws gets it from the build tooling, which
+% scans the source tree and only defers tikz when nothing in it draws --
+% texlib_preamble_scan.py treats this class specially for exactly that reason,
+% since the usual objection (library internals reaching tikz where a source scan
+% cannot follow) is false here.
+\TeXLibDeferOff{Tikz}{%
+	\RequirePackage{tikz}%
+	\RequirePackage{tikzpagenodes}%   current page text area -- committee-page frame
+}
+
 \RequirePackage{xcolor}
-\RequirePackage{caption}
+\TeXLibDefer{Caption}{\RequirePackage{caption}}
 % booktabs: this section is called "tables" and shipped none. A thesis has
 % tables, UNR requires a List of Tables when it does, and \hline rules are the
 % classic giveaway of an unstyled LaTeX table. Also tags cleanly -- the rules are
@@ -202,10 +224,29 @@
 % Bibliography (biber backend). The document adds its .bib with \addbibresource
 % and prints the list with \makereferences, which titles it and adds it to the
 % ToC as an unnumbered chapter (matching the front-matter pages).
-\RequirePackage[backend=biber, style=numeric, sorting=nyt, maxbibnames=10, giveninits=true]{biblatex}
-\newcommand{\makereferences}{%
-	\clearpage
-	\printbibliography[heading=bibintoc, title={References}]%
+% Deferrable (+0.78s, the largest single load in this class), though in practice
+% it nearly always loads: a thesis cites, so the scanner sees \addbibresource or
+% a \cite and keeps it. The flag earns its place while a chapter is being
+% drafted on its own, which is the one build an author repeats all day.
+\TeXLibDefer{Bib}{%
+	\RequirePackage[backend=biber, style=numeric, sorting=nyt, maxbibnames=10, giveninits=true]{biblatex}%
+}
+
+\@ifundefined{TeXLibNoBib}{%
+	\newcommand{\makereferences}{%
+		\clearpage
+		\printbibliography[heading=bibintoc, title={References}]%
+	}%
+}{%
+	% Defined either way, so a draft build of a chapter that still calls
+	% \makereferences says why the list is missing instead of dying on an
+	% undefined \printbibliography.
+	\newcommand{\makereferences}{%
+		\ClassWarning{texlib-thesis}{%
+			\string\makereferences\space ignored: this document was built with
+			\string\TeXLibNoBib, so biblatex was never loaded%
+		}%
+	}%
 }
 
 % ---------------------------------------------------------------------------
