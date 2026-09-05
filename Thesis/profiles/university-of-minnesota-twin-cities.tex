@@ -1,0 +1,173 @@
+% profiles/university-of-minnesota-twin-cities.tex — University of Minnesota-Twin Cities
+% ============================================================================
+% source: https://onestop.umn.edu/academics/grad-and-professional/thesis-or-dissertation-submission
+%         (the live submission page, which says "You must follow the University
+%          of Minnesota formatting and submission guidelines" and links the PDF
+%          below; it also warns that "The guidelines found in your department or
+%          in the University Library to format your thesis may not meet current
+%          formatting guidelines")
+% source: https://drive.google.com/file/d/1-EFscAFvtZbJXyPkCs4OgPQ6IHrAJjEj/view
+%         ("Thesis Formatting & Submission Guidelines", Graduate Student
+%          Services and Progress; every page footed "Updated: January 2023")
+% accessed: 2026-09-03
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, the absence of an
+% approval page, and the absence of any published accessibility requirement.
+% NOT set (left to the class's neutral behaviour):
+%   * \thesissetchapteropening — Minnesota states no deeper margin on chapter
+%     openings. The margin rule is flat: "Every page of the thesis, including
+%     all appendices, notes, and the bibliography".
+%   * a font rule — Minnesota's font list is headed "Recommended font types",
+%     and "The recommended minimum font size is 10-point", so there is nothing
+%     to require. The class's Latin Modern satisfies "Standard fonts should be
+%     used" and embeds every face.
+%
+% IPEDS records this institution as "University of Minnesota-Twin Cities"; the
+% Graduate School, the guidelines and the prescribed title page all say
+% "University of Minnesota", and that is what \thesisinstitution carries, since
+% it is the string the class prints in warnings.
+%
+% CURRENCY. The governing document is dated January 2023 — three and a half
+% years old at the access date. A second, OLDER edition is still served at
+% https://assets.asr.umn.edu/files/gssp/Thesis_formatting_guidelines.pdf
+% (10 pages; its PDF metadata says Adobe InDesign CS5, created 2013,
+% modified 2021, and it carries no "Updated:" footer). It is NOT linked from
+% the One Stop page, and it disagrees on the point that matters most here: it
+% prescribes an in-document signature page reading "This is to certify that I
+% have examined this copy of a [Master's thesis] or [Doctoral dissertation]
+% by …", with a rule for the adviser's signature. The January 2023 edition
+% replaced that with the online Approval and Deposit Agreement. This profile
+% follows the January 2023 edition because One Stop links it and says it
+% governs. If a reviewer finds that GSSP has since reinstated the signature
+% leaf, the line to change is \thesisnoapprovalpage at the bottom.
+
+\thesisinstitution{University of Minnesota}
+
+% "At minimum, students must use 1 inch (2.6 cm) margins on all sides", applying
+% to "Every page of the thesis, including all appendices, notes, and the
+% bibliography", and "Nothing may appear in the margins, meaning no page
+% numbers, text, tables, graphs, charts, or parts of illustrations."
+%
+% The 1.5in left margin is a recommendation and only for a printed copy — "It is
+% also recommended that students consider using a 1.5 inch (3.9 cm) left margin
+% if they intend to have their manuscript printed" — so it does not belong in
+% the filed PDF's geometry. Add a binding offset at print time.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "The body of the thesis must be double-spaced or 1½-spaced." Minnesota offers
+% the choice; this profile takes double, which is also the class default.
+% \thesissetspacing{onehalf} is equally in spec.
+%
+% The rule is about the BODY. Single spacing is permitted for several parts and
+% the class does not force those either way: "Long quotations, notes, and the
+% bibliography may be single-spaced, unless the student's graduate program
+% requires otherwise", "Captions may be single-spaced", and, for appendices,
+% "text and information in appendices can be single-spaced".
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Read and found ABSENT, not skipped. The One Stop submission page and all eight
+% pages of the January 2023 guidelines were read in full: neither states an
+% accessibility requirement for the filed document. The word "accessible"
+% appears in them only about the Digital Conservancy making the deposit
+% "freely accessible online to the public". The requirements Minnesota does put
+% on the file are format and size, not conformance.
+%
+% Nothing is therefore declared with \thesisrequiretagging,
+% \thesisrequiredocumentlanguage or \thesisrequirepdfstandard. This class emits
+% a tagged PDF regardless; declaring a requirement GSSP has not published would
+% put words in their mouth.
+%
+% Elsewhere in the University — the Libraries' Digital Conservancy deposit
+% guidance, the Accessible U site, and University policy on digital content —
+% accessibility guidance does exist. None of it is the Graduate School's filing
+% requirement, so none of it is recorded here.
+\thesisaccessibilityrequirement{Not published}
+	{Graduate Student Services and Progress states no accessibility requirement
+	 for a filed thesis or dissertation. Its requirements for the file are that
+	 "The full text must be in Adobe PDF format and must be one file" and that
+	 the complete file size is no more than 1,000 MB. Read 2026-09-03 in the
+	 January 2023 Formatting \& Submission Guidelines and on the One Stop
+	 submission page; an absence found, not a section skipped.}
+
+% --- Title page --------------------------------------------------------------
+% The guidelines print a specimen title page ("See Title Page example below:")
+% and the wording and line breaks here are that specimen, reproduced. The
+% surrounding rules are:
+%   1. "The title page is included as the first page."
+%   2. "The title page is not to be numbered or counted."
+%   3. "The year that degree requirements were met must be included (not
+%      necessarily the year the student defends)."
+%   5. "The title page must include only one title."
+%   6. "The student's name listed on the title page may be the official name,
+%      preferred name, or degree name on record with the University."
+% and, from the checklist, "The title page has the correct year listed. Year
+% must correspond to the year the degree is awarded."
+%
+% \graddate should therefore be given the YEAR of conferral. The class default
+% is a month and year; a month is not forbidden, but the year is the part
+% Minnesota checks, so whatever is passed must contain the right one.
+%
+% Rule 4 — "The title of the thesis must not contain chemical or mathematical
+% formulas, symbols, superscripts, subscripts, Greek letters, or other
+% non-standard characters; words must be substituted" — is a constraint on
+% \title, which no macro can enforce. It is stated here so a mathematician
+% reads it before typing $\Gamma$ into the title.
+%
+% The specimen sets the boilerplate in capitals and leaves the title in title
+% case; the degree line is capitalised there too, so \thesis@degree is
+% uppercased. VERTICAL placement is not prescribed anywhere in the document —
+% only the wording, the order and the line breaks are — so the gaps below are a
+% reading of the specimen's proportions, not a quoted figure.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{1in}%
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{0.75in}
+		A \thesis@DocNoun\\
+		SUBMITTED TO THE FACULTY OF THE UNIVERSITY\\
+		OF MINNESOTA\\
+		BY\par
+		\vspace{0.75in}
+		\@author\par
+		\vspace{0.75in}
+		IN PARTIAL FULFILLMENT OF THE REQUIREMENTS\\
+		FOR THE DEGREE OF\\
+		\MakeUppercase{\thesis@degree}\par
+		\vspace{0.75in}
+		\thesis@advisor\par
+		\vspace{0.75in}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Minnesota prescribes none inside the document. The introductory material is
+% enumerated in the guidelines — title page, copyright page, acknowledgements,
+% dedication, abstract, table of contents, list of tables, list of figures, then
+% "other introductory material (e.g., notations, list of abbreviations)" — and
+% no approval or signature leaf is among them. Approval is collected on a
+% separate online form instead:
+%
+%   "Students must sign and submit the online form for Thesis/Dissertation
+%    Approval and Deposit Agreement … It also includes the signature page, which
+%    is signed by the advisor (and co-advisor if applicable). The advisor(s)
+%    will confirm they have seen and approve of the final version of the
+%    thesis."
+%
+% So the signature page exists, but it is part of that form and not part of the
+% filed PDF, which "must be one file" containing "all introductory pages, the
+% body of the manuscript, bibliography, and appendices". The adviser is named on
+% the title page above.
+%
+% Note what is NOT quoted: Minnesota nowhere writes that the document may not
+% contain an approval page, the way Washington does. The page is taken away on
+% the strength of the enumerated introductory material and the separate signed
+% form, and because the superseded 2013/2021 edition's signature leaf is exactly
+% the page a student would otherwise carry over. See the CURRENCY note above.
+\thesisnoapprovalpage
