@@ -1,0 +1,212 @@
+% profiles/washington-university-in-st-louis.tex
+% — Washington University in St. Louis
+% ============================================================================
+% source: https://gradstudies.artsci.washu.edu/guides
+%         (Office of Graduate Studies, Guides — the page that links both
+%          documents below. Note the domain: WashU moved from wustl.edu to
+%          washu.edu, and graduateschool.wustl.edu no longer resolves at all.)
+% source: "WashU PhD Dissertation Guide_May 2026.pdf", 19 pp., last updated
+%         May 2026, linked from that page as "View Doctoral Dissertation Guide":
+%         https://wustl.app.box.com/s/q863bhdp2op5kyopfqmsjrlssy36qby3
+% source: "Dissertation Template_2022 update.doc", linked from that page as
+%         "View Dissertation Template":
+%         https://wustl.app.box.com/s/908fpw81iaaco0cuier7dex7c5yl9lec
+%         This is the document that carries the FORMATTING RULES — the Guide is
+%         about process (defence, forms, ProQuest, embargoes) and states no
+%         margin or spacing figure. The template says of itself: "This document
+%         contains the guidelines for the proper formatting of dissertations and
+%         theses for PhD students at Washington University in St. Louis. The
+%         document is formatted using the same guidelines it describes."
+% accessed: 2026-09-05
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the absence of a
+% separate approval page. NOT set: chapter-opening margin — and at WashU that is
+% a DELIBERATE NON-SETTING, not a gap; see the note below.
+%
+% HOW TO REACH THESE SOURCES AGAIN, because it is not obvious and cost most of
+% the time on this institution:
+%   * gradstudies.artsci.washu.edu/guide-doctoral-dissertation returns 403 to
+%     curl AND renders "Access denied ... Please click here to log in" in a real
+%     browser. That single page is gated.
+%   * gradstudies.artsci.washu.edu/guides is NOT gated and is reachable in the
+%     in-app Browser pane. It carries the links.
+%   * Both documents live on Box, whose /s/<hash> pages are JavaScript viewers
+%     that curl cannot read. Get the file id out of the rendered page (it appears
+%     as f_<digits> in the DOM) and then fetch
+%       https://wustl.app.box.com/index.php?rm=box_download_shared_file&shared_name=<hash>&file_id=f_<digits>
+%     which returns the real file.
+%   * The template is a legacy .doc (OLE compound), not .docx, so it will not
+%     unzip. `antiword` reads it.
+
+\thesisinstitution{Washington University in St. Louis}
+
+% --- Filing figures ----------------------------------------------------------
+% "Your printed output must reflect physically measurable top, bottom, left, and
+% right margins of 1 inch. Some systems' settings produce varying results when
+% printing to different printers, so be sure to measure your output. Remember,
+% nothing, not even page numbers, should print in the margins."
+%
+% Note the last clause: WashU explicitly refuses the page-number exemption that
+% Northwestern and Emory grant. Page numbers go INSIDE the 1in block — "All page
+% numbers should be placed on the center of each page immediately above the
+% bottom margin" — which is what this class's `includefoot' geometry does
+% anyway. This is the first institution in this round where the class's footer
+% placement is not merely tolerable but exactly right.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Use double-spacing for body text." Required, flatly. The single-spacing
+% allowances WashU names are per-element and not expressible here (citations,
+% footnotes/endnotes, block quotations, appendices, table content); the lists of
+% figures/tables are asked for at 1.15, which is neither of the class's three
+% values and is likewise a per-element rule.
+\thesissetspacing{double}
+
+% --- Chapter openings: DELIBERATELY UNSET ---------------------------------------
+% WashU does publish a chapter-opening rule, and it is PERMISSIVE, which is why
+% \thesissetchapteropening stays unset rather than being filled in:
+%
+%   "Begin each chapter on a new page. You may start the chapter title below the
+%    top margin or you may leave some space and start the chapter title up to 3
+%    inches from the top edge of the page."
+%
+% So anything from the 1in top margin down to 3in is in spec. The class's default
+% — chapter titles at the top margin — is the FIRST of the two options WashU
+% offers, stated in its own words. Setting \thesissetchapteropening{3in} would
+% also be in spec but would be a choice, not a requirement, and would silently
+% change every chapter opening in a document that never asked for it.
+%
+% Recorded here so a later pass does not read the unset hook as "not researched".
+
+% --- Accessibility -----------------------------------------------------------
+% NOTHING IS DECLARED REQUIRED. The 24-page template contains ZERO occurrences of
+% "accessib", "alt text", "WCAG", "tagged" or "PDF/A". The 19-page Guide contains
+% "accessib" twice and neither is a document rule: "The student is responsible
+% for making the full text of the dissertation accessible to their" committee,
+% and "make sure the following items are accessible" (i.e. to hand, before you
+% start the ProQuest account). WashU is private, so the April 2026 ADA Title II
+% date does not reach it as it does the public universities in this directory.
+%
+% The one adjacent requirement WashU does state is a font one, and it is about
+% fidelity rather than accessibility: "Your PDF for ProQuest will already have
+% embedded fonts."
+\thesisaccessibilityrequirement{Not published}
+	{Washington University in St. Louis publishes no accessibility requirement
+	 for a filed dissertation, in either the May 2026 Dissertation Guide or the
+	 formatting template, as read on 2026-09-05. The word "accessible" appears
+	 only in the sense of a document being available to a committee. A finding,
+	 not a licence.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduced from the template's own specimen title page. Its shape, in order:
+%
+%   WASHINGTON UNIVERSITY IN ST. LOUIS
+%   <administrative unit / school>
+%   <program>
+%
+%   Dissertation Examination Committee:
+%   <Chair>, Chair
+%   <Co-Chair>, Co-Chair
+%   <members, alphabetical by last name>
+%
+%   <Title>
+%   by
+%   <Author>
+%
+%   A dissertation presented to
+%   Washington University in St. Louis
+%   in partial fulfillment of the
+%   requirements for the degree
+%   of <Degree>
+%
+%   <Month Year>
+%   St. Louis, Missouri
+%
+% Rules applied on top of the specimen:
+%
+%   * "Format the title page so that it is centered vertically and horizontally
+%     on the page with equal amounts of white space from top and bottom
+%     margins." -> equal \vspace*{\fill} above and below, not a fixed offset.
+%   * "Use a 12-point regular font." REGULAR, so nothing here is bold. The title
+%     is not bold, unlike the class's neutral page.
+%   * "Do not include a page number on the title page." The page is counted but
+%     not numbered.
+%   * "The date on the title page should reflect the month and year the degree is
+%     to be officially earned, and should be one of the following months:
+%     December, May, or August." So \graddate{May 2027} — and the Guide's own
+%     pre-submission checklist asks "Does your title page indicate the month and
+%     year in which your degree is being conferred (not the month/year you are
+%     submitting the dissertation)?"
+%   * "Following the dissertation chair or co-chair, the faculty should be
+%     listed alphabetically by last name." A document must supply
+%     \committeemember in that order; the class cannot sort it.
+%   * From the Guide's checklist: "Did you remember to remove Ph.D. from your
+%     faculty titles?" So committee names carry NO post-nominals here. This is
+%     the opposite of most profiles in this directory — do not copy a
+%     \committeemember line from another one.
+%
+% THE ADMINISTRATIVE UNIT IS TWO LINES, and the Guide's checklist asks "Does
+% your title page indicate the correct administrative unit and school?" The
+% specimen shows "Division of Biology and Biomedical Sciences" over
+% "Neurosciences". The class has one \gradprogram field, so a document filing
+% here should write both into it:
+%     \gradprogram{Division of Biology and Biomedical Sciences\\Neurosciences}
+%
+% AMBIGUITY LEFT FOR THE REVIEWER, not resolved here. The template says: "In most
+% cases your dissertation title should be in \"Title Case\" unless a specific
+% format is required by your discipline." The Guide's checklist asks: "Is Your
+% Title in Sentence Case, as in This Question?" — a line that is itself written
+% in Title Case. The two documents name different cases, and the checklist's own
+% example contradicts the words in it. The title is therefore emitted VERBATIM,
+% neither uppercased nor recased, which is correct under either reading and
+% leaves the choice where it belongs.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		WASHINGTON UNIVERSITY IN ST.\ LOUIS\par
+		\vspace{\baselineskip}
+		\thesis@program\par
+		\vspace{2\baselineskip}
+		\begingroup
+		% "<Name>, Chair" -- role after the name, comma-separated, no rules and
+		% no post-nominals.
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par
+		}%
+		Dissertation Examination Committee:\par
+		\thesis@committee
+		\endgroup
+		\vspace{2\baselineskip}
+		\thesis@tagtitle{Title}{\@title}\par
+		by\par
+		\@author\par
+		\vspace{2\baselineskip}
+		A \thesis@docnoun{} presented to\\
+		Washington University in St.\ Louis\\
+		in partial fulfillment of the\\
+		requirements for the degree\\
+		of \thesis@degree\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+		St.\ Louis, Missouri\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% WashU's filed dissertation has none. The template's Table 1.1, "Required and
+% Optional Dissertation Components", is exhaustive and lists for the front
+% matter only: Title page, Copyright page, Table of Contents, List of Figures,
+% List of Illustrations, List of Tables, List of Abbreviations, Acknowledgments,
+% Dedication, Abstract page, Preface. No approval, committee or signature page
+% appears anywhere in it. The committee is named ON the title page above.
+%
+% PHYSICAL SIGNATURES: none in the document. Approval is carried by the
+% Dissertation Defense Approval Form and the Examination Approval Form, which
+% the Guide handles as separate forms routed to the school administrator — "Has
+% your school administrator received your Examination Approval Form?" — and not
+% as a leaf of the manuscript.
+\thesisnoapprovalpage
