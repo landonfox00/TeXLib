@@ -2467,8 +2467,14 @@ def main():
 
     PLAIN = r"\documentclass{didactic}\begin{document}x\end{document}"
     names = scan_tmp({"doc.tex": PLAIN})
-    check("scan: a document using nothing defers everything",
-          set(names) == set(_ps.DEFERRABLE), names)
+    check("scan: a document using nothing defers everything it can",
+          set(names) == set(_ps.DEFERRABLE) | {"Tikz"}, names)
+
+    # A class NOT on the audited list defers the general set and no more.
+    SYLL = r"\documentclass{syllabus}\begin{document}x\end{document}"
+    check("scan: an unaudited class defers the general set only",
+          set(scan_tmp({"doc.tex": SYLL})) == set(_ps.DEFERRABLE),
+          scan_tmp({"doc.tex": SYLL}))
 
     check("scan: tikz is not a general deferrable (internals reach it)",
           "Tikz" not in _ps.DEFERRABLE)
@@ -2481,8 +2487,20 @@ def main():
     THESIS = r"\documentclass{texlib-thesis}\begin{document}x\end{document}"
     check("scan: thesis with no drawing defers Tikz",
           "Tikz" in scan_tmp({"doc.tex": THESIS}), scan_tmp({"doc.tex": THESIS}))
-    check("scan: didactic with no drawing still does NOT defer Tikz",
-          "Tikz" not in scan_tmp({"doc.tex": PLAIN}))
+    check("scan: didactic with no drawing defers Tikz (audited class)",
+          "Tikz" in scan_tmp({"doc.tex": PLAIN}))
+    check("scan: report-card is NOT audited, so keeps Tikz",
+          "Tikz" not in scan_tmp(
+              {"doc.tex": r"\documentclass{report-card}"
+                          r"\begin{document}x\end{document}"}))
+
+    # The two library uses a didactic/pset scan has to catch, or the deferral
+    # breaks a document that never mentions tikz by name.
+    for lib_use in (r"\encircle{3}", r"\usepackage{quiver}"):
+        names = scan_tmp({"doc.tex": r"\documentclass{didactic}\begin{document}"
+                                     + lib_use + r"\end{document}"})
+        check(f"scan: didactic using {lib_use!r} keeps Tikz",
+              "Tikz" not in names, names)
     for drawing in (r"\begin{tikzpicture}\end{tikzpicture}", r"\tikz\draw(0,0);",
                     r"\usetikzlibrary{calc}", r"\encircle{3}",
                     r"\begin{tikzcd}\end{tikzcd}"):

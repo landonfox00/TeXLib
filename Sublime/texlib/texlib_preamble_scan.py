@@ -27,25 +27,34 @@ resolves toward loading:
   * The patterns are deliberately loose. A false positive costs a package load
     (the status quo); a false negative costs a broken build.
 
-WHY TIKZ IS NOT AUTO-DEFERRED, EXCEPT FOR ONE CLASS
+WHY TIKZ IS DEFERRED ONLY FOR THE CLASSES IN TIKZ_CLASSES
 
-tikz is deferrable in the .sty (\TeXLibNoTikz) but is not auto-deferred for the
-teaching classes, for two reasons. It pays badly -- didactic, pset and
-report-card load tcolorbox, which pulls the pgf core in regardless, so only
-~0.1s of the 0.47s is actually reclaimable there -- and it is reached from
-library internals a source scan does not see, notably \encircle in
-texlib-itemfmt.sty and the vendored quiver.sty.
+The rule is not "tikz is cheap to defer". It is "defer tikz only where a source
+scan can actually see every use of it", and that had to be established per class
+by reading every module the class loads, with comments stripped:
 
-texlib-thesis is the exception, and both objections are simply false there. It
-loads no tcolorbox, so the full cost is reclaimable; and nothing in the class
-draws -- the only tikz in the entire Thesis tree is the decorative
-committee-page frame in profiles/unr.tex, one profile of twenty-one, which asks
-for tikz itself with \TeXLibLoadTikz. So for that class the scan sees everything
-that matters, and TIKZ_CLASSES lists it.
+  texlib-thesis   Nothing in the class draws. The only tikz in the whole Thesis
+                  tree is the decorative committee-page frame in
+                  profiles/unr.tex -- one profile of twenty-one -- which asks for
+                  tikz itself with \TeXLibLoadTikz. It loads no tcolorbox either,
+                  so the full cost is reclaimable.
 
-The asymmetry is deliberate and worth keeping asymmetric: the rule is not "tikz
-is cheap to defer", it is "defer tikz only where a source scan can actually see
-every use of it".
+  didactic, pset  Two library uses exist and BOTH are visible to a scan:
+                  \encircle (texlib-itemfmt.sty) and the vendored quiver.sty,
+                  which are in TIKZ_PATTERNS below. texlib-theorems.sty calls
+                  \pgfqkeys at load time, but pgfkeys comes from its own declared
+                  tcolorbox dependency, not from tikz.
+
+                  It pays much less here than for thesis: tcolorbox pulls the pgf
+                  core in regardless, so deferring tikz reclaims only the
+                  tikz-specific layer -- measured 0.07s in isolation, 0.12s of a
+                  1.16s class load in place. Worth taking, not worth pretending
+                  is large.
+
+Every other class stays off the list. report-card, quiz and autoexam were not
+audited to this standard, and an unaudited class is exactly the one where a
+missed internal use turns into "Undefined control sequence \tikz" in someone
+else's document.
 """
 
 import io
@@ -59,7 +68,8 @@ import re
 # Classes for which Tikz may be auto-deferred as well. See the module docstring:
 # the test is whether a source scan can see every use of tikz, which is true for
 # texlib-thesis and false for the tcolorbox-based teaching classes.
-TIKZ_CLASSES = ("thesis", "texlib-thesis")
+TIKZ_CLASSES = ("thesis", "texlib-thesis",
+                "didactic", "texlib-didactic", "pset", "texlib-pset")
 
 # Evidence that a document draws. Kept separate from DEFERRABLE because it
 # applies only to the classes above.
