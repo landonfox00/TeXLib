@@ -27,34 +27,43 @@ resolves toward loading:
   * The patterns are deliberately loose. A false positive costs a package load
     (the status quo); a false negative costs a broken build.
 
-WHY TIKZ IS DEFERRED ONLY FOR THE CLASSES IN TIKZ_CLASSES
+WHY ONLY texlib-thesis IS ON TIKZ_CLASSES
 
-The rule is not "tikz is cheap to defer". It is "defer tikz only where a source
-scan can actually see every use of it", and that had to be established per class
-by reading every module the class loads, with comments stripped:
+Because it is the only class where deferring tikz actually removes tikz.
 
-  texlib-thesis   Nothing in the class draws. The only tikz in the whole Thesis
-                  tree is the decorative committee-page frame in
-                  profiles/unr.tex -- one profile of twenty-one -- which asks for
-                  tikz itself with \TeXLibLoadTikz. It loads no tcolorbox either,
-                  so the full cost is reclaimable.
+The test that settles this is not "can the class build with \TeXLibNoTikz" --
+all of them can -- but "is tikz still LOADED afterwards". Probed with
+\@ifpackageloaded on a bare stub of every class, in a clean directory:
 
-  didactic, pset  Two library uses exist and BOTH are visible to a scan:
-                  \encircle (texlib-itemfmt.sty) and the vendored quiver.sty,
-                  which are in TIKZ_PATTERNS below. texlib-theorems.sty calls
-                  \pgfqkeys at load time, but pgfkeys comes from its own declared
-                  tcolorbox dependency, not from tikz.
+    class          tikz eager   tikz with \TeXLibNoTikz   tcolorbox
+    texlib-thesis      N                 N                    N
+    didactic           Y                 Y                    Y
+    pset               Y                 Y                    Y
+    report-card        Y                 Y                    N
+    quiz               Y                 Y                    N
+    autoexam           Y                 Y                    Y
+    bank               Y                 Y                    N
 
-                  It pays much less here than for thesis: tcolorbox pulls the pgf
-                  core in regardless, so deferring tikz reclaims only the
-                  tikz-specific layer -- measured 0.07s in isolation, 0.12s of a
-                  1.16s class load in place. Worth taking, not worth pretending
-                  is large.
+Every teaching class reaches tcolorbox (directly, or through texlib-thmenv ->
+texlib-theorems), and tcolorbox loads tikz itself, AFTER this bundle's deferral
+has correctly skipped its own \RequirePackage{tikz}. So the flag is honoured and
+changes nothing: the same packages end up in memory either way, and there is no
+work to save.
 
-Every other class stays off the list. report-card, quiz and autoexam were not
-audited to this standard, and an unaudited class is exactly the one where a
-missed internal use turns into "Undefined control sequence \tikz" in someone
-else's document.
+didactic and pset were briefly added to this list on the strength of a 0.12s
+measurement. That measurement was noise -- with identical packages loaded there
+is nothing for it to have measured -- and they were removed again once the
+package probe replaced the stopwatch. Do not re-add a class here on a timing
+difference alone; probe what is loaded.
+
+texlib-thesis is the exception because it loads no tcolorbox at all. Nothing in
+that class draws: the only tikz in the whole Thesis tree is the decorative
+committee-page frame in profiles/unr.tex, one profile of twenty-one, which asks
+for tikz itself with \TeXLibLoadTikz.
+
+The scan-visibility rule below still applies and is still necessary -- it is
+just no longer sufficient. A class must ALSO shed tikz for inclusion to mean
+anything.
 """
 
 import io
@@ -68,8 +77,7 @@ import re
 # Classes for which Tikz may be auto-deferred as well. See the module docstring:
 # the test is whether a source scan can see every use of tikz, which is true for
 # texlib-thesis and false for the tcolorbox-based teaching classes.
-TIKZ_CLASSES = ("thesis", "texlib-thesis",
-                "didactic", "texlib-didactic", "pset", "texlib-pset")
+TIKZ_CLASSES = ("thesis", "texlib-thesis")
 
 # Evidence that a document draws. Kept separate from DEFERRABLE because it
 # applies only to the classes above.

@@ -4,6 +4,43 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Fixed
+
+- **`didactic` and `pset` are off the tikz deferral list again — it never did
+  anything.** They were added on the strength of a 0.12s measurement. Auditing
+  the four remaining classes for the same treatment turned the stopwatch into a
+  package probe, and the probe says the measurement was noise. On a bare stub of
+  every class, in a clean directory:
+
+  | class | tikz eager | tikz with `\TeXLibNoTikz` | tcolorbox |
+  |---|---|---|---|
+  | texlib-thesis | N | **N** | N |
+  | didactic | Y | **Y** | Y |
+  | pset | Y | **Y** | Y |
+  | report-card | Y | **Y** | N |
+  | quiz | Y | **Y** | N |
+  | autoexam | Y | **Y** | Y |
+  | bank | Y | **Y** | N |
+
+  Every teaching class reaches tcolorbox — directly, or through `texlib-thmenv`
+  → `texlib-theorems` — and tcolorbox loads tikz itself, *after* the bundle's
+  deferral has correctly skipped its own `\RequirePackage{tikz}`. The flag is
+  honoured and changes nothing: the same packages end up in memory either way,
+  so there is no work to save and no timing difference that is not noise.
+
+  `texlib-thesis` remains the one class where it works, because it is the one
+  class that loads no tcolorbox.
+
+  The right test is "is tikz still loaded", not "did the build get faster" or
+  even "does the build still work" — all seven classes build fine with the flag
+  set, which is exactly why the earlier check passed something it should not
+  have. The scanner now documents the probe table, and a test pins the list so a
+  future timing difference cannot quietly put a class back on it.
+
+  So the audit of `report-card`, `quiz`, `autoexam` and `bank` is complete and
+  its answer is: none of them qualifies, and neither did two of the classes
+  already on the list.
+
 ### Changed
 
 - **`didactic` and `pset` defer tikz too, and the benchmark now reports what a
@@ -27,16 +64,9 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   number, which is the one that moves when a package creeps back into the
   bundle.
 
-  The smaller finding is the optimisation itself. `didactic` and `pset` join
-  `texlib-thesis` on the tikz audit list, which was earned by reading every
-  module they load with comments stripped: the only two library uses,
-  `\encircle` (`texlib-itemfmt.sty`) and the vendored `quiver.sty`, are both
-  visible to a source scan and both already in the scanner's patterns. It is
-  worth **0.12s of a 1.16s class load** — tcolorbox pulls the pgf core in
-  regardless, so only the tikz-specific layer is reclaimable, and that is the
-  honest size of it. `report-card`, `quiz` and `autoexam` stay off the list:
-  they were not audited to that standard, and an unaudited class is exactly
-  where a missed internal use becomes someone else's broken document.
+  The accompanying attempt to defer tikz for these two classes was **reverted in
+  the same release** — see the Fixed entry above. It changed nothing, because
+  tcolorbox loads tikz regardless.
 
   `texlib-theorems.sty` calls `\pgfqkeys` at load time and never required
   pgfkeys — it works because its own declared tcolorbox dependency supplies it.
