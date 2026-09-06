@@ -43,6 +43,12 @@
 
 \RequirePackage[many]{tcolorbox}
 \RequirePackage{amsthm}
+% \pgfqkeys is used below, at load time, to declare the theorem styles. It
+% arrives with tcolorbox's pgf and always has, so this changes nothing today --
+% but the dependency was implicit, and it is the kind that breaks silently the
+% first time the load order moves. pgfkeys is already in memory by this point,
+% so requiring it measures as +0.00s.
+\RequirePackage{pgfkeys}
 
 % Single source of truth for every TeXLib left rule. Consumed here and by the
 % solution / hint / dashed-answer boxes in didactic.cls and pset.cls.

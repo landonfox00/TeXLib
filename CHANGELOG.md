@@ -4,7 +4,72 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- **`didactic` and `pset` defer tikz too, and the benchmark now reports what a
+  real build actually pays.** Two findings from auditing the two heaviest
+  teaching classes, one larger than the other.
+
+  The larger one is a measurement gap. `benchmark.py` priced the class *eagerly*
+  — the figure a document pays only if the preamble scanner defers nothing —
+  while every real build goes through that scanner. For the heavy classes the
+  difference is about half:
+
+  | class | eager | fully deferred |
+  |---|---|---|
+  | pset | 2.30s | **1.17s (−49%)** |
+  | didactic | 2.29s | **1.18s (−48%)** |
+  | thesis | 2.54s | **1.66s (−35%)** |
+
+  The harness now measures both and reports a `min` column: the eager figure is
+  the ceiling, `min` is the floor a document of that class can reach, and a real
+  document sits between them. The regression gate still runs on the eager
+  number, which is the one that moves when a package creeps back into the
+  bundle.
+
+  The smaller finding is the optimisation itself. `didactic` and `pset` join
+  `texlib-thesis` on the tikz audit list, which was earned by reading every
+  module they load with comments stripped: the only two library uses,
+  `\encircle` (`texlib-itemfmt.sty`) and the vendored `quiver.sty`, are both
+  visible to a source scan and both already in the scanner's patterns. It is
+  worth **0.12s of a 1.16s class load** — tcolorbox pulls the pgf core in
+  regardless, so only the tikz-specific layer is reclaimable, and that is the
+  honest size of it. `report-card`, `quiz` and `autoexam` stay off the list:
+  they were not audited to that standard, and an unaudited class is exactly
+  where a missed internal use becomes someone else's broken document.
+
+  `texlib-theorems.sty` calls `\pgfqkeys` at load time and never required
+  pgfkeys — it works because its own declared tcolorbox dependency supplies it.
+  Now declared explicitly, at a measured cost of +0.00s.
+
 ### Fixed
+
+- **`benchmark.py` will not write a baseline from a run it cannot trust.**
+  `min` (everything deferred) cannot exceed `class` (nothing deferred) — deferring
+  cannot cost more than not deferring. A run where it does is not a result; it is
+  the machine reporting that it is too loaded or too throttled to measure on.
+  Seen for real while regenerating: autoexam, bingo and syllabus all came back
+  with `min > class` in one run, while the pdflatex floor ranged 1.25–1.81s
+  *within that same run*. Such rows now report no floor, the run is flagged, and
+  `--update-baseline` refuses. A baseline written from that run would have
+  silently loosened the gate to whatever the day's interference happened to be,
+  which is worse than having no baseline at all.
+
+  The committed baseline is therefore unchanged by this branch; regenerate it
+  deliberately, on a quiet machine.
+
+- **`benchmark.py` divided every class by a stale engine floor.** The floor was
+  measured once per engine and reused for the rest of the run, on the reasoning
+  that it is a property of the toolchain. The harness caught the consequence
+  itself: in one run the *same class* priced **3.42s under the Notes staging and
+  6.54s under Perf**, because the machine had drifted between the first document
+  and the last, and every later class was being divided by a floor from a faster
+  moment.
+
+  Reporting a ratio only cancels machine speed if numerator and denominator are
+  measured under the same conditions, so a cached floor quietly destroyed that
+  property on exactly the long runs a baseline is generated from. The floor is
+  now re-measured for every document, adjacent to the class measurement it feeds.
 
 - **`benchmark.py` was measuring the search path as if it were the class.** It
   inherited `smoke_test`'s recursive `TEXINPUTS` (`<root>//`). A correctness

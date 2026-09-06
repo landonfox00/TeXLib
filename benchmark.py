@@ -312,25 +312,38 @@ def timed(staged, argv, reps):
     return best, ok
 
 
-def measure(module, template, reps, variants, floors, bench_doc=False):
+def measure(module, template, reps, variants, floors, bench_doc=False,
+            noisy=None):
     """Every measurement for one document. Returns a dict, or None if unusable.
 
     `bench_doc` marks a document present for its content rather than its class
     (see the Perf fixture): it contributes the per-picture figure and is kept out
     of the per-class baseline.
     """
+    if noisy is None:
+        noisy = []
     with Staged(module, template) as st:
         if not os.path.exists(st.tex_src):
             return None
 
-        # 1. Engine floor. Shared per engine across the whole run: it is a
-        #    property of the toolchain, and re-measuring it per document would
-        #    triple the harness's runtime to produce the same number.
-        if st.engine not in floors:
-            st.write("_bench_floor.tex", _empty_article(st.engine))
-            floor, _ = timed(st, st.engine_cmd(["_bench_floor.tex"]), reps)
-            floors[st.engine] = floor
-        floor = floors[st.engine]
+        # 1. Engine floor, re-measured for EVERY document, next to the class
+        #    measurement it will be divided into.
+        #
+        #    It was measured once per engine and cached, on the reasoning that
+        #    the floor is a property of the toolchain and re-measuring it would
+        #    only cost runtime. That was wrong, and the harness caught it: in one
+        #    run the SAME class priced 3.42s under the Notes staging and 6.54s
+        #    under Perf, because the machine had drifted between the first
+        #    document and the last and every later class was being divided by a
+        #    floor from a faster moment.
+        #
+        #    The whole point of reporting a ratio is that machine speed cancels,
+        #    and it only cancels if numerator and denominator are measured under
+        #    the same conditions. A cached floor quietly destroys that property
+        #    on exactly the long runs the baseline is generated from.
+        st.write("_bench_floor.tex", _empty_article(st.engine))
+        floor, _ = timed(st, st.engine_cmd(["_bench_floor.tex"]), reps)
+        floors.setdefault(st.engine, floor)   # kept only for reporting
 
         # 2. Class load: the same near-empty document, but of this class.
         stub_name = "_bench_stub.tex"
@@ -338,6 +351,44 @@ def measure(module, template, reps, variants, floors, bench_doc=False):
             st.docclass, CLASS_STUB_BODY.get(st.docclass, "")))
         class_time, class_ok = timed(st, st.engine_cmd([stub_name]), reps)
         class_ok = class_ok and log_is_clean(st, "_bench_stub")
+
+        # 2b. The same stub with every deferral the scanner can apply. This is
+        #     the number a real build actually pays, and it is roughly HALF the
+        #     eager one for the heavy classes -- didactic 2.27s -> 1.16s, pset
+        #     2.09s -> 1.15s. Reporting only the eager figure told the truth
+        #     about the bundle and the wrong thing about the user's experience.
+        #
+        #     The flags come from the SCANNER, asked about this very stub, not
+        #     from a hardcoded full set. That distinction matters: the scanner
+        #     refuses to defer tikz for a class it has not audited, so forcing
+        #     every flag would advertise a floor those classes cannot actually
+        #     reach. A stub has no content, so what comes back is the most the
+        #     scanner would ever defer for this class -- its true floor, against
+        #     the eager figure as the ceiling, with real documents in between.
+        st.write("_bench_min.tex", _stub_source(
+            st.docclass, CLASS_STUB_BODY.get(st.docclass, "")))
+        deferred_prefix = _scan.defer_prefix_for(
+            os.path.join(st.dir, "_bench_min.tex"))
+        st.write("_bench_min.tex",
+                 deferred_prefix + "\n" + _stub_source(
+                     st.docclass, CLASS_STUB_BODY.get(st.docclass, "")))
+        min_time, min_ok = timed(st, st.engine_cmd(["_bench_min.tex"]), reps)
+        min_ok = min_ok and log_is_clean(st, "_bench_min")
+        if not min_ok:
+            # A class that cannot build with everything deferred is not a
+            # failure of the benchmark -- most cannot, and should not be able
+            # to. It simply has no floor to report.
+            min_time = None
+        elif min_time > class_time + NOISE_FLOOR_SECONDS:
+            # Deferring cannot cost MORE than not deferring, so this is not a
+            # result: it is the machine telling us it is too noisy to measure on
+            # right now. Reporting it as a number would put an impossible figure
+            # in a table that people read as fact, and -- worse -- into a
+            # committed baseline. Seen for real: a run where autoexam, bingo and
+            # syllabus all came back with min > class while the pdflatex floor
+            # ranged 1.25-1.81s within the single run.
+            min_time = None
+            noisy.append(module)
 
         # 3. The real document, one pass, exactly as it is today.
         full, full_ok = timed(st, st.engine_cmd([template]), reps)
@@ -363,6 +414,8 @@ def measure(module, template, reps, variants, floors, bench_doc=False):
             "class_s": class_time,
             "full_s": full,
             "class_load_s": class_time - floor,
+            "class_min_s": (min_time - floor) if min_time else None,
+            "reclaimed_s": (class_time - min_time) if min_time else None,
             "content_s": content,
             "class_cost": ((class_time - floor) / floor
                            if floor and floor > NOISE_FLOOR_SECONDS else None),
@@ -430,17 +483,17 @@ def fmt(value, width=7):
 
 
 def print_table(rows, variants):
-    head = "%-22s %-12s %-9s %7s %7s %7s %7s" % (
-        "module", "class", "engine", "floor", "class", "content", "cost")
+    head = "%-22s %-12s %-9s %7s %7s %7s %7s %7s" % (
+        "module", "class", "engine", "floor", "class", "min", "content", "cost")
     if variants:
         head += " %7s %7s" % ("defer", "cached")
     print(head)
     print("-" * len(head))
     for r in rows:
-        line = "%-22s %-12s %-9s %s %s %s %s" % (
+        line = "%-22s %-12s %-9s %s %s %s %s %s" % (
             r["module"].split("/")[-1][:22], r["class"][:12], r["engine"],
-            fmt(r["floor_s"]), fmt(r["class_load_s"]), fmt(r["content_s"]),
-            fmt(r["class_cost"]))
+            fmt(r["floor_s"]), fmt(r["class_load_s"]), fmt(r.get("class_min_s")),
+            fmt(r["content_s"]), fmt(r["class_cost"]))
         if variants:
             line += " %s %s" % (fmt(r.get("deferred_s")), fmt(r.get("cached_s")))
         if not r["ok"]:
@@ -453,6 +506,15 @@ def print_table(rows, variants):
         print("-" * len(head))
         print("class load costs %.1f-%.1f engine floors (median %.1f)"
               % (min(costs), max(costs), statistics.median(costs)))
+
+    reclaimed = [r for r in rows
+                 if r["ok"] and r.get("reclaimed_s") and r["class_load_s"] > 0]
+    if reclaimed:
+        print("deferral reclaims (class -> min):")
+        for r in sorted(reclaimed, key=lambda x: -x["reclaimed_s"])[:6]:
+            print("  %-13s %.2f -> %.2f s  (-%.0f%%)"
+                  % (r["class"][:13], r["class_load_s"], r["class_min_s"],
+                     100 * r["reclaimed_s"] / r["class_load_s"]))
 
     drawn = [r for r in rows if r.get("ms_per_picture")]
     for r in drawn:
@@ -630,7 +692,7 @@ def main(argv=None):
     print("  documents : %d" % len(documents))
     print("  reps      : %d (best-of, after a discarded warm-up)\n" % args.reps)
 
-    floors, rows = {}, []
+    floors, rows, noisy = {}, [], []
     for module, template in documents:
         label = "%s/%s" % (os.path.basename(module), template)
         sys.stdout.write("  measuring %-44s " % label[:44])
@@ -638,7 +700,7 @@ def main(argv=None):
         started = time.perf_counter()
         try:
             row = measure(module, template, args.reps, args.variants, floors,
-                          bench_doc=((module, template) in bench))
+                          bench_doc=((module, template) in bench), noisy=noisy)
         except Exception as exc:              # noqa: BLE001 - report and continue
             print("ERROR %s" % exc)
             continue
@@ -657,7 +719,22 @@ def main(argv=None):
             fh.write("\n")
         print("\nwrote %s" % args.json)
 
+    if noisy:
+        print("\nTOO NOISY TO MEASURE: %s" % ", ".join(
+            os.path.basename(m) for m in sorted(set(noisy))))
+        print("  Deferring came out slower than not deferring, which is "
+              "impossible.\n  The machine is under load or thermally throttled; "
+              "these figures are not results.")
+
     if args.update_baseline:
+        # A baseline is a fact other runs are judged against, and one written
+        # from a run this noisy is worse than none: it silently loosens the gate
+        # to whatever today's interference happened to be. Refusing costs a
+        # re-run; accepting costs a gate that no longer catches anything.
+        if noisy:
+            print("\nREFUSING to write a baseline from a run flagged noisy.")
+            print("  Re-run on a quiet machine, or raise --reps.")
+            return 1
         payload = save_baseline(rows)
         print("\nbaseline written: %d classes -> %s"
               % (len(payload["classes"]),
