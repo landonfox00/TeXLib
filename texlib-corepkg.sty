@@ -10,15 +10,22 @@
 % (graphicx/xcolor/tikz/pgfplots), and hyperref + the canonical hypersetup
 % used across the library.
 %
-% Two entry points reach this bundle:
+% WHO ACTUALLY LOADS THIS. The list here used to say "lightweight classes --
+% autoexam, quiz, schedule, bingo, syllabus -- load it directly", and three of
+% those five do not load it at all. Checked by reading every class:
 %
-%   1. Lightweight classes — autoexam, quiz, schedule, bingo, syllabus — load
-%      it directly:
-%          \RequirePackage{texlib-corepkg}
+%   via basic-utilities     didactic, pset, report-card
+%                           (which also adds siunitx/caption/tasks/enumitem)
+%   via texlib-assessment   autoexam, quiz, bank
+%   NOT AT ALL              schedule, bingo, syllabus -- they load neither this
+%                           bundle nor basic-utilities
+%   NOT AT ALL              texlib-thesis, deliberately: it loads no TeXLib
+%                           package, so a thesis is not coupled to the teaching
+%                           library (it takes \TeXLibDefer from texlib-defer.sty,
+%                           which has no dependencies of its own)
 %
-%   2. Heavier classes — didactic, pset, report-card — load basic-utilities,
-%      which re-requires this bundle and adds siunitx/caption/tasks/enumitem
-%      on top.
+% So a change here reaches six of the ten classes, not all of them. That is easy
+% to get wrong from the old list and it has been got wrong.
 %
 % Class-specific packages (lastpage, needspace, tocloft, multicol, tcolorbox,
 % adjustbox, comment, ...) stay in each class file; this bundle is only the
