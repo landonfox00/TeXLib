@@ -1,0 +1,338 @@
+% profiles/massachusetts-institute-of-technology.tex — Massachusetts Institute of Technology
+% ============================================================================
+% source: https://libraries.mit.edu/distinctive-collections/thesis-specs/
+%         ("MIT Specifications for Thesis Preparation"; the page's own footer
+%          reads "Approved November 2022 and updated:" with the most recent
+%          entry "April 2026: to consolidate thesis holds information previously
+%          available on other MIT webpages")
+% source: https://oge.mit.edu/gpp/advanced-degrees/thesis/preparation-of-graduate-theses/
+%         (Office of Graduate Education, "Preparation of graduate theses" —
+%          read to establish that the Libraries document IS the governing rule)
+% source: https://libraries.mit.edu/app/uploads/sites/18/2023/03/PhD-CC.pdf
+%         (MIT's own PhD title-page specimen, linked from the specifications;
+%          rendered at 110 dpi and read as an image)
+% accessed: 2026-09-06
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: spacing, the PDF standard, the accessibility rules,
+% the title page, and the absence of an approval page.
+% NOT SET, because MIT PUBLISHES NO MARGIN FIGURE: \thesissetgeometry. See below.
+% NOT SET, never mentioned by MIT: \thesissetchapteropening,
+% \thesisrequiretagging, \thesisrequiredocumentlanguage.
+%
+% WHY THE LIBRARIES PAGE COUNTS AS A SOURCE HERE, when RESEARCHING.md rules out
+% library guides. It is not a guide. MIT's Office of Graduate Education — the
+% graduate school — states that thesis preparation "is described in the
+% Specifications for Thesis Preparation, published annually by the Director of
+% Libraries as prescribed by the Committee on Graduate Programs for graduate
+% theses", and links to it as the requirement. The OGE page was read on the
+% access date for exactly that purpose. The Libraries publish it; the Committee
+% on Graduate Programs prescribes it.
+
+\thesisinstitution{Massachusetts Institute of Technology}
+
+% --- Margins: DELIBERATELY UNSET ---------------------------------------------
+% MIT DOES NOT PUBLISH A MARGIN. This was checked, not assumed, and it is the
+% most surprising finding in this file.
+%
+% The specifications have a "Formatting specifications" section, and its table
+% of contents lists exactly five items: Pagination, Title selection, Embedded
+% links, Font, Spacing. There is no margin entry. The string "margin" occurs
+% ONCE in the whole document, in the notes rule — "If notes appear at the bottom
+% of the page, they should be single-spaced and included within the specified
+% margins" — a reference to a specification that is not there.
+%
+% The 2022-2023 PDF edition still served from the page (see the superseded-
+% edition note below) was checked too, and has the same single dangling
+% occurrence and no figure either.
+%
+% Under RESEARCHING.md an unverified figure stays unset, so the class's neutral
+% 1in geometry renders. That is a conformant document that makes no claim about
+% MIT's rules. Do NOT fill this in from a departmental page or from what the
+% other profiles in this directory use: individual departments "may dictate more
+% stringent requirements" (OGE), so a departmental margin is that department's,
+% not MIT's.
+
+% --- Spacing -----------------------------------------------------------------
+% MIT OFFERS A CHOICE OF THREE and this profile takes one of them:
+% "The text of the thesis may be single-, double-, or one-and-a-half-spaced."
+% Double is permitted and is the class default, so it is what is set;
+% \thesissetspacing{single} and {onehalf} are equally in spec at MIT.
+%
+% The rule is about the BODY. MIT single-spaces a named list of other parts:
+% "The abstract, biography, notes, bibliography, and acknowledgment should be
+% single-spaced." The class does not enforce that per-section split, so a filer
+% must single-space those parts themselves.
+\thesissetspacing{double}
+
+% --- Font: recorded, not enforced --------------------------------------------
+% "While not required, it is suggested that you use a sans serif font, as those
+% tend to be more easily readable." MIT's own specimens are set in sans.
+%
+% NOT REQUIRED is the operative half of that sentence, so this profile does not
+% change the class's font. A filer who wants to follow the suggestion should set
+% a sans face in their own preamble.
+
+% --- PDF standard and accessibility ------------------------------------------
+% The one hard machine-checkable requirement MIT states: "You are required to
+% submit a PDF/A-1 formatted thesis document to your department."
+\thesisrequirepdfstandard{PDF/A-1}
+
+% \thesisrequiretagging IS DELIBERATELY NOT SET. MIT never uses the word
+% "tagged", and it accepts "PDF/A-1 (either a or b)" — PDF/A-1b carries no
+% tagging obligation at all. Declaring tagging required would put words in MIT's
+% mouth. This class emits a tagged PDF anyway; that exceeds MIT's rule rather
+% than satisfying a stated one.
+%
+% \thesisrequiredocumentlanguage is likewise unset: MIT says nothing about
+% document language.
+%
+% MIT's accessibility items are stated under "You should create accessible
+% files", so they are recorded verbatim rather than raised as check-flags.
+\thesisaccessibilityrequirement{Accessible source files}
+	{"You should create accessible files that support the use of screen readers
+	 and make your document more easily readable by assistive technologies."
+	 Stated as "should", not as a condition of acceptance.}
+\thesisaccessibilityrequirement{Structure}
+	{"Use styles and other layout features for headings, lists, tables, etc.",
+	 and "Avoid using blank lines to add visual spacing". Text boxes are to be
+	 avoided.}
+\thesisaccessibilityrequirement{Alt text}
+	{"Add alt-text to any images or figures that convey meaning (including,
+	 math formulas)." The parenthesis is MIT's: formulas set as images need
+	 alt text too.}
+\thesisaccessibilityrequirement{Embedded links}
+	{"Embed URLs." A link must also be self-descriptive: "Make the link
+	 self-descriptive so that it can stand on its own", with the full URL given
+	 in a footnote or bibliography entry.}
+\thesisaccessibilityrequirement{Embedded metadata}
+	{"Add basic embedded metadata, such as author, title, year of graduation,
+	 department, keywords etc. to your thesis via your original author tool."}
+\thesisaccessibilityrequirement{Sans serif font}
+	{"Use a sans serif font" appears in the accessibility list, though the
+	 formatting section says a sans face is "not required". Recorded as MIT
+	 states it, on both sides.}
+\thesisaccessibilityrequirement{PDF/A-1 validation}
+	{"Validate your PDF/A file before submitting it to your department." The
+	 file must not be password protected or encrypted, and multimedia,
+	 scripts and executables must not be embedded.}
+\thesisaccessibilityrequirement{Captions for audio and video}
+	{For supplemental audio and video, captioning is "legally required" —
+	 MIT's own words, and the only place it calls an accessibility item
+	 legally binding. Audio description and transcripts are listed as
+	 "Additional content, not required".}
+
+% --- Approval page: MIT's filed document does not contain one -----------------
+% "Signature page — Not Required", and the submission checklist separates the
+% two files explicitly: the department receives "A PDF/A-1 of your final thesis
+% document (with no signatures)" as one item and a "Signature page (if required
+% by your department; your department will provide specific guidance)" as
+% another. The file-naming scheme gives them different names — the example pair
+% is macdonald-mssimon-mcp-dusp-2025-thesis.pdf and
+% macdonald-mssimon-mcp-dusp-2025-sig.pdf.
+%
+% So where a signature page exists at MIT it is a SEPARATE administrative file,
+% not a page of the manuscript, and the manuscript is filed "with no
+% signatures". That is what \thesisnoapprovalpage records.
+%
+% CONTRAST WITH usc.tex, WHICH LOOKS SIMILAR AND IS NOT. USC also says a
+% signature page is not required by the university, but then says a student
+% whose department requires one "should ... include the signature page in the
+% uploaded PDF version" — inside the manuscript. That is why USC keeps the
+% neutral page and MIT does not. Do not cross-correct these two.
+%
+% Approval at MIT is carried on the title page instead: the "Certified by:" and
+% "Accepted by:" lines below ARE the approval, which is the other reason a
+% separate page would be redundant here.
+\thesisnoapprovalpage
+
+% --- Fields MIT's title page needs and the class has no macro for --------------
+% MIT prescribes the title page field by field, and four of its fields have no
+% counterpart in texlib-thesis. They are added here, local to this profile.
+% Two of them warn when unset, because MIT's specimen carries them on every
+% degree level; two are genuinely optional and stay silent.
+%
+% Set them in the document preamble:
+%   \thesiscopyrightyear{2027}
+%   \thesisacceptedby{Claudia Smith\\Professor of Biological Engineering\\Chair, Department of Biological Engineering}
+%   \thesissubmissiondate{December 29, 2026}
+%   \thesispriordegrees{B.S.\\Example University, 2015}
+%   \thesiscopyrightlicense{License: CC BY-NC 4.0, https://creativecommons.org/licenses/by-nc/4.0}
+\newcommand{\thesis@copyrightyear}{}
+\newcommand{\thesiscopyrightyear}[1]{\renewcommand{\thesis@copyrightyear}{#1}}
+\newcommand{\thesis@acceptedby}{}
+\newcommand{\thesisacceptedby}[1]{\renewcommand{\thesis@acceptedby}{#1}}
+\newcommand{\thesis@submissiondate}{}
+\newcommand{\thesissubmissiondate}[1]{\renewcommand{\thesis@submissiondate}{#1}}
+\newcommand{\thesis@priordegrees}{}
+\newcommand{\thesispriordegrees}[1]{\renewcommand{\thesis@priordegrees}{#1}}
+% Default is the plain rights reservation MIT lists first among its examples:
+% "All rights are reserved: (c) 2008 Jane Doe. All rights reserved".
+\newcommand{\thesis@copyrightlicense}{All rights reserved.}
+\newcommand{\thesiscopyrightlicense}[1]{\renewcommand{\thesis@copyrightlicense}{#1}}
+
+% The left-aligned block at the foot of the page. MIT's instruction for each of
+% the three entries is that the continuation lines "align with the beginning of
+% the [name] from the previous line", so the label sits in a fixed box and the
+% content hangs in a block beside it.
+\newcommand{\thesis@mit@field}[2]{%
+	\noindent\makebox[1.15in][l]{#1}%
+	\begin{minipage}[t]{\dimexpr\textwidth-1.15in\relax}\raggedright #2\end{minipage}\par
+}
+
+% Every vertical gap on the title page goes through this, and each one can give
+% back two thirds of itself. MIT requires the title page to be ONE page --
+% "Required (all information should be on a single page)" -- and the page has no
+% other way to absorb a long title or a long degree name. See the note above
+% \thesistitlepage for the case this was tuned against.
+%
+% The two scratch dimens are needed because the shrink is a FRACTION of the
+% argument: writing 0.67#1\baselineskip inline pastes the digits together
+% ("0.671.5\baselineskip") and every gap on the page then throws a dimension
+% error. Compute, then use.
+\newcommand{\thesis@mit@gap}[1]{%
+	\@tempdima=#1\baselineskip
+	\@tempdimb=0.67\@tempdima
+	\vspace{\@tempdima \@minus \@tempdimb}%
+}
+
+% --- Title page --------------------------------------------------------------
+% Reproduced from the field list in the specifications and checked against MIT's
+% PhD specimen (PhD-CC.pdf), read as an image.
+%
+% "The title page should have the following fields in the following order and
+% centered (including spacing)", then, partway down, MIT's own note:
+% "The remaining fields are left aligned and not centered". Both halves are
+% below, in that order, separated by the "[Insert 2 blank lines]" the
+% specification calls for.
+%
+% THE TITLE IS NOT BOLD. The specimen sets it at body size in the same weight as
+% everything else, so \thesis@tagtitle is given plain text here rather than the
+% class's default bold. As at USC, do not "fix" this.
+%
+% THE PERMISSION LEGEND IS HARD-CODED because MIT does not treat it as
+% variable: "This permission legend MUST follow" (MIT's capitals).
+%
+% EVERY GAP ON THIS PAGE IS DELIBERATELY SMALL, AND THE ONLY FLEXIBLE SPACE IS
+% THE \stretch PAIR BEFORE AND AFTER THE LEFT-ALIGNED BLOCK. MIT requires the
+% title page to be one page -- "Required (all information should be on a single
+% page)" -- and this page has to hold, in the worst realistic case, a two-line
+% title, two prior degrees, a two-line degree name, a five-line copyright block
+% and an eight-line signature block. A first draft with 2\baselineskip gaps
+% pushed "Accepted by:" onto a second page, which is a filing error. If you
+% widen these, rebuild with a long title AND two prior degrees AND a three-line
+% \thesisacceptedby and confirm the PDF is still one page at that point.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing
+		{\centering
+			\vspace*{0.3in}
+			\thesis@tagtitle{Title}{\@title}\par
+			\thesis@mit@gap{1.5}
+			By\par
+			\thesis@mit@gap{1}
+			\@author\par
+			% "Previous degree information, if applicable" -- optional, so it
+			% contributes nothing at all when unset.
+			\ifx\thesis@priordegrees\@empty\else
+				\thesis@mit@gap{1}
+				\thesis@priordegrees\par
+			\fi
+			\thesis@mit@gap{1.5}
+			Submitted to the \thesis@program\\
+			in Partial Fulfillment of the Requirements for the Degree of\par
+			\thesis@mit@gap{1}
+			\MakeUppercase{\thesis@degree}\par
+			\thesis@mit@gap{1}
+			at the\par
+			\thesis@mit@gap{1}
+			MASSACHUSETTS INSTITUTE OF TECHNOLOGY\par
+			\thesis@mit@gap{1}
+			\MakeUppercase{\thesis@date}\par
+			\thesis@mit@gap{1.5}
+			% The copyright notice: "the symbol 'c' with a circle around it (c)
+			% and/or the word 'copyright'", the year, the copyright owner, and
+			% "the words 'All rights reserved' or your chosen Creative Commons
+			% license".
+			\begin{minipage}{0.82\textwidth}
+				\centering
+				\ifx\thesis@copyrightyear\@empty
+					\ClassWarningNoLine{texlib-thesis}{MIT requires a copyright notice on^^J%
+						the title page and \string\thesiscopyrightyear{} is unset, so the^^J%
+						year was omitted. Put \string\thesiscopyrightyear{<year>} in the^^J%
+						preamble}%
+					\copyright\ \@author. \thesis@copyrightlicense\par
+				\else
+					\copyright\thesis@copyrightyear\ \@author. \thesis@copyrightlicense\par
+				\fi
+				The author hereby grants to MIT a nonexclusive, worldwide,
+				irrevocable, royalty-free license to exercise any and all rights
+				under copyright, including to reproduce, preserve, distribute and
+				publicly display copies of the thesis, or release the thesis under
+				an open-access license.\par
+			\end{minipage}\par
+			\par}
+		% "[Insert 2 blank lines]" between the centred block and this one, per
+		% the specification. \stretch, not a fixed skip, so a long title page
+		% collapses this gap instead of spilling onto a second page.
+		\thesis@mit@gap{2}
+		\vspace{\stretch{2}}
+		% "Authored by:" -- name, department, and the date the thesis is
+		% presented to the department (which is NOT the conferral date above).
+		\thesis@mit@field{Authored by:}{%
+			\@author\\
+			\thesis@program
+			\ifx\thesis@submissiondate\@empty
+				\ClassWarningNoLine{texlib-thesis}{MIT's title page carries the date the^^J%
+					thesis is presented to the department, under the author's^^J%
+					name, and \string\thesissubmissiondate{} is unset. Put^^J%
+					\string\thesissubmissiondate{<date>} in the preamble}%
+			\else
+				\\\thesis@submissiondate
+			\fi}
+		\thesis@mit@gap{1}
+		% "Certified by:" -- the thesis supervisor. MIT wants the advisor's
+		% department on a second line, ending ", Thesis supervisor", so a filer
+		% puts the line break in \gradadvisor itself:
+		%   \gradadvisor{Beatrice J. Jansen\\Professor of Biological Engineering}
+		\thesis@mit@field{Certified by:}{\thesis@advisor, Thesis Supervisor}
+		\thesis@mit@gap{1}
+		% "Accepted by:" -- MIT will not say who: "The name and title of this
+		% person varies in different degree programs and may vary each term;
+		% contact the departmental thesis administrator for specific
+		% information." So this is a free-form block, and it warns rather than
+		% inventing a role.
+		\ifx\thesis@acceptedby\@empty
+			\ClassWarningNoLine{texlib-thesis}{MIT's title page requires an "Accepted by:"^^J%
+				line and \string\thesisacceptedby{} is unset, so it was omitted. MIT^^J%
+				says the name and title vary by program and by term -- ask the^^J%
+				departmental thesis administrator, then put^^J%
+				\string\thesisacceptedby{Name\string\\Title} in the preamble}%
+		\else
+			\thesis@mit@field{Accepted by:}{\thesis@acceptedby}
+		\fi
+		\vspace{\stretch{1}}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Two things a later pass must not have to rediscover ----------------------
+%
+% 1. A SUPERSEDED EDITION IS STILL LINKED FROM THE LIVE PAGE. The "View this
+%    page as an accessible PDF" link at the top of the specifications resolves
+%    to .../2023/04/Specifications-for-Thesis-Preparation-2022-2023-for-PDF.pdf
+%    — the 2022-2023 edition. The HTML page itself carries updates through April
+%    2026. The HTML page is therefore what this profile follows. The 2022-2023
+%    PDF was downloaded and checked anyway: on margins it says the same nothing,
+%    so the two do not conflict on anything encoded here.
+%
+% 2. PAGINATION IS UNUSUAL AND THE CLASS DOES NOT DO IT. "The title page is
+%    always considered to be page 1, and every page must be included in the
+%    count regardless of whether a number is physically printed on a page. The
+%    entire thesis — including title page, prefatory material, illustrations,
+%    and all text and appendices — must be paginated in one consecutive
+%    numbering sequence." That is a SINGLE arabic sequence with no roman front
+%    matter, which is not what this class's front matter does. It is recorded
+%    here rather than implemented, because changing the numbering scheme is a
+%    class-level change, not a profile-level one.
