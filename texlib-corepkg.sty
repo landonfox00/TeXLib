@@ -10,23 +10,75 @@
 % (graphicx/xcolor/tikz/pgfplots), and hyperref + the canonical hypersetup
 % used across the library.
 %
-% Two entry points reach this bundle:
+% WHO ACTUALLY LOADS THIS. The list here used to say "lightweight classes --
+% autoexam, quiz, schedule, bingo, syllabus -- load it directly", and three of
+% those five do not load it at all. Checked by reading every class:
 %
-%   1. Lightweight classes — autoexam, quiz, schedule, bingo, syllabus — load
-%      it directly:
-%          \RequirePackage{texlib-corepkg}
+%   via basic-utilities     didactic, pset, report-card
+%                           (which also adds siunitx/caption/tasks/enumitem)
+%   via texlib-assessment   autoexam, quiz, bank
+%   NOT AT ALL              schedule, bingo, syllabus -- they load neither this
+%                           bundle nor basic-utilities
+%   NOT AT ALL              texlib-thesis, deliberately: it loads no TeXLib
+%                           package, so a thesis is not coupled to the teaching
+%                           library (it takes \TeXLibDefer from texlib-defer.sty,
+%                           which has no dependencies of its own)
 %
-%   2. Heavier classes — didactic, pset, report-card — load basic-utilities,
-%      which re-requires this bundle and adds siunitx/caption/tasks/enumitem
-%      on top.
+% So a change here reaches six of the ten classes, not all of them. That is easy
+% to get wrong from the old list and it has been got wrong.
 %
 % Class-specific packages (lastpage, needspace, tocloft, multicol, tcolorbox,
 % adjustbox, comment, ...) stay in each class file; this bundle is only the
 % true intersection of every class's needs.
 
 % --- Font + geometry ---
-\RequirePackage[T1]{fontenc}
-\RequirePackage{lmodern}
+% Font setup is engine-conditional, and it has to be: under a Unicode engine a
+% T1-encoded 8-bit font silently corrupts text. LuaTeX has no UTF-8 -> LICR
+% layer at all (\DeclareUnicodeCharacter is not even defined there), so a
+% literal "§" in the source is never translated to \textsection. It is handed to
+% ec-lmr10 as codepoint 0xA7, and T1 slot 0xA7 is `gbreve' -- the document
+% typesets "ğ". The same accident hits every character whose codepoint lands in
+% the T1 upper half: "¡" sets `aogonek', "¿" sets `ccaron', "ß" sets "SS", "×"
+% sets an OE ligature. Characters above U+00FF have no 8-bit slot at all -- "Ł",
+% "ř", the en dash, curly quotes -- and are dropped from the page outright,
+% leaving only a "Missing character" line in the log.
+%
+% None of that is visible without reading the log or the PDF text layer, which
+% is how it survived this long: on a 139-character non-ASCII probe, lualatex got
+% 79 wrong (11 mis-set, 68 dropped) and pdflatex got 0 wrong. The accessible
+% build forces lualatex for EVERY class, so this hit precisely the builds the
+% accessibility program exists to protect. test_text_layer.py (repo root, run
+% by smoke.yml) is the regression gate; it generates its own probe document and
+% round-trips it through this bundle under both engines.
+%
+% Under pdfTeX the inputenc LICR layer does the translation and T1 is correct,
+% so that path is unchanged.
+%
+% This is not a design change: Latin Modern is the same typeface either way --
+% lmodern's Type1 EC fonts under pdfTeX, the OpenType originals under fontspec.
+% lmodern is still loaded on both paths for the 8-bit math symbol fonts, and
+% fontspec's [no-math] leaves that math setup alone, so math output is
+% byte-identical and only the text faces change.
+%
+% texlib-thesis.cls does not route through this bundle; it already loads
+% fontspec directly, for this same reason.
+%
+% The pdfTeX branch keeps fontenc BEFORE lmodern, which is the order this
+% bundle has always used. That is not cosmetic: loading lmodern first changes
+% which .fd is in play when the encoding is set, and it moves glyphs on the
+% page -- it cost a visual-reference diff on notes__worked-gated (a pdflatex
+% scenario that this fix must not touch at all) before the order was restored.
+\RequirePackage{iftex}
+\ifPDFTeX
+	\RequirePackage[T1]{fontenc}
+	\RequirePackage{lmodern}
+\else
+	\RequirePackage{lmodern}
+	\RequirePackage[no-math]{fontspec}
+	\setmainfont{Latin Modern Roman}
+	\setsansfont{Latin Modern Sans}
+	\setmonofont{Latin Modern Mono}
+\fi
 \RequirePackage[margin=1in]{geometry}
 
 % --- LaTeX3 core ---
@@ -87,11 +139,22 @@
 % graphicx is cheap and universally needed; it stays eager.
 \RequirePackage{graphicx}
 
-% tikz (+0.47s) carries the three libraries every TeXLib diagram uses. Deferring
-% it is worth less than the raw number suggests on the boxed classes -- didactic,
-% pset and report-card load tcolorbox, which pulls the pgf core in regardless, so
-% only the ~0.1s tikz layer is reclaimed there. On the unboxed classes (syllabus,
-% schedule) the full 0.47s comes back. \TeXLibNoTikz to opt out.
+% tikz (+0.47s) carries the three libraries every TeXLib diagram uses.
+%
+% \TeXLibNoTikz is honoured here and, for every class that loads this bundle,
+% reclaims NOTHING -- because they all reach tcolorbox (directly, or through
+% texlib-thmenv -> texlib-theorems) and tcolorbox loads tikz itself, after this
+% deferral has skipped its own \RequirePackage. Probed with \@ifpackageloaded on
+% a bare stub of each class: didactic, pset, report-card, quiz, autoexam, bank
+% and bingo all end with tikz loaded whether the flag is set or not. An earlier
+% comment here claimed ~0.1s was reclaimed on the boxed classes and the full
+% 0.47s on "the unboxed classes (syllabus, schedule)"; both halves were wrong,
+% the second because syllabus and schedule do not load this bundle at all.
+%
+% So the flag is kept for documents that opt out by hand, and
+% texlib_preamble_scan.py deliberately does NOT set it for any class that loads
+% this bundle. texlib-thesis is the one place deferring tikz works, and that
+% class does its own \TeXLibDeferOff{Tikz} rather than coming through here.
 \TeXLibDefer{Tikz}{%
 	\RequirePackage{tikz}%
 	\usetikzlibrary{arrows.meta, positioning, shapes.geometric}%

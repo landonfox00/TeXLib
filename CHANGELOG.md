@@ -370,6 +370,44 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Fixed
 
+- **Non-ASCII text was silently corrupted under lualatex, on the page and in the
+  text layer.** `texlib-corepkg` loaded `[T1]{fontenc}` + `lmodern` for every
+  engine. Under pdfTeX that is right, because inputenc translates a literal `§`
+  to `\textsection` before the font ever sees it. Under LuaTeX there is no such
+  layer — `\DeclareUnicodeCharacter` is not even defined — so the character was
+  handed to the 8-bit font as its own codepoint. U+00A7 selected T1 slot 0xA7,
+  which is `gbreve`, and the document set **ğ**. It was never a text-layer bug:
+  the PDF honestly reported the letter that was typeset, and the page was
+  wrong.
+
+  Every character whose codepoint lands in the T1 upper half was affected the
+  same way — `¡`→`ą`, `¿`→`£`, `£`→`č`, `«`→`ń`, `»`→`ż`, `ß`→`SS`, `ÿ`→`ß`,
+  `×`→`Œ`, `÷`→`œ` — and everything above U+00FF had no slot at all and was
+  dropped from the page outright: the whole of Latin Extended-A (`Ł`, `ř`, `š`,
+  `ő`, …), the en and em dashes, and every curly quote. A 139-character probe
+  scored 79 wrong under lualatex and 0 under pdflatex.
+
+  This mattered most exactly where it was least visible: the accessible build
+  forces lualatex for *every* class, so the PDF/UA copies — the ones that go to
+  a screen reader — were the most exposed. Nothing caught it because nothing
+  had ever compared a document's input characters against its output.
+
+  Font setup is now engine-conditional. pdfTeX keeps `[T1]{fontenc}` + `lmodern`
+  in exactly that order and is byte-for-byte unchanged; Unicode engines get
+  Latin Modern through `fontspec`. It is the same typeface either way —
+  lmodern's Type1 EC fonts under pdfTeX, the OpenType originals under fontspec —
+  and `lmodern` still supplies the 8-bit math symbol fonts on both paths, so
+  math is untouched. `texlib-thesis` never routed through this bundle and was
+  never affected.
+
+  Two new gates keep it fixed. `test_text_layer.py` round-trips 35 characters
+  through `texlib-corepkg` and through `texlib-didactic`, under **both** engines
+  — the pdfTeX half of the conditional is now covered too — and asserts the
+  extracted text equals the source. `smoke_test.check_missing_glyphs` fails any
+  build whose log carries a `Missing character` line, which is the cheap general
+  form: a dropped glyph is an exit-0 data-loss bug, and it now turns a build
+  red everywhere in the suite.
+
 - **MathML structure elements are back for every document that can take them.**
   0.8.0 withheld `mathml-SE` from the whole library because a luamml 0.9.2
   defect aborts the run — no PDF at all — when one formula holds two or more

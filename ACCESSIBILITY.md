@@ -44,6 +44,17 @@ navigate.
 - **A missing validator fails the gate.** If veraPDF is absent the job fails
   instead of skipping, because a skipped check reports the same green as a
   passing one.
+- **The characters themselves.** Tags and conformance say how a document is
+  structured, not whether the letters in it are the right letters. `smoke.yml`
+  runs `test_text_layer.py`, which sets 35 non-ASCII characters through
+  `texlib-corepkg` and `texlib-didactic` under both engines and asserts that
+  `pdftotext` gives each one back unchanged; and every build in the suite fails
+  if its log carries a `Missing character` line, meaning a glyph was dropped
+  from the page. Both exist because neither failure is visible any other way:
+  until 2026-09 a literal `§` in a lualatex build typeset `ğ`, most of Latin
+  Extended-A and every curly quote vanished from the page, and a fully
+  conformant, fully tagged PDF/UA file carried the wrong text to the screen
+  reader. Structure was never the thing that was broken.
 
 ## Getting the evidence
 

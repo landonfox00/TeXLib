@@ -38,15 +38,23 @@ jobs:
         with:
           docker_image: ghcr.io/xu-cheng/texlive-full:20260701
           # poppler-utils provides pdftotext for the content checks (substring
-          # assertions + non-empty artifact checks). Visual regression is a
-          # local-only aid (environment-specific reference images), so
-          # ImageMagick is intentionally not installed here.
+          # assertions + non-empty artifact checks) and for the text-layer
+          # round trip. Visual regression is a local-only aid
+          # (environment-specific reference images), so ImageMagick is
+          # intentionally not installed here.
           run: |
             set -e
             apk add --no-cache python3 poppler-utils=25.12.0-r1
             texlua Schedule/test_schedule_synctex.lua
             texlua Schedule/test_schedule_quiz_exam.lua
             python3 Sublime/test_texlib_builder.py
+            # Text-layer fidelity: what a document sets is what the PDF says.
+            # Runs BEFORE the module suite because it is fast, needs no
+            # fixtures, and its failure mode (silent character corruption)
+            # is one the module suite cannot see. Both engines are exercised,
+            # so it also guards the pdfTeX half of the corepkg font
+            # conditional, which is not otherwise covered here.
+            python3 test_text_layer.py
             python3 smoke_test.py -v ${{ github.event.inputs.modules }}
 
       - name: Upload failed-build logs

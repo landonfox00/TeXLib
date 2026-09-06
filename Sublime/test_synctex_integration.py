@@ -892,13 +892,34 @@ def scenario_partsolution_inverse_search():
             _hits = [d for d, p in _probe
                      if basename_matches(p["input"], "bank.tex")
                      and p["line"] == PARTSOL_ANSWER_LINE]
+            # The fallback is a GRID SCAN of the page, not a neighbourhood of
+            # the word centre. That is what this scenario's own prose has always
+            # described -- "nothing anywhere resolves to the answer line" -- and
+            # a radius only approximated it.
+            #
+            # The approximation broke when the engine-conditional font fix
+            # landed. Unicode engines now set text through fontspec rather than
+            # an 8-bit T1 lmodern; metrics move, and on the pinned Alpine
+            # container the word centre began resolving to the PAGE box
+            # (quiz.tex, the \end{document} line) rather than to any bank.tex
+            # box -- so no radius around it could find the stamp, and +/-6 then
+            # +/-24 both reported a regression that a grid scan disproves in one
+            # pass: 194 of ~1800 grid points resolve to bank.tex:7.
+            #
+            # This does not weaken the gate. A genuinely missing stamp resolves
+            # to the answer line from nowhere on the page, which is exactly what
+            # the scan tests; it only stops a moved word centre from being
+            # mistaken for a deleted stamp.
             if not _hits:
-                for _dy in (-6, -4, -2, 2, 4, 6):
-                    _p = synctex_edit(pdf, _pg, _x, _y + _dy)
-                    _probe.append((_dy, _p))
-                    if (basename_matches(_p["input"], "bank.tex")
-                            and _p["line"] == PARTSOL_ANSWER_LINE):
-                        _hits.append(_dy)
+                for _gy in range(60, 720, 8):
+                    for _gx in range(60, 540, 40):
+                        _p = synctex_edit(pdf, _pg, _gx, _gy)
+                        if (basename_matches(_p["input"], "bank.tex")
+                                and _p["line"] == PARTSOL_ANSWER_LINE):
+                            _hits.append(int(_gy - _y))
+                            break
+                    if _hits:
+                        break
 
             r = _probe[0][1]
             _centre_ok = (basename_matches(r["input"], "bank.tex")

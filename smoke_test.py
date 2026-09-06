@@ -260,7 +260,12 @@ def extract_pdf_text(pdf_path: str) -> str | None:
         return None
     try:
         r = subprocess.run(
-            [PDFTOTEXT, "-layout", pdf_path, "-"],
+            # -enc UTF-8 is not optional. poppler's pdftotext defaults to UTF-8
+            # (what CI has), but xpdf's defaults to Latin-1 (what a Windows
+            # host is likely to have on PATH), so without this the same PDF
+            # yields different bytes on the two and every non-ASCII assertion
+            # becomes host-dependent. Both builds accept the flag.
+            [PDFTOTEXT, "-enc", "UTF-8", "-layout", pdf_path, "-"],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -271,6 +276,41 @@ def extract_pdf_text(pdf_path: str) -> str | None:
         return r.stdout
     except (OSError, subprocess.SubprocessError):
         return None
+
+
+_MISSING_CHAR_RE = re.compile(r"^Missing character: There is no (.*?) in font (\S+?)!?$",
+                              re.MULTILINE)
+
+
+def check_missing_glyphs(log_text: str) -> list[str]:
+    """
+    Report characters the engine dropped from the page.
+
+    A "Missing character" line means TeX was asked for a glyph the current font
+    has no slot for and silently emitted NOTHING. The page is missing a
+    character, the PDF text layer is missing it too, and the build still exits
+    0 -- so nothing else in this harness notices. That is not a warning to
+    tolerate; in a document library it is data loss.
+
+    This is cheap (a regex over a log we already have) and it generalises: it
+    catches any future font/encoding regression, not just the one that prompted
+    it. That one was a T1 8-bit font under lualatex, where the whole of Latin
+    Extended-A plus the en dash and curly quotes fell off the page -- see the
+    font block in texlib-corepkg.sty. test_text_layer.py covers the other half
+    of that failure, the characters that map to the WRONG glyph and so never
+    produce a log line at all.
+    """
+    hits = _MISSING_CHAR_RE.findall(log_text or "")
+    if not hits:
+        return []
+    # Collapse duplicates but keep the font, which is what identifies the cause.
+    seen: dict[tuple[str, str], int] = {}
+    for ch, font in hits:
+        seen[(ch.strip(), font)] = seen.get((ch.strip(), font), 0) + 1
+    shown = "; ".join(f"{ch} in {font}" + (f" (x{n})" if n > 1 else "")
+                      for (ch, font), n in list(seen.items())[:6])
+    more = "" if len(seen) <= 6 else f" (+{len(seen) - 6} more)"
+    return [f"{len(seen)} character(s) dropped from the page: {shown}{more}"]
 
 
 def check_content(module: str, template: str, tmp: str, pdf_path: str,
@@ -772,6 +812,9 @@ def build_one(
         if ok:
             skipped = False
             problems: list[str] = []
+            # Dropped glyphs are a silent, exit-0 failure -- check every build,
+            # in every mode, with no external tool required.
+            problems += check_missing_glyphs(log_text or stdout_text)
             if accessible:
                 sp, struct_skipped = check_pdfua_structure(pdf)
                 problems += sp
@@ -964,6 +1007,7 @@ def build_scenario(scen: dict, timeout: int, verbose: bool,
 
         problems: list[str] = []
         skipped = False
+        problems += check_missing_glyphs(log_text or stdout_text)
         if content:
             # Artifact check only (grid non-empty). The per-page visual diff is
             # the real content check for visual scenarios; a module's
