@@ -892,8 +892,23 @@ def scenario_partsolution_inverse_search():
             _hits = [d for d, p in _probe
                      if basename_matches(p["input"], "bank.tex")
                      and p["line"] == PARTSOL_ANSWER_LINE]
+            # The neighbourhood is +/-24pt, roughly two lines, not the +/-6pt it
+            # started as. Widened when the engine-conditional font fix landed:
+            # Unicode engines now set text through fontspec rather than an 8-bit
+            # T1 lmodern, glyph metrics move, and the answer box moved further
+            # from the word centre than 6pt. A grid probe over the whole page
+            # then found the stamp alive and well -- 194 of ~1800 points resolve
+            # to bank.tex:7 in `key' and 196 in `key-inline' -- so the stamp was
+            # never the problem; the probe was looking too close.
+            #
+            # Widening does NOT weaken the discriminator this scenario exists
+            # for. A missing stamp resolves to line 7 from NOWHERE on the page,
+            # at any radius, so the `no hits' branch still fails hard; only the
+            # already-documented "present but the CLI picks the enclosing box"
+            # case is rescued into known_issue.
             if not _hits:
-                for _dy in (-6, -4, -2, 2, 4, 6):
+                for _dy in (-2, 2, -4, 4, -6, 6, -8, 8, -12, 12,
+                            -16, 16, -20, 20, -24, 24):
                     _p = synctex_edit(pdf, _pg, _x, _y + _dy)
                     _probe.append((_dy, _p))
                     if (basename_matches(_p["input"], "bank.tex")
