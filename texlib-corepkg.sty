@@ -132,11 +132,22 @@
 % graphicx is cheap and universally needed; it stays eager.
 \RequirePackage{graphicx}
 
-% tikz (+0.47s) carries the three libraries every TeXLib diagram uses. Deferring
-% it is worth less than the raw number suggests on the boxed classes -- didactic,
-% pset and report-card load tcolorbox, which pulls the pgf core in regardless, so
-% only the ~0.1s tikz layer is reclaimed there. On the unboxed classes (syllabus,
-% schedule) the full 0.47s comes back. \TeXLibNoTikz to opt out.
+% tikz (+0.47s) carries the three libraries every TeXLib diagram uses.
+%
+% \TeXLibNoTikz is honoured here and, for every class that loads this bundle,
+% reclaims NOTHING -- because they all reach tcolorbox (directly, or through
+% texlib-thmenv -> texlib-theorems) and tcolorbox loads tikz itself, after this
+% deferral has skipped its own \RequirePackage. Probed with \@ifpackageloaded on
+% a bare stub of each class: didactic, pset, report-card, quiz, autoexam, bank
+% and bingo all end with tikz loaded whether the flag is set or not. An earlier
+% comment here claimed ~0.1s was reclaimed on the boxed classes and the full
+% 0.47s on "the unboxed classes (syllabus, schedule)"; both halves were wrong,
+% the second because syllabus and schedule do not load this bundle at all.
+%
+% So the flag is kept for documents that opt out by hand, and
+% texlib_preamble_scan.py deliberately does NOT set it for any class that loads
+% this bundle. texlib-thesis is the one place deferring tikz works, and that
+% class does its own \TeXLibDeferOff{Tikz} rather than coming through here.
 \TeXLibDefer{Tikz}{%
 	\RequirePackage{tikz}%
 	\usetikzlibrary{arrows.meta, positioning, shapes.geometric}%
