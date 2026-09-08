@@ -1,0 +1,2 @@
+slug,date,reason
+academy-of-chinese-culture-and-health-sciences,2026-09-06,"site unreachable behind Imperva/Incapsula bot protection: acchs.edu returns an Incapsula challenge to curl (plain, browser-UA, and full headers with Referer), to WebFetch and to the browser pane, for HTML pages and static PDFs alike; the only reachable copy is an EXPIRED 2023-2025 catalog on the Wayback Machine, which shows no thesis requirement (zero margin/title page hits) but cannot be checked against the current edition"
