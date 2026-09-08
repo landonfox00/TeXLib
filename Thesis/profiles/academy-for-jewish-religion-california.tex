@@ -1,0 +1,91 @@
+% profiles/academy-for-jewish-religion-california.tex — Academy for Jewish Religion California
+% ============================================================================
+% source: https://ajrca.edu/students/academic-catalog/
+% source: https://ajrca.edu/wp-content/uploads/2026/09/2026-2027-AJRCA-Academic-Catalog-Final.pdf
+%         (Academic Catalog 2026-2027, 101 pages; every page footer reads
+%          "Academy of Jewish Religion California; 2026-2027")
+% accessed: 2026-09-06
+% checked:  texlib-thesis-profile-round
+%
+% PARTIAL, in the manner of stanford-university.tex, and the gap is the point of
+% this file.
+%
+% VERIFIED and set here: the institution name, and nothing that changes a page.
+%
+% NOT SET, because AJRCA PUBLISHES NO FIGURES: margins, spacing, typeface, the
+% title page. This is not "the catalog could not be found" — the current catalog
+% was read in full. AJRCA states the manuscript format by DELEGATION, and that
+% is the whole of what it says about layout:
+%
+%   "The completed thesis, in appropriate format and style (based on Chicago
+%    Manual of Style), must be submitted to the advisor by April 1 of the year
+%    of ordination."
+%
+% The sentence recurs, near-verbatim, in all four programs that require a thesis
+% — Rabbinic (p. 20), Cantorial (p. 28), Chaplaincy, and the M.A. The wording
+% varies trivially ("based on", "following", a bare parenthesis) and the
+% substance does not.
+%
+% The Chicago Manual of Style is a third-party style guide, not an AJRCA
+% specification and not an AJRCA URL. Under RESEARCHING.md a value must come
+% from a source actually opened, and a style manual's advice is explicitly not
+% one. So no geometry is set, the class's neutral page renders, and this file
+% makes no claim about AJRCA's margins — because AJRCA makes none.
+%
+% Counts in the 101-page catalog, for anyone tempted to re-search it:
+%   thesis 67 | margin 0 | title page 0 | double-spac 0 | font 0
+%
+% TO FINISH THIS PROFILE: ask the AJRCA office whether the Academy enforces any
+% figures of its own beyond Chicago, and whether it publishes a template for the
+% signature page described below. If the answer is genuinely "Chicago and
+% nothing else", then this file is already complete and should say so.
+
+\thesisinstitution{Academy for Jewish Religion California}
+
+% --- Accessibility: none published -------------------------------------------
+% The catalog's two "accessib" hits are "documents are accessible in the central
+% office" and "accessible conceptual language". Neither is a document rule.
+% No "alt text", "WCAG", "tagged", "PDF/A" or "screen reader" anywhere.
+%
+% AJRCA is a private institution, so the April 2026 ADA Title II compliance date
+% does not reach it the way it reaches the public universities in this directory.
+\thesisaccessibilityrequirement{Not published}
+	{The Academy for Jewish Religion California publishes no accessibility
+	 requirement for a filed thesis. The 2026-2027 Academic Catalog was read in
+	 full on the access date and names no accessibility standard, tagging rule,
+	 alt-text rule or PDF standard.}
+
+% --- Approval page: REQUIRED, AND DELIBERATELY LEFT AS THE NEUTRAL PAGE -------
+% This is the one real judgement in the file, and it is the opposite of the call
+% made for MIT and for Abilene Christian in the same round. Do not "tidy" it into
+% agreement with them.
+%
+% AJRCA's thesis DOES carry a certification page, inside the document:
+%
+%   "After final corrections, the advisor, reader, and Dean of the Rabbinical
+%    School will certify on a signature page that the thesis is satisfactory.
+%    After the certification is complete, the student will submit two bound
+%    copies to the Academy."
+%
+% So \thesisnoapprovalpage would be WRONG here — the page exists and the filed
+% artifact contains it. But AJRCA publishes no layout, no wording and no field
+% order for it, so writing one would invent a page the Academy never specified.
+%
+% Leaving \thesisapprovalpage alone is the documented meaning of "not yet
+% checked", and it renders the class's institution-neutral page. That is the
+% conservative outcome: a page appears where AJRCA requires one, and it claims
+% nothing about AJRCA's wording.
+%
+% TWO FACTS THE SIGNATURE PAGE DEPENDS ON, both stated in the catalog:
+%
+%  * THE SIGNATORIES DIFFER BY PROGRAM. Rabbinic names three — "the advisor,
+%    reader, and Dean of the Rabbinical School". The Cantorial, Chaplaincy and
+%    M.A. passages name two — "the advisor and reader". A single fixed page
+%    could not serve all four, which is a further reason not to write one from
+%    the prose.
+%  * SIGNATURES ARE PHYSICAL, AND SO IS THE FILED THESIS. "the student will
+%    submit two bound copies to the Academy." AJRCA has not moved to electronic
+%    filing, and this is the rare profile in this directory whose deliverable is
+%    a bound object. A binding margin would therefore be a real concern — and
+%    AJRCA publishes none, which is another reason the geometry above is unset
+%    rather than defaulted to a symmetric 1in.
