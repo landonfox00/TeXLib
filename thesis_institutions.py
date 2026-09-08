@@ -54,7 +54,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PROFILES = os.path.join(HERE, "Thesis", "profiles")
 WORKLIST = os.path.join(PROFILES, "institutions.csv")
 SOURCE   = os.path.join(PROFILES, "institutions.source")
-BLOCKED  = os.path.join(PROFILES, "institutions.blocked.csv")
+BLOCKED  = os.path.join(PROFILES, "blocked")
 PRIORITY = os.path.join(PROFILES, "priority.csv")
 
 IPEDS_URL = "https://nces.ed.gov/ipeds/datacenter/data/HD{year}.zip"
@@ -183,6 +183,10 @@ def existing_profiles():
     return have | {ipeds for ipeds, short in ALIASES.items() if short in have}
 
 
+def blocked_path(slug):
+    return os.path.join(BLOCKED, slug + ".csv")
+
+
 def blocked_slugs():
     """Institutions a research pass could not complete, and why.
 
@@ -195,13 +199,37 @@ def blocked_slugs():
     Blocking is not a verdict on the institution -- it is a note that THIS
     attempt failed, with the date and reason, so a later attempt can be
     deliberate rather than accidental.
+
+    One file per slug, not one shared table. The round researches ten
+    institutions and opens one PR each, so a shared file is rewritten at the
+    same place by every sibling branch: the first to merge conflicts the rest.
+    Worse, a shared table is created by whichever branch lands first, which
+    makes the other nine add/add conflicts against a file that did not exist
+    when any of them was cut. Per-slug files collide only if two rounds block
+    the same institution, which the queue already prevents. This is the same
+    fix `progress/` applied to the round log.
     """
-    if not os.path.exists(BLOCKED):
+    if not os.path.isdir(BLOCKED):
         return {}
     out = {}
-    with open(BLOCKED, encoding="utf-8", newline="") as f:
-        for row in csv.DictReader(f):
-            out[row["slug"]] = row
+    for name in sorted(os.listdir(BLOCKED)):
+        if not name.endswith(".csv"):
+            continue
+        with open(os.path.join(BLOCKED, name), encoding="utf-8",
+                  newline="") as f:
+            rows = list(csv.DictReader(f))
+        if not rows:
+            sys.exit("thesis_institutions: %s has no row"
+                     % os.path.relpath(os.path.join(BLOCKED, name), HERE))
+        # The filename is the identity; a row disagreeing with it would make
+        # the same block reachable under two slugs, one of which `next` would
+        # never consult.
+        slug = os.path.splitext(name)[0]
+        if rows[0].get("slug") != slug:
+            sys.exit("thesis_institutions: %s records slug %r"
+                     % (os.path.relpath(os.path.join(BLOCKED, name), HERE),
+                        rows[0].get("slug")))
+        out[slug] = rows[0]
     return out
 
 
@@ -215,15 +243,15 @@ def cmd_block(args):
     if args.slug in blocked and not args.force:
         sys.exit("thesis_institutions: %r is already blocked (%s)"
                  % (args.slug, blocked[args.slug].get("reason", "")))
-    exists = os.path.exists(BLOCKED)
-    with open(BLOCKED, "a", encoding="utf-8", newline="") as f:
+    path = blocked_path(args.slug)
+    os.makedirs(BLOCKED, exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["slug", "date", "reason"])
-        if not exists:
-            w.writeheader()
+        w.writeheader()
         w.writerow({"slug": args.slug, "date": today(), "reason": args.reason})
     print("blocked %s (%s)" % (args.slug, args.reason))
-    print("`next` will skip it. Remove the row from %s to retry."
-          % os.path.relpath(BLOCKED, HERE))
+    print("`next` will skip it. Delete %s to retry."
+          % os.path.relpath(path, HERE))
     return 0
 
 
@@ -304,7 +332,7 @@ def cmd_next(args):
             return 0
     n_blocked = len(blocked_slugs())
     print("no institution left to work on"
-          + (" (%d blocked; see %s)" % (n_blocked, os.path.basename(BLOCKED))
+          + (" (%d blocked; see %s/)" % (n_blocked, os.path.basename(BLOCKED))
              if n_blocked else ""))
     return 0
 

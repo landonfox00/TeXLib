@@ -69,6 +69,11 @@ it and stop:
 python thesis_institutions.py block <slug> "requirements behind a student login"
 ```
 
+That writes `Thesis/profiles/blocked/<slug>.csv` — one file per institution,
+for the same reason `progress/` is one file per round: ten branches a night
+cannot all append to one table without conflicting the moment the first
+merges. Delete the file to retry the institution.
+
 That keeps the queue moving; without it `next` returns the same institution
 forever. Blocking is not a verdict on the institution, just a note that this
 attempt could not complete.
