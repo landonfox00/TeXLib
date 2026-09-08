@@ -1,0 +1,148 @@
+% profiles/abilene-christian-university.tex — Abilene Christian University
+% ============================================================================
+% source: https://acu.edu/wp-content/uploads/2024/09/Thesis-Guide_2024.pdf
+%         (Office of Graduate Programs, "ACU Thesis Guide"; every page footer
+%          reads "Updated August 2024")
+% source: https://acu.edu/wp-content/uploads/2024/09/formatting-checklist.pdf
+%         (the Formatting Checklist the guide names as the standard the final
+%          mechanical review is run against)
+% source: https://acu.edu/current-graduate-students/graduate-program-thesis-resources/
+%         (Graduate Program Thesis Resources — the page that links both)
+% accessed: 2026-09-06
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry (all four sides), the 2in chapter/section
+% opening, spacing, and the absence of a student-typeset approval page.
+% NEUTRAL FALLBACK: \thesistitlepage. ACU prescribes it by TEMPLATE, and the
+% template is behind a Google sign-in — see below. Some of its rules are known
+% and are recorded, but not enough to lay the page out.
+% NOT SET: every accessibility check-flag. ACU publishes no accessibility rule.
+
+\thesisinstitution{Abilene Christian University}
+
+% --- Margins -----------------------------------------------------------------
+% Both sources agree, and they are quoted rather than reconciled because they
+% state the same figures in different words.
+%
+% The guide, "measuring from edge of paper to first letter of type":
+%   Left (binding edge)  1 1/2 inch
+%   Right                1 inch
+%   Top                  1 inch (except first page of each section or chapter)
+%   Bottom               1 inch (with no more than 1 1/4 inches)
+%
+% The checklist: "Bottom and right margins are 1". Left margin is 1.5". Top
+% margin is 1", except for the front matter and first page of each chapter or
+% section (which should be 2")." The checklist is where the 2in figure comes
+% from; the guide states the exception without a number.
+%
+% ACU is one of the few schools here with an ASYMMETRIC margin — 1.5in at the
+% binding edge — and it applies to the filed electronic copy, because that copy
+% "will be printed and bound".
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "except for the front matter and first page of each chapter or section (which
+% should be 2")". 2in is the TOTAL top margin ACU names, which is what this hook
+% takes; the class subtracts the geometry's own top.
+%
+% NOTE THE HALF ACU ASKS FOR THAT THIS DOES NOT COVER: the same 2in applies to
+% every front-matter heading — ABSTRACT, TABLE OF CONTENTS, ACKNOWLEDGMENTS,
+% the dedication, APPENDIX, and the List of Tables/Figures are each "centered 2
+% inches from the top". This hook reaches chapter and major-section openings.
+% A filer should check the front matter by hand.
+\thesissetchapteropening{2in}
+
+% "The text of the thesis must be double-spaced. Single spacing can be used in
+% tables and in some footnotes (see your discipline's style manual)."
+\thesissetspacing{double}
+
+% --- Rules ACU states that a profile is not allowed to encode -----------------
+% RESEARCHING.md fixes what a profile may contain, and these are outside it.
+% They are recorded because a filer needs them and because a later pass should
+% not have to re-read the guide to find out they exist. They are NOT implemented.
+%
+%  * NO FULL JUSTIFICATION. "The use of double (left & right) justification is
+%    unacceptable since it often causes gaps within printed lines." This class
+%    justifies by default, so an ACU filer must put \raggedright in their own
+%    preamble. Of everything in this block, this is the one most likely to be
+%    caught in the final mechanical review.
+%  * FONT: "A 12-point standard serif font should be used (e.g., Times New
+%    Roman)." The checklist is firmer: "In most cases, this should be 12-point
+%    Times New Roman", with footnotes allowed smaller.
+%  * PARAGRAPH INDENT: "All paragraphs should begin with a 1/2 inch
+%    indentation."
+%  * PAGE NUMBERS: bottom centre throughout. The front matter is unusual — the
+%    first pages carry no number, counting starts at the Table of Contents, and
+%    the pages after it take lowercase roman numerals, so a two-page TOC is
+%    followed by page "iii". The body restarts at arabic 1 on the first page of
+%    Chapter I.
+%  * ORDER OF SECTIONS: abstract FIRST, then the title page — which is the
+%    reverse of most schools in this directory. Then dedication, acknowledgments,
+%    table of contents, list of tables, list of figures.
+
+% --- Accessibility: none published -------------------------------------------
+% Searched the 17-page Thesis Guide (zero occurrences of "accessib"), the
+% Formatting Checklist, the Graduate Program Thesis Resources page, and the
+% DC@ACU ETD submission instructions. The only hit anywhere is the bepress
+% platform's site-wide "Accessibility Statement" footer link on the repository,
+% which is a statement about the website, not a rule for a filed thesis.
+%
+% ACU is a private university, so the April 2026 ADA Title II date does not
+% reach it the way it reaches the public universities in this directory.
+\thesisaccessibilityrequirement{Not published}
+	{Abilene Christian University publishes no accessibility requirement for a
+	 filed thesis. The Thesis Guide, the Formatting Checklist and the ETD
+	 submission instructions were all read on the access date and none names
+	 tagging, alt text, WCAG, PDF/A or a document language.}
+
+% --- Title page: NEUTRAL FALLBACK, and this is the gap in the file ------------
+% ACU prescribes the title page by template, not by specification: "Follow the
+% title page template." The template is one of the files in the ACU Thesis
+% Template folder, and THAT FOLDER IS BEHIND A GOOGLE SIGN-IN — the "usp=sharing"
+% link on the resources page redirects to accounts.google.com rather than
+% serving a public listing. It could not be read on the access date.
+%
+% So the class's neutral title page renders. What ACU does state in prose about
+% the page is recorded here, and it is not enough to lay the page out — there is
+% no wording, no field order and no author/degree block:
+%
+%   "The title appears 2 inches from the top of the page. Format the title in
+%    sentence case with main words capitalized. The date at the bottom of the
+%    page should be 1 1/2 inches from the bottom of the page."
+%
+% The checklist adds the standard the page is judged against: "Page layouts
+% exactly match the sample pages for thesis title page, Table of Contents, etc."
+%
+% TO FINISH THIS PROFILE: get the title page template out of the ACU Thesis
+% Template Drive folder (or ask the Thesis Coordinator for it) and write
+% \thesistitlepage from it. Note that ACU's title is SENTENCE CASE and the
+% class's neutral page sets the title bold — check that against the template
+% before filing.
+
+% --- Approval page: the student does not typeset one --------------------------
+% ACU's signature page is real, is signed, and ends up in the finished thesis —
+% but the STUDENT never puts it there, and it is not part of the manuscript they
+% write. The guide is explicit about who does what:
+%
+%   "at the defense, all committee members should sign the thesis signature
+%    page. Signatures may be physical or electronic. Please follow the signature
+%    page template ... Once signed, this signature page should be submitted to
+%    the Thesis Coordinator via email or Canvas. The Thesis Coordinator will
+%    obtain the Associate Provost's signature and INSERT the signature page into
+%    the finished thesis once approved by all parties."
+%
+% And the guide's own "Order of Sections" front matter list — abstract, title
+% page, dedication, acknowledgments, table of contents, list of tables, list of
+% figures — CONTAINS NO SIGNATURE PAGE. So a manuscript that typesets one is
+% wrong twice over: it is not in the prescribed order, and the Coordinator will
+% insert the real one anyway, giving the filed thesis two.
+%
+% THIS IS A THIRD CASE, and worth knowing when reading the warning text.
+% \thesisnoapprovalpage's message says approval "is collected on a separate
+% form", which is how Washington and Johns Hopkins work. ACU is not quite that:
+% approval is collected on a separate PAGE that ACU itself then puts into the
+% document. The behaviour — print nothing — is right either way, and printing
+% nothing is what keeps the filed copy correct.
+%
+% SIGNATURES ARE STILL COLLECTED, and may be "physical or electronic". ACU has
+% not moved to electronic-only.
+\thesisnoapprovalpage
