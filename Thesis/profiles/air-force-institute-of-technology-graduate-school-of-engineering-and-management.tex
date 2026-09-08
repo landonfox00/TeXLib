@@ -1,0 +1,308 @@
+% profiles/air-force-institute-of-technology-graduate-school-of-engineering-and-management.tex
+% — Air Force Institute of Technology, Graduate School of Engineering and Management
+% ============================================================================
+% source: https://scholar.afit.edu/docs/24/
+%         (AFIT Scholar record for "Style Guide for AFIT Dissertations, Theses,
+%          and Graduate Research Papers", Graduate School of Engineering and
+%          Management, Air Force Institute of Technology. Publication Date
+%          6-2024; Comments: "Revised edition issued June 2024.")
+% source: https://web.archive.org/web/20240916020100if_/https://scholar.afit.edu/cgi/viewcontent.cgi?article=1023&context=docs
+%         (the Style Guide PDF itself, 95 pp, whose cover reads "STYLE GUIDE FOR
+%          AFIT DISSERTATIONS, THESES, AND GRADUATE RESEARCH PAPERS / June 2024"
+%          and whose PDF CreationDate is 2024-06-28 — the same June 2024 edition
+%          the live record describes. See the fetch note below for why the
+%          archived copy was used.)
+% accessed: 2026-09-08
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the committee
+% membership page. The accessibility finding is a recorded absence.
+% NOT set, deliberately:
+%   * \thesissetchapteropening — AFIT prescribes no deeper margin on chapter
+%     openings. See the note under the geometry below; this is easy to misread.
+%   * \thesisrequiretagging / \thesisrequiredocumentlanguage /
+%     \thesisrequirepdfstandard — the Style Guide says nothing about
+%     accessibility at all, so declaring any of them would put words in AFIT's
+%     mouth. See the accessibility block.
+%
+% FETCH NOTE, so a later pass does not repeat the work. The live PDF at
+% scholar.afit.edu is unreachable from an automated client: the direct download
+% returns HTTP 403 to curl (with browser User-Agent and Referer), to WebFetch,
+% and to a same-origin fetch() from the loaded record page, and a browser
+% navigation to it lands on a Cloudflare bot-verification interstitial that does
+% not clear. www.afit.edu itself is worse — curl fails with an SSL error on
+% every TLS setting tried, WebFetch reports a closed socket, and the in-app
+% browser refuses the navigation. The RECORD page (scholar.afit.edu/docs/24/)
+% does load in a browser and is what establishes June 2024 as the current
+% edition; the Internet Archive capture of 2024-09-16 supplies the bytes. The
+% capture postdates the June 2024 revision and the PDF's own cover and internal
+% CreationDate agree with the live record, so this is the current edition rather
+% than a superseded one. A reviewer with .mil access should confirm against the
+% live copy.
+%
+% NAMING. IPEDS records "Air Force Institute of Technology-Graduate School of
+% Engineering & Management". The Style Guide, the prescribed title page and the
+% prescribed committee page all write "Air Force Institute of Technology", with
+% "Graduate School of Engineering and Management" as a separate line naming the
+% school. \thesisinstitution therefore carries the short form, since it is the
+% string the class prints in warnings and on the neutral pages.
+
+\thesisinstitution{Air Force Institute of Technology}
+
+% "All margins--top, bottom, left, and right--should be 1" in width. These
+% measurements apply to all pages in the document, including those containing
+% visual aids and all items placed in the appendices." (§4.2)
+%
+% Flat, four sides, no exceptions, no binding allowance, no choice to record.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "All text should be double-spaced except in the prefatory pages, which have
+% their own specific layout requirements." (§4.2)
+%
+% The permitted single-spacing exceptions are all optional and local: "As an
+% option to improve readability, students may choose to use single spacing for
+% elements with multiple components, like lists, tabulations, and bibliographies,
+% and for figure and table captions", and for a blocked quotation of more than
+% four lines — "Generally, however, double spacing is preferred." So `double' is
+% the rule, not one of two equal choices, and the two pages below single-space
+% themselves as prefatory pages.
+\thesissetspacing{double}
+
+% NO CHAPTER-OPENING MARGIN, and this is the point most likely to be "corrected"
+% wrongly by a later pass, because §4.3 does talk about extra space at the top of
+% a chapter. Read it carefully: "On the first page of Chapter I, the title is
+% placed three single lines below the normal one-inch top margin." That is (a)
+% the REPORT TITLE, not the chapter heading, (b) on Chapter I ONLY — "Note that
+% only Chapter I has the title of the thesis at the top of the page" (§A.7) —
+% and (c) explicitly measured from the *normal* one-inch top margin, which it
+% therefore leaves at 1in. Every other chapter's primary heading is "centered at
+% the top of the page" with no deeper margin. \thesissetchapteropening would set
+% a deeper margin on EVERY chapter opening, which is not what AFIT asks for.
+
+% --- Fonts, for the record ----------------------------------------------------
+% §4.4: "The font size must be no larger than 12 pt. for serif fonts (e.g.,
+% Times New Roman, Cambria) and no smaller than 10 pt. for sans serif fonts
+% (e.g., Arial, Calibri). Any legible font within this range except script,
+% italic, or ornamental font is acceptable for the main body of text." There is
+% no profile field for typeface or size and none is invented here. texlib-thesis
+% loads report at 12pt in Latin Modern, a legible non-ornamental serif at 12pt,
+% which satisfies the rule — but by coincidence of the class default, so it is
+% written down rather than relied on silently. If the class's base size ever
+% changes, check this again.
+%
+% §4.4 also requires "The same font must be used throughout the entire document,
+% including page numbers, table and figure numbers and captions, and references."
+% This profile deliberately selects no extra face, so that holds.
+
+% --- Accessibility -----------------------------------------------------------
+% NOT PUBLISHED, and this is a finding rather than a gap in the research. The
+% 95-page June 2024 Style Guide — which is AFIT's complete filing standard, and
+% is detailed enough to prescribe widow and orphan handling, superscript point
+% sizes and where the page number sits in the bottom margin — contains ZERO
+% occurrences of "accessib", "alt text", "WCAG", "Section 508", "tagged",
+% "PDF/A" or "screen reader". Its only requirement about the PDF as a file is
+% §8.3: it must be a PDF, must include DTIC Form 530 (if applicable) and the
+% SF 298 as its last pages, and "Students should not use password protection on
+% this file."
+\thesisaccessibilityrequirement{Not published}
+	{The June 2024 AFIT Style Guide states no accessibility requirement for a
+	 filed manuscript: no tagging, no document language, no PDF standard, no alt
+	 text, no named conformance level. The whole 95-page guide contains no
+	 occurrence of "accessib", "alt text", "WCAG", "Section 508", "tagged",
+	 "PDF/A" or "screen reader". This records that AFIT asks for nothing here,
+	 not that nobody looked.}
+
+% --- Fields AFIT needs that the class has no home for -------------------------
+% AFIT's prefatory pages carry four values texlib-thesis does not model. They are
+% providecommand'd here with the specimen's own values as visible placeholders,
+% so a page built without setting them still renders and obviously wants editing.
+% A document filing at AFIT sets them in its preamble:
+%
+%   \renewcommand{\thesisdocumentdesignator}{AFIT-ENG-MS-26-M-001}
+%   \renewcommand{\thesisauthorrank}{First Lieutenant, USAF}
+%   \renewcommand{\thesisdepartment}{Department of Electrical and Computer Engineering}
+%   \renewcommand{\thesisdeanname}{Dean's Name, Ph.D.}   % DISSERTATIONS ONLY
+%
+% The designator is not the student's to invent: "the Thesis Processing Center
+% assigns an identifying alphanumeric designator that appears on the cover page,
+% disclaimer page, title page, committee page, abstract, dedication page,
+% acknowledgments page, and SF 298. Students should receive their document
+% designators from the Thesis Processing Committee the first week of the quarter
+% in which they will graduate." (§6.11)
+%
+% \thesisdeanname prints ONLY on the committee page and ONLY when set, because
+% §6.5 requires "the name of the dean of the school (for dissertations only)".
+% Leaving it empty is correct for a thesis.
+\providecommand{\thesisdocumentdesignator}{AFIT-XXX-MS-XX-X-XXX}
+\providecommand{\thesisauthorrank}{Rank, USAF}
+\providecommand{\thesisdepartment}{Department of \thesis@program}
+\providecommand{\thesisdeanname}{}
+% Distribution A is the default because the Style Guide's own example thesis
+% carries it and because it is the statement on a publicly released manuscript.
+% A limited thesis (Distribution B–F) replaces this AND appends a signed Document
+% Distribution Memorandum; see §8.1.2 and §A.5.
+\providecommand{\thesisdistributionstatement}{%
+	DISTRIBUTION STATEMENT A. APPROVED FOR PUBLIC RELEASE: DISTRIBUTION IS
+	UNLIMITED.}
+
+% The identifying word AFIT prints in full capitals under the title. The class's
+% \doctype gives "thesis"/"dissertation"; AFIT's third kind, GRADUATE RESEARCH
+% PAPER, has no class equivalent, so a filer writing one sets this by hand.
+\providecommand{\thesisidentifyingword}{\MakeUppercase{\thesis@docnoun}}
+
+% --- Title page --------------------------------------------------------------
+% §6.4 fixes the contents exactly:
+%   "The contents of the title page are
+%      * The document designator (at the top left)
+%      * The title of the document
+%      * The identifying text "DISSERTATION," "THESIS," or "GRADUATE RESEARCH
+%        PAPER"
+%      * The supervising department and school to which it is submitted (in the
+%        case of dissertations, only the school)
+%      * The degree and specialization for which the document was prepared
+%      * The name(s) and rank(s) of the author(s)
+%      * The month and year of graduation
+%      * The Distribution A statement, if applicable"
+% and adds "Where there are two or more authors, their names are placed in
+% alphabetical order. The information is centered and evenly spaced."
+%
+% §4.3 supplies the title's own treatment: "The title of the report appears on
+% the title page, committee page, and at the top of the first page of Chapter I.
+% In all three cases, it is written in full capitals and centered horizontally."
+%
+% The intervening wording — "Presented to the Faculty", the Air University and
+% Air Education and Training Command lines, "in Partial Fulfillment of the
+% Requirements for the / Degree of ..." — is not quoted in the prose. It comes
+% from the Style Guide's own specimen title page (Appendix C, "Example Thesis"),
+% which RESEARCHING.md admits as evidence of layout. The line breaks below are
+% that specimen's.
+%
+% VERTICAL SPACING was measured off the rendered specimen page rather than
+% guessed: every block sits three single lines below the previous one, and the
+% title two lines below the designator. §6.4's "evenly spaced" is satisfied by
+% that uniform gap. \graddate supplies the "month and year of graduation"
+% ("March 2012" is the guide's own example of the form), and \gradprogram the
+% specialization.
+%
+% NOTE for a document that files here: AFIT requires a COVER PAGE and a
+% DISCLAIMER/COPYRIGHT page BEFORE this title page (§6.1–6.3), and the cover page
+% carries the AFIT crest. The class has no cover-page hook and this profile ships
+% no crest, so neither is produced. They are the filer's to add. See the round
+% log for this institution.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing
+		% The designator is flush LEFT at the top margin; everything after it is
+		% centred.
+		\noindent\thesisdocumentdesignator\par
+		\centering
+		\vspace{\baselineskip}
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{2\baselineskip}
+		\thesisidentifyingword\par
+		\vspace{2\baselineskip}
+		Presented to the Faculty\par
+		\vspace{2\baselineskip}
+		\thesisdepartment\\
+		Graduate School of Engineering and Management\\
+		Air Force Institute of Technology\\
+		Air University\\
+		Air Education and Training Command\par
+		\vspace{2\baselineskip}
+		in Partial Fulfillment of the Requirements for the\\
+		Degree of \thesis@degree{} in \thesis@program\par
+		\vspace{2\baselineskip}
+		\@author\\
+		\thesisauthorrank\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+		\vspace{2\baselineskip}
+		\thesisdistributionstatement\par
+		\vfill
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee membership page ------------------------------------------------
+% AFIT's approval page is the "Committee Membership Page", and it is REQUIRED:
+% "A committee membership page is required in a dissertation or thesis." (§6.5)
+% So \thesisnoapprovalpage is emphatically wrong here.
+%
+% §6.5 fixes the contents: "Information on this page includes the document
+% designator, the title of the document, the name (with degrees previously
+% earned) of the author, a complete list of committee member names and roles
+% (see Appendix C), and the name of the dean of the school (for dissertations
+% only). Information is centered and evenly spaced. The document designation
+% number should be included at the top left of the committee membership page."
+%
+% NO SIGNATURE RULES. The class's default \thesis@memberline draws a 3in rule
+% above each name, which is wrong here: the specimen prints the name and the role
+% on two centred lines and nothing else, and AFIT collects no signature inside the
+% manuscript at all (see the signatures note below). \thesis@memberline is
+% therefore redefined for this page only.
+%
+% Declare the committee in the document like this, matching the specimen's roles:
+%     \committeemember{Albert Einstein, Ph.D.}{Chair}
+%     \committeemember{Lt Col Michael Faraday, Ph.D.}{Member}
+%     \committeemember{Maj Carl F. Gauss, M.S.}{Member}
+% AFIT writes rank into the name (the specimen does), so no separate rank field is
+% used on this page.
+%
+% SIGNATURES: none, inside the manuscript. The Style Guide collects them on
+% separate forms only — the SF 298's coordination blocks, and, for a LIMITED
+% thesis (Distribution B–F) alone, the Document Distribution Memorandum, which
+% "is signed by your primary research advisor and the department head" (§A.5).
+% Neither is the committee page.
+%
+% SPACING: gaps measured off the rendered specimen, where each block sits five
+% and a half single lines below the last. They are SHRINKABLE glue so a larger
+% committee compresses onto one page instead of spilling: the specimen shows
+% three members, but a dissertation adds more members and the dean's name.
+% Anyone retuning \afit@ccgap must re-check that the largest committee they care
+% about still lands above the bottom margin.
+%
+% It is a MACRO, not a \newskip. A skip assigned at profile-load time freezes
+% whatever \baselineskip is in the preamble, which is not the single-spaced
+% value this page runs at — the first draft did that and every gap came out
+% about 30% too deep. Written this way, \baselineskip is read where it is used,
+% under the \singlespacing below.
+\newcommand{\afit@ccgap}{\vskip 4.5\baselineskip plus 0pt minus 3\baselineskip\relax}
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	% A hidden tagged heading, as on the class's neutral page and on UNR's: this
+	% page is otherwise a wall of centred text with no structure for a screen
+	% reader. The negative skip puts the designator back on the top margin, which
+	% means the two share a baseline; a screen reader gets them in the right
+	% order from the tag tree, but `pdftotext' interleaves their characters. That
+	% is cosmetic and affects only the invisible run — do not "fix" it by moving
+	% the heading above the top margin, which would put content outside the 1in
+	% margin AFIT requires on every page.
+	\thesis@tagtitle{H1}{{\color{white}\tiny Committee Membership Page}}\par
+	\vspace{-\baselineskip}
+	\noindent\thesisdocumentdesignator\par
+	\begingroup
+	\centering
+	\renewcommand{\thesis@memberline}[2]{%
+		\afit@ccgap
+		##1\par
+		\ifx\relax##2\relax\else##2\par\fi
+	}%
+	\vspace{\baselineskip}
+	\MakeUppercase{\@title}\par
+	\afit@ccgap
+	\@author\\
+	\thesisauthorrank\par
+	\afit@ccgap
+	Committee Membership:\par
+	\thesis@committee
+	\ifx\thesisdeanname\@empty\else
+		\afit@ccgap
+		\thesisdeanname\par
+		Dean, Graduate School of Engineering and Management\par
+	\fi
+	\endgroup
+	\vfill
+	\loadgeometry{normal}\doublespacing\clearpage
+}
