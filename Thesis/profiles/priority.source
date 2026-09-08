@@ -5,8 +5,11 @@ report: NSF 26-304
 table: Table 4 -- higher education R&D expenditures at institutions in the
        standard form and short form survey populations, ranked by all R&D
        expenditures, by source of funds: FY 2024
-ranks: 1-33 transcribed in order; slugs resolved against institutions.csv by
-       IPEDS name, one row each, no institution mapped by guess
+ranks: 1-100 in order; slugs resolved against institutions.csv by IPEDS name,
+       one row each, no institution mapped by guess. Ranks 1-33 were
+       transcribed from the PDF and are unchanged; 34-100 were read from the
+       published spreadsheet (see below) and mapped as described under HOW THE
+       MAPPING WAS DONE.
 
 WHY A RANKED QUEUE EXISTS AT ALL
 
@@ -30,5 +33,40 @@ TWO CAVEATS ON THE RANKING
   the clearest case). Rank is a proxy for "whose students are likely to need
   this", not a measure of it.
 
-regenerate: transcribe Table 4 of the current HERD report; there is no API for
-            this table, and the ranking changes yearly
+TWO RANKS ARE DELIBERATELY ABSENT
+
+Rank 60 (Uniformed Services University of the Health Sciences) and rank 72
+(Scripps Research Institute) are not in institutions.csv at all -- neither
+appears in the IPEDS thesis-level population the worklist is derived from. They
+are omitted rather than mapped to a near-name. `next` would skip an unknown slug
+anyway, but a row that cannot resolve is worse than no row: it reads as a
+mapping someone made and stopped checking.
+
+HOW THE MAPPING WAS DONE, AND TWO TRAPS IN IT
+
+HERD abbreviates ("U. California, Davis"); IPEDS does not
+("University of California-Davis"). Matching is therefore required, and it must
+not be done by similarity score. Two live examples of why:
+
+* Character-ratio matching scores "Arizona State U." against "Winona State
+  University" at 0.89 and "North Carolina State U." against "South Carolina
+  State University" at 0.94. Both are confident-looking and both are a
+  different institution in a different state.
+
+* Token-subset matching fixes those but is still not safe alone: it mapped
+  "SUNY, U. Buffalo" to "SUNY Buffalo State University" (the wrong Buffalo) and
+  "U. Oklahomac" to the Health Sciences Center rather than Norman.
+
+So only an EXACT token-set match was accepted automatically. Everything else --
+20 of the 67 new ranks -- was resolved by hand against the IPEDS name and state
+and is listed as an override in the generator. A near-match is not a match.
+
+One more trap, in the PDF rather than the data: the report's text layer prints
+each row's figures one line ABOVE its institution, which makes Johns Hopkins's
+$4.13B look like Pennsylvania's. Ranks 1-33 predate this note and were checked
+against the spreadsheet afterwards; they are correct.
+
+regenerate: Table 4 is published as a spreadsheet --
+            https://ncses.nsf.gov/pubs/nsf26304/assets/data-tables/tables/nsf26304-tab004.xlsx
+            (925 ranked institutions, to rank 923). Read that, not the PDF. The
+            ranking changes yearly.
