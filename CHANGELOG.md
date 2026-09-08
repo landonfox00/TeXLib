@@ -4,6 +4,8 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-09-08
+
 ### Fixed
 
 - **`didactic` and `pset` are off the tikz deferral list again — it never did
@@ -1065,7 +1067,14 @@ Initial public-on-GitHub release. Snapshot of TeXLib after the documentation pas
 - `course-metadata_old.sty` (v7) was archived on the `archive/old-metadata` branch before deletion. Recoverable from there if ever needed.
 - A handful of pre-class-consolidation prototypes (`Bingo/bingo.tex`, `Bingo/bingo_og.tex`, `Bingo/Math 181 Su25 *.tex`) and dev-test files (`Notes/test_aliases.*`, `Notes/test_conv_fix.*`, `Notes/test_labeledsection.*`) were deleted from disk before the first commit, so they have no history in this repo.
 
-[Unreleased]: https://github.com/landonfox00/TeXLib/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/landonfox00/TeXLib/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/landonfox00/TeXLib/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/landonfox00/TeXLib/compare/v0.7.4...v0.8.0
+[0.7.4]: https://github.com/landonfox00/TeXLib/compare/v0.7.3...v0.7.4
+[0.7.3]: https://github.com/landonfox00/TeXLib/compare/v0.7.2...v0.7.3
+[0.7.2]: https://github.com/landonfox00/TeXLib/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/landonfox00/TeXLib/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/landonfox00/TeXLib/compare/v0.5.0...v0.7.0
 [0.5.0]: https://github.com/landonfox00/TeXLib/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/landonfox00/TeXLib/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/landonfox00/TeXLib/compare/v0.2.0...v0.3.0

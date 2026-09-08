@@ -695,7 +695,7 @@ class CliHost:
         elif WARNING_RE.search(s) and len(self.warnings) < MAX_WARNINGS:
             self.warnings.append(s)
 
-    def run_argv(self, cmd, emit=True):
+    def run_argv(self, cmd, emit=True, aux_dir=None):
         """One engine/biber pass. Returns the captured text for host.out.
 
         emit=False captures without printing or classifying: a parallel lane
@@ -706,11 +706,15 @@ class CliHost:
         TEXLIB_AUX_DIR goes into THIS subprocess's env rather than os.environ so
         two concurrent CLI builds of different documents cannot race a shared
         value -- the same reason the Sublime runner does it per-process.
+        `aux_dir` overrides it for one pass: a variant lane must scribble in its
+        OWN output directory, because the Lua scratch is named from \\jobname
+        and every lane of a fan-out shares it (see run_parallel).
         """
         env = dict(os.environ)
         if self.texinputs:
             env["TEXINPUTS"] = self.texinputs
-        env["TEXLIB_AUX_DIR"] = getattr(self.host, "_aux_target", None) or ""
+        env["TEXLIB_AUX_DIR"] = (
+            aux_dir or getattr(self.host, "_aux_target", None) or "")
         try:
             proc = subprocess.Popen(
                 cmd, cwd=self.tex_dir, env=env,
@@ -740,14 +744,20 @@ class CliHost:
         several engines writing at once produces a log in which no error can be
         attributed to a document, and collect() also classifies errors, which
         has to stay deterministic rather than depend on scheduling.
+
+        A lane may be (label, cmds) or (label, cmds, aux_dir); the third element
+        is that lane's own output directory, handed to the engine as
+        TEXLIB_AUX_DIR so concurrent lanes do not overwrite each other's
+        \\jobname-named Lua scratch.
         """
         done = [0]
         lock = threading.Lock()
+        lanes = [(ln[0], ln[1], ln[2] if len(ln) > 2 else None) for ln in lanes]
 
-        def one(label, cmds):
+        def one(label, cmds, lane_aux):
             buf = []
             for cmd in cmds:
-                buf.append(self.run_argv(cmd, emit=False))
+                buf.append(self.run_argv(cmd, emit=False, aux_dir=lane_aux))
             with lock:
                 done[0] += 1
                 self.emit("texlib: %s done (%d/%d).\n"
@@ -755,9 +765,10 @@ class CliHost:
             return "".join(buf)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
-            futures = [pool.submit(one, label, cmds) for label, cmds in lanes]
+            futures = [pool.submit(one, label, cmds, lane_aux)
+                       for label, cmds, lane_aux in lanes]
             outs = []
-            for (label, _c), fut in zip(lanes, futures):
+            for (label, _c, _a), fut in zip(lanes, futures):
                 try:
                     outs.append((label, fut.result()))
                 except Exception as exc:  # noqa: BLE001 - one lane, not the build

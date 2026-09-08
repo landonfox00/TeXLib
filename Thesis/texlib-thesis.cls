@@ -46,7 +46,7 @@
 % spacing and any current wording should be checked against your own graduate
 % school's filing guidelines before a real submission.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{texlib-thesis}[2026/08/31 v0.8.0 Accessible thesis/dissertation (TeXLib)]
+\ProvidesClass{texlib-thesis}[2026/09/08 v0.9.0 Accessible thesis/dissertation (TeXLib)]
 
 % ---------------------------------------------------------------------------
 % 0. Options: oneside (default, per grad-school submission) / twoside (binding)

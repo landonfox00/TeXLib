@@ -444,8 +444,20 @@ def _run_lanes(lanes, jobs, tex_dir, collect, cancel, texinputs, aux_dir,
                entry, emit):
     """Run independent variant lanes concurrently; replay their logs in order.
 
-    Each lane is (label, [argv, ...]) and its commands run in sequence; the
-    lanes themselves run in a pool. Output is buffered per lane and replayed
+    Each lane is (label, [argv, ...]) -- or (label, [argv, ...], aux_dir) --
+    and its commands run in sequence; the lanes themselves run in a pool.
+
+    A lane carrying its own aux_dir gets it as TEXLIB_AUX_DIR in place of the
+    build-wide one. That is not a nicety: the Lua engines write their scratch
+    (<jobname>_synctex.tex, <jobname>_prob_*.tex, .sco, .srcmap,
+    <jobname>_autoexam_body.tex) with raw io.open into TEXLIB_AUX_DIR, and every
+    lane shares the document's pinned \\jobname -- so lanes pointed at ONE
+    directory overwrite each other's scratch between the write and the
+    \\@@input that reads it, and served problem bodies come back spliced from
+    two variants. The fan-out passes each lane its own -output-directory here,
+    which is what the env var was always meant to mirror.
+
+    Output is buffered per lane and replayed
     through `collect` afterwards in the order the lanes were planned, because
     interleaving several engines' output live produces a log in which no error
     can be attributed to a document -- and `collect` also classifies errors,
@@ -453,23 +465,27 @@ def _run_lanes(lanes, jobs, tex_dir, collect, cancel, texinputs, aux_dir,
     """
     done = [0]
     lock = threading.Lock()
+    # Normalize to (label, cmds, lane_aux). A 2-tuple lane keeps the build-wide
+    # aux dir, which is what a caller with nothing to isolate wants.
+    lanes = [(ln[0], ln[1], ln[2] if len(ln) > 2 else None) for ln in lanes]
 
-    def one(label, cmds):
+    def one(label, cmds, lane_aux):
         buf = []
         for cmd in cmds:
             if cancel.is_set():
                 break
-            _run_argv(cmd, tex_dir, buf.append, cancel, texinputs, aux_dir,
-                      entry)
+            _run_argv(cmd, tex_dir, buf.append, cancel, texinputs,
+                      lane_aux or aux_dir, entry)
         with lock:
             done[0] += 1
             emit("TeXLib: %s finished (%d/%d).\n" % (label, done[0], len(lanes)))
         return buf
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
-        futures = [pool.submit(one, label, cmds) for label, cmds in lanes]
+        futures = [pool.submit(one, label, cmds, lane_aux)
+                   for label, cmds, lane_aux in lanes]
         buffers = []
-        for (label, _cmds), fut in zip(lanes, futures):
+        for (label, _cmds, _lane_aux), fut in zip(lanes, futures):
             try:
                 buffers.append((label, fut.result()))
             except Exception as exc:  # noqa: BLE001 - a lane must not kill the build
