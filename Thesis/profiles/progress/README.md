@@ -44,7 +44,7 @@ Outcome is one of:
 
 - **profile** — a profile was written and a draft PR opened;
 - **blocked** — the graduate school's own filing requirements could not be
-  found, recorded in `institutions.blocked.csv` so the queue moves on;
+  found, recorded in `blocked/<slug>.csv` so the queue moves on;
 - **dropped** — researched but not shipped, because the profile would not build.
 
 `PROGRESS.md` keeps the record from before this change, including the
