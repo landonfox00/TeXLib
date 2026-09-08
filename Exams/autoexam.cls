@@ -8,7 +8,7 @@
 %% \documentclass{autoexam} keeps working, unchanged, with identical output.
 %% Prefer \documentclass{texlib-autoexam} in new documents.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{autoexam}[2026/08/31 v0.8.0 autoexam wrapper over texlib-autoexam (TeXLib)]
+\ProvidesClass{autoexam}[2026/09/08 v0.9.0 autoexam wrapper over texlib-autoexam (TeXLib)]
 \DeclareOption*{\PassOptionsToClass{\CurrentOption}{texlib-autoexam}}
 \ProcessOptions\relax
 \LoadClass{texlib-autoexam}

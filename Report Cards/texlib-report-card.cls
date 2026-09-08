@@ -1,7 +1,7 @@
 % report-card.cls
 % Per-Student Report Card Class — TeXLib unified style
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{texlib-report-card}[2026/08/31 v0.8.0 Per-Student Report Cards (TeXLib)]
+\ProvidesClass{texlib-report-card}[2026/09/08 v0.9.0 Per-Student Report Cards (TeXLib)]
 
 % ==============================================================================
 % 0. OPTIONS

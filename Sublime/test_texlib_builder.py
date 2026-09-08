@@ -403,8 +403,8 @@ def main():
     check("parallel: six lanes -- three variants, normal and tagged",
           len(lanes) == 6, [l[0] for l in lanes])
     check("parallel: every lane is the variant's two settle passes",
-          all(len(cmds) == 2 and cmds[0] == cmds[1] for _l, cmds in lanes),
-          [(l, len(c)) for l, c in lanes])
+          all(len(cmds) == 2 and cmds[0] == cmds[1] for _l, cmds, _a in lanes),
+          [(l, len(c)) for l, c, _a in lanes])
     check("parallel: job count is passed through from build_jobs",
           jobs == 4, jobs)
 
@@ -434,7 +434,28 @@ def main():
         return tuple(re.sub(r"texlib_(?:bt|par)_[A-Za-z0-9_]+", "<TMP>", str(x))
                      for x in cmd)
 
-    lane_cmds = {_norm(cmds[0]) for _l, cmds in lanes}
+    # Each lane must also carry its OWN output directory as its aux dir. The
+    # engines' Lua scratch is named from \jobname, which every lane shares, so
+    # lanes pointed at one directory splice each other's served problem bodies
+    # -- an error that only appears under parallelism and looks like broken
+    # source. Regression: the variant fan-out silently corrupted every
+    # solutions/instructor PDF while the base build stayed clean.
+    def _outdir_full(cmd):
+        for x in cmd:
+            if str(x).startswith("-output-directory="):
+                return str(x).split("=", 1)[1]
+        return ""
+
+    check("parallel: each lane's aux dir is its own output directory",
+          all(lane_aux and lane_aux == _outdir_full(cmds[0])
+              for _l, cmds, lane_aux in lanes),
+          [(l, a, _outdir_full(c[0])) for l, c, a in lanes
+           if a != _outdir_full(c[0])])
+    check("parallel: no two lanes share an aux dir",
+          len({a for _l, _c, a in lanes}) == len(lanes),
+          sorted(a for _l, _c, a in lanes))
+
+    lane_cmds = {_norm(cmds[0]) for _l, cmds, _a in lanes}
     # Everything the serial path builds EXCEPT the base and its tagged twin --
     # those two stay serial in both modes.
     serial_variant_cmds = {_norm(c[0]) for c in serial
@@ -456,9 +477,9 @@ def main():
         PSET, ["--texlib-mode=default"], {"doc.buildmeta": FULL_META},
         out=_SE_ABORT)
     ab_lanes = ab_batches[0][0] if ab_batches else []
-    ab_tagged = [(l, c) for l, c in ab_lanes if "-a11y" in l]
+    ab_tagged = [(l, c) for l, c, _a in ab_lanes if "-a11y" in l]
     check("parallel+SE: tagged lanes exist to check", bool(ab_tagged),
-          [l for l, _ in ab_lanes])
+          [l for l, _c, _a in ab_lanes])
     check("parallel+SE: after the probe aborts NO lane asks for SE",
           all("mathml-SE" not in c[0][-1] for _l, c in ab_tagged),
           [c[0][-1][:60] for _l, c in ab_tagged if "mathml-SE" in c[0][-1]])
@@ -471,7 +492,8 @@ def main():
     # And with a clean document the lanes keep SE.
     _, ok_batches, _ = run_parallel_builder(
         PSET, ["--texlib-mode=default"], {"doc.buildmeta": FULL_META})
-    ok_tagged = [(l, c) for l, c in (ok_batches[0][0] if ok_batches else [])
+    ok_tagged = [(l, c) for l, c, _a in (ok_batches[0][0] if ok_batches
+                                         else [])
                  if "-a11y" in l]
     check("parallel+SE: a clean document keeps SE on every tagged lane",
           bool(ok_tagged) and all("mathml-SE" in c[0][-1] for _l, c in ok_tagged),

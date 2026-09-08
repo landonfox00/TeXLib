@@ -8,7 +8,7 @@
 %% \documentclass{schedule} keeps working, unchanged, with identical output.
 %% Prefer \documentclass{texlib-schedule} in new documents.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{schedule}[2026/08/31 v0.8.0 schedule wrapper over texlib-schedule (TeXLib)]
+\ProvidesClass{schedule}[2026/09/08 v0.9.0 schedule wrapper over texlib-schedule (TeXLib)]
 \DeclareOption*{\PassOptionsToClass{\CurrentOption}{texlib-schedule}}
 \ProcessOptions\relax
 \LoadClass{texlib-schedule}

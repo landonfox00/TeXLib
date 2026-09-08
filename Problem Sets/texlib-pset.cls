@@ -14,7 +14,7 @@
 %   * \ShowKey or
 %     \ShowSolutions          — answer-key build: solutions visible.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{texlib-pset}[2026/08/31 v0.8.0 UNR Problem Sets (TeXLib)]
+\ProvidesClass{texlib-pset}[2026/09/08 v0.9.0 UNR Problem Sets (TeXLib)]
 
 % ==============================================================================
 % 0. OPTIONS

@@ -1357,7 +1357,11 @@ class TexlibBuildCore:
         # Everything else is independent: each variant owns its output
         # directory and shares no aux state with any other, which is exactly
         # why these are two fixed passes rather than the convergence loop. So
-        # they can all run at once.
+        # they can all run at once -- provided each lane's TEXLIB_AUX_DIR is
+        # its OWN output directory too (passed as the third lane element
+        # below). The engines' Lua scratch is named from \jobname, which every
+        # lane shares, so one shared scratch dir has concurrent lanes
+        # overwriting each other's served problem bodies mid-read.
         lanes = [(v, False) for v in variants] + [(v, True) for v in variants]
         if not lanes:
             return
@@ -1380,8 +1384,8 @@ class TexlibBuildCore:
             # Two passes per lane, run in order within the lane; the lanes
             # themselves are concurrent. The host owns the pool, so it also
             # owns cancellation and output ordering.
-            runner([(label, [cmd, cmd]) for _v, _t, _tag, _out, cmd, label
-                    in plans], jobs)
+            runner([(label, [cmd, cmd], out_dir)
+                    for _v, _t, _tag, out_dir, cmd, label in plans], jobs)
             for v, tagged, _tag, out_dir, _cmd, _label in plans:
                 self._copy_back_variant(tex_dir, v, tagged, out_dir)
                 self._variants_built.append((v, tagged))
