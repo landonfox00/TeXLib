@@ -1,0 +1,212 @@
+% profiles/indiana-university-bloomington.tex — Indiana University-Bloomington
+% ============================================================================
+% source: https://graduate.indiana.edu/academic-requirements/thesis-dissertation/doctoral-guide/formatting.html
+%         (The Graduate School Bloomington, Doctoral Dissertation Guide,
+%          "Formatting")
+% source: https://graduate.indiana.edu/academic-requirements/thesis-dissertation/doctoral-guide/sections.html
+%         (the same guide, "Required & Optional Sections")
+% source: https://graduate.indiana.edu/academic-requirements/thesis-dissertation/masters-guide/sections.html
+%         (Master's Thesis Guide, "Required & Optional Sections")
+% source: https://graduate.indiana.edu/doc/phdtitlepage.docx
+% source: https://graduate.indiana.edu/doc/phdacceptancepage.docx
+% source: https://graduate.indiana.edu/doc/masters-title-page.docx
+% source: https://graduate.indiana.edu/doc/masters-acceptance-page.docx
+%         (the four specimens the guides link as "an example of the ... page")
+% accessed: 2026-09-09
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the acceptance
+% page. Both degree levels are covered; the guides differ only in the degree
+% named and in the committee heading.
+% NOT set:
+%   * \thesissetchapteropening — none prescribed.
+%   * every checkable accessibility declaration — see the accessibility note.
+%
+% CURRENCY. The pages carry no revision date. They are plainly maintained (they
+% reference ProQuest submission and the current Graduate Recorder address), and
+% no superseded edition was found. Treat the substance as current but note that
+% nothing here is dated.
+%
+% THE ACCEPTANCE PAGE IS REQUIRED AND IS FILED UNSIGNED. Indiana is unusual in
+% wanting the signature RULES in the document with nothing on them:
+%
+%     "Your Research Committee members' names and signature lines follow and are
+%      fully right-justified."
+%     "The page remains unsigned for inclusion in your dissertation."
+%
+% So the rules below are correct as drawn, and a filer must not replace this
+% page with a scan of a signed one. That is the opposite of Mount Sinai and
+% Arizona, and matches UC Davis's arrangement.
+%
+% THE TYPEFACE LIST IS A RECOMMENDATION, so the class passes: the six faces
+% Indiana names (Arial, Bookman Old Style, Calibri, Cambria, Lucida Bright,
+% Times New Roman) are "recommended for the ease with which they convert to a
+% PDF", not required. Size is: "Font size should be either 11 or 12 point for
+% the entire document", with the title page allowed up to 16 point and footnotes
+% and table content down to 10. The class's 12pt is in range.
+%
+% ONE PROHIBITION WORTH KNOWING, and one this class was never going to break:
+% "The IU Seal or Branding should not be used on any portion of the
+% dissertation. These items may be used only with the written permission of the
+% university." No insignia is drawn here.
+%
+% PAGE NUMBERING, which no profile field can express: "The title page counts as
+% page i but does not bear a number. Begin the actual numbering with the
+% acceptance page as page ii, and continue with lowercase Roman numerals until
+% the start of the actual body", then Arabic 1 onward. The vita at the end
+% carries no page number at all, and "Running heads are not used in dissertation
+% submissions. Please limit the content of your header and footer space to the
+% page number only." A document filed here needs \frontmatter before the title
+% page and its own handling of the unnumbered title and vita pages.
+
+\thesisinstitution{Indiana University}
+
+% "Top, Right, and Bottom margins must be one inch. If the dissertation will
+% only be electronically accessed, a one-inch left margin is acceptable. The
+% left margin should be one inch if the dissertation will be bound in paper form
+% by ProQuest. If using a bindery other than ProQuest, please consult with the
+% bindery about the size of the left margin needed for their binding process."
+%
+% One inch on all four sides is therefore right for both the electronic filing
+% and a ProQuest-bound copy. The only case Indiana leaves open is a third-party
+% bindery, which it sends the student to ask -- so a wider left margin is a
+% decision for that student and their bindery, not a figure this profile can
+% pick. "These margin requirements apply to all materials included in the
+% dissertation, including figures, tables, maps, plates, etc."
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "The material should be double-spaced. Long quotations within the text should
+% be typed single-spaced with wider margins." Not a choice here.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Both guides -- Formatting and Required & Optional Sections, at both degree
+% levels -- were read end to end, along with the Thesis & Dissertation index.
+% None of them contains the words accessible, accessibility, alt text, tagged,
+% WCAG, PDF/UA, PDF/A, screen reader or Title II, and none states a
+% document-language or heading-structure rule.
+%
+% IU Libraries publishes guidance on accessible PDFs. That is a library research
+% guide, not the Graduate School's filing requirements, so under RESEARCHING.md
+% it is not a source for this file and nothing from it is encoded here.
+\thesisaccessibilityrequirement{Not published}
+	{The Graduate School Bloomington's doctoral and master's guides state no
+	 accessibility requirement. All of Formatting, Required \& Optional Sections
+	 and the Thesis \& Dissertation index were read in full on the access date.
+	 This records that the Graduate School asks for nothing on accessibility,
+	 not that nobody looked.}
+
+% --- Profile-local metadata ----------------------------------------------------
+% Indiana's two front pages carry two DIFFERENT dates, and conflating them is
+% the easy mistake: \thesis@date is the title page's, and the guide is explicit
+% that it is not the defence -- "(The month and year is the date when all
+% requirements have been satisfied -- this is not necessarily the month in which
+% you defend.)" The acceptance page carries the defence date, in full, and that
+% is what \iudefensedate supplies.
+\newcommand{\iu@defense}{}
+\newcommand{\iudefensedate}[1]{\renewcommand{\iu@defense}{#1}}
+% The department or school named on the title page, if it is not what
+% \gradprogram already says.
+\newcommand{\iu@unit}{}
+\newcommand{\iuunit}[1]{\renewcommand{\iu@unit}{#1}}
+\newcommand{\iu@theunit}{\ifx\iu@unit\@empty\thesis@program\else\iu@unit\fi}
+% "Doctoral Committee" or "Master's Committee", chosen from \doctype.
+\newcommand{\iu@ifdoctoral}[2]{%
+	\def\iu@tmp{dissertation}%
+	\ifx\thesis@docnoun\iu@tmp #1\else #2\fi
+}
+
+% --- Title page ----------------------------------------------------------------
+% "The title page should be a separate page and no longer than one page. All
+% content on this page should be centered horizontally and vertically. Keep in
+% mind that the title must be able to fit on the spine of a bound manuscript."
+%
+% The doctoral specimen, whose first line is an instruction to the reader rather
+% than page content ("TITLE CENTERED, ALL IN CAPITAL LETTERS:"):
+%
+%     THE IMPORTANCE OF KEY WORDS IN THE SUCCESSFUL INDEX
+%     Author's Name
+%     Submitted to the faculty of the Graduate School in partial fulfillment of
+%     the requirements
+%     for the degree Doctor of Philosophy
+%     in the Department (or School) of ______________ ,
+%     Indiana University
+%     Month Year
+%
+% The master's specimen is the same page with "for the degree Master of (Arts or
+% Sciences)" and the department and university on one line, so \thesis@degree
+% carries the difference and no branch is needed. Note "for the degree", with no
+% "of" -- the acceptance page says "for the degree of", and they really do
+% differ.
+%
+% The title page bears no page number, though it counts as page i.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\centering\singlespacing
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{4\baselineskip}
+		\@author\par
+		\vspace{4\baselineskip}
+		Submitted to the faculty of the Graduate School in partial fulfillment
+		of the requirements\\
+		for the degree \thesis@degree\\
+		in the \iu@theunit,\\
+		Indiana University\\
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Acceptance page -----------------------------------------------------------
+% "This page confirms the committee's approval and acceptance of your
+% dissertation. The acceptance page should be a separate page and no longer than
+% one page." The layout is prescribed in four sentences, each honoured here:
+%
+%   - "The Acceptance statement should be centered at the top of the page:
+%     Accepted by the Graduate Faculty, Indiana University, in partial
+%     fulfillment of the requirements for the degree of Doctor of Philosophy."
+%   - "The words 'Doctoral Committee' immediately follow the Acceptance
+%     statement and are left-justified." (Master's: "Master's Committee".)
+%   - "Your Research Committee members' names and signature lines follow and are
+%     fully right-justified. Behind each name, place the appropriate
+%     post-nominal initials for that individual (Ph.D., M.F.A., O.D., etc.)"
+%   - "After the names, should be the date of your defense, left-justified."
+%
+% ONE DISAGREEMENT BETWEEN PROSE AND SPECIMEN, left for a reviewer rather than
+% split: the master's specimen puts the defence date immediately after the
+% "Master's Committee" heading and BEFORE the signature lines, while the prose
+% at both degree levels says it comes after the names. The doctoral specimen
+% agrees with the prose. This page follows the prose, per RESEARCHING.md.
+%
+% Post-nominal initials belong to the NAME, not to the class's role argument:
+% pass \committeemember{Robin Reader, Ph.D.}{} and leave the second argument
+% empty. \thesis@memberline is replaced because the class's default rule is
+% centred and 3in wide, where Indiana wants the rule and the name both flush
+% right.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\thesis@tagtitle{H1}{{\color{white}\tiny Acceptance Page}}\par
+	\begin{center}
+		Accepted by the Graduate Faculty, Indiana University, in partial
+		fulfillment of the requirements for the degree of \thesis@degree.
+	\end{center}
+	\vspace{2\baselineskip}
+	\noindent\iu@ifdoctoral{Doctoral Committee}{Master's Committee}\par
+	\vspace{\baselineskip}
+	\begingroup
+	\renewcommand{\thesis@memberline}[2]{%
+		\vspace{2\baselineskip}
+		{\raggedleft\rule{3.4in}{0.4pt}\par
+		 ##1\ifx\relax##2\relax\else, ##2\fi\par}%
+	}%
+	\thesis@committee
+	\endgroup
+	\vspace{3\baselineskip}
+	\noindent\ifx\iu@defense\@empty\thesis@date\else\iu@defense\fi\par
+	\vspace*{\fill}
+	\loadgeometry{normal}\doublespacing\clearpage
+}
