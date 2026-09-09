@@ -645,6 +645,19 @@ def _run_with_reruns(cmd: list[str], tmp: str, env: dict, timeout: int,
             stderr=subprocess.STDOUT, text=True, encoding="utf-8",
             errors="replace", timeout=timeout,
         )
+        # This harness builds modules in parallel, so it is exposed to the same
+        # luaotfload cache-path race the builder is (see
+        # texlib_buildspec.luaotfload_cache_aborted): the engine dies at startup
+        # over a probe filename every concurrent engine shares, and the module
+        # fails for a reason that has nothing to do with the module. A red gate
+        # nobody can reproduce is worse than a slow one -- spend the startup
+        # again. Not counted as a pass: nothing was typeset.
+        if _spec.luaotfload_cache_aborted(r.stdout or ""):
+            r = subprocess.run(
+                cmd, cwd=tmp, env=env, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                errors="replace", timeout=timeout,
+            )
         returncode, stdout = r.returncode, r.stdout
         log_text = ""
         if os.path.exists(log_path):
