@@ -2182,9 +2182,10 @@ end
 --   not match the document's declared total.  Extra credit is excluded for free:
 --   scan_problem_pts (used by prescan_problems) matches \problem only, never
 --   \extracredit.  Best-effort and silent when nothing is comparable: a
---   non-numeric/absent declared value, an unreadable body, or a source with no
+--   non-numeric/absent declared value, an unreadable body, a source with no
 --   annotated points (sum 0 -- e.g. an all-bank exam whose points resolve at
---   typeset time and are invisible to the source prescan) all skip quietly.
+--   typeset time and are invisible to the source prescan), or a source where
+--   only SOME problems are annotated all skip quietly.
 function autoexam_check_points(declared)
 	declared = tonumber(declared)
 	if not declared then return end
@@ -2192,6 +2193,13 @@ function autoexam_check_points(declared)
 	if not body then return end
 	local total = 0
 	for _, row in ipairs(prescan_problems(body)) do
+		-- A \problem with no [pts] bracket carries its points in the BANK, as
+		-- \part[n] values this source prescan cannot see. Summing the annotated
+		-- ones alone would compare a fragment against the whole exam and warn on
+		-- a document that is perfectly correct, so a single unannotated problem
+		-- makes the comparison meaningless and the check stands down. Mixing the
+		-- two is what a partly-migrated document looks like mid-move.
+		if row.pts == '' then return end
 		for p in row.pts:gmatch("[^,]+") do
 			total = total + (tonumber(p) or 0)
 		end
