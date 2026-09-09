@@ -1,0 +1,167 @@
+% profiles/michigan-state-university.tex — Michigan State University
+% ============================================================================
+% source: https://grad.msu.edu/academics/theses-and-dissertations/formatting-your-document
+%         (The Graduate School, "Formatting Your Document" — the page that
+%          serves the two documents below)
+% source: https://edge.sitecorecloud.io/michigansta4a14-msu70a4-prod718c-8cd0/media/project/msu/grad/manuals/etd-formatting-guide-august-2026.pdf
+%         ("MSU Formatting Guide for Theses and Dissertations", footed
+%          "August 2026" on every page — linked from that page as the
+%          "Printable Formatting Guide")
+% source: https://edge.sitecorecloud.io/michigansta4a14-msu70a4-prod718c-8cd0/media/project/msu/grad/manuals/sample-page-packet-jan-2026.pdf
+%         ("Printable Sample Pages", January 2026; the annotated thesis and
+%          dissertation title pages are pages 2 and 3 of 18)
+% accessed: 2026-09-09
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry (a range — see below), spacing (a choice —
+% likewise), the title page, and the absence of a separate approval page.
+% NOT set:
+%   * \thesissetchapteropening — no deeper chapter-opening margin is prescribed.
+%     (The title page's own 2in top margin IS prescribed, and is applied inside
+%     \thesistitlepage rather than through that hook, which governs chapters.)
+%   * every checkable accessibility declaration — see the accessibility note.
+%
+% CURRENCY, AND A STALE EDITION THAT SEARCH ENGINES STILL SERVE. The governing
+% guide is dated August 2026 and lives on MSU's Sitecore CDN. Two older
+% editions are still reachable at the OLD grad.msu.edu/sites/default/files path
+% and are what a search for "MSU ETD formatting guide" returns first:
+% "ETD Formatting Guide August 2025.pdf" and "ETD Formatting Guide FINAL Jan
+% 2023.pdf". Neither is linked from the current Formatting Your Document page.
+% Follow the CDN link that page serves; do not take a figure from the
+% grad.msu.edu/sites/... copies.
+%
+% THE APPROVAL IS A FORM, NOT A PAGE. "The signed Approval Form for electronic
+% submission serves as evidence that the document has been examined and approved
+% by the major professor (or thesis/dissertation director) and guidance
+% committee. The electronic approval form is received by The Graduate School
+% after the major professor ... has signed off on it." The guide goes further and
+% forbids carrying it with the manuscript: "Do not attach the Approval Form,
+% Embargo Form, IRB letter or IACUC letter as supplemental files in your ProQuest
+% account." Its list of preliminary pages — Title, Abstract, Copyright,
+% Dedication, Acknowledgements, Preface, Table of Contents, and the lists — has
+% no approval or signature leaf in it. Hence \thesisnoapprovalpage.
+%
+% SIGNATURES: yes, but never inside the document. The major professor signs the
+% electronic Approval Form, which reaches the Graduate School separately.
+%
+% THE TYPEFACE RULE IS A BAN, NOT A LIST, so this class satisfies it — unlike at
+% Arizona State, whose closed list of eight faces it fails. MSU: "Script, small
+% caps, and ornamental fonts will not be accepted. Fonts strongly suggested
+% include Times New Roman, Calibri, Arial, Garamond, and Cambria." Latin Modern
+% is none of the three banned kinds, and the named five are "strongly suggested"
+% rather than required. Type size: "A 12-point font is the norm for regular
+% text", which the class's 12pt report already is.
+
+\thesisinstitution{Michigan State University}
+
+% "All regular margins must be between 1 and 1 1/2 inches and consistent on all
+% sides. The only text permitted to be in the margins are the page numbers."
+%
+% A RANGE, and the profile takes the bottom of it. 1in is in spec, is what the
+% class defaults to, and keeps the most text on the page; anything up to 1.5in
+% is equally in spec provided it is used on all four sides. Note the consistency
+% clause — a binding allowance on the left alone would be out of spec here.
+%
+% The page-number relaxation is the reason the class's `includefoot' geometry is
+% safe: MSU expects the folio "1/2 inch to an inch from the bottom of the page
+% (in the footer)", and permits it in the margin.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "The manuscript may be 1.5-spaced or double-spaced and must be consistent
+% throughout the document." A CHOICE; the profile takes double, which is the
+% class default. \thesissetspacing{onehalf} is equally in spec. The guide lists
+% the usual single-spaced exceptions: table-of-contents entries within chapters,
+% multi-line list entries, "titles, headings, footnotes, endnotes, lengthy
+% quotations".
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% The August 2026 Formatting Guide was read end to end. The string "accessib"
+% appears in it exactly ONCE, and not as a document-conformance rule: it is
+% about transcribing linked media. There is no WCAG level, no tagging rule, no
+% alt-text rule, no document-language rule and no PDF standard anywhere in it,
+% and no Graduate School accessibility page for ETDs was located.
+%
+% MSU does run a university-wide digital accessibility programme, and its
+% library publishes guidance on accessible LaTeX. Neither is the Graduate
+% School's filing requirements, so neither is a source for this file and neither
+% is encoded here.
+\thesisaccessibilityrequirement{Not published}
+	{The Graduate School's Formatting Guide states no accessibility requirement
+	 for the document itself — no WCAG level, no tagging, no alt text, no
+	 document language, no PDF standard. It was read in full on the access date.
+	 This records that the Graduate School asks for nothing, not that nobody
+	 looked.}
+\thesisaccessibilityrequirement{Transcribe linked media}
+	{``QR codes/YouTube videos/etc.\ will need to be transcribed within the
+	 document for accessibility purposes.'' Links to outside resources ``must be
+	 maintained in perpetuity'', and for media the student created ``a
+	 summary/transcription must be provided'' immediately following it.}
+
+% --- Title page ----------------------------------------------------------------
+% Reproduced from the annotated dissertation specimen (page 3 of the Sample
+% Pages packet), whose green inch ruler is what fixes the vertical positions,
+% together with the guide's own bullets:
+%
+%   - "Do not use boldface type on the Title Page."
+%   - "The title is to be in all capital letters and single-spaced", and the
+%     specimen's own text says "CENTERED, 2 INCHES FROM THE TOP OF THE PAGE".
+%   - "Capitalize ``By'' and Your Name."
+%   - "``A THESIS'' or ``A DISSERTATION'' is to be in all capital letters."
+%   - "The text block beneath A THESIS or A DISSERTATION should be centered,
+%     left to right, and appear as follows: 1. Submitted to 2. Michigan State
+%     University 3. in partial fulfillment of the requirements 4. for the degree
+%     of 5. <Graduate Degree Granting Unit/Program> - <degree that is being
+%     conferred> 6. <the year of degree conferral>", with the specimen's callout
+%     "These 4 lines should be single-spaced" against lines 1--4.
+%   - "The year in line 6 must match the year listed in the ProQuest account".
+%
+% THE SEPARATOR IN LINE 5 IS AMBIGUOUS AND IS LEFT AS THE PROSE WRITES IT. The
+% guide's text uses a hyphen-minus, "<unit/program> - <degree>"; the rendered
+% specimen shows what looks like an em dash with no space before the degree
+% ("Mechanical Engineering ---Doctor of Philosophy"). RESEARCHING.md says to
+% prefer the prose where a template and the prose disagree, so a spaced hyphen
+% is what is emitted. A reviewer who reads the specimen as authoritative should
+% change one character here.
+%
+% The unit/program string is \thesis@program and must be one of the Graduate
+% Degree Granting Units on the Registrar's list: "Only the units/programs listed
+% here are approved by Michigan State University."
+%
+% Vertical placement: the 2in top is a stated figure and is set exactly. The
+% three gaps below it are NOT stated anywhere, so they are elastic in the
+% proportions the specimen's ruler shows (title to "By" ~1.3in, name to
+% "A DISSERTATION" ~2.9in, year to the bottom margin ~0.9in) rather than frozen,
+% which keeps a long title from pushing the block off the page.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\centering\singlespacing
+		% geometry's top margin is 1in, so 1in more puts the title at 2in.
+		\vspace*{1in}%
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{\stretch{1.3}}
+		By\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{\stretch{2.9}}
+		A \MakeUppercase{\thesis@DocNoun}\par
+		\vspace{\baselineskip}
+		Submitted to\\
+		Michigan State University\\
+		in partial fulfillment of the requirements\\
+		for the degree of\par
+		\vspace{\baselineskip}
+		\thesis@program\ - \thesis@degree\par
+		\vspace{\baselineskip}
+		\thesis@date\par
+		\vspace{\stretch{0.9}}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page ---------------------------------------------------
+% None: the approval is an electronic Approval Form that the Graduate School
+% receives separately, and the guide's list of preliminary pages contains no
+% approval or signature leaf. See the header.
+\thesisnoapprovalpage
