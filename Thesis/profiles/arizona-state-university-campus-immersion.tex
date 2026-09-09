@@ -1,0 +1,243 @@
+% profiles/arizona-state-university-campus-immersion.tex — Arizona State University
+% ============================================================================
+% source: https://graduate.asu.edu/current-students/completing-your-degree/formatting-your-thesis-or-dissertation/asu-graduate-college
+%         (Graduate College, the page that serves the Format Manual)
+% source: https://graduate.asu.edu/sites/default/files/2022-02/asu-graduate-college-format-manual.pdf
+%         ("ASU Graduate College Format Manual", footed "February 2022" on all
+%          twenty pages; the annotated title-page specimen is page 5 of 20)
+% source: https://graduate.asu.edu/current-students/completing-your-degree/formatting-your-thesis-or-dissertation
+%         (the Formatting page, which links the accessibility guidance below)
+% source: https://graduate.asu.edu/sites/g/files/litvpz641/files/2026-08/2026%2008-27%20Best%20Practice%20Creating%20Accessible%20ETD%20v2%20%28HS%29.pdf
+%         ("Best practice for students and faculty advisors: Creating an
+%          accessible Electronic Thesis/Dissertation (ETD)", dated 2026-08-27 in
+%          its own asset path)
+% accessed: 2026-09-09
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the absence of a
+% separate approval page.
+% NOT set:
+%   * \thesissetchapteropening — no deeper chapter-opening margin is prescribed.
+%   * \thesisrequiretagging, \thesisrequiredocumentlanguage,
+%     \thesisrequirepdfstandard — see the accessibility note; ASU's guidance is
+%     published as BEST PRACTICE, not as a filing requirement.
+%
+% NAMING. IPEDS records this unit as "Arizona State University Campus
+% Immersion", an administrative name that appears nowhere in ASU's own
+% documents. The Format Manual's title-page specimen prints "ARIZONA STATE
+% UNIVERSITY", and that is what \thesisinstitution carries and what the page
+% below sets.
+%
+% ============================================================================
+% READ THIS BEFORE FILING: THIS CLASS DOES NOT SATISFY ASU'S TYPEFACE RULE.
+% ============================================================================
+% Unlike every other institution in this directory so far, ASU prescribes the
+% FACE and the SIZE together, from a closed list:
+%
+%     "The Graduate College requires that students use one of the TrueType fonts
+%      listed below. You should retain the same font and font size throughout
+%      your document (preliminary, main text, back matter pages); the only
+%      exception is endnotes and footnotes which may be in a smaller point size."
+%
+%         Arial 10pt · Century 11pt · Garamond 12pt · Georgia 11pt
+%         Sans Serif 10pt · Tahoma 10pt · Times New Roman 12pt · Verdana 10pt
+%
+% texlib-thesis sets Latin Modern at 12pt. Latin Modern is on no part of that
+% list, so a document built with the class as it stands is OUT OF SPEC at ASU —
+% and this is the one requirement a profile has no field for. It cannot be
+% fixed here without a profile reaching past the filing figures into the
+% document's typography, which is not what a profile owns.
+%
+% The filer has to do it, in the document preamble, e.g.
+%
+%     \setmainfont{Times New Roman}      % 12pt, per the list above
+%
+% (fontspec is already loaded by the class, and lualatex will find the system
+% face on Windows and macOS.) Note the manual's further warning: "There are
+% multiple versions of Times New Roman font that vary slightly. If using Times
+% New Roman, make sure that only one version is used consistently throughout
+% entire document." A Times CLONE — TeX Gyre Termes, Nimbus Roman — is metric-
+% compatible but is not the named face; whether the format reviewer accepts one
+% is not something these sources answer, so do not assume it.
+%
+% ONE MORE THING THE PROFILE CANNOT EXPRESS. Pagination: "Title page is not
+% paginated"; "All preliminary pages (title page to preface) are paginated with
+% lowercase Roman numerals, starting with `i' on the abstract"; body pages in
+% arabic "starting with `1' on the first page"; "Place all page numbers at the
+% bottom of the page, centered". The abstract-is-page-i rule in particular is
+% not something the class's \frontmatter produces, and the optional copyright
+% page "does not change pagination". A filer must set that up.
+
+\thesisinstitution{Arizona State University}
+
+% "Every page of your document must meet the margin requirements of 1.25 inches
+% on the left and right, and 1 inch on the top and bottom. All materials
+% including appendices, if you choose to include them, must meet the margin
+% requirements."
+%
+% ASU is the first institution in this directory whose margins are NOT square.
+% The manual's annotated specimen labels the same four figures on the page
+% itself (1.25" at each side, 1" top and bottom), so this is confirmed twice.
+\thesissetgeometry{left=1.25in, right=1.25in, top=1in, bottom=1in}
+
+% "All text must be double-spaced, except: block quotes, appendices,
+% table/figure captions, material in tables, footnotes, endnotes, reference
+% citations, and the optional biographical sketch. You must single-space
+% individual footnotes and reference entries, then double-space between each
+% note and entry." The title page has its own single-spaced blocks, handled
+% below.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% ASU publishes real, specific accessibility guidance — and publishes it as
+% GUIDANCE. The document is titled "Best practice for students and faculty
+% advisors", and its own framing sentence is:
+%
+%     "This document provides guidance to help ensure that ETDs comply with Web
+%      Content Accessibility Guidelines (WCAG) 2.1, level AA in order to adhere
+%      to state and federal law, the ASU IT Accessibility Standard and ASU's
+%      charter."
+%
+% The feature list beneath it is written in the declarative ("Text is selectable
+% and searchable", "All images include alt text", "Include tags") — describing
+% what an accessible document looks like, not stating what the Graduate College
+% will reject a filing over. The February 2022 Format Manual, which IS the
+% document a format review is run against, contains the word "accessib" nowhere
+% at all; its only adjacent line is that four of the eight permitted faces "are
+% designed for easy screen readability and are highly recommended".
+%
+% So the checkable declarations stay UNSET. That follows the reading already
+% applied to Texas A&M: encouragement is not a requirement, and declaring one
+% ASU never published would put words in the Graduate College's mouth. The one
+% sentence that pulls the other way is the second entry below — an ASU standard
+% is asserted to COVER ETDs — and it is quoted here rather than acted on so a
+% reviewer can weigh it without re-reading the source.
+\thesisaccessibilityrequirement{Published as best practice, not as a filing rule}
+	{ASU's accessibility document is titled ``Best practice for students and
+	 faculty advisors'' and says it ``provides guidance to help ensure that ETDs
+	 comply with Web Content Accessibility Guidelines (WCAG) 2.1, level AA''.
+	 The Format Manual that a format review is run against says nothing about
+	 accessibility at all.}
+\thesisaccessibilityrequirement{Scope of the ASU IT Accessibility Standard}
+	{``ASU is committed to providing digital accessibility for resources used by
+	 members of the university community and the general public. The ASU IT
+	 Accessibility Standard covers electronic theses and dissertations (ETDs)
+	 published on the ASU Digital Repository.''}
+\thesisaccessibilityrequirement{Text readability}
+	{``Text is selectable and searchable, not just an image. Fonts are embedded
+	 (also a requirement for ProQuest publication). Avoid including text that
+	 conveys important information within images.''}
+\thesisaccessibilityrequirement{Proper headings}
+	{``Use structured headings (H1, H2, etc.) for easy navigation. Avoid
+	 skipping heading levels and keep formatting consistent.''}
+\thesisaccessibilityrequirement{Alt text for images}
+	{``All images include alt text describing the image for visually impaired
+	 readers, or are marked as decorative. Tables may also include alt text
+	 summaries when needed.''}
+\thesisaccessibilityrequirement{Tagged content}
+	{``Include tags that help assistive technology understand structure.''}
+\thesisaccessibilityrequirement{Logical reading order}
+	{``Content flows in a natural, logical order. Avoid a disorganized or
+	 jumbled reading order. Use simple layouts for tables and include tagged
+	 heading rows/columns.''}
+\thesisaccessibilityrequirement{Document title in the file properties}
+	{``Include the document title under `properties' in final PDF (separate from
+	 the file name).''}
+
+% --- The approval date ---------------------------------------------------------
+% ASU's title page carries TWO dates and the class has one. The upper one is the
+% defence: "Date: month and year of your oral defense; no comma". The lower one
+% is the conferral month: "Date: month (either May, August, or December)", and
+% that is \thesis@date. Set the defence date with \asuapproved{April 2027}.
+% Unset, the page falls back to \thesis@date, which is very likely wrong — so it
+% is worth setting even when the two months happen to agree.
+\newcommand{\asu@approved}{}
+\newcommand{\asuapproved}[1]{\renewcommand{\asu@approved}{#1}}
+
+% --- Title page ----------------------------------------------------------------
+% Reproduced from the Format Manual's annotated specimen (page 5 of 20). The
+% specimen's own text, with the manual's spacing annotations applied:
+%
+%     Eurocentric Myths
+%     in Three Quechua Novels          <- title, double spaced, Title Case
+%     by                               <- all lowercase
+%     Nigel St. John-Smith
+%     [5 single line spaces]
+%     A Dissertation Presented in Partial Fulfillment
+%     of the Requirements for the Degree
+%     Doctor of Philosophy             <- single spaced; degree name only
+%     [10 single line spaces]
+%     Approved April 2013 by the
+%     Graduate Supervisory Committee:
+%
+%     Humbolt Volker, Chair
+%     Jean-Pierre Fusquiere
+%     Mercees Tomlin
+%     ARIZONA STATE UNIVERSITY         <- ALL CAPITAL LETTERS
+%     May 2013
+%
+% Every bullet the manual prints for this page is honoured:
+%   - "Title: double-spaced, Title Case, center aligned" — so \@title is emitted
+%     as written and never uppercased, and never bolded (nothing on this page is).
+%   - "``by'': double-spaced; all lowercase letters, center aligned".
+%   - "Name: what is included in the ASU system".
+%   - "Clause ``A Thesis Presented in Partial Fulfillment'': 5 single line spaces
+%     after name" — the specimen prints "A Dissertation Presented..." for a
+%     doctorate, so the noun comes from \thesis@DocNoun.
+%   - "Description: single-spaced; insert name of degree only".
+%   - "Clause ``Approved [Month] [Year] by the'': ten single line spaces after
+%     the degree".
+%   - "Block 3: ``Graduate Supervisory Committee'' in title case followed by a
+%     colon (:); insert names of committee members; comma and space before Chair
+%     and Co-Chair" — so a member with no role prints bare, and the class's
+%     signature rule must go: ASU collects no signatures on this page.
+%   - "University: ALL CAPITAL LETTERS".
+%   - "Title page is not paginated".
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\centering
+		% The specimen's title block begins AT the 1in top margin -- no leading
+		% fill. The single slack in the page is above the university line, which
+		% the manual's own annotation places at the foot.
+		{\doublespacing
+		 \thesis@tagtitle{Title}{\@title}\par
+		 by\par
+		 \@author\par}%
+		% "5 single line spaces" and, below, "ten single line spaces" -- SINGLE,
+		% so they are measured against the single-spaced baseline, not against
+		% the page's double-spaced one. Taking them at the ambient (double)
+		% \baselineskip overruns the page and pushes the last committee member
+		% and the university line off it.
+		{\singlespacing
+		 \vspace{5\baselineskip}
+		 A \thesis@DocNoun\ Presented in Partial Fulfillment\\
+		 of the Requirements for the Degree\\
+		 \thesis@degree\par
+		 \vspace{10\baselineskip}
+		 Approved \ifx\asu@approved\@empty\thesis@date\else\asu@approved\fi\
+		 by the\\
+		 Graduate Supervisory Committee:\par
+		 \vspace{\baselineskip}
+		 % No rules: ASU prints typed names only, with a role label on the chair
+		 % and co-chairs and on nobody else.
+		 \begingroup
+		 \renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par
+		 }%
+		 \thesis@committee
+		 \endgroup}%
+		\vfill
+		{\doublespacing
+		 ARIZONA STATE UNIVERSITY\par
+		 \thesis@date\par}%
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page ---------------------------------------------------
+% None. The Graduate Supervisory Committee is named on the title page above, and
+% the manual's "Contents and Order" list runs Title Page, Copyright page,
+% Abstract, Dedication, Acknowledgments, Table of Contents, ... with no approval
+% or signature leaf anywhere in it.
+\thesisnoapprovalpage
