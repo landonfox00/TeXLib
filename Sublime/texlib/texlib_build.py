@@ -1334,6 +1334,7 @@ class TexlibBuildCore:
         self._variant_build = True
         self._variant_pdfs = []
         yield from self._build_once(base, engine, None)
+        self._offer_preview(tex_dir)
 
         meta = self._read_buildmeta(tex_dir)
         override = self._configured_variants()
@@ -1657,6 +1658,51 @@ class TexlibBuildCore:
             self.display(
                 "TeXLib: removed stale artifacts no longer planned: "
                 + ", ".join(sorted(removed)) + "\n")
+
+    def _offer_preview(self, tex_dir):
+        """Put <base>.pdf in front of the user as soon as the base compile ends.
+
+        The base PDF is finished and final at that moment -- everything the
+        fan-out does afterwards writes OTHER files (the tagged twins, the
+        variant copies, the per-version slices). Waiting for all of it to open a
+        viewer means waiting on work you are not looking at: measured on a
+        twelve-version exam, the base PDF is ready at 7s of a 126s build.
+
+        The host decides whether to act (it owns the viewer and the
+        preferred_pdf preference) by supplying `preview_ready`; a host without
+        one -- the LaTeXTools adapter, the CLI -- is unaffected.
+
+        Only the PDF is copied back, not the .synctex.gz: the final
+        _finalize_synctex swaps that for an uncompressed .synctex specifically so
+        SumatraPDF does not build its own decompression cache beside it, and
+        handing it the .gz early would provoke exactly that file. SyncTeX starts
+        working when the build finishes, a few seconds after you are already
+        reading the page.
+
+        Skipped for a .spl build: _postprocess replaces <base>.pdf with its two
+        halves there, so previewing it would put up a file about to vanish. The
+        signal is written by the base compile, so it is already knowable here.
+        """
+        hook = getattr(self, "preview_ready", None)
+        if hook is None:
+            return
+        aux = getattr(self, "_aux_target", None) or tex_dir
+        if os.path.exists(os.path.join(aux, self.base_name + ".spl")):
+            return
+        src = os.path.join(aux, self.base_name + ".pdf")
+        dst = os.path.join(tex_dir, self.base_name + ".pdf")
+        if aux != tex_dir and os.path.exists(src):
+            self._force_remove(dst)
+            try:
+                shutil.copy2(src, dst)
+            except OSError:
+                return
+        if not os.path.exists(dst):
+            return
+        try:
+            hook(dst)
+        except Exception:  # noqa: BLE001 - a viewer must not fail a build
+            pass
 
     def _sweep_stale_version_slices(self, tex_dir, built):
         """Delete per-version slices belonging to variants this build dropped.

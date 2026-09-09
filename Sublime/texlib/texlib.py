@@ -782,10 +782,46 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         # it has (a multi-copy exam's _A_solutions.pdf only exists post-slice).
         preferred = settings.get("preferred_pdf")
 
+        # Early preview: the core offers <base>.pdf the moment the base compile
+        # ends, before the tagged twins and the variant lanes it does not affect.
+        # Held so on_success can tell "already showing this exact file" from
+        # "the preference resolved somewhere else".
+        early = {"pdf": None}
+
+        def preview_ready(pdf):
+            """Open the base PDF mid-build. Runs in the build worker.
+
+            Declined when the preference is going to resolve to some OTHER copy:
+            swapping the viewer from the base PDF to a sliced one halfway through
+            is worse than waiting for the right file. With preferred_pdf unset or
+            "combined" -- the default, and the only value forward sync can aim at
+            -- the early file IS the final one, so there is nothing to swap.
+            """
+            if not settings.get("open_pdf_early", True):
+                return
+            if not settings.get("open_pdf_on_build", True):
+                return
+            want = (preferred or "combined").strip().lower()
+            if want not in ("", "combined", "default", "main"):
+                return
+            early["pdf"] = pdf
+            emit("TeXLib: %s is ready -- opening it now; the accessible and "
+                 "variant copies keep building.\n" % os.path.basename(pdf))
+            sublime.set_timeout(lambda: _post_build_view(window, root, pdf), 0)
+
+        host.preview_ready = preview_ready
+
         def on_success():
             # Post-build PDF open + forward sync (Tier C). `root` rides along:
             # the active view may be a different document by the time this runs.
             pdf = host.preferred_pdf_path(preferred)
+            # Already up from the early preview, and untouched since: opening it
+            # again only steals focus a second time. SyncTeX is the one thing
+            # that changed underneath it, and the viewer picks that up on its
+            # own the next time it is asked to sync.
+            if early["pdf"] and _same_path(early["pdf"], pdf):
+                _remember_preferred(root, pdf)
+                return
             sublime.set_timeout(lambda: _post_build_view(window, root, pdf), 0)
 
         def on_finish(state, error_lines, warning_lines):

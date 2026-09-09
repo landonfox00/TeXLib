@@ -505,6 +505,64 @@ def main():
     check("parallel: build_jobs=1 keeps the serial path",
           none_batches == [], none_batches)
 
+    # (k1q) EARLY PREVIEW. <base>.pdf is final once the base compile ends -- the
+    # rest of the fan-out writes other files -- so the host is offered it there
+    # rather than after everything. The offer must land BEFORE the lanes are
+    # handed over, or it has bought nothing.
+    def run_preview_builder(extra_files=None, mode="default"):
+        tmp = tempfile.mkdtemp(prefix="texlib_pv_")
+        with open(os.path.join(tmp, "doc.tex"), "w", encoding="utf-8") as fh:
+            fh.write(PSET)
+        with open(os.path.join(tmp, "doc.buildmeta"), "w", encoding="utf-8") as fh:
+            fh.write(FULL_META)
+        # A real PDF is what the offer is about; aux routing off so the file the
+        # core looks for is the one written here.
+        for name in ("doc.pdf",) + tuple(extra_files or ()):
+            with open(os.path.join(tmp, name), "wb") as fh:
+                fh.write(b"%PDF-1.7\n")
+        b = TexlibBuilder(aux_directory="")
+        b.tex_root = os.path.join(tmp, "doc.tex")
+        b.tex_name, b.base_name, b.tex_dir = "doc.tex", "doc", tmp
+        b.engine, b.out = "pdflatex", ""
+        b.options = ["--texlib-mode=%s" % mode]
+        b.builder_settings = {"build_jobs": 4}
+        events = []
+        b.preview_ready = lambda pdf: events.append(("preview", pdf))
+        b.run_parallel = lambda lanes, n: events.append(("lanes", len(lanes)))
+        gen = b.commands()
+        try:
+            next(gen)
+            while True:
+                gen.send(0)
+        except StopIteration:
+            pass
+        return events, tmp
+
+    ev, pv_tmp = run_preview_builder()
+    kinds = [k for k, _ in ev]
+    check("preview: the host is offered the base PDF",
+          kinds.count("preview") == 1, kinds)
+    check("preview: it is offered BEFORE the lanes are dispatched",
+          "preview" in kinds and "lanes" in kinds
+          and kinds.index("preview") < kinds.index("lanes"), kinds)
+    check("preview: the offer is <base>.pdf beside the source",
+          any(k == "preview" and p == os.path.join(pv_tmp, "doc.pdf")
+              for k, p in ev),
+          [p for k, p in ev if k == "preview"])
+
+    # A .spl build replaces <base>.pdf with its two halves in _postprocess, so
+    # previewing it would put up a file that is about to vanish.
+    spl_ev, _ = run_preview_builder(extra_files=("doc.spl",))
+    check("preview: declined for a .spl split build",
+          "preview" not in [k for k, _ in spl_ev], [k for k, _ in spl_ev])
+
+    # A single-compile mode has nothing to preview EARLY -- the build ends where
+    # the offer would be made -- so it goes through the ordinary end-of-build
+    # path and the hook is never called.
+    base_ev, _ = run_preview_builder(mode="base")
+    check("preview: a single-compile mode makes no early offer",
+          "preview" not in [k for k, _ in base_ev], [k for k, _ in base_ev])
+
     # And a host with no run_parallel (the LaTeXTools adapter) is untouched.
     check("parallel: without a capable host every variant is still yielded",
           all(t in " ".join(_args(serial))
