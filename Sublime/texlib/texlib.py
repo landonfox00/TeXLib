@@ -38,6 +38,10 @@ try:
     from TeXLib import texlib_build
 except ImportError:
     import texlib_build
+try:
+    from TeXLib import texlib_buildspec as _spec
+except ImportError:
+    import texlib_buildspec as _spec
 
 # CREATE_NO_WINDOW: we own the engine's Popen, so we suppress the Windows console
 # flash directly -- no need for the builder's LaTeXTools-internal monkeypatch.
@@ -394,6 +398,24 @@ def _spin_ensure():
 
 # --- Engine runner (the new surface: async, streamed, cancellable) -----------
 def _run_argv(cmd, cwd, emit, cancel, texinputs, aux_dir, entry):
+    """Run one engine/biber command, retrying once past a luaotfload cache abort.
+
+    That abort is a startup race between concurrent engines over one shared
+    probe filename (see texlib_buildspec.luaotfload_cache_aborted), not anything
+    the document did: the process dies before LaTeX begins, so re-running it
+    costs a startup and nothing else. Retried ONCE -- a second failure is either
+    very bad luck or a genuinely unusable cache directory, and both deserve to
+    reach the log rather than a loop.
+    """
+    out = _run_argv_once(cmd, cwd, emit, cancel, texinputs, aux_dir, entry)
+    if not cancel.is_set() and _spec.luaotfload_cache_aborted(out):
+        emit("TeXLib: luaotfload lost its cache-path race with another "
+             "engine; running that pass again.\n")
+        out = _run_argv_once(cmd, cwd, emit, cancel, texinputs, aux_dir, entry)
+    return out
+
+
+def _run_argv_once(cmd, cwd, emit, cancel, texinputs, aux_dir, entry):
     """Run one engine/biber command; stream combined output via `emit`; return
     the full captured text (fed back to the brain as self.out for rerun/biber
     detection). The aux dir is injected into THIS subprocess's own env (never a
@@ -760,10 +782,46 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         # it has (a multi-copy exam's _A_solutions.pdf only exists post-slice).
         preferred = settings.get("preferred_pdf")
 
+        # Early preview: the core offers <base>.pdf the moment the base compile
+        # ends, before the tagged twins and the variant lanes it does not affect.
+        # Held so on_success can tell "already showing this exact file" from
+        # "the preference resolved somewhere else".
+        early = {"pdf": None}
+
+        def preview_ready(pdf):
+            """Open the base PDF mid-build. Runs in the build worker.
+
+            Declined when the preference is going to resolve to some OTHER copy:
+            swapping the viewer from the base PDF to a sliced one halfway through
+            is worse than waiting for the right file. With preferred_pdf unset or
+            "combined" -- the default, and the only value forward sync can aim at
+            -- the early file IS the final one, so there is nothing to swap.
+            """
+            if not settings.get("open_pdf_early", True):
+                return
+            if not settings.get("open_pdf_on_build", True):
+                return
+            want = (preferred or "combined").strip().lower()
+            if want not in ("", "combined", "default", "main"):
+                return
+            early["pdf"] = pdf
+            emit("TeXLib: %s is ready -- opening it now; the accessible and "
+                 "variant copies keep building.\n" % os.path.basename(pdf))
+            sublime.set_timeout(lambda: _post_build_view(window, root, pdf), 0)
+
+        host.preview_ready = preview_ready
+
         def on_success():
             # Post-build PDF open + forward sync (Tier C). `root` rides along:
             # the active view may be a different document by the time this runs.
             pdf = host.preferred_pdf_path(preferred)
+            # Already up from the early preview, and untouched since: opening it
+            # again only steals focus a second time. SyncTeX is the one thing
+            # that changed underneath it, and the viewer picks that up on its
+            # own the next time it is asked to sync.
+            if early["pdf"] and _same_path(early["pdf"], pdf):
+                _remember_preferred(root, pdf)
+                return
             sublime.set_timeout(lambda: _post_build_view(window, root, pdf), 0)
 
         def on_finish(state, error_lines, warning_lines):

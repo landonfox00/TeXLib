@@ -218,6 +218,13 @@ VARIANT_ENV = "TEXLIB_VARIANTS"
 JOBS_SETTING = "build_jobs"
 JOBS_ENV = "TEXLIB_JOBS"
 
+# Whether a fan-out also builds the tagged PDF/UA twin of the base and of every
+# variant. On by default -- the tagged copies are the ones that go to an LMS --
+# but they are ~3x the cost of an untagged pass, so a write loop can turn them
+# off and get them back on the build that ships.
+TAGGED_TWINS_SETTING = "tagged_twins"
+TAGGED_TWINS_ENV = "TEXLIB_TAGGED_TWINS"
+
 # Build mode  ->  the compile-time macro the TeXLib classes respond to.
 # texlib-build.sty turns these \def's into the \ifsolutions / \ifkey / ...
 # conditionals that every TeXLib class branches on.
@@ -1213,9 +1220,13 @@ class TexlibBuildCore:
           * DETECTED. The document says what it actually contains. No
             {solution} anywhere means `solutions' and `instructor' would be
             byte-identical to the plain build; no \\rubric and no
-            {commonerrors} means `instructor' differs from `solutions' by its
-            badge alone -- still worth having (the badge is how you tell the
-            copies apart in a stack) but worth SAYING, so it is reported.
+            {commonerrors} means `instructor' differs from `solutions' by one
+            word on the cover, so it is not built either. That second gate used
+            to be a comment here saying the badge was "still worth having" --
+            it is not worth a whole compile, a whole tagged twin, and (on a
+            versioned exam) a whole set of slices: 13 near-duplicate PDFs for
+            one word. `full', or a rubric appearing in the bank, brings it
+            straight back.
 
         `prune=False' (the `full' mode) applies the declared gate only. There
         is no point offering a variant the class cannot render differently,
@@ -1235,6 +1246,17 @@ class TexlibBuildCore:
             if prune and name in ("solutions", "instructor") \
                     and (meta or {}).get("has-solutions") != "1":
                 skipped.append((name, "no solution content in this document"))
+                continue
+            # The instructor copy exists to carry the rubric and the
+            # common-error notes. With neither in the document it is the
+            # solutions copy with a different word on the cover, and the
+            # solutions copy is the one every downstream tool already looks for.
+            if prune and name == "instructor" \
+                    and (meta or {}).get("has-rubric") != "1" \
+                    and (meta or {}).get("has-commonerrors") != "1":
+                skipped.append((name, "no rubric or common-error content; it "
+                                      "would differ from solutions by its "
+                                      "badge alone"))
                 continue
             variants.append(name)
         # An inline key is only meaningful where {partsolution} is used, so it
@@ -1312,6 +1334,7 @@ class TexlibBuildCore:
         self._variant_build = True
         self._variant_pdfs = []
         yield from self._build_once(base, engine, None)
+        self._offer_preview(tex_dir)
 
         meta = self._read_buildmeta(tex_dir)
         override = self._configured_variants()
@@ -1345,14 +1368,31 @@ class TexlibBuildCore:
         if override == []:
             return
 
+        # Tagging is where a build's time actually goes: measured on this
+        # course's 12-version Exam 1, an untagged pass is 6.8s and a tagged one
+        # ~20s, so the tagged twins were 118s of a 126s build. They are what
+        # reaches an LMS, so they stay ON by default -- but a write loop that
+        # pays 3x per keystroke for a PDF nobody is reading yet is a bad trade,
+        # and `tagged_twins: false` (or TEXLIB_TAGGED_TWINS=0) buys it back.
+        # Turning it off means this build produces NO <base>_accessible.pdf, so
+        # the sweep below removes the stale ones rather than leaving a tagged
+        # PDF that no longer matches its source.
+        tagged_twins = self._setting_on(
+            TAGGED_TWINS_SETTING, TAGGED_TWINS_ENV, True)
+        if not tagged_twins:
+            self._variants_skipped.append(
+                ("tagged twins", "tagged_twins is off; the _accessible.pdf "
+                                 "copies are not being built"))
+
         # The base tagged twin goes first, on its own, because its run 1 is the
         # mathml-SE probe (see ACCESSIBLE_DOCMETA) and every other tagged lane
         # needs that verdict before it can be given a command line. It is also
         # the twin veraPDF reports on, so it is the one worth having early.
-        yield from self._build_one_variant(
-            "base", VARIANT_MACROS.get("base", ""), engine, tex_dir,
-            engine_options, tagged=True)
-        self._variants_built.append(("base", True))
+        if tagged_twins:
+            yield from self._build_one_variant(
+                "base", VARIANT_MACROS.get("base", ""), engine, tex_dir,
+                engine_options, tagged=True)
+            self._variants_built.append(("base", True))
 
         # Everything else is independent: each variant owns its output
         # directory and shares no aux state with any other, which is exactly
@@ -1362,7 +1402,9 @@ class TexlibBuildCore:
         # below). The engines' Lua scratch is named from \jobname, which every
         # lane shares, so one shared scratch dir has concurrent lanes
         # overwriting each other's served problem bodies mid-read.
-        lanes = [(v, False) for v in variants] + [(v, True) for v in variants]
+        lanes = [(v, False) for v in variants]
+        if tagged_twins:
+            lanes += [(v, True) for v in variants]
         if not lanes:
             return
         # The base tagged twin above has already settled the mathml-SE verdict,
@@ -1581,19 +1623,25 @@ class TexlibBuildCore:
         keep = {self._variant_pdf_name(self.base_name, variant, tagged).lower()
                 for variant, tagged in built}
         removed = []
-        for variant in VARIANT_MACROS:
-            for tagged in (False, True):
-                name = self._variant_pdf_name(self.base_name, variant, tagged)
-                if name.lower() in keep:
-                    continue
-                path = os.path.join(tex_dir, name)
-                if not os.path.exists(path):
-                    continue
-                # _force_remove returns None whether or not it succeeded, so
-                # confirm by absence rather than by its return value.
-                self._force_remove(path)
-                if not os.path.exists(path):
-                    removed.append(name)
+        # `base` is swept too, but ONLY its tagged spelling: <base>.pdf is the
+        # artifact the build exists to make, while <base>_accessible.pdf is a
+        # planned variant like any other and goes stale the moment a build stops
+        # producing it (tagged_twins off, or an accessible run that failed).
+        candidates = [(v, t) for v in VARIANT_MACROS for t in (False, True)]
+        candidates.append(("base", True))
+        for variant, tagged in candidates:
+            name = self._variant_pdf_name(self.base_name, variant, tagged)
+            if name.lower() in keep:
+                continue
+            path = os.path.join(tex_dir, name)
+            if not os.path.exists(path):
+                continue
+            # _force_remove returns None whether or not it succeeded, so
+            # confirm by absence rather than by its return value.
+            self._force_remove(path)
+            if not os.path.exists(path):
+                removed.append(name)
+        removed += self._sweep_stale_version_slices(tex_dir, built)
         # The conformance report describes the base tagged PDF specifically, so
         # it goes when that PDF does. A report outliving the file it certifies
         # is the same failure mode as a stale _instructor.pdf, and worse in
@@ -1610,6 +1658,108 @@ class TexlibBuildCore:
             self.display(
                 "TeXLib: removed stale artifacts no longer planned: "
                 + ", ".join(sorted(removed)) + "\n")
+
+    def _offer_preview(self, tex_dir):
+        """Put <base>.pdf in front of the user as soon as the base compile ends.
+
+        The base PDF is finished and final at that moment -- everything the
+        fan-out does afterwards writes OTHER files (the tagged twins, the
+        variant copies, the per-version slices). Waiting for all of it to open a
+        viewer means waiting on work you are not looking at: measured on a
+        twelve-version exam, the base PDF is ready at 7s of a 126s build.
+
+        The host decides whether to act (it owns the viewer and the
+        preferred_pdf preference) by supplying `preview_ready`; a host without
+        one -- the LaTeXTools adapter, the CLI -- is unaffected.
+
+        Only the PDF is copied back, not the .synctex.gz: the final
+        _finalize_synctex swaps that for an uncompressed .synctex specifically so
+        SumatraPDF does not build its own decompression cache beside it, and
+        handing it the .gz early would provoke exactly that file. SyncTeX starts
+        working when the build finishes, a few seconds after you are already
+        reading the page.
+
+        Skipped for a .spl build: _postprocess replaces <base>.pdf with its two
+        halves there, so previewing it would put up a file about to vanish. The
+        signal is written by the base compile, so it is already knowable here.
+        """
+        hook = getattr(self, "preview_ready", None)
+        if hook is None:
+            return
+        aux = getattr(self, "_aux_target", None) or tex_dir
+        if os.path.exists(os.path.join(aux, self.base_name + ".spl")):
+            return
+        src = os.path.join(aux, self.base_name + ".pdf")
+        dst = os.path.join(tex_dir, self.base_name + ".pdf")
+        if aux != tex_dir and os.path.exists(src):
+            self._force_remove(dst)
+            try:
+                shutil.copy2(src, dst)
+            except OSError:
+                return
+        if not os.path.exists(dst):
+            return
+        try:
+            hook(dst)
+        except Exception:  # noqa: BLE001 - a viewer must not fail a build
+            pass
+
+    def _sweep_stale_version_slices(self, tex_dir, built):
+        """Delete per-version slices belonging to variants this build dropped.
+
+        A versioned exam multiplies every variant by its version count, so the
+        combined <base>_instructor.pdf is one file and <base>_1A_instructor.pdf
+        .. <base>_6B_instructor.pdf are twelve more. Sweeping only the combined
+        name left those twelve sitting in the folder looking current -- the
+        exact failure the sweep exists to prevent, twelve times over.
+
+        The names are built from the version labels in this build's own .vmap,
+        never globbed. `<base>_*_instructor.pdf` looks like the obvious pattern
+        and is wrong: exam1's sweep matched exam1_review_instructor.pdf, a
+        different document that merely starts with the same characters. Reading
+        the labels means only <base>_<label><suffix>.pdf is ever considered.
+
+        `solutions` and `solutions-inline` deliberately share `_solutions`, so a
+        suffix is only swept when NO built variant claims it.
+        """
+        labels = self._version_labels()
+        if not labels:
+            return []
+        keep_suffixes = {self.VARIANT_SLICE_SUFFIX.get(v)
+                         for v, _tagged in built}
+        keep_suffixes.discard(None)
+        removed = []
+        for suffix in set(self.VARIANT_SLICE_SUFFIX.values()) - keep_suffixes:
+            for label in labels:
+                name = "%s_%s%s.pdf" % (self.base_name, label, suffix)
+                path = os.path.join(tex_dir, name)
+                if not os.path.exists(path):
+                    continue
+                self._force_remove(path)
+                if not os.path.exists(path):
+                    removed.append(name)
+        return removed
+
+    def _version_labels(self):
+        """This document's \\versions labels, read from the base build's .vmap.
+
+        The .vmap is written by the engine into the aux dir and consumed later
+        by _slice_versions_from_vmap, so it is still on disk while the sweep
+        runs. A single-version document writes none, and gets an empty list --
+        which is also the right answer for "there are no per-version slices".
+        """
+        search_dir = getattr(self, "_aux_target", None) or self._tex_dir()
+        vmap = os.path.join(search_dir, self.base_name + ".vmap")
+        labels = []
+        try:
+            with open(vmap, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    parts = line.strip().split("|")
+                    if len(parts) == 3 and parts[0] and parts[0] not in labels:
+                        labels.append(parts[0])
+        except OSError:
+            return []
+        return labels
 
     def _accessible_out_dir(self):
         """Aux subdirectory the accessible build writes into (created on demand)."""

@@ -128,6 +128,35 @@ def luamml_se_aborted(log_text):
 def _FLATTEN(s):
     return re.sub(r"\s+", "", s)
 
+
+# luaotfload's verdict when it cannot claim a cache directory. See
+# luaotfload_cache_aborted below for why a parallel build provokes it.
+LUAOTFLOAD_CACHE_ABORT = "no writeable cache path, quiting"
+
+
+def luaotfload_cache_aborted(log_text):
+    """True when a run died before LaTeX started because luaotfload could not
+    claim a cache path -- a startup race between concurrent engines, not a
+    property of the document.
+
+    luaotfload decides whether a $TEXMFCACHE entry is usable by writing a probe
+    file into it, closing it and deleting it (fontloader-l-file.lua's
+    file.is_writable; LuaTeX's lfs has no iswritablefile, so the probe is the
+    implementation). The probe's name is a CONSTANT -- m_t_x_t_e_s_t.tmp -- so
+    every concurrent engine writes and deletes the same path in the same
+    directory. On Windows a delete leaves the name briefly unopenable, so a
+    second process's io.open returns nil, luaotfload reads that as "not
+    writable", runs off the end of the cache list and calls os.exit: no PDF, and
+    a traceback instead of a LaTeX error. Measured at ~11% of probes under
+    eight-way contention on one directory.
+
+    Nothing document-side can prevent it and the paths cannot be separated (an
+    engine pointed at a private $TEXMFCACHE fails this same check outright), so
+    the answer is to notice it and spend the pass again. It is a startup
+    failure, so the retry is cheap: nothing had been typeset yet.
+    """
+    return LUAOTFLOAD_CACHE_ABORT in (log_text or "")
+
 # The marker the classes gate their accessible branches on (\ifdefined
 # \TeXLibAccessibleMode). Defined on the command line, never in the source.
 ACCESSIBLE_MACRO = ACCESSIBLE_DOCMETA + r"\def\TeXLibAccessibleMode{}"

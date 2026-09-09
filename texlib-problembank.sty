@@ -566,6 +566,50 @@
 \newcounter{texlibpartno}
 \newcounter{@texlib@qcarry}
 
+% ---- "Part N" prefix: only when there IS more than one part -----------------
+% "Part I — Free Response" on a document whose every page says Part I names a
+% distinction the reader cannot use.  The prefix is therefore emitted only when
+% the document actually has two or more HEADED sections; a one-section document
+% (most quizzes, every review sheet, a free-response-only exam) is headed
+% "Free Response" alone, in the body and in the running header both.
+%
+% The count is only knowable AFTER the last section, so it goes through the
+% .aux: \@texlib@partmax records the most sections any one copy showed this run
+% (a multi-version exam resets texlibpartno per copy, so it is a max, not a
+% total), \TeXLibPartSectionCount plays it back on the next pass.  Nothing needs
+% to ask for a rerun: the builder's convergence check fingerprints the .aux, so
+% a changed count is itself the request.  The first pass of a fresh build has no
+% count and suppresses the prefix, which is the right guess -- one section is
+% the common case, and a second section corrects it on the next pass.
+\newcounter{@texlib@partmax}
+\providecommand{\TeXLibPartSectionCount}[1]{\gdef\@texlib@partcount{#1}}
+\providecommand{\@texlib@partcount}{0}
+\AtEndDocument{%
+	\immediate\write\@auxout{%
+		\string\TeXLibPartSectionCount{\the\c@@texlib@partmax}%
+	}%
+}
+% \@texlib@notepart — record that a HEADED section just opened.  Only headed
+% sections count: the starred forms suppress the heading, so they are not parts
+% the reader could be asked to tell apart.  A max, not a step: texlibpartno
+% restarts at 0 for every copy of a multi-version exam.
+\newcommand{\@texlib@notepart}{%
+	\ifnum\c@texlibpartno>\c@@texlib@partmax
+		\global\c@@texlib@partmax\c@texlibpartno
+	\fi
+}
+% \@texlib@partlabel{default-label}{user-label} — the heading text itself.
+% Must be EXPANDABLE: autoexam feeds it to \markboth, and \mark expands its
+% argument at once, so a \def here would be copied into the mark rather than
+% executed and the macro it defines would be undefined by the time the \if read
+% it.  Hence \detokenize for the empty test rather than the usual \ifx scratch.
+\newcommand{\@texlib@partlabel}[2]{%
+	\ifnum\@texlib@partcount>\@ne
+		Part~\Roman{texlibpartno}\space\textemdash\space
+	\fi
+	\if\relax\detokenize{#2}\relax #1\else #2\fi
+}
+
 % \texlib@partheading{text} — render a section's "Part N — Label" heading.
 % Overridable per class; the default is a starred section that texlib-sectionhang
 % styles like every other heading.  The heading is emitted inside the exam-class
@@ -628,11 +672,8 @@
 	%   never replays it in-list. Normal builds keep the in-list emission below.
 	\ifdefined\TeXLibAccessibleMode
 		\if 1#4%
-			\def\@texlib@ulbl{#3}%
-			\texlib@partheading{%
-				Part~\Roman{texlibpartno}\space\textemdash\space
-				\ifx\@texlib@ulbl\@empty #2\else #3\fi
-			}%
+			\@texlib@notepart
+			\texlib@partheading{\@texlib@partlabel{#2}{#3}}%
 		\fi
 	\fi
 	% ---- inter-problem separator: first problem on a page gets no rule -------
@@ -659,11 +700,8 @@
 	%   hoisted out of the list, so skip here to avoid a duplicate.
 	\ifdefined\TeXLibAccessibleMode\else
 		\if 1#4%
-			\def\@texlib@ulbl{#3}%
-			\texlib@partheading{%
-				Part~\Roman{texlibpartno}\space\textemdash\space
-				\ifx\@texlib@ulbl\@empty #2\else #3\fi
-			}%
+			\@texlib@notepart
+			\texlib@partheading{\@texlib@partlabel{#2}{#3}}%
 		\fi
 	\fi
 }

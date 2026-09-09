@@ -4,7 +4,106 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- **The viewer opens on `<base>.pdf` as soon as the base compile ends, not when
+  the fan-out does.** That PDF is final at that moment — everything after it
+  writes *other* files (the tagged twins, the variant copies, the per-version
+  slices), so waiting for them is waiting on work you are not looking at. On a
+  twelve-version exam the page is up at **7.4s of a 128s build**, and the rest
+  continues behind it. The core offers the file through an optional
+  `preview_ready` hook and the host decides whether to act, so the LaTeXTools
+  adapter and the CLI are unaffected; the Sublime host declines when
+  `preferred_pdf` points at a different copy, rather than swapping the viewer
+  out from under you mid-build. Only the PDF is copied back early — the
+  `.synctex.gz` is deliberately left until `_finalize_synctex` has replaced it
+  with the uncompressed map SumatraPDF prefers — and a `.spl` split build is
+  skipped, since `<base>.pdf` does not survive that one. New setting:
+  `open_pdf_early` (default on).
+
+- **`tagged_twins` / `TEXLIB_TAGGED_TWINS` — keep the write loop off the PDF/UA
+  path.** Tagging is where a build's time actually goes. Measured on a
+  twelve-version exam: an untagged pass is 6.8s, a tagged one ~20s, and the
+  tagged twins were **118s of a 126s build**. They are the copies that reach an
+  LMS, so they stay on by default; turning them off takes that build to **22s**.
+  A build with them off produces no `<base>_accessible.pdf`, so the stale sweep
+  removes the ones a previous build left, rather than leaving a tagged PDF that
+  no longer matches its source.
+
+### Changed
+
+- **A document with one problem-section is no longer headed "Part I".** The
+  `Part N —` prefix now appears only when there really are two or more headed
+  sections — in the body heading and the running header both — so a quiz, a
+  review sheet or a free-response-only exam reads "Free Response", while a
+  two-section exam still reads Part I / Part II. The section count round-trips
+  through the `.aux`; nothing has to request a rerun, because the builder's
+  convergence check fingerprints the `.aux` and a changed count *is* the
+  request. Starred sections do not count (they emit no heading), and the count
+  is a per-copy maximum, since a multi-version exam restarts the counter for
+  every copy.
+
+- **The `instructor` variant is not built when it would only differ by its
+  badge.** It exists to carry the rubric and the common-error notes; with
+  neither in the document it is the solutions copy with one different word on
+  the cover. `has-rubric` and `has-commonerrors` are already in the `.buildmeta`
+  the base compile writes, so the decision happens before any lane is spawned.
+  On a twelve-version exam that was 13 near-duplicate PDFs. `full` builds it
+  regardless, and the omission is reported like every other.
+
+- **An `exam-date` the author wrote is authoritative even when empty.** A review
+  sheet or a take-home has no date, and `exam-date = {}` is how a document says
+  so. That used to be indistinguishable from never setting the key, so the cover
+  printed the red `\todo` placeholder meant for the exam whose date nobody
+  remembered. The cover line is emitted conditionally too, so an absent date
+  leaves no blank strut behind.
+
+### Fixed
+
+- **A luaotfload cache-path race cost roughly one parallel build in five.** The
+  lane died before LaTeX started, with a traceback and no PDF:
+  `"no writeable cache path, quiting"`. luaotfload decides whether a
+  `$TEXMFCACHE` entry is usable by writing a probe file into it, closing it and
+  deleting it — and the probe's name is a constant, `m_t_x_t_e_s_t.tmp`
+  (LuaTeX's `lfs` has no `iswritablefile`, so the probe *is* the
+  implementation). Every concurrent engine writes and deletes the same path in
+  the same directory, and on Windows a delete leaves that name briefly
+  unopenable, so another process's `io.open` returns nil, luaotfload reads "not
+  writable", runs off the end of the cache list and exits. Measured at ~11% of
+  probes under eight-way contention. The paths cannot be separated — an engine
+  pointed at a private `$TEXMFCACHE` fails the same check outright — so both
+  hosts recognise the abort and spend the pass again. It is a startup failure,
+  so the retry costs a startup and nothing else.
+
+- **The stale sweep missed two whole classes of artifact.** It walked
+  `VARIANT_MACROS`, which does not contain `base`, so `<base>_accessible.pdf`
+  outlived any build that stopped producing it; and it only ever considered the
+  *combined* name, so a versioned exam's twelve `<base>_1A_instructor.pdf`
+  slices stayed in the folder looking current — the exact failure the sweep
+  exists to prevent, twelve times over. Slice names are built from the version
+  labels in the build's own `.vmap`, never globbed: `<base>_*_instructor.pdf` is
+  the obvious pattern and is wrong, because `exam1`'s sweep matches
+  `exam1_review_instructor.pdf`, a different document that merely starts with
+  the same characters.
+
 ## [0.9.0] — 2026-09-08
+
+### Fixed
+
+- **Concurrent variant lanes overwrote each other's engine scratch.** Shipped in
+  0.9.0 but described here after the fact, because it was folded into the
+  release commit rather than landing on its own. Every lane of a fan-out was
+  handed the *same* `TEXLIB_AUX_DIR` — the build-wide aux root — while only its
+  `-output-directory` was per-lane. The Lua engines write their scratch
+  (`<jobname>_synctex.tex`, `<jobname>_prob_*.tex`, `.sco`, `.srcmap`,
+  `<jobname>_autoexam_body.tex`) into `TEXLIB_AUX_DIR` by raw `io.open`, named
+  from `\jobname`, which every lane shares — so lanes overwrote each other's
+  served problem bodies between the write and the `\@@input` that read them.
+  The result was a solutions or instructor PDF spliced out of two variants, with
+  errors like `\end{parts}` without a `\begin{parts}` that pointed at
+  source that was perfectly correct, while the serial base compile stayed clean.
+  Each lane now gets its own output directory as its aux dir — what the env var
+  was always meant to mirror.
 
 ### Fixed
 
