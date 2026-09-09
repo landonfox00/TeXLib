@@ -163,6 +163,11 @@ _DYNAMIC_ARG_RE = re.compile(r"\\|#")
 # shared preamble). Looked for beside the document and one level up.
 _IMPLICIT = ("coursemeta.tex", "preamble.tex")
 
+# Where a preamble ends. mylatexformat dumps its image of everything before this
+# and nothing after it, so a format cache keyed for that dump stops reading here.
+# No TeXLib document uses \endofdump, which is the one marker that would move it.
+_BEGIN_DOC_RE = re.compile(r"\\begin\s*\{\s*document\s*\}")
+
 
 def strip_comments(text):
     """Drop TeX line comments, keeping escaped \\%.
@@ -241,6 +246,69 @@ def gather_source(tex_path, _seen=None):
             candidate = os.path.join(directory, name)
             if os.path.isfile(candidate) and os.path.abspath(candidate) not in _seen:
                 sub_text, sub_complete = gather_source(candidate, _seen)
+                text += "\n" + sub_text
+                complete = complete and sub_complete
+
+    return text, complete
+
+
+def gather_preamble(tex_path, _seen=None):
+    r"""Like gather_source, but stopping at \begin{document}.
+
+    A precompiled format is an image of the preamble: mylatexformat dumps
+    everything up to \begin{document} and discards the rest, so the body cannot
+    change what the image contains. Keying a format cache on the body therefore
+    misses on exactly the edits that leave the preamble alone -- changing a
+    problem and pressing Ctrl+B -- which is the case the cache exists to serve.
+
+    An \input reached from the preamble is preamble material and is folded in
+    whole, recursively under this same rule (a sub-file carrying its own
+    \begin{document} truncates there too). The implicit companions are preamble
+    material by definition.
+
+    A root with no \begin{document} at all yields the entire file, so the result
+    is never narrower than gather_source's -- it degrades to it.
+    """
+    if _seen is None:
+        _seen = set()
+    tex_path = os.path.abspath(tex_path)
+    if tex_path in _seen:
+        return "", True
+    _seen.add(tex_path)
+
+    try:
+        with io.open(tex_path, "r", encoding="utf-8", errors="replace") as fh:
+            raw = fh.read()
+    except OSError:
+        return "", False
+
+    text = strip_comments(raw)
+    cut = _BEGIN_DOC_RE.search(text)
+    if cut:
+        text = text[: cut.start()]
+    complete = True
+    base_dir = os.path.dirname(tex_path)
+
+    for match in _INPUT_RE.finditer(text):
+        arg = match.group(1).strip()
+        if not arg or _DYNAMIC_ARG_RE.search(arg):
+            complete = False
+            continue
+        resolved = _resolve(arg, base_dir)
+        if resolved is None:
+            complete = False
+            continue
+        sub_text, sub_complete = gather_preamble(resolved, _seen)
+        text += "\n" + sub_text
+        complete = complete and sub_complete
+
+    for name in _IMPLICIT:
+        for directory in (base_dir, os.path.dirname(base_dir)):
+            if not directory:
+                continue
+            candidate = os.path.join(directory, name)
+            if os.path.isfile(candidate) and os.path.abspath(candidate) not in _seen:
+                sub_text, sub_complete = gather_preamble(candidate, _seen)
                 text += "\n" + sub_text
                 complete = complete and sub_complete
 

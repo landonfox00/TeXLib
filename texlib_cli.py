@@ -686,6 +686,9 @@ class CliHost:
             options=["--texlib-mode=%s" % mode],
             display=self.emit,
         )
+        # The format-cache dump is spawned by the core rather than yielded to
+        # this host, so it cannot pick TEXINPUTS up from _run_argv_once.
+        self.host.texinputs = texinputs
         if settings:
             # The core reads builder_settings first, then the matching TEXLIB_*
             # env var, then its default -- same precedence as in Sublime.

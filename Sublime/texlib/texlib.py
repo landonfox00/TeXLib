@@ -760,12 +760,19 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             tex_root=root, engine=engine,
             options=["--texlib-mode=%s" % mode], display=emit,
         )
+        # The format-cache dump is spawned by the core itself, not yielded here,
+        # so it never sees the TEXINPUTS _run_argv_once injects per command.
+        host.texinputs = texinputs
         # Build toggles: the native host has no LaTeXTools builder_settings, so
         # feed the sublime settings in (the brain's _setting_on reads them first,
         # else falls back to the matching TEXLIB_* env vars).
+        # The build knobs TeXLib.sublime-settings documents belong here too:
+        # without them the native host read only the TEXLIB_* env vars, so a
+        # setting the file presents as working did nothing in the editor.
         toggles = {}
         for _k in ("publish_shareable_copies", "copy_published_path_to_clipboard",
-                   "detect_reruns_by_state"):
+                   "detect_reruns_by_state", "preview_version", "tagged_twins",
+                   "default_variants", "build_jobs"):
             _v = settings.get(_k)
             if _v is not None:
                 toggles[_k] = _v
