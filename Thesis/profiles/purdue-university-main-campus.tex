@@ -1,0 +1,268 @@
+% profiles/purdue-university-main-campus.tex — Purdue University-Main Campus
+% ============================================================================
+% source: https://www.purdue.edu/academics/ogsps/thesis/templates/
+%         (OGSPS Thesis & Dissertation Office, "Templates")
+% source: https://www.purdue.edu/academics/ogsps/research/thesis/resources/policies.html
+%         ("Thesis and Dissertation Policies and Practices"; its accessibility
+%          section is stamped "Last Updated: 05/13/2026")
+% source: https://www.purdue.edu/academics/ogsps/thesis/wp-content/uploads/sites/6/2026/08/Purdue-Standard-Thesis-Handbook-August-2026-1.docx
+%         ("PURDUE UNIVERSITY STANDARD THESIS HANDBOOK", August 2026 — the
+%          official handbook, whose own front pages ARE the specimen title page
+%          and Statement of Committee Approval page)
+% accessed: 2026-09-09
+% checked:  texlib-thesis-profile-round
+%
+% ============================================================================
+% READ FIRST: PURDUE FORBIDS FILING FROM A NON-OFFICIAL TEMPLATE.
+% ============================================================================
+% This is not a formatting quibble and it is not something the profile can fix.
+% The Standard Thesis Handbook, first page:
+%
+%     "Please do not use a non-official template or attempt to recreate a
+%      template. You must use and work directly within the official template,
+%      use existing styles and settings in the template, and be careful not to
+%      override template format settings."
+%
+% And the Templates page:
+%
+%     "Students must use and work directly within ONE of the three official
+%      Purdue thesis templates provided below (Standard, APA, or
+%      LaTeX/Overleaf) when writing their thesis or dissertation."
+%
+% Purdue publishes its own LaTeX/Overleaf template
+% (https://www.overleaf.com/latex/templates/purduethesis-template/hynbqqtnyfpg),
+% so a LaTeX author at Purdue is not short of one — they are required to use
+% THAT one. A texlib-thesis document is, by Purdue's own rule, not an acceptable
+% Purdue submission however exactly it reproduces the figures below.
+%
+% This file therefore exists as a RECORD, not as a filing route. It is accurate
+% and it is complete, and it should not be used to file at Purdue. Anyone who
+% needs a Purdue thesis should start from the Overleaf template.
+%
+% (A transcription note, since a later reader will hit it: the Templates page
+% renders the prohibition as "Please DO override template formatting, mix
+% formatting methods, use a non-official template, or attempt to recreate a
+% template." Read against the list that follows it and against the handbook's
+% wording, that "DO" is plainly a dropped "NOT" in Purdue's own copy. It is
+% quoted here as printed rather than silently mended.)
+%
+% ============================================================================
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the Statement of
+% Committee Approval page. All four come from the August 2026 Standard Handbook.
+% NOT set:
+%   * \thesissetchapteropening — Purdue's deeper 1.5in top margin applies to the
+%     title page and the approval page ONLY, not to chapter openings, so it is
+%     applied inside those two macros rather than through that hook.
+%   * \thesisrequirepdfstandard — Purdue names no PDF standard.
+%
+% A SECOND THING THE CLASS DOES NOT SATISFY, independent of the template rule:
+% "The font style and size for sentences and paragraphs throughout your document
+% should be Times New Roman with 12-point font size." texlib-thesis sets Latin
+% Modern at 12pt. Same situation as Arizona State; there is no profile field for
+% a typeface. (\setmainfont{Times New Roman} in the preamble is the mechanical
+% fix, but see the template rule above before reaching for it.)
+%
+% THINGS NO PROFILE FIELD CAN EXPRESS.
+%   * Page numbering: "The title cover page should not be numbered. Page
+%     numbering begins on page 2 (the Statement of Committee Approval page).
+%     Page numbers must be numerical and in sequential order", centred in the
+%     footer. Purdue uses ONE arabic sequence with no roman front matter at all,
+%     which is not what this class's \frontmatter produces.
+%   * "To comply with ADA Accessibility requirements, DO NOT include extra
+%     paragraph spaces above/below headings, subheadings, figures, tables,
+%     schemes, captions, and equations" — a Word-specific authoring rule with no
+%     LaTeX analogue.
+%
+% AN ERROR IN PURDUE'S OWN HANDBOOK, so a later pass does not think it misread:
+% section 1.1 of the STANDARD handbook says "The official Purdue APA Thesis
+% Template you will use to write your thesis or dissertation..." — copy-paste
+% from the APA handbook. Every other reference in the document says Standard.
+
+\thesisinstitution{Purdue University}
+
+% "All other pages require 1.0'' margins on all sides." The deeper top margin
+% Purdue also prescribes -- "Both the Title Cover Page and the Statement of
+% Committee Approval page both require a 1.5'' top margin and 1.0'' for the
+% left, right, and bottom page margins" -- is applied on those two pages below.
+% Confirmed twice: the handbook's prose, and its own section properties, which
+% carry w:top=1440 twips (1in) for the body and 2160 (1.5in) for the front.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Line spacing should be 1.5 line spacing." Not a choice at Purdue -- unlike
+% Michigan State, which permits either -- so this is the one value in spec.
+\thesissetspacing{onehalf}
+
+% --- Accessibility -----------------------------------------------------------
+% Purdue publishes a dated, binding, unusually detailed requirement, and unlike
+% Arizona State's it is written as a REQUIREMENT with a consequence attached:
+% "Submissions that are reviewed and found to be non-compliant with WCAG 2.1
+% Level AA standards will be returned to the student for correction.
+% Accessibility compliance is required for final acceptance."
+%
+% \thesisrequiretagging rests on an explicit sentence, not a derivation: "If
+% your final submission is a PDF, it must be a tagged PDF."
+%
+% \thesisrequiredocumentlanguage is a derivation from WCAG 2.1 Level AA (SC
+% 3.1.1 Language of Page), the same step taken for UC Davis. Purdue does not
+% name the document language itself. A reviewer who wants only Purdue's own
+% words in this file should strike that one line.
+%
+% NOTE THE DATE: Spring 2027. Other profiles here say April 2026 (UC Davis).
+% Both are right -- the ADA Title II compliance dates differ by entity size --
+% and they must not be reconciled against each other.
+\thesisrequiretagging
+\thesisrequiredocumentlanguage
+\thesisaccessibilityrequirement{WCAG 2.1 Level AA, from Spring 2027}
+	{``Beginning Spring 2027, all theses and dissertations deposited with Purdue
+	 University must comply with the Web Content Accessibility Guidelines (WCAG)
+	 2.1 Level AA standards.'' Non-compliant submissions ``will be returned to
+	 the student for correction. Accessibility compliance is required for final
+	 acceptance.''}
+\thesisaccessibilityrequirement{Headings}
+	{``Your thesis or dissertation must use built-in heading styles (for
+	 example, Heading 1, Heading 2, Heading 3) to show the structure of the
+	 document. Headings are not just visual formatting. They create a navigable
+	 outline that screen-reader users rely on to move through your work.''}
+\thesisaccessibilityrequirement{Colour contrast}
+	{``For normal text, WCAG 2.1 Level AA requires a contrast ratio of at least
+	 4.5:1 between text and its background. Color should never be the only way
+	 information is conveyed.''}
+\thesisaccessibilityrequirement{Alternative text}
+	{``All meaningful images, including charts, graphs, diagrams, and
+	 figures---must include alternative text (alt text) that describes the
+	 information the image conveys. Complex images require a two-part text
+	 alternative'': a short description that identifies the image and points to
+	 the long description, and the long description itself.}
+\thesisaccessibilityrequirement{Accessible tables}
+	{``Tables must be created using Word or \LaTeX's built-in table tools, not
+	 by using tabs, spaces, or images of tables. Tables should have a simple,
+	 logical structure, with clearly identified row and/or column headers.''}
+\thesisaccessibilityrequirement{Logical reading order and tagging}
+	{``The logical reading order must be manually checked... If your final
+	 submission is a PDF, it must be a tagged PDF. Tags provide the underlying
+	 structure (headings, paragraphs, lists, tables, figures) that assistive
+	 technologies use to read the document correctly.''}
+\thesisaccessibilityrequirement{Selectable text}
+	{``All text in your thesis or dissertation must be real, selectable text,
+	 not scanned images of text.''}
+\thesisaccessibilityrequirement{The checker is not the check}
+	{\LaTeX{} filers ``are required to check their thesis/dissertation for
+	 accessibility compliance using Adobe's built-in accessibility checker and
+	 resolve all outstanding accessibility issues''---but ``automated
+	 accessibility checkers are not sufficient for confirming compliance. Manual
+	 checks are still needed'', naming colour contrast and reading order.}
+
+% --- Profile-local metadata ----------------------------------------------------
+% Purdue's title page names the campus, and its approval page ends with the
+% program's Thesis Form Head, who is not a committee member and has no slot in
+% the class's metadata model.
+\newcommand{\purdue@campus}{West Lafayette}
+\newcommand{\purduecampus}[1]{\renewcommand{\purdue@campus}{#1}}
+\newcommand{\purdue@formhead}{}
+\newcommand{\purdueformhead}[1]{\renewcommand{\purdue@formhead}{#1}}
+
+% --- Title page ----------------------------------------------------------------
+% The handbook's own cover page is the specimen, and every line of it is centred
+% (verified from the paragraph properties, not just by eye):
+%
+%     TITLE OF THESIS
+%     by
+%     Your Name
+%     A <Thesis|Dissertation>
+%     Submitted to the Faculty of Purdue University
+%     In Partial Fulfillment of the Requirements for the degree of
+%     <Degree>
+%     <Department>
+%     <Campus Location>, Indiana
+%     <Graduation Term>
+%
+% "Formatting is already set on this page, so please do not change formatting.
+% You will need to select the appropriate answer for the following dropdown
+% boxes: Thesis (for Masters) or Dissertation (for PhD), Choose Degree, Choose
+% Department, Choose Campus Location, and Choose Graduation Term. Note that on
+% the template the Title page will not have a page number, so please do not add
+% a page number to the title page."
+%
+% The title is set in capitals after the specimen's "TITLE OF THESIS". Note the
+% lower-case "by", which the specimen prints and which is easy to normalise away.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\centering\singlespacing
+		% 1.5in total top margin on this page; geometry already gives 1in.
+		\vspace*{0.5in}%
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{\baselineskip}
+		by\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{\stretch{1}}
+		A \thesis@DocNoun\par
+		Submitted to the Faculty of Purdue University\par
+		In Partial Fulfillment of the Requirements for the degree of\par
+		\vspace{\stretch{1}}
+		\thesis@degree\par
+		\vspace{\stretch{1}}
+		\thesis@program\par
+		\purdue@campus, Indiana\par
+		\thesis@date\par
+		\vspace{\stretch{0.6}}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Statement of Committee Approval -------------------------------------------
+% "The Statement of Committee Approval page comes after the cover Title page,
+% and it must be page 2 of the document. You will need to complete thesis
+% committee information on this page. Please list only your committee members'
+% primary department (do not include multiple departments). The name after
+% ``Approved by:'' should match the name of the Thesis Form Head that is listed
+% in your Form 9 ETAF (do not include a title and department name)."
+%
+% The specimen, centred throughout:
+%
+%     THE PURDUE UNIVERSITY GRADUATE SCHOOL
+%     STATEMENT OF COMMITTEE APPROVAL
+%     Prof. John Doe, <committee member type>
+%     <Department>
+%     ... one name/department pair per member ...
+%     Approved by:
+%     Dr. <Thesis Form Head name>
+%
+% NO SIGNATURE LINES: the committee's actual approval travels on the Form 9
+% Electronic Thesis Acceptance Form, signed in the Graduate Student Portal after
+% the defence, not on this page. So the class's default \thesis@memberline rule
+% is replaced -- drawing one here would invite signatures Purdue does not collect
+% in the document.
+%
+% The class carries one department for the whole document (\thesis@program) and
+% Purdue wants each member's own primary department beneath their name. Pass it
+% as the member's second argument if it differs -- \committeemember{Prof. Jane
+% Doe, Chair}{Chemistry} -- and the department prints on its own line below.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\begin{center}
+		\vspace*{0.5in}%
+		% The \par matters: without it the invisible heading shares a line with
+		% the first visible one and drags the whole centred block off-centre.
+		\thesis@tagtitle{H1}{{\color{white}\tiny Statement of Committee Approval}}\par
+		THE PURDUE UNIVERSITY GRADUATE SCHOOL\par
+		STATEMENT OF COMMITTEE APPROVAL\par
+		\vspace{2\baselineskip}
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\par
+			\ifx\relax##2\relax\else ##2\par\fi
+			\vspace{0.8\baselineskip}%
+		}%
+		\thesis@committee
+		\endgroup
+		\vspace{2\baselineskip}
+		Approved by:\par
+		\purdue@formhead\par
+		\vspace*{\fill}
+	\end{center}%
+	\loadgeometry{normal}\clearpage
+}
