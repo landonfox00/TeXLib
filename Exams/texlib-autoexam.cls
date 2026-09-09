@@ -297,6 +297,10 @@
 \newif\if@texlib@prevmc
 \@texlib@prevmcfalse
 
+% True while the cover's date line is being emitted (see \maketitle): the
+% build-mode label under it needs to know whether there is a line to break from.
+\newif\if@autoexam@dateline
+
 % Multi-section page policy.  An exam may contain several problem-sections
 % ({mcproblems}, {problems}, ...) in document order.  The shared core steps
 % \texlibpartno BEFORE calling this hook, so texlibpartno=1 marks the FIRST
@@ -618,10 +622,20 @@
 \tl_new:N \g__autoexam_date_tl
 \tl_new:N \g__autoexam_postscript_tl
 \tl_new:N \g__autoexam_points_tl
+% An exam-date the author WROTE is authoritative even when it is empty: a review
+% sheet or a take-home has no date, and `exam-date = {}' is how a document says
+% so. Only an exam-date never mentioned at all falls through to coursemeta and,
+% failing that, to the \todo placeholder -- which exists to catch the exam whose
+% date nobody remembered, and says nothing useful on a document that has none.
+\bool_new:N \g__autoexam_date_given_bool
+\cs_new_protected:Npn \__autoexam_set_date:n #1 {
+	\tl_gset:Nn \g__autoexam_date_tl {#1}
+	\bool_gset_true:N \g__autoexam_date_given_bool
+}
 \keys_define:nn { meta } {
 	exam-number             .tl_gset:N = \g__autoexam_number_tl,
 	exam-title              .tl_gset:N = \g__autoexam_title_tl,
-	exam-date               .tl_gset:N = \g__autoexam_date_tl,
+	exam-date               .code:n    = { \__autoexam_set_date:n {#1} },
 	exam-postscript         .tl_gset:N = \g__autoexam_postscript_tl,
 	points                  .tl_gset:N = \g__autoexam_points_tl,
 	% exam-instructions-file lives in course-metadata.sty (so a course can set it
@@ -629,7 +643,7 @@
 	% Backward-compat aliases (bare names available via \examsetup or \meta)
 	number                  .tl_gset:N = \g__autoexam_number_tl,
 	title                   .tl_gset:N = \g__autoexam_title_tl,
-	date                    .tl_gset:N = \g__autoexam_date_tl,
+	date                    .code:n    = { \__autoexam_set_date:n {#1} },
 	ps                      .tl_gset:N = \g__autoexam_postscript_tl,
 	instructions-file       .tl_gset:c = { g__meta_exam-instructions-file_tl },
 }
@@ -670,7 +684,9 @@
 }
 \NewExpandableDocumentCommand{\GetExamDate}{}{
 	\tl_if_empty:NTF \g__autoexam_date_tl
-		{ \__autoexam_coursemeta_date: }
+		{ \bool_if:NTF \g__autoexam_date_given_bool
+			{ }
+			{ \__autoexam_coursemeta_date: } }
 		{ \tl_use:N \g__autoexam_date_tl }
 }
 \NewExpandableDocumentCommand{\GetExamPostscript}{}{ \tl_use:N \g__autoexam_postscript_tl }
@@ -901,17 +917,26 @@
 		% and an unconditional line would leave a blank \large strut on the cover.
 		\sbox\z@{\GetTermSection}%
 		\ifdim\wd\z@>\z@ \large\GetTermSection \\ \vspace{0.1em} \fi
-		\large \GetExamDate
+		% Same non-empty test as the term/section line above, and for the same
+		% reason: a document that declares `exam-date = {}' has no date, and an
+		% unconditional line would leave a blank \large strut where it would have
+		% been.  The flag is then what tells the build-mode label below whether
+		% there is a line to break away from.
+		\sbox\z@{\GetExamDate}%
+		\ifdim\wd\z@>\z@ \@autoexam@datelinetrue \else \@autoexam@datelinefalse \fi
+		\if@autoexam@dateline \large\GetExamDate \fi
 		% Build-mode label: shown in red when solutions and/or rubrics are on.
 		% \@autoexam@solword carries the rubric suffix itself now (the instructor
 		% copy implies rubrics and says only "Instructor Version"), so this no
 		% longer appends one -- doing both produced "Instructor Version and
 		% Rubrics and Rubrics".
 		\ifsolutions
-			\\ \large\textcolor{red}{\textbf{\@autoexam@solword}}%
+			\if@autoexam@dateline \\ \fi
+			\large\textcolor{red}{\textbf{\@autoexam@solword}}%
 		\else
 			\if@autoexam@rubric
-				\\ \large\textcolor{red}{\textbf{Rubrics}}%
+				\if@autoexam@dateline \\ \fi
+				\large\textcolor{red}{\textbf{Rubrics}}%
 			\fi
 		\fi
 
