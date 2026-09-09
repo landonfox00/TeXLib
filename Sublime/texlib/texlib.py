@@ -38,6 +38,10 @@ try:
     from TeXLib import texlib_build
 except ImportError:
     import texlib_build
+try:
+    from TeXLib import texlib_buildspec as _spec
+except ImportError:
+    import texlib_buildspec as _spec
 
 # CREATE_NO_WINDOW: we own the engine's Popen, so we suppress the Windows console
 # flash directly -- no need for the builder's LaTeXTools-internal monkeypatch.
@@ -394,6 +398,24 @@ def _spin_ensure():
 
 # --- Engine runner (the new surface: async, streamed, cancellable) -----------
 def _run_argv(cmd, cwd, emit, cancel, texinputs, aux_dir, entry):
+    """Run one engine/biber command, retrying once past a luaotfload cache abort.
+
+    That abort is a startup race between concurrent engines over one shared
+    probe filename (see texlib_buildspec.luaotfload_cache_aborted), not anything
+    the document did: the process dies before LaTeX begins, so re-running it
+    costs a startup and nothing else. Retried ONCE -- a second failure is either
+    very bad luck or a genuinely unusable cache directory, and both deserve to
+    reach the log rather than a loop.
+    """
+    out = _run_argv_once(cmd, cwd, emit, cancel, texinputs, aux_dir, entry)
+    if not cancel.is_set() and _spec.luaotfload_cache_aborted(out):
+        emit("TeXLib: luaotfload lost its cache-path race with another "
+             "engine; running that pass again.\n")
+        out = _run_argv_once(cmd, cwd, emit, cancel, texinputs, aux_dir, entry)
+    return out
+
+
+def _run_argv_once(cmd, cwd, emit, cancel, texinputs, aux_dir, entry):
     """Run one engine/biber command; stream combined output via `emit`; return
     the full captured text (fed back to the brain as self.out for rerun/biber
     detection). The aux dir is injected into THIS subprocess's own env (never a

@@ -89,6 +89,11 @@ MAX_WARNINGS = 500
 
 # --- Importing the build core ------------------------------------------------
 
+# Bound by import_core() once PLUGIN_PKG is on sys.path; None if the checkout
+# has no texlib_buildspec (then run_argv simply skips its retry).
+_spec = None
+
+
 def import_core():
     """Import the shared build core, or exit with a diagnosis.
 
@@ -100,6 +105,16 @@ def import_core():
     """
     if PLUGIN_PKG not in sys.path:
         sys.path.insert(0, PLUGIN_PKG)
+    # The spec module comes along for the ride: run_argv needs its
+    # luaotfload_cache_aborted predicate, and it resolves off the same path
+    # entry. Bound to the module global so the host method can reach it without
+    # threading an argument through every construction site; a checkout missing
+    # it just loses the retry, not the build.
+    global _spec  # noqa: PLW0603 - one-time binding after sys.path is set
+    try:
+        import texlib_buildspec as _spec  # noqa: PLC0415 - deferred with core
+    except ImportError:
+        _spec = None
     try:
         import texlib_build  # noqa: PLC0415 - deliberately deferred
     except ImportError as exc:
@@ -696,6 +711,23 @@ class CliHost:
             self.warnings.append(s)
 
     def run_argv(self, cmd, emit=True, aux_dir=None):
+        """One engine/biber pass, retried once past a luaotfload cache abort.
+
+        That abort is a startup race between concurrent engines over one shared
+        probe filename (see texlib_buildspec.luaotfload_cache_aborted), not
+        anything the document did: the process dies before LaTeX begins, so the
+        retry costs a startup and nothing else. `self.fatal` is cleared for the
+        retry because the first attempt's traceback already tripped it.
+        """
+        out = self._run_argv_once(cmd, emit=emit, aux_dir=aux_dir)
+        if _spec is not None and _spec.luaotfload_cache_aborted(out):
+            self.emit("texlib: luaotfload lost its cache-path race with "
+                      "another engine; running that pass again.\n")
+            self.fatal = False
+            out = self._run_argv_once(cmd, emit=emit, aux_dir=aux_dir)
+        return out
+
+    def _run_argv_once(self, cmd, emit=True, aux_dir=None):
         """One engine/biber pass. Returns the captured text for host.out.
 
         emit=False captures without printing or classifying: a parallel lane
