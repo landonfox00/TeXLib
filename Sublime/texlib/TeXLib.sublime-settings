@@ -75,6 +75,25 @@
     //
     // "preferred_pdf": "combined"
 
+    // preview_version: in QUICK mode only, compile ONE version of a
+    // \versions{...} exam instead of every version. The value is a label from
+    // the document's own \versions list, e.g. "1A"; anything not in that list is
+    // reported and ignored rather than passed to the engine, because the class
+    // reads \Version as authoritative and a typo would quietly hand you a paper
+    // you did not ask for.
+    //
+    // Worth ~2s on the twelve-version Exam 1: a copy costs ~0.2s against a fixed
+    // ~4.5s of class loading, which is why this is a small lever on its own. It
+    // composes with the precompiled preamble (also quick-only), and that is
+    // where the write loop actually gets fast -- class loading is ~3.5s of the
+    // ~4.5s, and a cached format removes most of it.
+    //
+    // Quick mode only, deliberately: a normal build's <base>.pdf is a
+    // deliverable that the .vmap slicing, the stale sweep, the freshness stamp
+    // and the publish step all read as "every version".
+    //
+    // "preview_version": "1A"
+
     // show_panel_on_build: when to surface the build output panel.
     //   "errors" (default) -- hidden while building (a spinner + current step
     //                         shows in the status bar); pops open only if the
