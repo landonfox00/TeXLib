@@ -639,6 +639,50 @@ def main():
     check("quick -> single-pass message shown",
           bool(cmds) and "quick" in cmds[0][1], cmds[0][1] if cmds else "")
 
+    # (j3) preview_version: compile ONE version of a \versions exam in quick
+    # mode. The class reads \Version as an authoritative single-copy selection,
+    # so an unknown label must never reach it -- a quick build is exactly where
+    # nobody would notice being handed the wrong paper.
+    VERSIONED = (r"\documentclass{autoexam}\versions{1A, 1B, 2A}"
+                 r"\begin{document}x\end{document}")
+    _prev = os.environ.get("TEXLIB_PREVIEW_VERSION")
+    try:
+        os.environ["TEXLIB_PREVIEW_VERSION"] = "1A"
+        cmds, disp = run_builder(VERSIONED, options=["--texlib-mode=quick"],
+                                 engine="lualatex")
+        check("preview_version: a declared label is selected",
+              bool(cmds) and r"\def\Version{1A}" in cmds[0][0][-1], _args(cmds))
+        check("preview_version: the message names the version",
+              bool(cmds) and "1A only" in cmds[0][1],
+              cmds[0][1] if cmds else "")
+
+        # Quick only: a normal build's <base>.pdf is a deliverable that the
+        # slicer, sweep and publish step all read as "every version".
+        cmds, _ = run_builder(VERSIONED, options=["--texlib-mode=base"],
+                              engine="lualatex")
+        check("preview_version: ignored outside quick mode",
+              bool(cmds) and r"\def\Version" not in cmds[0][0][-1], _args(cmds))
+
+        os.environ["TEXLIB_PREVIEW_VERSION"] = "9Z"
+        cmds, disp = run_builder(VERSIONED, options=["--texlib-mode=quick"],
+                                 engine="lualatex")
+        check("preview_version: an undeclared label is NOT passed through",
+              bool(cmds) and r"\def\Version" not in cmds[0][0][-1], _args(cmds))
+        check("preview_version: an undeclared label is reported",
+              "1A, 1B, 2A" in disp, repr(disp[:300]))
+
+        UNVERSIONED = r"\documentclass{autoexam}\begin{document}x\end{document}"
+        cmds, disp = run_builder(UNVERSIONED, options=["--texlib-mode=quick"],
+                                 engine="lualatex")
+        check("preview_version: silent on a document with no versions",
+              bool(cmds) and r"\def\Version" not in cmds[0][0][-1]
+              and "ignoring" not in disp, _args(cmds))
+    finally:
+        if _prev is None:
+            os.environ.pop("TEXLIB_PREVIEW_VERSION", None)
+        else:
+            os.environ["TEXLIB_PREVIEW_VERSION"] = _prev
+
     # (k) accessible mode is a PAIRED build: the class's own engine produces the
     # normal PDF first, then lualatex re-typesets the same source with the
     # DocumentMetadata prefix into an a11y/ output dir. syllabus is a pdflatex
@@ -2653,13 +2697,32 @@ def main():
     check("cache: a different library fingerprint is a different key",
           k_base != _fc.format_key(doc, "pdflatex", "", tmp))
 
-    with open(doc, "a", encoding="utf-8") as fh:
-        fh.write("\n% edited\n")
-    check("cache: editing the document is a different key",
+    # The key covers the PREAMBLE, because that is all mylatexformat dumps.
+    # Editing the body must NOT move it -- that miss is the one the cache exists
+    # to avoid (change a problem, press Ctrl+B) -- and editing the preamble must.
+    with open(doc, "w", encoding="utf-8") as fh:
+        fh.write(r"\documentclass{didactic}\begin{document}x y z\end{document}")
+    check("cache: editing the BODY is the same key",
+          k_base == _fc.format_key(doc, "pdflatex", "", HERE_ROOT))
+
+    with open(doc, "w", encoding="utf-8") as fh:
+        fh.write(r"\documentclass{didactic}\usepackage{amsmath}"
+                 r"\begin{document}x\end{document}")
+    check("cache: editing the PREAMBLE is a different key",
           k_base != _fc.format_key(doc, "pdflatex", "", HERE_ROOT))
+
+    with open(doc, "w", encoding="utf-8") as fh:
+        fh.write(PLAIN)
 
     check("cache: an unsupported engine yields no format",
           _fc.ensure(doc, "xelatex", "", HERE_ROOT) is None)
+    # A dumped format restores TeX's state, not Lua's, so every TeXLib lua class
+    # loses the engine its preamble built (problem_engine.lua's `texlib` global)
+    # and dies at the first \directlua with no PDF. Refusing lualatex outright is
+    # what keeps the cache from turning a slow build into a fast broken one.
+    check("cache: lualatex is refused (Lua state does not survive a format)",
+          "lualatex" not in _fc.INITEX and
+          _fc.ensure(doc, "lualatex", "", HERE_ROOT) is None)
     check("cache: TEXFORMATS keeps a fallback entry",
           _fc.env_with_cache({"TEXFORMATS": ""})["TEXFORMATS"].endswith(
               ";" if os.name == "nt" else ":"))

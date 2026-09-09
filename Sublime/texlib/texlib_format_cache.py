@@ -28,8 +28,9 @@ what the preamble does:
 
   * the engine, and the injected prefix (deferral flags, accessible metadata) --
     two different prefixes are two different preambles;
-  * the full source tree, gathered by texlib_preamble_scan.gather_source, so a
-    change to an \input'd preamble.tex or coursemeta.tex invalidates it;
+  * the PREAMBLE and its input tree, gathered by
+    texlib_preamble_scan.gather_preamble, so a change to an \input'd preamble.tex
+    or coursemeta.tex invalidates it;
   * every texlib .sty/.cls in the library -- editing the class must not leave a
     stale format behind, which is the failure mode that would waste the most
     time in this repo specifically;
@@ -39,6 +40,17 @@ what the preamble does:
 Any mismatch produces a different key, which is a cache miss, which re-dumps.
 There is no invalidation logic to get wrong -- a stale entry is simply never
 addressed again, and `prune()` reclaims it later.
+
+WHY THE BODY IS NOT IN THE KEY
+
+mylatexformat dumps everything up to \begin{document} and nothing after it, so
+the body cannot change the image. Keying on it only produced misses -- and misses
+on precisely the edit the cache exists to serve, changing a problem and pressing
+Ctrl+B. On the Math 126 Exam 1 that is every write-loop build.
+
+The body still reaches the key by the one route through which it can genuinely
+change the preamble: the deferral prefix is computed from the FULL source, so a
+body that starts using plots or units changes `prefix`, and the key with it.
 
 WHAT IT DOES NOT DO
 
@@ -65,9 +77,26 @@ except ImportError:  # plain import outside the Sublime package (tests, CLI)
 
 # The -ini program that dumps a format for each engine, and the format it
 # preloads. luahbtex/pdftex are the binaries; lualatex/pdflatex are the formats.
+# pdflatex ONLY, and that is not an oversight.
+#
+# A dumped format restores TeX's state, not Lua's. Every TeXLib lua class builds
+# its engine at preamble time -- problem_engine.lua publishes itself as the
+# global `texlib`, schedule.lua and bingo.lua likewise -- and none of that
+# survives into a -fmt run. The format loads, \begin{document} reaches the first
+# \directlua, and the document dies with "attempt to index a nil value (global
+# 'texlib')" and no PDF.
+#
+# lualatex was listed here from the start and never worked: the dump exits 1 on
+# luahbtex ("no pages of output"), the old returncode check read that as failure,
+# and the cache silently declined every lualatex document. Fixing that check
+# without this restriction converts a cache that does nothing into a build that
+# produces a broken PDF quickly, which is strictly worse.
+#
+# Reaching autoexam would mean re-initialising the Lua side after format load --
+# a library change in texlib-problembank.sty and each class-local engine, not a
+# builder one.
 INITEX = {
     "pdflatex": ("pdftex", "pdflatex"),
-    "lualatex": ("luahbtex", "lualatex"),
 }
 
 # A dumped format is ~8-10 MB, so the cache needs a ceiling. Both are generous:
@@ -75,6 +104,11 @@ INITEX = {
 # is almost certainly a document that has moved on.
 MAX_CACHE_BYTES = 2 * 1024 * 1024 * 1024      # 2 GB
 MAX_CACHE_AGE_SECONDS = 14 * 24 * 60 * 60     # 14 days
+
+# Bumped whenever what the key COVERS changes, so entries dumped under an older
+# rule are never addressed again rather than being trusted under the new one.
+# v2: the key reads the preamble only, not the whole source tree.
+KEY_VERSION = "v2"
 
 
 def cache_dir():
@@ -119,9 +153,10 @@ def _library_fingerprint(library_root):
 
 def format_key(tex_path, engine, prefix, library_root):
     """Stable cache key for one (document, engine, prefix, library) combination."""
-    source, complete = _scan.gather_source(tex_path)
+    source, complete = _scan.gather_preamble(tex_path)
     digest = hashlib.sha256()
     for part in (
+        KEY_VERSION,
         engine,
         prefix,
         os.path.abspath(tex_path),
@@ -207,7 +242,13 @@ def ensure(tex_path, engine, prefix, library_root, env=None, timeout=300):
     except (OSError, subprocess.SubprocessError):
         return None
 
-    if result.returncode != 0 or not os.path.isfile(produced):
+    # The ARTIFACT is the verdict, not the exit status. A -ini dump typesets
+    # nothing, and luahbtex reports "no pages of output" by exiting 1 -- so
+    # every lualatex document failed this check while writing a perfectly good
+    # format, which is every exam, quiz and lecture-notes document in the
+    # library. (pdftex exits 0 on the same run, which is why the pdflatex
+    # numbers in this module's header were real and nobody noticed.)
+    if not os.path.isfile(produced) or os.path.getsize(produced) == 0:
         _unlink(produced)
         _unlink(os.path.join(tex_dir, key + ".log"))
         return None

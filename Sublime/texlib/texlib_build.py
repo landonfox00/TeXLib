@@ -225,6 +225,22 @@ JOBS_ENV = "TEXLIB_JOBS"
 TAGGED_TWINS_SETTING = "tagged_twins"
 TAGGED_TWINS_ENV = "TEXLIB_TAGGED_TWINS"
 
+# builder_settings knob: in QUICK mode, compile one named version of a
+# \versions{...} exam instead of every version. A copy costs ~0.2s against a
+# fixed ~4.5s of class loading, so this is worth ~2s on a twelve-version exam --
+# small alone, but it composes with the format cache, which is also quick-only.
+#
+# Quick mode only, deliberately. A normal build's <base>.pdf is a deliverable
+# that the .vmap slicing, the stale sweep, the freshness stamp and the publish
+# step all read as "every version"; handing them one version would be a silent
+# content change in files that go to students. Quick mode already produces no
+# deliverable and settles no references, so narrowing it costs nothing.
+PREVIEW_VERSION_SETTING = "preview_version"
+PREVIEW_VERSION_ENV = "TEXLIB_PREVIEW_VERSION"
+
+# \versions{A,B} / \examversions{A,B} -- the labels a document declares.
+_VERSIONS_RE = re.compile(r"\\(?:exam)?versions\s*\{([^}]*)\}")
+
 # Build mode  ->  the compile-time macro the TeXLib classes respond to.
 # texlib-build.sty turns these \def's into the \ifsolutions / \ifkey / ...
 # conditionals that every TeXLib class branches on.
@@ -955,18 +971,30 @@ class TexlibBuildCore:
         final build stays on the ordinary path and depends on no cache at all.
         The dumped image already contains the deferral flags, so the compile
         must not repeat them -- see texlib_format_cache.
+
+        With `preview_version` set, a \\versions{...} exam compiles that one
+        version rather than all of them (\\def\\Version, which the class reads as
+        an authoritative single-copy selection). It rides in the same prefix as
+        the deferral flags, so it is baked into the cached image and covered by
+        its key -- two versions are two images, never one reused for both.
         """
-        prefix = self._defer_prefix()
+        version = self._preview_version_prefix()
+        prefix = self._defer_prefix() + version
+        # Name the consequence, not just the setting: a quick build writes the
+        # ordinary <base>.pdf, so afterwards that file holds ONE version under
+        # the whole-exam name until a normal build puts every version back.
+        label = self._preview_version_label()
+        note = f" {label} only," if version else ""
         key = self._quick_format_key(engine, prefix)
         if key:
             cmd = [base[0], "-fmt=" + key] + list(base[1:]) + [self.tex_name]
-            yield (cmd, f"{engine} [quick] single pass, cached preamble "
+            yield (cmd, f"{engine} [quick]{note} single pass, cached preamble "
                         "(refs may be stale)...")
             return
 
         arg = f"{prefix}\\input{{{self.tex_name}}}" if prefix else self.tex_name
         cmd = base + [arg]
-        yield (cmd, f"{engine} [quick] single pass (refs may be stale)...")
+        yield (cmd, f"{engine} [quick]{note} single pass (refs may be stale)...")
 
     def _wants_shell_escape(self):
         r"""True when this document loads texlib-tikzexternal.
@@ -989,8 +1017,17 @@ class TexlibBuildCore:
         return wants
 
     def _freshness_key(self, engine, mode):
-        """Identity of the build being asked for, for the freshness stamp."""
-        return _fresh.build_key(engine, mode, self._defer_prefix(),
+        """Identity of the build being asked for, for the freshness stamp.
+
+        The quick-mode version selection belongs in here: changing
+        preview_version changes which paper the PDF holds while leaving every
+        input file untouched, so without it the next build would be judged
+        fresh and skipped, and the viewer would keep showing the old version.
+        """
+        prefix = self._defer_prefix()
+        if mode == MODE_QUICK:
+            prefix += self._preview_version_prefix()
+        return _fresh.build_key(engine, mode, prefix,
                                 getattr(self, "_engine_options", ()) or ())
 
     def _skip_if_fresh(self, engine, mode, tex_dir):
@@ -1059,8 +1096,20 @@ class TexlibBuildCore:
         root = self._library_root()
         if not root:
             return None
+        # The dump is a subprocess the core spawns itself, so it does not go
+        # through the host's _run_argv and inherits none of the TEXINPUTS the
+        # host injects per engine call. Without it the dump cannot find
+        # autoexam.cls (or any other class outside TEXMFHOME), fails, and
+        # returns None -- silently, by design, so the cache simply never
+        # engaged for any course document. Hosts publish the value as
+        # `texinputs`; a host that has none is unaffected.
+        env = dict(os.environ)
+        texinputs = getattr(self, "texinputs", "") or ""
+        if texinputs:
+            env["TEXINPUTS"] = texinputs
         try:
-            key = _fmtcache.ensure(self._tex_path(), engine, prefix, root)
+            key = _fmtcache.ensure(self._tex_path(), engine, prefix, root,
+                                   env=env)
         except Exception:           # noqa: BLE001 -- see _defer_prefix
             return None
         if key:
@@ -1267,6 +1316,56 @@ class TexlibBuildCore:
             skipped.append(("solutions-inline",
                             "layout preference; build it explicitly"))
         return variants, skipped
+
+    def _declared_versions(self):
+        r"""The labels this document's \versions{...} declares, in order.
+
+        Read from the gathered preamble, so a \versions sitting in an \input'd
+        preamble counts. Empty for the ordinary single-copy document.
+        """
+        try:
+            source, _complete = _scan.gather_preamble(self._tex_path())
+        except Exception:           # noqa: BLE001 -- see _defer_prefix
+            return []
+        match = _VERSIONS_RE.search(source)
+        if not match:
+            return []
+        return [v for v in re.split(r"[,\s]+", match.group(1)) if v]
+
+    def _preview_version_label(self):
+        """The version label a quick build will select, or "" for all of them."""
+        prefix = self._preview_version_prefix()
+        match = re.search(r"\{([^}]*)\}", prefix) if prefix else None
+        return match.group(1) if match else ""
+
+    def _preview_version_prefix(self):
+        r"""`\def\Version{<label>}` for a quick build, or "" when not selecting.
+
+        An unknown label is REPORTED and ignored rather than passed through: the
+        class treats \Version as an authoritative single-copy selection, so a
+        typo would quietly produce a paper that is not the one asked for, and a
+        quick build is exactly where nobody is checking.
+        """
+        raw = os.environ.get(PREVIEW_VERSION_ENV)
+        if raw is None:
+            getter = getattr(self, "builder_settings", None) or {}
+            try:
+                raw = getter.get(PREVIEW_VERSION_SETTING)
+            except AttributeError:
+                raw = None
+        label = str(raw or "").strip()
+        if not label:
+            return ""
+        declared = self._declared_versions()
+        if not declared:
+            return ""               # nothing to select from; not an error
+        if label not in declared:
+            self.display(
+                f"TeXLib: ignoring {PREVIEW_VERSION_SETTING}={label!r} -- "
+                f"this document declares {', '.join(declared)}.\n"
+            )
+            return ""
+        return "\\def\\Version{" + label + "}"
 
     def _configured_variants(self):
         """The `default_variants' override, or None to let the planner decide.
