@@ -6,6 +6,21 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Added
 
+- **The viewer opens on `<base>.pdf` as soon as the base compile ends, not when
+  the fan-out does.** That PDF is final at that moment — everything after it
+  writes *other* files (the tagged twins, the variant copies, the per-version
+  slices), so waiting for them is waiting on work you are not looking at. On a
+  twelve-version exam the page is up at **7.4s of a 128s build**, and the rest
+  continues behind it. The core offers the file through an optional
+  `preview_ready` hook and the host decides whether to act, so the LaTeXTools
+  adapter and the CLI are unaffected; the Sublime host declines when
+  `preferred_pdf` points at a different copy, rather than swapping the viewer
+  out from under you mid-build. Only the PDF is copied back early — the
+  `.synctex.gz` is deliberately left until `_finalize_synctex` has replaced it
+  with the uncompressed map SumatraPDF prefers — and a `.spl` split build is
+  skipped, since `<base>.pdf` does not survive that one. New setting:
+  `open_pdf_early` (default on).
+
 - **`tagged_twins` / `TEXLIB_TAGGED_TWINS` — keep the write loop off the PDF/UA
   path.** Tagging is where a build's time actually goes. Measured on a
   twelve-version exam: an untagged pass is 6.8s, a tagged one ~20s, and the
