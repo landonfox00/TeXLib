@@ -1,0 +1,149 @@
+% profiles/rutgers-university-new-brunswick.tex — Rutgers University-New Brunswick
+% ============================================================================
+% source: https://grad.rutgers.edu/academics/graduation/electronic-thesis-and-dissertation-style-guide
+%         (Rutgers School of Graduate Studies, "Electronic Thesis and
+%         Dissertation Style Guide")
+% source: https://grad.rutgers.edu/sites/default/files/2024-02/title%20page.pdf
+%         (the SGS "Doctorate Title Page" sample, linked from that guide)
+% source: https://grad.rutgers.edu/sites/default/files/2024-02/samplemasterstitlepage.pdf
+%         (the SGS "Master's Title Page" sample, linked from that guide)
+% accessed: 2026-09-10
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, title page, the absence of a
+% separate approval page, and the accessibility requirement.
+% NOT set: nothing is left to the neutral fallback.
+%
+% Rutgers is one graduate school (the School of Graduate Studies) serving
+% several campuses, and the title page names the campus. This profile is the
+% NEW BRUNSWICK one and prints "New Brunswick, New Jersey"; a Newark or Camden
+% filing needs that line changed. (Rutgers-Camden's Graduate School publishes a
+% separate style guide of its own, which was not read for this file.)
+
+\thesisinstitution{Rutgers, The State University of New Jersey}
+
+% "All margins must be 1 inch." Stated once, for all four sides, with no
+% binding exception -- the manuscript is filed as a PDF through ProQuest.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Double-space preliminary pages, appendices, and all text." The single-spaced
+% items SGS lists -- footnotes, endnotes, references and bibliographic material,
+% block quotations of four or more lines, verse quotations of two or more lines
+% -- are per-element choices, not a document spacing rule.
+\thesissetspacing{double}
+
+% No chapter-opening exception: SGS states one margin figure and no deeper
+% opening for chapters or major sections. \thesissetchapteropening is
+% deliberately not called.
+
+% Typeface: "Choose an easy-to-read type. Use one typeface throughout; script or
+% italic typefaces are not acceptable for the main text (10-12 points)." No face
+% is named, so this profile sets none; the class's Latin Modern satisfies it.
+
+% --- Accessibility -----------------------------------------------------------
+% SGS publishes a real requirement here, but it is FUTURE-DATED, and the modal
+% verbs matter. Today the guide "encourages"; from 2027-04-26 it requires.
+%
+% NOTE FOR ANYONE COMPARING PROFILES: the date below is 26 April 2027. Other
+% profiles in this directory carry 26 April 2026. Both are correct -- the ADA
+% Title II compliance deadline differs by the size of the public entity -- and
+% neither should be "corrected" against the other.
+%
+% \thesisrequiretagging is NOT set, and that is a judgement, not an oversight.
+% SGS names Title II and points at its own PDF guide; it never says "tagged
+% PDF", "PDF/UA" or "PDF/A" in the style guide. Declaring a tagging requirement
+% here would be inferring the mechanism from the standard, which is exactly the
+% inference RESEARCHING.md forbids. The requirement is recorded verbatim
+% instead.
+\thesisaccessibilityrequirement{Title II ADA, from 26 April 2027}
+	{"Starting on April 26, 2027, all electronic dissertations and theses will
+	 be required to comply with Title II ADA accessibility standards." Until
+	 then the School of Graduate Studies "encourages authors to adhere to best
+	 practices for accessibility in all newly submitted materials, including
+	 electronic theses and dissertations."}
+\thesisaccessibilityrequirement{Standard}
+	{"The requirements for digital accessibility set by the School of Graduate
+	 Studies are based on Title II of the ADA Accessibility Regulations." SGS
+	 names no PDF standard of its own and refers authors to the SGS Quick Guide
+	 on Accessibility Regulations and the SGS PDF Accessibility Guide.}
+\thesisaccessibilityrequirement{Checking}
+	{"You can verify compliance using Adobe Acrobat, but these checks can also
+	 be performed in Microsoft Word before saving your document as a PDF."
+	 SGS prescribes no check a LaTeX author can run; veraPDF is this class's
+	 answer and is not Rutgers's.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduced from the two SGS sample pages, which differ only in the words the
+% class already varies by \doctype: "A dissertation submitted to the" against
+% "A thesis submitted to the", and the degree line.
+%
+% The samples' own notes, verbatim: "Center and double space everything";
+% "Title and author's name in upper case letters"; "Use your full, legal name";
+% "Fill in the correct, official name of the program under 'Graduate program
+% in'"; "Indicate your Dissertation Director's name [do not include their title]
+% under 'Written under the direction of'"; "Number of lines corresponds to
+% number of committee members"; "Indicate the month and the year the degree is
+% to be conferred - October, January or May, 20XX-not the defense month and
+% year."
+%
+% Two consequences for a document using this profile:
+%   * \graddate must be one of October, January or May with the year of
+%     CONFERRAL -- not the defense date. The profile cannot check that.
+%   * \gradadvisor must carry the name alone. The class's default value ends in
+%     ", Ph.D."; SGS says "do not use any formal title (Ph.D., Dr., etc.)".
+%
+% DOUBLE spacing on this page, not single: the class's other profiles switch to
+% \singlespacing here, and SGS explicitly does not.
+%
+% The signature lines are BLANK BY REQUIREMENT, which is why the committee list
+% is redefined to print a rule and no name: "The title page within your entire
+% dissertation which you will upload to ProQuest for publishing must not be
+% signed. That version has blank lines." One rule per \committeemember, per
+% "Number of lines corresponds to number of committee members".
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\doublespacing\centering
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		By\par
+		\MakeUppercase{\@author}\par
+		A \thesis@docnoun{} submitted to the\par
+		School of Graduate Studies\par
+		Rutgers, The State University of New Jersey\par
+		In partial fulfillment of the requirements\par
+		For the degree of\par
+		\thesis@degree\par
+		Graduate Program in \thesis@program\par
+		Written under the direction of\par
+		\thesis@advisor\par
+		And approved by\par
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			\rule{3in}{0.4pt}\par
+		}%
+		\thesis@committee
+		\endgroup
+		New Brunswick, New Jersey\par
+		\thesis@date\par
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Rutgers's filed document contains no separate approval page: approval is on
+% the title page, as the blank signature lines above.
+%
+% The style guide fixes the order of sections and the list has no approval page
+% in it -- "Starting with the Copyright page (which is optional) all the way to
+% the Bibliography (a required section) the following sections are the order
+% which must be followed in every dissertation/thesis" -- and the entries are
+% Copyright, Title, Abstract, Acknowledgement/Dedication, Table of contents,
+% List of tables, List of figures, List of illustrations.
+%
+% SIGNATURES ARE STILL COLLECTED ON PAPER, on a copy of the title page that is
+% NOT the filed one: "The signed copy of this page gets submitted along with the
+% rest of your checklist to sgs.degree.submissions@grad.rutgers.edu for review
+% as per the checklist instructions. The title page within your entire
+% dissertation which you will upload to ProQuest for publishing must not be
+% signed."
+\thesisnoapprovalpage
