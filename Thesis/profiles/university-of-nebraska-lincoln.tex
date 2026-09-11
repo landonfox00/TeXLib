@@ -1,0 +1,134 @@
+% profiles/university-of-nebraska-lincoln.tex — University of Nebraska-Lincoln
+% ============================================================================
+% source: https://graduate.unl.edu/preparing-thesis-or-dissertation/format/
+%         (Office of Graduate Studies, "Format")
+% source: https://graduate.unl.edu/sites/unl.edu.executive-vice-chancellor.graduate-studies/files/media/file/Dissertation_SamplePages.pdf
+%         ("Sample Dissertation Title Page", "Sample Dissertation Abstract",
+%          "Sample Page Format", linked from the Format page as the specimen)
+% accessed: 2026-09-11
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the ABSENCE of
+% an approval page.
+% NOT set: \thesissetchapteropening (Graduate Studies states no deeper opening
+% margin — the 1in top applies to "all material"), and the accessibility
+% declarations, because nothing was found to declare (see below).
+%
+% Neither source carries a revision date. The sample-pages PDF is undated and
+% its specimen year reads "May, 2015"; the Format page is the live one linked
+% from Preparing a Thesis or Dissertation, so it governs.
+%
+% One navigation trap for a later pass: the PARENT path
+% https://graduate.unl.edu/preparing-thesis-or-dissertation/ returns "Page not
+% found" while its /format/ child is live. Do not read the 404 as a dead source.
+
+\thesisinstitution{University of Nebraska-Lincoln}
+
+% --- Filing figures ----------------------------------------------------------
+% "All margins should be 1 inch wide except the left margin which should be 1.5
+% inches. This applies to all material including the abstract, headers,
+% footnotes/endnotes and images." The Sample Page Format specimen annotates the
+% same three figures in its own margins (1.5" left, 1" right, 1" bottom).
+%
+% The wider left margin is a BINDING allowance stated unconditionally — it is
+% not offered as a choice and not conditioned on ordering a bound copy — so it
+% is set on every page rather than alternated, and `twoside' remains a layout
+% option that must not move it.
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "Body text should be double-spaced. Footnotes/endnotes, bibliographic entries,
+% lists in appendices may be single-spaced." The rule is about the BODY; the
+% single-spacing permission is a may, not a must, so the document-wide default
+% stays double.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Graduate Studies publishes no accessibility rule for a filed thesis or
+% dissertation on any page read on the access date: the Format page, the Style
+% page, and the Doctoral Degree Steps to Completion page all carry none, and the
+% only "Accessibility" links on them are UNL's site-wide accessibility
+% STATEMENT, which is about the website and not about the manuscript.
+%
+% This is recorded as NOT FOUND rather than NOT PUBLISHED on purpose. A WCAG 2.1
+% Level AA requirement dated 24 April 2026 circulates in search results for UNL
+% deposits, and it plausibly exists — but it is attributed to the UNL Digital
+% Commons deposit workflow (library-published, and the two Graduate Studies
+% deposit guides there answered 403 to every fetch), not to a Graduate Studies
+% requirements page, and it was never read. Under RESEARCHING.md that is not a
+% source, so no \thesisrequire... is declared from it. Finding and reading that
+% page is the one thing left to finish this profile.
+\thesisaccessibilityrequirement{Not found}
+	{No accessibility requirement for a filed manuscript was located on an
+	 Office of Graduate Studies page on the access date. Treat that as "not
+	 looked up successfully", not as "none exists".}
+
+% --- Title page --------------------------------------------------------------
+% Reproduces the "Sample Dissertation Title Page" specimen line for line. The
+% required elements and their wording come from the Format page's Title Page
+% list; the line order and the vertical arrangement come from the specimen.
+%
+% Two Graduate Studies rules are encoded rather than left to the author:
+%   * "The official name of your University is 'University of Nebraska'. Don't
+%     add '-Lincoln' after it." — so the page says Nebraska without the campus,
+%     even though \thesisinstitution above carries the IPEDS name.
+%   * "Their title for this page is Professor -- no 'Dr.' and no rank" — so the
+%     word Professor is printed HERE and \gradadvisor must be given the bare
+%     name. \thesis@advisor's class default ("Advisor Name, Ph.D.") would read
+%     "Professor Advisor Name, Ph.D.", which is out of spec; that is a document's
+%     responsibility, not something a profile can fix.
+%
+% AMBIGUITY left for the reviewer, not resolved silently: the title is
+% uppercased because both specimen pages print it that way, but the Format
+% page's prose never says the title must be uppercase (it says that only of
+% chapter and appendix headings). The specimen is introduced as illustrating
+% "layout and formatting", which is why the specimen is followed here.
+%
+% No bold anywhere: the specimen sets every line in the body face, and the
+% class's neutral page's \bfseries title is therefore dropped.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{2\baselineskip}
+		A \MakeUppercase{\thesis@DocNoun}\par
+		\vspace{2\baselineskip}
+		Presented to the Faculty of\\
+		The Graduate College at the University of Nebraska\\
+		In Partial Fulfillment of Requirements\\
+		For the Degree of \thesis@degree\par
+		\vspace{2\baselineskip}
+		Major: \thesis@program\par
+		\vspace{2\baselineskip}
+		Under the Supervision of Professor \thesis@advisor\par
+		\vspace{2\baselineskip}
+		Lincoln, Nebraska\par
+		\vspace{\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% The filed manuscript contains none. Graduate Studies: "To prevent the release
+% of digital signatures, do not include a scanned copy of the signature page in
+% your submitted manuscript. It is only for your personal or departmental use."
+%
+% Two further checks agree with that reading, which is why this is
+% \thesisnoapprovalpage and not a neutral fallback: the Format page's ordered
+% list of front matter runs title page, abstract, copyright notice, dedication,
+% acknowledgments, grant information, table of contents, lists of multimedia
+% objects — no approval or signature leaf anywhere in it — and the sample-pages
+% specimen shows only a title page, an abstract and a body page.
+%
+% Committee signatures are still collected at UNL, on the separate Report of
+% Completion form, which is an administrative form and not part of the
+% manuscript. A document that wants the signature leaf for its own departmental
+% copy must build it itself.
+\thesisnoapprovalpage
