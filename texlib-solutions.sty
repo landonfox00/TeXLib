@@ -414,6 +414,15 @@
 			}%
 		\vspace{\@sol@outervsep}%
 	\else
+		% ACCESSIBLE, and the exact mirror of the \par at \begin: close the body's
+		% paragraph before shutting the discard box. A body that ENDS in vertical
+		% mode -- one whose last content is a \begin{center} block, which is what
+		% a solution carrying a figure looks like -- leaves the enclosing list's
+		% structure open across the \egroup, and every later \problem then emits
+		% its <LI> as a sibling of the <L> instead of a child. veraPDF reports it
+		% as ISO 32005 Table 5 "Sect shall not contain LI", once per problem
+		% AFTER the offending one, and the ordinary PDF is flawless.
+		\ifdefined\TeXLibAccessibleMode\par\fi
 		\egroup\texlib@acc@tagresume
 	\fi
 }
@@ -525,6 +534,11 @@
 			\par\noindent\box\@partsol@outer\par\smallskip
 		\fi
 	\else
+		% Same closing \par as {solution}'s discard branch, and for the same
+		% reason -- see the comment there. A {partsolution} whose last content is
+		% a \begin{center} figure otherwise breaks the enclosing {problems} list
+		% for every problem after it.
+		\ifdefined\TeXLibAccessibleMode\par\fi
 		\egroup\texlib@acc@tagresume
 	\fi
 }

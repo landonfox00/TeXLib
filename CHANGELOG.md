@@ -60,6 +60,31 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Fixed
 
+- **A `{solution}` or `{partsolution}` ending in a figure broke PDF/UA tagging
+  for every problem after it.** In a build that does not render solutions, both
+  environments open a discard box and suspend tagging. The opening branch has
+  `\par`ed since the para-hook fix, so a body that *starts* in horizontal mode is
+  handled; the closing branch never did. A body that *ends* in vertical mode —
+  which is precisely what a solution whose last content is a `\begin{center}`
+  figure looks like — therefore left the enclosing `{problems}` list open across
+  the `\egroup`, and every later `\problem` emitted its `<LI>` as a sibling of
+  the `<L>` instead of a child. veraPDF fails that as ISO 32005 Table 5,
+  *"`<Sect>` shall not contain `<LI>`"*, once per following problem; a
+  twelve-version exam with one such solution drew 40. Both discard branches now
+  mirror the opening `\par`.
+
+  Three things make this expensive to find, and they are the reason for the
+  length of this entry. The **ordinary PDF is flawless** — only the tagged twin
+  is wrong. The symptom lands on the problems *after* the offending one and
+  never on it, so on a shuffled exam the versions where that problem fell last
+  passed and the rest did not, which reads like a shuffle bug. And the obvious
+  suspect — a nested `enumerate` inside a `\ppart` — is **innocent**: verified by
+  putting one back after this fix (0 failures). Do not rewrite authoring idioms
+  to chase it. To isolate one of these, build a two-problem probe (suspect,
+  `\newpage`, anything) with `--mode accessible`: it reproduces in seconds
+  instead of minutes, and the failure count moves as you strip the suspect line
+  by line.
+
 - **A luaotfload cache-path race cost roughly one parallel build in five.** The
   lane died before LaTeX started, with a traceback and no PDF:
   `"no writeable cache path, quiting"`. luaotfload decides whether a
