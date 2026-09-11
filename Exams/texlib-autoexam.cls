@@ -373,9 +373,12 @@
 % handled by the engine's pbank_suppress_redirect flag, set by
 % autoexam_run_versions before the version loop iterates.
 
-% \shuffle is provided by texlib-problembank.sty
+% \shuffle (and \shuffle[pages]) is provided by texlib-problembank.sty
 % (shared with quiz).  The autoexam version loop reads its flag to reorder
 % problems per version; the engine also shuffles each MC problem's options.
+% \shuffle[pages] permutes whole PAGES instead of individual problems, which is
+% what a page-laid-out exam wants: every version then prints the same pages in a
+% different order, so none of them can overflow.
 
 % The multiple-choice key frame (\@mcframe@* side-by-side override) and the
 % left-shifted \choiceshook are provided by texlib-solutions.sty (shared with
