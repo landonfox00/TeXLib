@@ -125,7 +125,7 @@
 % docs. Example: \setversionseed{A}{7} nudges version A after a bad draw.
 \newcommand{\setversionseed}[2]{\pbank@lua{version_seed_override['#1'] = #2}}
 
-% \shuffle  — turn on per-version shuffling.
+% \shuffle[grain]  — turn on per-version shuffling.
 % Shared by both assessment classes so the toggle (and its default-off behaviour)
 % lives in one place.  autoexam: reorders problems within each {problems} /
 % {mcproblems} section per version (the version loop's source pre-pass) AND
@@ -135,7 +135,20 @@
 % authored problem AND choice order, and \begin{choices}[choose=m] presents ALL
 % options (subset selection is part of the shuffle).  \begin{choices}[fixed]
 % keeps a block in authored order even under \shuffle.
-\newcommand{\shuffle}{\pbank@lua{set_autoexam_shuffle_pages()}}
+%
+% The optional argument picks the GRAIN of the question-order shuffle:
+%   \shuffle          problems (default) — every problem is movable; the
+%                     authored per-page counts are refilled in the new order,
+%                     so a problem can change which page it lands on.
+%   \shuffle[pages]   pages — each authored page keeps its own problems, in
+%                     their authored order, and the PAGE BLOCKS are permuted.
+% Use [pages] whenever the pages were laid out to fit.  At problem grain a page
+% authored as "two short problems" can receive two full-page ones and overflow;
+% at page grain no page's contents ever change, so a paper that fits in one
+% version fits in all of them.  MC option shuffling is on either way.
+\NewDocumentCommand{\shuffle}{O{problems}}{%
+	\pbank@lua{set_autoexam_shuffle_grain('\luaescapestring{#1}')}%
+}
 % \shufflepages (the deprecated alias of \shuffle) is REMOVED, not kept: a
 % pre-release sweep of the repo AND every live course folder under Teaching\
 % found zero uses -- unlike the other deprecated aliases (\theExamNumber,
