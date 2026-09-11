@@ -1,0 +1,220 @@
+% profiles/university-of-kansas.tex — University of Kansas
+% ============================================================================
+% source: https://graduate.ku.edu/sites/graduate/files/files/ETD%20Forms/ETD%20Guidelines_2025%20Final.pdf
+%         (Office of Graduate Studies, "Electronic Thesis and Dissertation
+%          (ETD) Formatting Requirements for Graduate Degree Candidates", 2025)
+% source: https://graduate.ku.edu/formatting
+%         (Graduate & Postdoc Affairs, "Thesis & Dissertation Formatting" — the
+%          live page that links the PDF, and the ONLY place the accessibility
+%          requirement appears)
+% accessed: 2026-09-11
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the CONTENT of the title page and
+% the acceptance page, and the accessibility requirements.
+%
+% PARTIALLY verified, and the distinction matters: KU prescribes WHICH ELEMENTS
+% each of the two pages carries, but publishes no specimen or annotated sample
+% of either -- there is no layout to reproduce, and NO PRESCRIBED WORDING. So
+% the element lists, the role rules, the signing rules and the page number are
+% KU's; the arrangement and the few connective words ("Submitted to ... in
+% partial fulfillment of the requirements for the degree of", "Date Defended:",
+% "Date Approved:") are this class's, chosen to carry KU's required elements and
+% nothing more. They are not quoted from KU and must not be read as such.
+% Anyone filing should check the page against whatever their school's contact
+% person enforces; KU routes every submission through one.
+%
+% THE PDF IS NOT THE WHOLE RULE. The 2025 guidelines predate KU's accessibility
+% requirement, which exists only on the /formatting page and starts with Spring
+% 2026 graduates. Read both. The PDF carries its own supersession notice: "This
+% revision of guidelines supersedes prior instructions for formatting
+% dissertations and theses. Do not use copies on file in departments and
+% libraries as guides for formatting your dissertation or thesis."
+
+\thesisinstitution{University of Kansas}
+
+% --- Filing figures ----------------------------------------------------------
+% "Each page must have at least one-inch margins on all sides, although margins
+% may be wider." A MINIMUM, so 1in is the safe setting; wider is explicitly in
+% spec. "Margins must be consistent throughout the document", so `twoside' must
+% not alternate them.
+%
+% One consequence the class already satisfies: "Only page numbers should appear
+% within the header or footer area. All other material must appear within the
+% margins, including equations, URLs, images, and tables", and "Theses and
+% dissertations should not contain page headers or footers, and the only thing
+% that should appear in this space is a page number."
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Normally, theses and dissertations use double-spaced formatting throughout."
+% Single spacing is listed as acceptable in the table of contents, notes,
+% labels, charts, tables, block quotations, captions, glossary, appendices and
+% bibliography; anything else needs "the prior written approval of their
+% dissertation committee".
+\thesissetspacing{double}
+
+% No \thesissetchapteropening: one margin rule applies to every page.
+%
+% No face is set. KU asks for one consistent font "usually 11- or 12-point",
+% "typically ... a common systems font like Times New Roman, Arial, Garamond,
+% Helvetica, etc.", with all fonts embedded. "Typically" and "etc." are not a
+% closed list, and the class embeds everything it uses.
+
+% --- Accessibility -----------------------------------------------------------
+% KU's requirement is unusually concrete -- a NUMERIC SCORE from a named tool --
+% and it is a must with a start date:
+%
+%   "Students must demonstrate their thesis/dissertation meets these federal
+%    requirements by submitting a YuJa Panorama Accessibility Report with a
+%    score of 85 or higher. This requirement is in effect starting with students
+%    meeting the May 15 graduation deadline for Spring 2026 degrees."
+%
+% NOTE ON THE DATES: KU cites an April 2026 federal deadline and a May 15 2026
+% KU deadline. These are KU's own published figures. ADA Title II compliance
+% dates differ legitimately between institutions, so do not reconcile them
+% against a different date in a neighbouring profile.
+%
+% \thesisrequiretagging is set because the score KU requires is a
+% document-accessibility score that an untagged PDF cannot reach, and because
+% KU's own best-practice list names heading styles and alt text. KU does not use
+% the word "tagged", nor name a document-language rule or a PDF standard, so
+% neither of the other two declarations is made.
+\thesisrequiretagging
+\thesisaccessibilityrequirement{Accessibility score}
+	{A YuJa Panorama Accessibility Report with a score of 85 or higher must be
+	 submitted, starting with students meeting the May 15 graduation deadline
+	 for Spring 2026 degrees.}
+\thesisaccessibilityrequirement{Why}
+	{A federal regulation requires all websites of federally funded institutions
+	 to be accessible, and this includes everything in KU ScholarWorks, to which
+	 all theses and dissertations must be submitted.}
+\thesisaccessibilityrequirement{Best practices}
+	{KU names using heading styles and providing alt text for each image among
+	 the items to address, and points at its "Making Your Dissertation or Thesis
+	 Accessible" module for the full list.}
+\thesisaccessibilityrequirement{Check the SOURCE, not the PDF}
+	{KU asks that the original Word or LaTeX document be uploaded to YuJa
+	 Panorama — not a PDF — and that the document be converted to PDF for
+	 ProQuest only after the score of 85 is reached.}
+\thesisaccessibilityrequirement{Not retroactive}
+	{The requirement does not apply to degrees earned before Spring 2026.}
+
+% --- Title page --------------------------------------------------------------
+% REQUIRED. KU lists the elements rather than drawing the page: "The Title Page
+% features the title of the work, the name of the author, the year the work was
+% finished, the department name, the degree awarded, the names of committee
+% members, and the date an ETD was defended."
+%
+% Rules encoded here:
+%   * "The names of all committee members must appear on the Title Page of the
+%     manuscript. A student's supervisor must be designated on the Title Page as
+%     Chair." -- so the roles ARE printed beside the names here, unlike Georgia
+%     or Miami. Pass "Chair" (and "Co-Chair") as the second \committeemember
+%     argument.
+%   * "The Title Page included with the electronic submission must not be
+%     signed." -- no signature rules.
+%   * "No page number should appear on the Title Page."
+%
+% TWO DATES ON ONE PAGE. KU asks for both "the year the work was finished" and
+% "the date an ETD was defended". \thesis@date carries the former; the profile
+% mints \thesisdefensedate for the latter, which prints only when set.
+\providecommand{\thesisdefensedate}{}
+% Optional per KU: "At the discretion of the student, the Title Page may include
+% previous academic degrees awarded." Give it \\-separated lines, or leave empty.
+\providecommand{\thesispriordegrees}{}
+% Also optional: the copyright mark beside the year. \thesiscopyrightonpagetrue
+% in the document turns it on.
+\newif\ifthesiscopyrightonpage
+\thesiscopyrightonpagefalse
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{2\baselineskip}
+		By\par
+		\vspace{\baselineskip}
+		\@author\par
+		\ifx\thesispriordegrees\@empty\else
+			\vspace{0.5\baselineskip}
+			\thesispriordegrees\par
+		\fi
+		\vspace{\baselineskip}
+		% "It may also include an indication of copyright next to the year" —
+		% optional, so it is off unless the document asks for it.
+		\ifthesiscopyrightonpage\copyright{} \fi\thesis@date\par
+		\vspace{2\baselineskip}
+		Submitted to the \thesis@program\\
+		and the Graduate Faculty of the University of Kansas\\
+		in partial fulfillment of the requirements for the degree of\\
+		\thesis@degree\par
+		\vfill
+		\begingroup
+		% Roles are printed: KU requires the supervisor to be designated Chair.
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par
+		}%
+		\thesis@committee
+		\endgroup
+		\ifx\thesisdefensedate\@empty\else
+			\vspace{2\baselineskip}
+			Date Defended: \thesisdefensedate\par
+		\fi
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Acceptance page -----------------------------------------------------------
+% REQUIRED, and KU is specific about where it goes and how it is numbered: "An
+% Acceptance Page is required. The Acceptance Page should immediately follow the
+% Title Page", and "The Acceptance page number must be 2. THIS NUMBER SHOULD
+% APPEAR ON THE PAGE."
+%
+% That last rule is why this page does NOT load the class's `nopagenumber'
+% geometry and does not set \thispagestyle{empty}: at KU the folio is required
+% here. A document filing at KU must therefore have page numbering live by the
+% time it calls \thesisapprovalpage, and must arrange for this to be page 2.
+%
+% Contents: "The Acceptance Page features the title of the document, the name of
+% the author, the name of the committee chair(s), and the date an ETD was
+% accepted." Only the CHAIR appears -- not the whole committee, which is the
+% title page's job -- because the chair's name "indicates that the chair has
+% reviewed and approved the final version of the dissertation".
+%
+% NOT SIGNED IN THE PDF, BUT SIGNED ON PAPER: "The Acceptance Page included with
+% the electronic submission must not be signed. However, students must submit
+% the signed copy of the Acceptance Page, bearing signatures of their chair(s),
+% to their schools in hard copy." So the filed PDF's page carries no rule, and
+% the same page is printed and signed separately.
+%
+% "Note that the title appearing on the acceptance page much [sic] be identical
+% to that which appears on the title page" -- both take \@title, so that holds.
+%
+% ONLY THE CHAIR, not the whole committee: that is the title page's job. The
+% chair is taken from \gradadvisor, and a co-chair from \thesiscochair.
+\providecommand{\thesisacceptancedate}{\thesis@date}
+\providecommand{\thesiscochair}{}
+
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage
+	\singlespacing
+	\begin{center}
+		\thesis@tagtitle{H1}{{\color{white}\tiny Acceptance Page}}\par
+		\vspace*{\fill}
+		\@title\par
+		\vspace{2\baselineskip}
+		\@author\par
+		\vspace{4\baselineskip}
+		\thesis@advisor, Chair\par
+		\ifx\thesiscochair\@empty\else
+			\thesiscochair, Co-Chair\par
+		\fi
+		\vspace{4\baselineskip}
+		Date Approved: \thesisacceptancedate\par
+		\vspace*{\fill}
+	\end{center}%
+	\doublespacing\clearpage
+}
