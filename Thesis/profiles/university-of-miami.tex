@@ -1,0 +1,183 @@
+% profiles/university-of-miami.tex — University of Miami
+% ============================================================================
+% source: https://www.grad.miami.edu/_assets/pdf/etd-organization-formatting-9-9-26.pdf
+%         (Graduate School, "Organization and Formatting of the Final Electronic
+%          Thesis, Dissertation, or Doctoral/Lecture Recital Essay" — every page
+%          footed "9/9/26 rev.")
+% source: https://www.grad.miami.edu/_assets/pdf/phd-template-8-13-26.docx
+%         (the Graduate School's own Ph.D. front-matter template — title page,
+%          copyright page, signature page, abstract page)
+% source: https://www.grad.miami.edu/electronic-thesis-and-dissertation/formatting-the-etd/index.html
+%         (the live page linking both)
+% accessed: 2026-09-11
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page and the signature
+% page. Nothing is left to the neutral fallback except the font (see below).
+%
+% SUPERSEDED TEMPLATES STILL LINKED FROM THE SAME PAGE. The formatting page
+% carries TWO generations of front-matter templates: the current 8-13-26 set
+% (../../_assets/pdf/<degree>-template-8-13-26.docx) and an older 4-1-24 /
+% 7-5-23 / 1-29-25 set at /_assets/pdf/. This profile follows the 8-13-26 Ph.D.
+% template. Do not "correct" a figure here against one of the older files.
+%
+% AMBIGUITY LEFT FOR THE REVIEWER — THE TYPEFACE. The guidelines say "Font:
+% 12-point throughout textual materials, including appendices. Acceptable fonts
+% include Arial, Times New Roman, and Courier New." This class's default face is
+% Latin Modern, which is NOT on that list. No face is set here, on two grounds:
+% "include" is not "limited to", and a profile that restyles the whole document
+% goes beyond what RESEARCHING.md says a profile owns. But anyone filing at
+% Miami should decide this deliberately -- \setmainfont{TeX Gyre Termes} in the
+% document gives a Times-metric face if the Sr. Editor reads the list as closed.
+
+\thesisinstitution{University of Miami}
+
+% --- Filing figures ----------------------------------------------------------
+% "Left margin: 1.5 inches. Top, bottom, and right margins: 1 inch."
+%
+% Stated flatly, with no binding caveat and no alternative, so this is the rule
+% rather than a choice -- and `twoside' must not alternate it. The manuscript
+% "must ... meet both electronic and hard-copy binding standards", which is why
+% the wide left margin applies to the filed PDF too.
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "Main text line spacing: Double-spaced." Single spacing is prescribed for
+% "Footnotes, block quotations, figure and table legends, and References
+% individual citations", which are per-element, so the document default is
+% double.
+\thesissetspacing{double}
+
+% No \thesissetchapteropening: Miami states one top margin, 1 inch, and names no
+% deeper opening for chapters or major sections.
+
+% --- Accessibility -----------------------------------------------------------
+% NOT PUBLISHED. Searched for accessib / alt text / alternative text / tagged /
+% WCAG / screen reader / PDF/A / Title II across the whole 9/9/26 formatting
+% guidelines, the 10/21/25 ETD Process document, the 9/9/26 ETD Preparation
+% Checklist, and the ETD index and formatting pages: zero occurrences, other
+% than the "Accessibility Options" widget in the university's own site chrome.
+\thesisaccessibilityrequirement{Not published}
+	{The University of Miami Graduate School publishes no accessibility
+	 requirement for a filed ETD in its formatting guidelines, its ETD process
+	 document, or its preparation checklist.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduces the Graduate School's Ph.D. front-matter template, which the
+% guidelines make binding: "Students should download the Graduate School's
+% prepared templates for the unnumbered front matter and reproduce the wording,
+% capitalization, and spacing exactly in their ETD."
+%
+% The title is ALL CAPS and, per the template's own annotation, "SINGLE SPACED
+% IF IT WRAPS AROUND".
+%
+% THE DATE IS THE DEGREE-AWARD DATE AND CARRIES NO COMMA: "The Title and
+% Abstract pages must note the date the degree is awarded, not the date of
+% defense. The date that appears in your ETD should not include a comma" —
+% "Fall: December 2026 / Spring: May 2027 / Summer: July 2027". The class's
+% \graddate default is "May, 20XX", which is out of spec on both counts; a
+% document filing here must set \graddate{May 2027}.
+\providecommand{\thesislocation}{Coral Gables, Florida}
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		UNIVERSITY OF MIAMI\par
+		\vspace{3\baselineskip}
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{3\baselineskip}
+		By\\
+		\@author\par
+		\vspace{3\baselineskip}
+		A \MakeUppercase{\thesis@DocNoun}\par
+		\vspace{2\baselineskip}
+		Submitted to the Faculty\\
+		of the University of Miami\\
+		in partial fulfillment of the requirements for\\
+		the degree of \thesis@degree\par
+		\vfill
+		\thesislocation\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Signature page ------------------------------------------------------------
+% REQUIRED IN THE FILED PDF, WITH THE RULES BLANK. This is the unusual case, and
+% it is stated rather than inferred:
+%
+%   "The Signature page in your ETD must be included in the final PDF of your
+%    ETD, but without the actual ink signature of any individual named on this
+%    page. For legal reasons, ink signatures are not displayed on this page."
+%
+% So the signature RULES are drawn and left empty -- unlike the several schools
+% that forbid the page outright or want typed names with no rules.
+%
+% HOW A MEMBER IS NAMED. "The individuals named on this page must also display
+% their full academic title", and the template's note is explicit about what NOT
+% to write: "Do NOT add 'Chairperson,' 'Committee Member,' or 'Outside Member'
+% to any signees' name. Signature lines should include only the signees' name,
+% degree earned, and title. Do not add 'Dr.' or 'Professor' in front of a
+% signee's name." So each entry is two lines -- "Jane Q. Smith, Ph.D." over
+% "Professor of Mathematics" -- which maps onto \committeemember{<name, degree>}
+% {<academic title>}. Do not pass a committee ROLE as the second argument here.
+%
+% THE DEAN'S LINE IS MANDATORY: "(Dean's line MUST be included on this page and
+% placed here.)" The name below is the one printed on the 8-13-26 template and
+% WILL rot; it is a \providecommand so a document can correct it.
+%
+% LAYOUT DIFFERENCE, FLAGGED RATHER THAN HIDDEN: the template lays the rules out
+% two to a row and puts the Dean's cell in the SECOND ROW, RIGHT COLUMN, with an
+% outside member after it. This profile lays out the same two-column grid but
+% appends the Dean as the FINAL cell, because the template's position depends on
+% having exactly four committee members. The prose requirement — that the Dean's
+% line be on the page — is met either way.
+\providecommand{\thesisgraduatedean}{Soyeon Ahn, Ph.D.}
+\providecommand{\thesisgraduatedeantitle}{Interim Dean of the Graduate School}
+
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\begin{center}
+		\thesis@tagtitle{H1}{{\color{white}\tiny Signature Page}}\par
+		\vspace*{0.25in}
+		UNIVERSITY OF MIAMI\par
+		\vspace{3\baselineskip}
+		A \thesis@docnoun{} submitted in partial fulfillment of\\
+		the requirements for the degree of\\
+		\thesis@degree\par
+		\vspace{3\baselineskip}
+		% "NO BOLD" is the template's own annotation on this line.
+		\MakeUppercase{\@title}\par
+		\vspace{3\baselineskip}
+		\@author\par
+	\end{center}
+	\vspace{2\baselineskip}
+	{\raggedright Approved:\par}
+	\vspace{\baselineskip}
+	\begingroup
+	% Two cells per row: 0.46+0.04+0.46 = 0.96 of the measure, so a third cell
+	% cannot fit and breaks at the \allowbreak. \lineskip opens the gap between
+	% rows, since these are inline boxes rather than separate paragraphs.
+	\setlength{\lineskip}{2.5\baselineskip}%
+	\setlength{\parindent}{0pt}%
+	\raggedright
+	\renewcommand{\thesis@memberline}[2]{%
+		\parbox[t]{0.46\linewidth}{%
+			\raggedright
+			\rule{0.9\linewidth}{0.4pt}\\
+			##1\\
+			##2\par
+		}%
+		\hspace{0.04\linewidth}\allowbreak
+	}%
+	\thesis@committee
+	\thesis@memberline{\thesisgraduatedean}{\thesisgraduatedeantitle}%
+	\par
+	\endgroup
+	\vspace*{\fill}%
+	\loadgeometry{normal}\doublespacing\clearpage
+}
