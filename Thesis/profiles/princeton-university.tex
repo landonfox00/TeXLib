@@ -1,0 +1,161 @@
+% profiles/princeton-university.tex — Princeton University
+% ============================================================================
+% source: https://libguides.princeton.edu/ld.php?content_id=77371930
+%         (Princeton University Archives, "PhD Dissertation & Master's Thesis
+%          Formatting Requirements", 8 pp. — the governing document)
+% source: https://libguides.princeton.edu/ld.php?content_id=77372176
+%         (the "Title Page Format" specimen it points to)
+% source: https://libguides.princeton.edu/dissertations_masters_theses_submission/formatting_requirements
+%         (the page linking both — "Last Updated: Aug 13, 2026")
+% accessed: 2026-09-11
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, the absence of an
+% approval page, and the accessibility position. Nothing is left to the neutral
+% fallback.
+%
+% ON THE SOURCE HOST. Princeton is unusual: format is not the Graduate School's
+% to set. "The Princeton University Archives (Mudd Library) oversees the format
+% and physical form of the dissertation or master's thesis", while "The general
+% requirements for the doctoral dissertation and the master's thesis are set
+% forth by the Graduate School" and "The Princeton University Archives does not
+% oversee the contents, order of elements (aside from the first three pages),
+% citation style". The Archives document IS the filing-format authority here,
+% and the submission guide says so explicitly of a conflicting source: "Where
+% there are discrepancies with the Princeton University Archives Dissertation
+% Formatting Requirements document, the Princeton University Archives
+% requirements should be followed."
+%
+% AND ITS OWN WARNING ABOUT PRECEDENT, which is worth repeating to anyone
+% tempted to "improve" this file from a Princeton thesis they have seen:
+% "Do not rely on the form or format of bound dissertations or theses that may
+% be found in the Princeton University Library or your department, or on LaTeX
+% templates shared by fellow students or staff. ... The Library's requirements
+% have evolved over the years, and older practices should not be used as
+% precedents."
+
+\thesisinstitution{Princeton University}
+
+% --- Filing figures ----------------------------------------------------------
+% "The dissertation PDF should have 1-inch margins on all sides (top, bottom,
+% left, and right)."
+%
+% A SEPARATE, WIDER RULE EXISTS FOR BOUND COPIES, and it does not apply here.
+% Only the "Dual Submission" subset -- students who removed content from the PDF
+% to avoid copyright infringement, approved by the Graduate School -- files a
+% bound copy, which has its own margin and spacing specification in the last
+% section of the Archives document. This profile encodes the PDF rule, which is
+% what every candidate files.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "The dissertation PDF must have double spacing in the main body of the text.
+% Single or 1.5 spacing may be acceptable in the front or back matter, captions,
+% or footnotes."
+\thesissetspacing{double}
+
+% No \thesissetchapteropening: Princeton states one margin for every page and
+% names no deeper opening.
+%
+% No face is set. Princeton "prefer[s]" Times New Roman or Arial rather than
+% requiring either -- "If using other fonts, be sure to use embeddable Type 1 or
+% TrueType fonts" -- and asks for a size "equivalent in scale to 10-point Arial
+% or 12-point Times New Roman", with embedded fonts. The class default meets the
+% embedding and scale requirements; script, italic and ornamental display faces,
+% which Princeton does forbid, are not in play.
+
+% --- Accessibility -----------------------------------------------------------
+% OPTIONAL, IN AS MANY WORDS, and that is a finding rather than a gap. Princeton
+% is the clearest "not required" of the schools profiled so far, so nothing
+% checkable is declared -- no \thesisrequiretagging, no document-language
+% requirement, no PDF standard. Declaring any of them would put words in the
+% Archives' mouth in the direction it has explicitly declined to go.
+\thesisaccessibilityrequirement{Optional}
+	{Accessibility is not required. "Should you wish to make your dissertation
+	 or Master's thesis meet accessibility standards, please refer to the
+	 following resources from the Princeton Accessibility Office."}
+\thesisaccessibilityrequirement{Alt text}
+	{Also optional: "While it is not required at this time, adding alt text for
+	 any illustrations makes your content accessible."}
+\thesisaccessibilityrequirement{Colour}
+	{The one colour rule is about fidelity, not contrast: "Illustrations that
+	 require color for their analysis or interpretation should be represented in
+	 full color." Font colour must be black throughout.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduces the Archives' Title Page Format specimen, which is binding: "The
+% first page of your dissertation should be an unpaginated title page to be
+% prepared as shown in our Title Page Format document, including the elements
+% shown, spacing, and capitalization."
+%
+% Everything but the author's name, the adviser line and the date is uppercase
+% on the specimen, and nothing is bold -- so the class's neutral \bfseries title
+% is dropped.
+%
+% THE DATE IS THE BOARD OF TRUSTEES CONFERRAL DATE, and no other date may
+% appear: "the title page must have the month and year of the Board of Trustees
+% meeting at which your degree is conferred -- not the date on which you
+% complete your dissertation or that your defense is held. No other date should
+% appear on the title page. ... The date should be formatted as 'Month YYYY',
+% for example, 'January 2027'." Note there is NO COMMA; the class's \graddate
+% default ("May, 20XX") is out of spec, and a document filing here must set
+% \graddate{January 2027}.
+%
+% The specimen offers "THE DEPARTMENT OF [OR PROGRAM IN]" — a choice the
+% document makes, not the profile.
+\providecommand{\thesisdepartmentline}{THE DEPARTMENT OF}
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{0.5in}
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{3\baselineskip}
+		\@author\par
+		\vspace{3\baselineskip}
+		A \MakeUppercase{\thesis@DocNoun}\par
+		\vspace{2\baselineskip}
+		PRESENTED TO THE FACULTY\par
+		\vspace{2\baselineskip}
+		OF PRINCETON UNIVERSITY\par
+		\vspace{2\baselineskip}
+		IN CANDIDACY FOR THE DEGREE\par
+		\vspace{2\baselineskip}
+		OF \MakeUppercase{\thesis@degree}\par
+		\vspace{2\baselineskip}
+		RECOMMENDED FOR ACCEPTANCE BY\par
+		\vspace{2\baselineskip}
+		\thesisdepartmentline\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\thesis@program}\par
+		\vspace{3\baselineskip}
+		Adviser: \thesis@advisor\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% There is none in the manuscript, and the title page above carries the approval
+% statement instead: "RECOMMENDED FOR ACCEPTANCE BY / THE DEPARTMENT OF ...",
+% over the adviser's name.
+%
+% THIS IS AN INFERENCE FROM THREE FACTS RATHER THAN A SINGLE PROHIBITING QUOTE,
+% so a reviewer should look at it:
+%   1. The opening pages are prescribed and closed: "The first three pages of
+%      your dissertation, in order, should be the Title page, the Copyright (or
+%      Creative Commons license) page, and the Abstract. If your submission does
+%      not meet these requirements, you will be contacted via email from the
+%      Mudd Library to make changes." An approval leaf cannot go where every
+%      other school puts it.
+%   2. The Archives' complete 8-page formatting specification never mentions a
+%      signature, approval or committee page anywhere.
+%   3. Approval is collected OUTSIDE the manuscript: each principal reader
+%      submits a signed dissertation reader report to the department, and the
+%      Graduate School's PhD Dissertation Report Form carries the signatures.
+%
+% Left unset, the class's neutral committee page with signature rules would
+% print -- a page Princeton has no place for. Emitting nothing is the safer of
+% the two errors here, and the reasoning above is the whole of the case.
+\thesisnoapprovalpage
