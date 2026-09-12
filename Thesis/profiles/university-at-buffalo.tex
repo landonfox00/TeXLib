@@ -1,0 +1,166 @@
+% profiles/university-at-buffalo.tex — University at Buffalo
+% ============================================================================
+% source: https://www.buffalo.edu/grad/succeed/graduate/electronic-submission.html
+%         (The Graduate School, "Electronic Thesis & Dissertation (ETD)
+%         Guidelines". Current: its deadline table runs to the Aug. 31, 2027
+%         conferral date.)
+% source: https://www.buffalo.edu/content/dam/grad/forms/etd-template.docx
+%         (the ETD Template the same page links and calls "required for
+%         students using Word"; its "Important Notes for Your Document" page
+%         restates the figures, and its first page is the prescribed title page)
+% accessed: 2026-09-12
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, the absence of an
+% approval page, and the accessibility requirements.
+%
+% NOT set, because the class has no hook for it: the typeface rule. UB requires
+% "Minimum of 12 characters per inch (or 12 point font). Simple fonts must be
+% used (e.g., Arial, Helvetica, Tahoma)" — the template adds Calibri. All four
+% named examples are sans-serif; the class's Latin Modern is not, and "e.g."
+% leaves it unsettled whether a serif face qualifies as "simple". A filer should
+% set a sans face rather than assume. That is a live question for the reviewer,
+% not something this file may decide.
+%
+% TWO PLACES WHERE THE TWO SOURCES DISAGREE — both recorded, neither resolved
+% here, because neither touches a field this profile sets:
+%   * Page-number placement. The guidelines page: "Generally the page number is
+%     placed in the upper right, lower right or bottom center of the page."
+%     The template: "Only the page number, centered in the bottom margin of
+%     portrait orientation is allowed."
+%   * PDF conversion. The guidelines page: "Use Quartz to convert to PDF and
+%     ProQuest's PDF conversion tool to preserve accessibility." The template:
+%     "Avoid printing to PDF or use of Quartz to convert to PDF." These are
+%     flatly opposite on Quartz. Neither matters to a lualatex build, which
+%     writes the tagged PDF directly.
+
+\thesisinstitution{University at Buffalo}
+
+% "Margins: All pages should be have a one-inch (1") white margin on all four
+% sides. Only the page number is allowed within the margin." [sic — the typo is
+% the source's]. The template repeats it: "All pages should have a one-inch
+% white margin on all four (4) sides." No binding exception is offered, and the
+% manuscript is filed electronically through the ETD Administrator, so there is
+% no bound copy to offset for. No chapter-opening exception is stated anywhere
+% in either source, so \thesissetchapteropening is deliberately NOT called.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Spacing: Use double-spacing consistently throughout the document, except for
+% long quotations, footnotes and endnotes, which are typically single-spaced."
+% The template's notes page says "All body text must be double spaced except for
+% short quotes and image captions." The exceptions differ in detail; the rule
+% for body text is double in both.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% UB's requirement is dated and it is in the future: "In alignment with updated
+% Americans with Disabilities ACT (ADA) Title II Regulations, beginning in
+% spring 2027, all theses and dissertations submitted to UB will be required to
+% meet digital accessibility standards." Note the date — it is UB's own, for a
+% SUNY campus, and it is NOT the April 2026 date some larger public entities
+% carry. Do not reconcile it against another profile's figure.
+%
+% Tagging is required on the strength of three statements that are already
+% unconditional: "Accessibility formatting found in the Word template is
+% required for all submissions"; "When converting your document to PDF select
+% 'Save as PDF' to preserve the accessibility. Avoid printing to PDF"; and
+% "[approved ETDs] will be delivered to the UBIR once confirmed to be fully
+% accessible." Neither source names a PDF standard (no PDF/A, no PDF/UA) and
+% neither asks for the document language to be set, so
+% \thesisrequirepdfstandard and \thesisrequiredocumentlanguage are NOT called.
+\thesisrequiretagging
+\thesisaccessibilityrequirement{Effective date}
+	{Beginning in spring 2027, all theses and dissertations submitted to UB are
+	 required to meet digital accessibility standards, in alignment with the
+	 updated ADA Title II regulations.}
+\thesisaccessibilityrequirement{Alt text}
+	{"Alternative text for all visuals, including pictures, graphics and
+	 charts." The template adds: "Ensure that all graphics have alternative
+	 text."}
+\thesisaccessibilityrequirement{Link text}
+	{"Meaningful hyperlinked text." The template: "Use meaningful text for
+	 links. The text should describe the link's destination. Avoid using 'click
+	 here' or 'read more' as the only word linked."}
+\thesisaccessibilityrequirement{Heading structure}
+	{"Logical semantic (heading) structure." The guidelines add: "Use the
+	 correct heading hierarchy as headings are one of the primary ways screen
+	 reader users navigate within a document."}
+\thesisaccessibilityrequirement{Tables}
+	{"Logical table structure with proper table headings."}
+\thesisaccessibilityrequirement{Contrast}
+	{"Ensure there is sufficient contrast between text and background colors."
+	 No ratio is named.}
+\thesisaccessibilityrequirement{Floating objects}
+	{"Avoid use of text boxes, background images, watermarks and word art. A
+	 screen reader may not detect these in a document."}
+\thesisaccessibilityrequirement{Running headers}
+	{"There should be no running headers throughout your document."}
+\thesisaccessibilityrequirement{Checker}
+	{The filer must run an accessibility checker before submitting: "Run the
+	 accessibility checker on your document (i.e., Accessibility Checker in MS
+	 Word or ACE by Daisy Consortium if EPUB)." No LaTeX equivalent is named.}
+
+% --- Title page --------------------------------------------------------------
+% "The title page must follow the format in the ETD Template." The template's
+% first page is that format, and the block below reproduces its element order
+% exactly: title, "by", author, date, the submission sentence, the degree, the
+% department or program.
+%
+% Typography from the template's own styles: the title is Heading 1 —
+% centred, 14pt, NOT bold, single line spacing — and everything under it is the
+% Normal style, 12pt at double line spacing. The one annotation on the page,
+% "(Double-spaced)", sits between the title and "by", which is why the block
+% below is double-spaced from "by" down and the title is not.
+%
+% The date line is "Center your defense date or the conferral date here" —
+% either is permitted — and the guidelines page confirms "The date of your
+% defense should be listed on the title page". \graddate supplies whichever the
+% filer chose.
+%
+% The page flows from the top margin; neither source prescribes vertical
+% centring or a deeper top margin here, so nothing is invented. The title is NOT
+% set in bold, because the template's Heading 1 is not bold — this differs from
+% the class's neutral title page, which is.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\thesis@tagtitle{Title}{{\fontsize{14}{17}\selectfont\@title}}\par
+		\vspace{24pt}
+		\begingroup\doublespacing
+		by\par
+		\@author\par
+		\thesis@date\par
+		A \thesis@docnoun{} submitted to the faculty of the Graduate School of
+		the University at Buffalo, The State University of New York in partial
+		fulfillment of the requirements for the degree of\par
+		\thesis@degree\par
+		\thesis@program\par
+		\endgroup
+		\vfill
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% UB prescribes none, and the filed document must not carry one.
+%
+% The guidelines page gives the page order as a closed, marked list — "Your
+% document should adhere the following prescribed order", then Title page
+% (required), Copyright page (required), Dedication and/or acknowledgments
+% (optional), Table of contents (required), Lists (optional), Abstract
+% (required), Chapters (required), Appendix (if applicable), Bibliography
+% (required). No approval, committee or signature page appears in it, and the
+% ETD Template — "required for students using Word" — has none either.
+%
+% Committee approval is collected on a separate form instead: the M-form, which
+% the same page lists under "In addition to your master's thesis/doctoral
+% dissertation, submit the following". The manuscript's title "must match the
+% approved title on your M-form", so the M-form is the approval instrument and
+% the manuscript is not.
+%
+% This is the one judgement in this file that rests on an absence rather than a
+% sentence. It is recorded as such for the reviewer: if UB does collect an
+% in-document approval leaf somewhere neither source mentions, delete this line
+% and the neutral page returns.
+\thesisnoapprovalpage
