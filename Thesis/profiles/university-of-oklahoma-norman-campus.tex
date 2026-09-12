@@ -1,0 +1,173 @@
+% profiles/university-of-oklahoma-norman-campus.tex — University of Oklahoma-Norman Campus
+% ============================================================================
+% source: https://www.ou.edu/content/dam/gradcollege/docs/gc-thesis-dissertation-instruction-packet.pdf
+%         (Graduate College, "Thesis/Dissertation Instruction Packet". Produced
+%         2025-12-11, so it is current. Section 2 carries the formatting
+%         checklist and the five sample pages; Section 3 is accessibility.)
+% source: https://www.ou.edu/gradcollege/forms-and-policies/steps-to-degree
+%         (Graduate College, "Steps to Degree" → Formatting Requirements, which
+%         restates the checklist word for word and adds one item the packet
+%         omits: "The document should not contain any blank pages.")
+% accessed: 2026-09-12
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set: geometry, the title page and the committee (approval) page.
+%
+% NOT SET, because OU publishes no rule: \thesissetspacing. Neither the packet
+% nor the web checklist states a line spacing anywhere — they cover font size,
+% margins, page order, page numbering, front matter, file name and blank pages,
+% and simply never mention it. The class's neutral default therefore applies,
+% which is the honest outcome; do not import a figure from a neighbouring
+% profile.
+%
+% NOT set, for want of a hook: "Standard, professional 12-point font must be
+% used throughout. (headings may be larger)". Note this one is a REQUIREMENT at
+% OU, not a range — unlike the margin.
+%
+% ONE MORE RULE WITH NO PROFILE FIELD, worth knowing because the class can
+% violate it: "The document should not contain any blank pages." A twoside build
+% inserts \cleardoublepage blanks, so OU documents should stay oneside.
+%
+% THE LATITUDE THIS PROFILE RELIES ON. OU's checklist says: "The text of the
+% Title Page, Committee Page, and Copyright Page must include all text on the
+% sample pages of the instruction packet (FORMAT MAY VARY)", and, of the
+% committee list, "(no signatures, format may vary)". So the WORDING below is
+% mandatory and reproduced exactly; the arrangement is not, and the layout here
+% follows the samples without claiming their spacing is prescribed.
+
+\thesisinstitution{University of Oklahoma}
+
+% "Page margins must be consistent throughout the document. (minimum 1" and
+% maximum 1.5")" — a RANGE, not a figure, and the only constraint besides the
+% range is consistency across the document. This profile takes the 1in end
+% because it is the class default and the commonest choice; anything up to 1.5in
+% is equally in spec at OU, so a filer may raise it, provided all four sides stay
+% consistent. No binding allowance is mentioned and none is implied: submission
+% is a single PDF to ProQuest.
+%
+% "All tables, figures, illustrations, and other visual content must be within
+% the page margins." \thesissetchapteropening is NOT called: no chapter-opening
+% exception appears in either source.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% --- Accessibility -----------------------------------------------------------
+% OU devotes a numbered section to accessibility and then states no requirement
+% in it. Section 3 is one sentence, quoted in full below. There is no rule to
+% declare, so \thesisrequiretagging, \thesisrequiredocumentlanguage and
+% \thesisrequirepdfstandard are all left uncalled — a section that exists but
+% asks for nothing is still an absence, and this class emits a tagged PDF
+% regardless.
+%
+% No ADA compliance date appears anywhere in either source. Nothing to reconcile
+% against another profile's date.
+\thesisaccessibilityrequirement{Not published}
+	{The Graduate College's Section 3, "Accessibility", is a referral and not a
+	 requirement, in full: "Please see the Accessibility Resources provided by
+	 OU's Accessibility and Disability Resource Center for information on
+	 creating web accessible PDFs, MS-Office documents, Google docs, A/V
+	 content, and specialized metadata related to accessibility." Nothing on the
+	 formatting checklist conditions acceptance on accessibility.}
+
+% --- Title page --------------------------------------------------------------
+% The sample title page, whose text is mandatory. It is identical for a thesis
+% and a dissertation except for the noun, which \doctype supplies:
+%
+%   UNIVERSITY OF OKLAHOMA / GRADUATE COLLEGE
+%   TITLE OF YOUR THESIS
+%   A THESIS / SUBMITTED TO THE GRADUATE FACULTY /
+%   in partial fulfillment of the requirements for the / Degree of /
+%   EXACT NAME OF YOUR DEGREE
+%   By YOUR NAME / Norman, Oklahoma / Year
+%
+% Note the deliberate mixed case in the sample: the two heading lines, the title,
+% the document noun, "SUBMITTED TO THE GRADUATE FACULTY" and the degree are in
+% capitals, while "in partial fulfillment of the requirements for the" is lower
+% case and "Degree of" and "By" are title case. That is reproduced.
+%
+% "The Title page must include the exact name of the degree", so \graddegree
+% must carry the degree exactly as OU awards it. \graddate should be the bare
+% YEAR, which is all the sample prints.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		UNIVERSITY OF OKLAHOMA\\
+		GRADUATE COLLEGE\par
+		\vspace{3\baselineskip}
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{3\baselineskip}
+		A \MakeUppercase{\thesis@docnoun}\\
+		SUBMITTED TO THE GRADUATE FACULTY\\
+		in partial fulfillment of the requirements for the\\
+		Degree of\\
+		\MakeUppercase{\thesis@degree}\par
+		\vspace{3\baselineskip}
+		By \@author\\
+		Norman, Oklahoma\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% OU calls this the COMMITTEE PAGE, it is required, and it is the second page of
+% the document — "The first three (3) pages of the document must appear in the
+% following order: Title Page, Committee Page, and Copyright Page. DO NOT
+% INCLUDE PAGE NUMBERS ON THESE PAGES."
+%
+% The sample:
+%
+%   TITLE OF YOUR THESIS
+%   A THESIS APPROVED FOR THE
+%   EXACT NAME OF YOUR ACADEMIC UNIT
+%   BY THE COMMITTEE CONSISTING OF
+%                                             Dr. John Doe, Chair
+%                                                  Dr. Jane Smith
+%                                                  Dr. Bob Jones
+%
+% with the committee list flush right. Two checklist items govern it:
+% "The Committee page must include the exact name of the academic unit" and
+% "The Committee page must include the names of each committee member. (no
+% signatures, format may vary)".
+%
+% NO SIGNATURES — so the class's default signature-rule member line is replaced.
+% The sample gives each member a courtesy title and the chair a role ("Dr. John
+% Doe, Chair"); this file does NOT add "Dr." itself, because it would be wrong
+% for a member who is not a doctor and the class cannot tell. Put the wanted form
+% into \committeemember, e.g. \committeemember{Dr. Jane Smith}{Chair}.
+%
+% A FILER MUST SET \ouacademicunit{...} — the exact name of the academic unit,
+% which the checklist requires by name and which the class has no field for. It
+% defaults to \thesis@program, which is often the right words but is not the
+% same field.
+\newcommand{\thesis@ou@unit}{\thesis@program}
+\newcommand{\ouacademicunit}[1]{\renewcommand{\thesis@ou@unit}{#1}}
+
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\begin{center}
+		\vspace*{\fill}
+		\thesis@tagtitle{H1}{\MakeUppercase{\@title}}\par
+		\vspace{3\baselineskip}
+		A \MakeUppercase{\thesis@docnoun} APPROVED FOR THE\\
+		\MakeUppercase{\thesis@ou@unit}\par
+		\vspace{2\baselineskip}
+		BY THE COMMITTEE CONSISTING OF\par
+	\end{center}
+	\vspace{3\baselineskip}
+	\begingroup
+	% Flush right, no signature rules, role kept after the name as the sample
+	% shows for the chair.
+	\renewcommand{\thesis@memberline}[2]{%
+		\raggedleft ##1\ifx\relax##2\relax\else, ##2\fi\par
+		\vspace{\baselineskip}%
+	}%
+	\thesis@committee
+	\endgroup
+	\vspace*{\fill}%
+	\loadgeometry{normal}\doublespacing\clearpage
+}
