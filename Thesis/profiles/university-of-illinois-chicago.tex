@@ -1,0 +1,214 @@
+% profiles/university-of-illinois-chicago.tex — University of Illinois Chicago
+% ============================================================================
+% source: https://grad.uic.edu/academic-support/thesis/thesis-manual/
+%         (Graduate College, "UIC Thesis Manual" — the governing document. It
+%         carries no revision date; its degree-statement example uses the year
+%         2026, and it names the current generative-AI policy, so it is recent.)
+% source: https://grad.uic.edu/academic-support/thesis/etd/electronic-thesis-and-dissertation-format/
+%         (Graduate College, "Electronic Thesis and Dissertation Format")
+% source: https://uofi.box.com/s/3l5uefwvdb6kwqclbwdwegagufpd6m4e
+%         (DoctoralTitlePageSampleD.docx — "Doctoral (5 member committee)
+%         Sample D", one of the four sample ETD title pages the ETD Format page
+%         links. This is the "sample UIC thesis title page" the Manual says to
+%         follow precisely. Its measurements are quoted below.)
+% source: https://github.com/juliusross1/Accessible-LaTeX-Thesis-Template
+%         (thesis.tex — "the accessible UIC LaTeX template created by UIC MSCS
+%         professor Julius Ross", which the Manual directs LaTeX users to)
+% accessed: 2026-09-12
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set: the title page, the absence of an approval page, and the
+% accessibility requirements. Geometry and spacing are set from the TEMPLATES
+% only — see the next paragraph, which is the important part of this file.
+%
+% UIC PUBLISHES NO PROSE MARGIN OR SPACING RULE, and that is a finding, not a
+% gap in the search. The Manual's FORMATTING REQUIREMENTS section covers
+% pagination, the title page, the preliminary pages and accessibility, and never
+% states a margin, a line spacing or a body font size. It is explicit about why:
+% the Graduate College "has delegated the responsibility for quality control of
+% content, most aspects of format, choice of style ... to the student's academic
+% program", and its own review is a listed, closed set — the title page, the
+% preliminary pages, "Consistency of formatting in the body of the thesis", and
+% accessibility. Body margins are nowhere in it.
+%
+% What the Manual does say is "Please use the available Word template and LaTeX
+% template ... to help format your work", and both of those agree: the LaTeX
+% template declares \geometry{margin=1in} and \doublespacing, and the Word
+% sample title page is set at 1in left, right and bottom. The figures below are
+% therefore TEMPLATE evidence under RESEARCHING.md's source rule (2), not a
+% quoted requirement. They are the right default and they are not a rule the
+% Graduate College will check.
+
+\thesisinstitution{University of Illinois Chicago}
+
+% \geometry{margin=1in} in the UIC LaTeX template; 1in left/right/bottom in the
+% Word sample title page (its top margin is 2in, which is handled on the title
+% page itself, below). No prose source — see the header.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% \doublespacing in the UIC LaTeX template, whose comment offers the
+% alternatives: "%other options are \onehalfspacing or \singlespacing". No prose
+% source. \thesissetchapteropening is NOT called: no chapter-opening exception
+% appears in any of the four sources.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% UIC is among the most demanding of the schools profiled so far, and its rule
+% is unconditional and in force now — no future effective date is given, and the
+% ADA Title II citation carries no compliance date at all. Nothing here should be
+% reconciled against a neighbouring profile's date.
+%
+% Tagging: "All UIC theses and dissertations must comply with Web Content
+% Accessibility Guidelines (WCAG) 2.1 Level AA standards. To demonstrate
+% compliance with WCAG 2.1 AA, all UIC thesis and dissertation submissions must
+% pass an accessibility check." An untagged PDF fails that check outright.
+%
+% Document language: this one is an inference from a checkable rule, and it is
+% flagged as such so a reviewer can overrule it. UIC does not write "set the
+% document language"; it writes that the PDF "must pass 31 of 32 possible
+% options in all categories of Acrobat's accessibility check. (The only item not
+% required is the table summary.)" Acrobat's checker has exactly 32 items and
+% Primary Language is one of them, so the language is required by name via the
+% only item UIC exempts being a different one. The ePub route requires "zero (0)
+% violations on all WCAG 2.0 lines and on the WCAG 2.1 A and AA lines", which
+% includes 3.1.1 Language of Page. Both routes therefore require it.
+%
+% No PDF standard is named anywhere — no PDF/A, no PDF/UA — so
+% \thesisrequirepdfstandard is NOT called.
+\thesisrequiretagging
+\thesisrequiredocumentlanguage
+\thesisaccessibilityrequirement{Standard}
+	{"All UIC theses and dissertations must comply with Web Content
+	 Accessibility Guidelines (WCAG) 2.1 Level AA standards", under Title II of
+	 the ADA. No compliance date is given; the rule is stated as being in force.}
+\thesisaccessibilityrequirement{Accessibility check}
+	{Passing an automated check is a condition of acceptance: "Any work that
+	 fails an accessibility check will be sent back to the author for
+	 remediation. In order to have your submission approved, your work must pass
+	 the accessibility check." For a PDF, "your final PDF document must pass 31
+	 of 32 possible options in all categories of Acrobat's accessibility check.
+	 (The only item not required is the table summary.)"}
+\thesisaccessibilityrequirement{LaTeX route}
+	{"Theses and dissertations created with LaTeX should be converted to both
+	 PDF and ePub formats. The ePub format will be checked for accessibility
+	 using the Ace by DAISY app ... your ePub document must show a total of zero
+	 (0) violations on all WCAG 2.0 lines and on the WCAG 2.1 A and AA lines in
+	 the Ace by DAISY Report Summary." A LaTeX filer who submits no ePub is held
+	 to the PDF check instead: "your PDF version will be required to pass an
+	 accessibility check."}
+\thesisaccessibilityrequirement{Alt text}
+	{"All informative figures must include alternative text offering a full
+	 explanation of the figure."}
+\thesisaccessibilityrequirement{Reading order}
+	{"Document reading order must be logical (i.e., the sequence in which
+	 content is presented by screen readers must ensure that meaning is
+	 preserved)." UIC notes this cannot be checked automatically.}
+\thesisaccessibilityrequirement{Colour and contrast}
+	{"Figures must not rely on color alone to convey information or distinguish
+	 a visual element." Text needs a contrast ratio of at least 4.5:1 with its
+	 background, or 3:1 for large text (18pt regular, 14pt bold); any graphical
+	 non-textual element needs at least 3:1. A figure that cannot meet all three
+	 must carry a long description or an accessible data table.}
+\thesisaccessibilityrequirement{Responsibility}
+	{"It is the student's responsibility to ensure accessibility of the final
+	 thesis document."}
+
+% --- Title page --------------------------------------------------------------
+% "The spacing, format, and content of the title page should follow precisely
+% the sample UIC thesis title page and the formatting in the Word and LaTeX
+% templates." The layout below is Sample D, measured out of the .docx: a 2in top
+% margin, Times New Roman 12pt throughout, the title bold, centred and
+% double-spaced (its Heading 1 style), everything else single-spaced, and the
+% committee block flush left with the members indented 1in. The vertical gaps
+% are the sample's own paragraph spacing converted from twips (1680, 240, 1200,
+% 240, 480, 960 → 84pt, 12pt, 60pt, 12pt, 24pt, 48pt).
+%
+% The 2in top margin is produced as \vspace*{1in} on top of the geometry's 1in,
+% because the class has no per-page geometry key for it. If the geometry above
+% is ever changed, that arithmetic has to change with it.
+%
+% WORDING, all from the Manual, quoted:
+%   * "Either the word 'THESIS' (for master's theses or doctoral dissertations)
+%     or the word 'DISSERTATION' (for doctoral dissertations only) must
+%     appear—centered on its own line—above your degree statement." The sample
+%     uses THESIS for a doctoral document; \doctype picks the word here, which
+%     is in spec either way.
+%   * The degree statement "must read": "Submitted as partial fulfillment of the
+%     requirements for the degree of [DEGREE] in [PROGRAM] in the Graduate
+%     College of the University of Illinois Chicago, [YEAR]". Its four line
+%     breaks below are the sample's.
+%   * "The words 'Chicago, Illinois' should appear below your degree statement
+%     (centered and on their own line)."
+%   * "A list of previously earned degrees should appear below your name on your
+%     title page. You should not include the degree for which your thesis is
+%     being submitted."
+%
+% TWO THINGS A FILER MUST SET, because the class's metadata model has no field
+% for either:
+%   * \uicpriordegrees{...} — the previously earned degrees, one per line,
+%     separated by \\. Defined just below; empty by default, and an empty list
+%     simply prints nothing.
+%   * \graddate — UIC's statement ends in a YEAR, not a month and year, so set
+%     \graddate{2027}, not \graddate{May, 2027}.
+\newcommand{\thesis@uic@priordegrees}{}
+\newcommand{\uicpriordegrees}[1]{\renewcommand{\thesis@uic@priordegrees}{#1}}
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{1in}% geometry's 1in + this = the sample's 2in top margin
+		\begingroup\doublespacing
+		\thesis@tagtitle{Title}{{\bfseries\@title}}\par
+		\endgroup
+		\vspace{84pt}
+		BY\par
+		\vspace{12pt}
+		\@author\par
+		\thesis@uic@priordegrees\par
+		\vspace{60pt}
+		\MakeUppercase{\thesis@docnoun}\par
+		\vspace{12pt}
+		Submitted as partial fulfillment of the requirements\\
+		for the degree of \thesis@degree{} in \thesis@program\\
+		in the Graduate College of the\\
+		University of Illinois Chicago, \thesis@date\par
+		\vspace{24pt}
+		Chicago, Illinois\par
+		\vspace{48pt}
+		% "The format of the title page for an ETD should include the names and
+		% roles of the defense committee. The chair and advisor should be
+		% specified as well as department (if from UIC) or institution (if from
+		% outside UIC) of any outside members." The sample prints those as
+		% "Name, Chair" / "Name, Advisor" / "Name" / "Name, Psychology" /
+		% "Name, University of South Michigan" — a role OR an affiliation in the
+		% same slot, with no signature rule, so the class's default member line
+		% is replaced for this page.
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par
+		}%
+		\raggedright
+		Defense Committee:\par
+		\begingroup\leftskip=1in\relax
+		\thesis@committee
+		\endgroup
+		\endgroup
+		\vfill
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% UIC prescribes none. The committee is named on the title page instead, and
+% approval travels on a separate form: "At the defense, the Examination Report
+% is signed by the committee. The completed and endorsed Examination Report must
+% be sent by the student's program to the Graduate College within two business
+% days of the defense." The Manual's list of what the Graduate College checks in
+% the submitted document names the title page, the preliminary pages, the body,
+% the vita and the abstract — and separately names the Examination Report as a
+% document the PROGRAM sends, not a page in the thesis.
+%
+% So signatures are still collected, on paper or electronically, but never in
+% the filed manuscript.
+\thesisnoapprovalpage
