@@ -1,0 +1,223 @@
+% profiles/virginia-commonwealth-university.tex — Virginia Commonwealth University
+% ============================================================================
+% source: https://graduate.vcu.edu/current-students/progress-to-degree/electronic-thesis-and-dissertation/
+%         (VCU Graduate School, "Electronic thesis and dissertation" — the hub
+%         page. Its deadline material runs to the August 2027 conferral, so it
+%         is current.)
+% source: https://docs.google.com/document/d/1uuNulNPy-mUzGYiEIfdbYdD0_0PkYLFD/
+%         ("Graduate School Thesis & Dissertation Manual" — the CURRENT edition.
+%         The hub page links this Google Doc, not the PDF; see the note on the
+%         superseded edition below.)
+% source: https://docs.google.com/document/d/1W6VZPgz3Wfxaai1_5irWEm4CXXZy0mMC/
+%         ("ETD sample templates", linked from the hub page. Its NOTE blocks are
+%         where VCU's only actual format figures live.)
+% source: https://docs.google.com/document/d/e/2PACX-1vRZU9INwFdpLcvP_KRSwdktvabzYLvzZ6ub5ei2Z11-hLUm56mGEIaQk4IAtPPw3eChT7Ti80nzirgF/pub
+%         ("ETD Uploads to Scholars Compass: Accessibility and ADA Compliance",
+%         linked from the hub page as its accessibility guidance. Its closing
+%         paragraphs are written in the voice of VCU Libraries; the Graduate
+%         School publishes it as the ETD accessibility reference, which is the
+%         standing it is cited with here.)
+% source: https://graduate.vcu.edu/media/graduate-school-2021/docs/ETDCheckListAY2026-27.pdf
+%         (the AY 2026-27 ETD checklist)
+% accessed: 2026-09-12
+% checked:  texlib-thesis-profile-round
+%
+% A SUPERSEDED EDITION IS STILL ON THE SERVER AND STILL THE FIRST SEARCH HIT:
+% https://graduate.vcu.edu/media/graduate-school-2021/docs/ETDManualApril2023-FINAL.pdf
+% is the April 2023 PDF of the Manual. The hub page no longer links it; it links
+% the Google Doc above. The two agree on everything this profile encodes, but
+% they are not identical (the PDF says a copyright notice is "not required",
+% the Doc drops that clause), so quote the Doc.
+%
+% VERIFIED and set: geometry and spacing (from the sample template — read the
+% next paragraph), the title page, the absence of an approval page, tagging, and
+% the accessibility requirements.
+%
+% READ THIS BEFORE TRUSTING THE MARGIN. The Manual says, in as many words:
+%
+%   "The Graduate School does not issue specific format requirements for
+%    Electronic Theses and Dissertations (ETD). Thesis or dissertation
+%    requirements may differ for individual schools and departments. Graduate
+%    students must check with the appropriate individuals in their schools to
+%    determine specific requirements ... Students should follow the guidelines
+%    of the school or college's ETD manual if there is one. If not, students
+%    should use the Graduate School ETD manual as their guide."
+%
+% and adds that "the student's thesis/dissertation committee is the final
+% arbiter concerning the thesis/dissertation's final acceptability. The
+% committee's responsibility includes approving style and format".
+%
+% So there is no university-wide margin RULE. What there is, is the Graduate
+% School's own sample template, whose NOTE on the first body page reads:
+%
+%   "All text is double spaced, with the exception of reference lists, long
+%    quotations, data in lists and tables, captions, and lists in appendices.
+%    All text and hyperlinks must be the same font, same font size (10-12pt),
+%    and in black colored text. All text must be the same justification, like
+%    left justified or fully justified. All text, figures/tables, captions, and
+%    equations must fit within the 1-inch margins. Pages may be rotated to
+%    landscape orientation to accommodate tables or illustrations."
+%
+% That is where the two figures below come from — template evidence under
+% RESEARCHING.md's source rule (2), overridable by a school or college that
+% publishes its own ETD manual. A VCU filer must check their school's manual
+% first; the School of Medicine, for one, publishes separate guidelines.
+
+\thesisinstitution{Virginia Commonwealth University}
+
+% "All text, figures/tables, captions, and equations must fit within the 1-inch
+% margins" (ETD sample template). No side is singled out and no binding
+% allowance is mentioned; submission is electronic to VCU Scholars Compass, and
+% students who want a bound copy "will select a binder for the work and pay for
+% the binding themselves", so the filed PDF carries no gutter.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "All text is double spaced, with the exception of reference lists, long
+% quotations, data in lists and tables, captions, and lists in appendices."
+% (ETD sample template). \thesissetchapteropening is NOT called: no source
+% mentions a deeper margin on chapter openings.
+\thesissetspacing{double}
+
+% NOT set, for want of a hook: the font-size rule. "All text and hyperlinks must
+% be the same font, same font size (10-12pt), and in black colored text."
+
+% --- Accessibility -----------------------------------------------------------
+% The Manual's rule is one sentence and it is unconditional: "VCU is committed
+% to providing equal access to programs, online content, services, and
+% activities. All submissions must be accessible." The ETD checklist repeats it
+% as a line item — "All documents are accessible".
+%
+% The detail lives in the accessibility document, which asks the filer to
+% "Confirm PDF tagging" and to "Generate tagged PDFs rather than print-to-PDF
+% outputs", so \thesisrequiretagging is set.
+%
+% \thesisrequirepdfstandard is deliberately NOT set, and the reason is the modal
+% verb. PDF/A appears only in a list of formats that "are most likely to remain
+% viable in the future" — "Other recommended formats include: Text — PDF or
+% PDF/A (.pdf)" — with plain PDF named in the same breath. PDF/UA appears only
+% as a property of a tool VCU recommends ("PAC ... validates PDFs against PDF/UA
+% standards"). Neither is required, and declaring one would put a standard in
+% VCU's mouth that it never named.
+%
+% \thesisrequiredocumentlanguage is NOT set either: no source asks for the
+% document language, even though WCAG conformance would imply it. VCU names WCAG
+% without naming a version or a level, so the chain is too loose to declare.
+%
+% VCU's ADA Title II citation carries NO compliance date. Nothing here to
+% reconcile against another profile's date.
+\thesisrequiretagging
+\thesisaccessibilityrequirement{Rule}
+	{"All submissions must be accessible." The ETD checklist carries it as a
+	 completion item: "All documents are accessible".}
+\thesisaccessibilityrequirement{Why}
+	{"Public universities are required to ensure that their digital content is
+	 accessible under Title II of the Americans with Disabilities Act (ADA).
+	 Accessible digital content conforms to the Web Content Accessibility
+	 Guidelines (WCAG)". No WCAG version or level is named, and no compliance
+	 date is given.}
+\thesisaccessibilityrequirement{Tagging}
+	{The filer must "Confirm PDF tagging" before submitting, and "Generate
+	 tagged PDFs rather than print-to-PDF outputs".}
+\thesisaccessibilityrequirement{Headings}
+	{Heading styles are to be used "from the start", in a stated hierarchy:
+	 Heading 1 for the document title (used once), Heading 2 for chapter titles,
+	 Heading 3 for major subsections, Heading 4 for subsections. In LaTeX: "Use
+	 semantic structure commands consistently (\textbackslash section,
+	 \textbackslash subsection, etc.)".}
+\thesisaccessibilityrequirement{Alt text}
+	{"All images must include alt-text" (ETD sample template); the accessibility
+	 guidance asks for "Meaningful alternative text for figures and diagrams".}
+\thesisaccessibilityrequirement{Mathematics}
+	{"Equations and formulas should be created using tools that preserve the
+	 underlying mathematical structure (such as Word's equation editor or
+	 LaTeX). Avoid inserting equations as images whenever possible, as this
+	 prevents assistive technologies from interpreting the mathematical
+	 content." For LaTeX specifically: "Use accessible math tagging packages
+	 (e.g., tagged PDF workflows now available in newer LaTeX distributions)".}
+\thesisaccessibilityrequirement{Tables}
+	{"Use accessible table formatting"; review "alt text and tables" before
+	 submitting.}
+\thesisaccessibilityrequirement{Reading order and navigation}
+	{"Logical reading order" and "Bookmarks and navigational structure" are
+	 listed among the points needing particular attention in a maths-heavy
+	 document.}
+\thesisaccessibilityrequirement{Checking}
+	{"Run accessibility checkers" before submitting. VCU names Adobe Acrobat
+	 Pro's Accessibility Checker, PAC (the PDF Accessibility Checker, "a free
+	 tool that validates PDFs against PDF/UA standards"), and Word's checker. It
+	 also warns that "the Library is not able to provide individual
+	 accessibility reviews of dissertations".}
+
+% --- Title page --------------------------------------------------------------
+% The Manual states the required CONTENT: "The title page includes the student's
+% name, the date the advisory committee approved the thesis/dissertation, and
+% the partial fulfillment statement", and gives the statement verbatim:
+%
+%   "A thesis/dissertation submitted in partial fulfillment of the requirements
+%    for the degree of (list degree, for example, Master of Science, Doctor of
+%    Philosophy) at Virginia Commonwealth University."
+%
+% The sample template supplies the ORDER and the remaining lines, and the block
+% below is that page: title; the statement; "by"; the student's name with prior
+% degrees; the director; the place; the date. The template's own words for the
+% name and director lines are "(Student's name in full, Student's degrees with
+% Institutions and dates)" and "Director: Thesis/Dissertation director's name,
+% Title, and department" — so both slots carry more than the class's metadata
+% model holds on its own.
+%
+% \graddate is the date the committee approved the work, and the template writes
+% it as "Month, Year" — which for once is exactly what \graddate defaults to.
+%
+% \vcupriordegrees{...} is provided for "Student's degrees with Institutions and
+% dates", which the class has no field for. It prints on the same line as the
+% author's name, as the template does. Empty by default.
+%
+% No vertical positions are prescribed by any source, so the page is centred
+% between the margins rather than pinned to invented offsets.
+\newcommand{\thesis@vcu@priordegrees}{}
+\newcommand{\vcupriordegrees}[1]{\renewcommand{\thesis@vcu@priordegrees}{#1}}
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{{\large\bfseries\@title}}\par
+		\vspace{2\baselineskip}
+		\begin{minipage}{0.85\textwidth}
+			\centering
+			A \thesis@docnoun{} submitted in partial fulfillment of the
+			requirements for the degree of \thesis@degree{} at Virginia
+			Commonwealth University.\par
+		\end{minipage}\par
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{\baselineskip}
+		\@author\ifx\thesis@vcu@priordegrees\@empty\else,
+			\thesis@vcu@priordegrees\fi\par
+		\vspace{2\baselineskip}
+		Director: \thesis@advisor\par
+		\vspace{2\baselineskip}
+		Virginia Commonwealth University\\
+		Richmond, Virginia\par
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% VCU's filed document must not contain one, and the Manual says so directly:
+% "The ETD approval form is not included in submission to VCU Scholars Compass."
+%
+% Signatures ARE still collected, and they are real: "A committee member's
+% approval is given by signing the approval form for thesis and dissertation and
+% final oral defense (ETD Approval Form) ... It is the student's responsibility
+% to obtain all signatures before submitting the approval form to the Graduate
+% School", which then adds the Graduate Dean's. The AY 2026-27 checklist routes
+% that form through DocuSign, so the signatures are electronic — and on a form,
+% never on a page of the manuscript.
+%
+% The committee is therefore named nowhere in the document. Only the director is
+% named, on the title page above.
+\thesisnoapprovalpage
