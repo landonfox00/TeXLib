@@ -53,6 +53,17 @@
 \newbox\@partsol@box
 \newbox\@sol@box
 \newbox\@sol@vtop
+% The assembled full-bleed frame, held so the inline layout can raise it to zero
+% size the way {partsolution} raises \@partsol@outer. Building it into a box
+% first is what lets ONE copy of the frame serve both layouts.
+\newbox\@sol@outer
+% \prevdepth across the inline overlay. A zero-height box still ENDS a line, so
+% it resets \prevdepth to that box's depth and TeX then computes the next
+% interline glue from 0 instead of from the real previous line -- which moved
+% everything after a solution up by ~6pt, measured. Saving and restoring the
+% value makes the overlay invisible to the vertical list, which is the whole
+% contract of the inline layout.
+\newdimen\@sol@prevdepth
 \gdef\@partsol@rubric{}
 \gdef\@sol@rubric{}
 
@@ -322,7 +333,10 @@
 		\ifdefined\directlua
 			\directlua{texlib_synctex_read_target(\number\@sol@box)}%
 		\fi
-		\par\vspace{\@sol@outervsep}%
+		% The outer 10pt separations are real vertical space, so the inline
+		% layout suppresses them for the same reason it zeroes the box below --
+		% exactly as {partsolution} suppresses its opening \smallskip.
+		\ifsolinline\else\par\vspace{\@sol@outervsep}\fi
 		\setlength{\fboxsep}{6pt}%
 		% Collect the "Solution." header (+ any \rubric overlay) and the pre-\box'd
 		% body into ONE \vtop, whose reference point is the header baseline. Then
@@ -364,7 +378,14 @@
 		% inter-problem separator rule (autoexam.cls:\autoexam@problem@sep) exactly.
 		% In the MC-key minipage \@totalleftmargin is 0 (minipage zeroes it), so this
 		% is a no-op there and the box keeps its narrow column.
-		\noindent\hspace*{-\@totalleftmargin}%
+		% The frame is a MACRO, not a box, so the ordinary key emits exactly the
+		% token stream it always did: \noindent, the pull-back, the parbox. An
+		% earlier draft boxed it for both layouts and the Bank template -- which
+		% renders its catalogue with \solutionstrue -- lost PDF/UA-2 on the extra
+		% structure level (Table 5 StructTreeRoot-Div / P-P / P-Part). Only the
+		% inline branch boxes it, because only that branch has to raise it.
+		\def\@sol@frame{%
+			\hspace*{-\@totalleftmargin}%
 			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
 				\noindent
 					% Green fill + left accent \smash\rlap'd BEHIND the content on this
@@ -412,7 +433,31 @@
 							depth \dimexpr\dp\@sol@vtop+6pt\relax}}}%
 				\box\@sol@vtop
 			}%
-		\vspace{\@sol@outervsep}%
+		}%
+		% Same geometry contract {partsolution} already honors: under the inline
+		% layout the frame declares ZERO height and depth and is lowered one
+		% \baselineskip, so the answer is drawn INTO the blank the student would
+		% have written in instead of displacing it -- which is what makes a key
+		% page geometrically identical to its student copy. Without this branch
+		% {solution} always displaced, so any problem answered by a full-problem
+		% {solution} (rather than per-part ones) re-paginated the key.
+		% Caveat, inherited from {partsolution}: nothing bounds the overlay, so a
+		% solution taller than its answer space overprints what follows.
+		\ifsolinline
+			\sbox\@sol@outer{\raisebox{-\baselineskip}[\z@][\z@]{\@sol@frame}}%
+			\begingroup
+				\parskip\z@skip
+				\par
+				\@sol@prevdepth\prevdepth
+				\nointerlineskip
+				\noindent\box\@sol@outer
+				\par
+				\prevdepth\@sol@prevdepth
+			\endgroup
+		\else
+			\noindent\@sol@frame
+			\vspace{\@sol@outervsep}%
+		\fi
 	\else
 		\egroup\texlib@acc@tagresume
 	\fi
