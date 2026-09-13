@@ -378,7 +378,13 @@
 		% inter-problem separator rule (autoexam.cls:\autoexam@problem@sep) exactly.
 		% In the MC-key minipage \@totalleftmargin is 0 (minipage zeroes it), so this
 		% is a no-op there and the box keeps its narrow column.
-		\sbox\@sol@outer{%
+		% The frame is a MACRO, not a box, so the ordinary key emits exactly the
+		% token stream it always did: \noindent, the pull-back, the parbox. An
+		% earlier draft boxed it for both layouts and the Bank template -- which
+		% renders its catalogue with \solutionstrue -- lost PDF/UA-2 on the extra
+		% structure level (Table 5 StructTreeRoot-Div / P-P / P-Part). Only the
+		% inline branch boxes it, because only that branch has to raise it.
+		\def\@sol@frame{%
 			\hspace*{-\@totalleftmargin}%
 			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
 				\noindent
@@ -438,18 +444,18 @@
 		% Caveat, inherited from {partsolution}: nothing bounds the overlay, so a
 		% solution taller than its answer space overprints what follows.
 		\ifsolinline
+			\sbox\@sol@outer{\raisebox{-\baselineskip}[\z@][\z@]{\@sol@frame}}%
 			\begingroup
 				\parskip\z@skip
 				\par
 				\@sol@prevdepth\prevdepth
 				\nointerlineskip
-				\noindent
-				\raisebox{-\baselineskip}[\z@][\z@]{\box\@sol@outer}%
+				\noindent\box\@sol@outer
 				\par
 				\prevdepth\@sol@prevdepth
 			\endgroup
 		\else
-			\noindent\box\@sol@outer
+			\noindent\@sol@frame
 			\vspace{\@sol@outervsep}%
 		\fi
 	\else

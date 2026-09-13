@@ -82,7 +82,13 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
   The non-inline key is untouched: the same fixture built with `\ShowSolutions`
   alone renders pixel-for-pixel identically before and after (0 differing pixels
-  on every page).
+  on every page). The frame is held in a **macro**, `\@sol@frame`, and boxed
+  only on the inline branch, so the ordinary key still emits the token stream it
+  always did. Boxing it for both layouts renders the same pixels but adds a
+  structure level, and that costs PDF/UA-2 on any document that renders
+  solutions — the Bank template, whose catalogue builds with `\solutionstrue`,
+  failed `Table 5 StructTreeRoot-Div / P-P / P-Part` until the box was confined
+  to the branch that needs it.
 
   Guarded by a new `test_solution_inline_parity.py`, which rasterizes the
   student copy and the inline key and requires every dark pixel of the student
