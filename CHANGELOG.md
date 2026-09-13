@@ -60,6 +60,40 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Fixed
 
+- **The inline key was only half inline: a full-problem `{solution}` still
+  displaced the page.** `\ShowKeyInline` exists so a key page *is* its student
+  page with the answers drawn into the blanks — same pagination, same problem
+  positions. `{partsolution}` has honored that since it was written (zero
+  declared height and depth, lowered one `\baselineskip`); `{solution}` never
+  had an `\ifsolinline` branch at all, so it always emitted its two 10pt outer
+  separations and a full-size box. Any problem answered by a whole-problem
+  `{solution}` therefore pushed everything printed after it down the page, and a
+  long enough exam re-paginated: measured on a real twelve-version Math 126
+  exam, the key ran **7 pages against the student copy's 6**. The box is now
+  assembled into `\@sol@outer` once and emitted either normally or, under
+  `\ifsolinline`, raised to zero size the way `{partsolution}` already was.
+
+  Zeroing the box was not sufficient on its own. A zero-height box still *ends a
+  line*, which resets `\prevdepth`, and TeX then computes the next interline
+  glue from 0 rather than from the real previous line — so the content after a
+  solution moved **up** by about 6pt instead of not moving at all. The overlay
+  now saves `\prevdepth` across itself (`\@sol@prevdepth`), which is what makes
+  it genuinely invisible to the vertical list.
+
+  The non-inline key is untouched: the same fixture built with `\ShowSolutions`
+  alone renders pixel-for-pixel identically before and after (0 differing pixels
+  on every page).
+
+  Guarded by a new `test_solution_inline_parity.py`, which rasterizes the
+  student copy and the inline key and requires every dark pixel of the student
+  page to survive in the key — the key may add ink, it may not move any. It
+  scores 100% on both problem pages with this fix and 83% without it. Two
+  details of that test are deliberate and worth not "simplifying" away: the
+  fixture puts a second problem *after* the `{solution}` one, because a
+  displaced box at the bottom of an otherwise empty page only eats its own
+  stretch and the unfixed library scores 100% on it; and the cover is excluded,
+  because the key's red "Solutions" badge is supposed to reflow it.
+
 - **A luaotfload cache-path race cost roughly one parallel build in five.** The
   lane died before LaTeX started, with a traceback and no PDF:
   `"no writeable cache path, quiting"`. luaotfload decides whether a
