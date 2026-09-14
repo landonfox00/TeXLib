@@ -1,0 +1,207 @@
+% profiles/georgetown-university.tex — Georgetown University
+% ============================================================================
+% source: https://grad.georgetown.edu/academics/current-students/dissertation-doctoral-project-and-thesis-information/
+%         ("Information and Templates for Dissertation, Doctoral Project and
+%          Thesis Writers", Graduate Studies)
+% source: https://grad.georgetown.edu/academics/current-students/submission-of-thesis/
+% source: https://grad.georgetown.edu/academics/current-students/submission-of-dissertation-or-doctoral-project/
+% source: the Graduate School's own Word template, "Thesis Dissertation
+%         Template-PC-OCT 2025.docx", linked from the first page above as
+%         "Thesis/Dissertation Template-PC" and served from
+%         https://georgetown.box.com/s/he5mi55y3gk3wgzfhkv36dumi24gc8b8
+% accessed: 2026-09-14
+% checked:  texlib-thesis-profile-round
+%
+% PARTIAL, and the gap is the important part of this file.
+%
+% GEORGETOWN'S PROSE REQUIREMENTS COULD NOT BE READ. The document Graduate
+% Studies calls the authority — "Dissertation, Doctoral Project and Thesis
+% Formatting Requirements", linked from all three pages above as
+% https://georgetown.box.com/s/pgffojhhneb119bqef0fkn88e7vgbn9j — is hosted on
+% Georgetown's Box tenancy and redirects to a Georgetown network login. It was
+% tried on the access date by plain fetch, by Box's shared-file download
+% endpoint, and in a browser; all three land on
+% georgetown.account.box.com/login. The TEMPLATES on the same page are NOT
+% behind that login, which is why this profile exists at all.
+%
+% So everything below comes from source 2 in RESEARCHING.md's order — the
+% graduate school's own template — and not from its prose requirements. Where
+% the two disagree the prose wins, and nobody here has read it. Treat every
+% figure in this file as "what Georgetown's October 2025 template does", which
+% is good evidence and is not the same thing as "what Georgetown requires".
+%
+% VERIFIED (against the template) and set here: geometry, spacing, and the title
+% page.
+% NOT SET: \thesisapprovalpage, deliberately — see the note at the foot of this
+% file. \thesissetchapteropening is not set either; the template applies no
+% deeper opening margin.
+%
+% TO FINISH THIS PROFILE: read the Box document above from a Georgetown account,
+% or ask Graduate Studies (gradstudentservices@georgetown.edu) for a copy that
+% is not behind the login, and reconcile the three set values against it.
+%
+% TWO PAGES THE CLASS DOES NOT OWN, recorded because the template prescribes
+% them and an author reading only this file would not know:
+%
+%   * Copyright page, immediately after the title page: "Copyright <year> by
+%     <your name, as shown on the title page>" and, below it, "All Rights
+%     Reserved". The class's \makecopyrightpage prints "Copyright by <author> /
+%     All Rights Reserved." — no year, and a full stop Georgetown does not use.
+%   * Abstract page, which at Georgetown repeats the title in all caps as on the
+%     title page, then the author's name with the abbreviation of their highest
+%     prior degree, then "Thesis Advisor:  <First M. Last, highest degree>",
+%     then the heading "Abstract". A doctoral abstract is capped at 350 words
+%     ("2,450 characters"), "strictly observed"; master's theses are not capped.
+%
+% ALSO FROM GRADUATE STUDIES, applying to a LaTeX document specifically, and not
+% expressible as profile fields: "All figures, tables and equations must fit
+% within the regular page margins", "Figure numbers and titles must appear UNDER
+% the figures", "Table numbers and titles must appear ABOVE the tables", "The
+% Abstract page must not be included in the Table of Contents", "All subheadings
+% at each level and across chapters must be capitalized in the same way", and
+% "Don't use the PDF converter on the ProQuest site".
+
+\thesisinstitution{Georgetown University}
+
+% FROM THE TEMPLATE, NOT FROM THE REQUIREMENTS. Every section of
+% "Thesis Dissertation Template-PC-OCT 2025.docx" carries
+% <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/> —
+% 1440 twips is exactly one inch — on <w:pgSz w:w="12240" w:h="15840"/>, i.e.
+% letter paper. So the template is a 1in square frame with no binding offset.
+%
+% These are also the class's neutral defaults, so this line changes nothing
+% today. It is here because it records the finding and because it is the line
+% whoever reads the Box document will edit.
+%
+% A CAUTION FOR THAT READER. Georgetown pages elsewhere on the web state 1.25in
+% for a thesis; the one that does so is english.georgetown.edu's UNDERGRADUATE
+% honors thesis page, which is both a department page (not a source under
+% RESEARCHING.md) and about a different document. It is named here only so the
+% next pass does not treat it as a contradiction it must resolve — but if the
+% prose requirements do say 1.25in, this line is wrong and must change.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% FROM THE TEMPLATE: its body paragraphs carry
+% <w:spacing w:line="480" w:lineRule="auto"/>, and 480 twentieths of a point
+% against a 240 single line is exactly double spacing. The template's abstract
+% placeholder says the same in prose — "the text of the abstract begins here and
+% continues, double-spaced".
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% NOT READ, which is different from "none published" and is recorded as such.
+% Graduate Studies' three readable pages carry no accessibility requirement
+% beyond the sitewide footer link, but the one document that would carry it —
+% the formatting requirements — is the one behind the login. Georgetown's
+% library publishes accessibility guidance for ETDs; a library guide is not a
+% source under RESEARCHING.md and is not used here.
+%
+% None of \thesisrequiretagging, \thesisrequiredocumentlanguage or
+% \thesisrequirepdfstandard is set, because no Georgetown requirement for them
+% has been read.
+\thesisaccessibilityrequirement{Not read}
+	{Georgetown's formatting requirements document is behind a Georgetown
+	 network login and could not be opened on 2026-09-14, so it is unknown
+	 whether it states an accessibility requirement. This is an unfinished
+	 enquiry, NOT a finding that Georgetown asks for nothing.}
+
+% --- Profile-local metadata ---------------------------------------------------
+% The template builds the title page out of dropdowns, so its permitted values
+% are known exactly. They are listed here because they are short and because
+% guessing one is how a page gets rejected.
+%
+%   School  — "College of Arts and Sciences", "School of Foreign Service",
+%             "School of Health", "School of Medicine"
+%   Degree  — "Doctor of Philosophy", "Master of Arts", "Master of Science"
+%   Field   — a long controlled list, each entry already carrying its preposition
+%             ("in Applied Mathematics", "in Computational Linguistics", …), so
+%             the page prints "degree of / <Degree> / in <Field>"
+\newcommand{\thesis@gt@school}{}
+\newcommand{\georgetownschool}[1]{\renewcommand{\thesis@gt@school}{#1}}
+% The author line on the title page is "<full name>, <abbreviation of your
+% single highest prior degree earned (with punctuation)>" — e.g. "B.A." or
+% "M.S." Optional in the sense that the class cannot know it; Georgetown's
+% template shows it filled.
+\newcommand{\thesis@gt@prior}{}
+\newcommand{\georgetownpriordegree}[1]{\renewcommand{\thesis@gt@prior}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% Reproduced from the template's own page, placeholder by placeholder:
+%
+%   "Type the Title of Your Thesis/Dissertation Here in All Caps: It Should
+%    APPear at the top of the page on as few lines as possible"
+%   A <Thesis|Dissertation>
+%   submitted to the Faculty of the
+%   <School>
+%   of Georgetown University
+%   in partial fulfillment of the requirements for the
+%   degree of
+%   <Degree written out>
+%   <in Field>
+%   By
+%   "Your First, Middle and Last Names (as they appear on the Personal
+%    Information card in GUExperience), Abbreviation of your single highest
+%    prior degree earned (with punctuation)"
+%   Washington, D.C.
+%   Month Day, Year
+%
+% The title sits AT THE TOP of the page rather than floating, which is why the
+% page opens with no leading fill.
+%
+% \thesis@program supplies the field WITHOUT its preposition — the page adds
+% "in" — because that is how every other profile in this directory uses it.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\ifx\thesis@gt@school\@empty
+		\ClassWarningNoLine{texlib-thesis}{Georgetown's title page names the
+			School or College^^J%
+			(College of Arts and Sciences, School of Foreign Service, School^^J%
+			of Health, or School of Medicine). Set \string\georgetownschool{}}%
+	\fi
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{4\baselineskip}
+		A \thesis@DocNoun\\
+		submitted to the Faculty of the\\
+		\thesis@gt@school\\
+		of Georgetown University\\
+		in partial fulfillment of the requirements for the\\
+		degree of\\
+		\thesis@degree\\
+		in \thesis@program\par
+		\vspace{3\baselineskip}
+		By\par
+		\vspace{3\baselineskip}
+		\@author\ifx\thesis@gt@prior\@empty\else, \thesis@gt@prior\fi\par
+		\vspace*{\fill}
+		Washington, D.C.\\
+		\thesis@date\par
+		\vspace{2\baselineskip}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page ---------------------------------------------------
+% LEFT UNSET ON PURPOSE, and this is the one decision in this file that a reader
+% should not mistake for an oversight.
+%
+% What is known: the Graduate School's October 2025 template contains NO approval
+% or signature page — its front matter runs title page, copyright page, abstract,
+% acknowledgements, table of contents, list of figures, list of tables — and
+% approval is collected outside the document, on a "Cover Sheet … with all the
+% appropriate signatures" that the student emails to Graduate Studies together
+% with the ETD Release Form.
+%
+% That is exactly the shape that justifies \thesisnoapprovalpage at Michigan,
+% Auburn and Tennessee. It is NOT used here, because at those three the closed
+% list of pages came from the graduate school's REQUIREMENTS, and here it comes
+% only from a template whose governing prose nobody has read. RESEARCHING.md is
+% explicit that \thesisnoapprovalpage needs a quote, and "emitting a forbidden
+% page and omitting a required one are both filing errors, in opposite
+% directions."
+%
+% So this profile leaves the hook alone, which means NOT YET CHECKED and renders
+% the class's institution-neutral page. An author must not file that page at
+% Georgetown on this profile's authority. Whoever reads the Box document should
+% expect to replace this comment with \thesisnoapprovalpage.
