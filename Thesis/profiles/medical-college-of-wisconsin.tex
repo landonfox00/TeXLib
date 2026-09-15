@@ -1,0 +1,102 @@
+% profiles/medical-college-of-wisconsin.tex — Medical College of Wisconsin
+% ============================================================================
+% source: https://www.mcw.edu/-/media/MCW/Education/Graduate-School/2026-Grad-School-Forms/Dissertation-or-Thesis-Organization.pdf
+%         ("DISSERTATION OR THESIS ORGANIZATION", School of Graduate Studies;
+%          served from the 2026 forms folder and linked from Degree Completion)
+% source: https://www.mcw.edu/education/graduate-school/current-students/degree-completion
+%         (the page that links the document above)
+% source: https://www.mcw.edu/-/media/MCW/Education/Graduate-School/2025-Grad-School-Forms/2025-2026-Handbook-Final.pdf
+%         (2025–2026 Graduate School Handbook — read in full; it carries NO
+%          margin, spacing, font or page-layout rule, only a pointer:
+%          "Reference the Dissertation Formatting Guide.")
+% accessed: 2026-09-15
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: the institution name, the margin rule, and the
+% committee page's defining property (it carries no signatures).
+%
+% NOT SET, because MCW publishes no rule: line spacing, font, and the title-page
+% layout. The class's neutral spacing (double) and neutral title page render
+% instead. MCW's own format document is one page long and states five
+% "Specific Instructions", reproduced in full below; it says nothing about
+% spacing or type, and the handbook adds nothing.
+%
+% ONE REQUIREMENT THIS CLASS CANNOT ENCODE. MCW: "Page numbering: Number pages,
+% including figures and figure legends, in the upper right-hand corner." A
+% profile owns only the fields listed in RESEARCHING.md, and page-number
+% placement is not one of them, so it is recorded here rather than implemented.
+% Anyone filing at MCW must set that page style in their own document.
+%
+% AMBIGUITY LEFT FOR THE REVIEWER. The handbook sends PhD candidates to "the
+% Dissertation Formatting Guide" without linking one; the only format document
+% the School of Graduate Studies publishes on Degree Completion is the
+% organization sheet cited above, and this profile treats the two as the same
+% document. For the DrPH the handbook instead says "Reference the Dissertation
+% formatting requirements provided by the program" — so a DrPH candidate's
+% margins may be set by their program, not by this file.
+%
+% ProQuest is named in the handbook ("Final dissertations are published and
+% bound through ProQuest"), and nothing from ProQuest's own requirements is
+% encoded here: those are ProQuest's, not MCW's.
+
+\thesisinstitution{Medical College of Wisconsin}
+
+% "Margins: 1 inch on all sides." — stated for all four sides, with no binding
+% exception and no separate rule for tables or appendices.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% \thesissetspacing is deliberately NOT called: MCW states no line-spacing rule
+% in either document, so the class's neutral default stands rather than a figure
+% borrowed from a school that does publish one.
+
+% "Each chapter or section should start on a new page." — that is the class's
+% behaviour already, and it is a page-break rule, not a deeper top margin, so
+% \thesissetchapteropening is NOT called.
+
+% --- Accessibility -----------------------------------------------------------
+% Searched: the format document, the Degree Completion page, the 2025–2026
+% handbook in full, and the Graduate Student Forms page. None of them asks for
+% an accessible or tagged PDF, alt text, a document language, or a PDF standard.
+\thesisaccessibilityrequirement{Not published}
+	{The School of Graduate Studies publishes no accessibility requirement for a
+	 filed dissertation. MCW's Web Accessibility Statement commits the
+	 \emph{website} to WCAG 2.1 Level AA; it is not addressed to a filed
+	 dissertation and is not reproduced as one here.}
+
+% --- Title page --------------------------------------------------------------
+% MCW requires a title page — it is first in the prescribed order — but publishes
+% no layout or wording for it and no specimen. The class's neutral title page is
+% therefore left in place, and a candidate should check the wording with the
+% Graduate School before filing.
+
+% --- Committee page ----------------------------------------------------------
+% MCW's prescribed order is: "Title page / List of Committee Member Names (no
+% signatures) / Abstract / ...". The parenthesis is the operative part: the
+% neutral approval page draws a \rule signature line under every member, which
+% this school's filed document must not have. So the page is rebuilt as what MCW
+% names it — a list of committee member names.
+%
+% \thesisnoapprovalpage would be wrong here: MCW requires the page, it just
+% requires it unsigned.
+%
+% The heading wording is MCW's own name for the page. Nothing else about the
+% layout is published, so the rest is plain and centred.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\begin{center}
+		\thesis@tagtitle{H1}{{\large\bfseries List of Committee Member Names}}\par
+		\vspace{2\baselineskip}
+		% Names only: no signature rule, no role suppressed -- MCW forbids the
+		% signature, not the role.
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par\vspace{0.5\baselineskip}%
+		}%
+		\thesis@committee
+		\endgroup
+		\vfill
+		\thesis@date\par
+	\end{center}%
+	\loadgeometry{normal}\doublespacing\clearpage
+}
