@@ -1,0 +1,107 @@
+% profiles/northeastern-university.tex — Northeastern University
+% ============================================================================
+% source: https://library.northeastern.edu/research_instruction/theses-dissertations/
+%         ("Each college at Northeastern University maintains its own individual
+%          requirements for the preparation of theses and dissertations.")
+% source: https://coe.northeastern.edu/wp-content/uploads/pdfs/coe/gse/T-D_StyleGuide.pdf
+%         (College of Engineering / Graduate School of Engineering style guide,
+%          cover page "Revised 2016")
+% source: https://coe.northeastern.edu/wp-content/uploads/pdfs/coe/gse/T-D_PrepSubmission.pdf
+%         (COE, "A Guide to the Preparation and Submission of Theses and
+%          Dissertations", cover page "Revised: 2021")
+% source: https://cssh.northeastern.edu/resources/theses-and-dissertations/
+%         and its checklist, https://cssh.northeastern.edu/wp-content/uploads/2021/06/ProQuest-Format-Review-Checklist.pdf
+%         (College of Social Sciences and Humanities; last updated 2021-06-02)
+% source: https://cos.northeastern.edu/wp-content/uploads/2017/09/Thesis-Preparation-GuideCOS-2017-18.pdf
+%         (College of Science thesis preparation guide, 2017–18)
+% accessed: 2026-09-15
+% checked:  texlib-thesis-profile-round
+%
+% PARTIAL, AND DELIBERATELY SO. Northeastern has no university-wide filing
+% format: the rules are the COLLEGE's, and the colleges do not agree about the
+% one figure a profile most wants. Encoding any college's margin as
+% "Northeastern's" would be wrong for every candidate in another college, which
+% is the failure mode RESEARCHING.md exists to prevent. So the geometry and
+% spacing are left to the class's neutral defaults and the college figures are
+% recorded below instead, ready to be pasted into a document preamble.
+%
+% VERIFIED and set here: the institution name, and the absence of an approval
+% page in the filed document.
+% NOT SET, because it is college-specific: geometry, spacing, the chapter
+% opening, and the title page.
+%
+% ---------------------------------------------------------------------------
+% WHAT EACH COLLEGE PUBLISHES (read on the access date)
+%
+% College of Engineering — the only one of the three with complete figures:
+%     "Page Margins  Left: 1.5"; Right: 1"; Top: 1.0"; Bottom: 1.0". The margin
+%      requirements are standard for a bound thesis."
+%     "Spacing of all text within the thesis, including references, should be
+%      either 1.5 or double-spaced."
+%     Type size "neither less than 10 point font nor more than 12 point font".
+%     Major headings sit "two inches from the top of the page, with the text
+%      beginning three single-space lines below" — i.e. a candidate in COE wants
+%      \thesissetchapteropening{2in} as well.
+%     Page numbers "in the upper right corner, ½ inch below the top edge".
+%     "Title pages are technically the first numbered pages (Roman numeral 'i').
+%      However, the numeral 'i' does not appear on the title page."
+%   A COE document therefore wants, in its own preamble:
+%     \thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+%     \thesissetspacing{onehalf}   % or double
+%     \thesissetchapteropening{2in}
+%   Note the style guide's own cover reads "Revised 2016" and is the older of
+%   the two COE documents; the submission procedures are "Revised: 2021".
+%
+% College of Social Sciences and Humanities — publishes NO margin, spacing or
+%   type figure of its own. Its formatting page points candidates at ProQuest's
+%   "Preparing Your Manuscript" guide and at a format-review appointment with
+%   the Graduate Office. ProQuest's guide states ProQuest's requirements, not
+%   Northeastern's, so nothing from it is reproduced here.
+%
+% College of Science — the 2017–18 preparation guide states no margin rule
+%   either; it is procedural.
+% ---------------------------------------------------------------------------
+%
+% TO FINISH THIS PROFILE someone has to decide what an institution-level profile
+% should mean for a university that files by college. The two honest options are
+% to leave this as the record of the split, or to add per-college profiles
+% (northeastern-university-coe, ...) — which is a change to how profiles are
+% named, and therefore a person's decision, not this routine's.
+
+\thesisinstitution{Northeastern University}
+
+% --- Accessibility -----------------------------------------------------------
+% Searched all five documents above for "accessib", "alt text", "tagged",
+% "WCAG" and "PDF/A": no match in any of them. The only document-format demand
+% any of them makes is COE's "(PDF) with embedded fonts. This is the only format
+% you may upload to the ETD Administrator."
+\thesisaccessibilityrequirement{Not published}
+	{Neither Northeastern nor any of the three colleges whose guides were read
+	 publishes an accessibility requirement for a filed thesis or dissertation.
+	 The only format demand found is the College of Engineering's, that the ETD
+	 be "(PDF) with embedded fonts".}
+
+% --- Title page --------------------------------------------------------------
+% College-specific, and only COE prints a specimen. The class's neutral title
+% page renders instead. A COE candidate should follow that college's example
+% page, which requires the full official title, the author's full name as
+% registered, the degree ("Master of Science" for all master's students) and the
+% graduation date, centred between the margins.
+
+% --- Committee approval page --------------------------------------------------
+% NOT in the filed document, at any of the three colleges. Signatures are
+% collected on a separate form — the NU Graduate Approval Record — and the
+% manuscript uploaded to ProQuest does not carry them:
+%
+%   COE, submission procedures, step (f): "Do not include signature page in the
+%   final ETD submission."
+%   CSSH, upload checklist: "Bring the prepared Approval Record to the defense.
+%   Collect committee member signatures... Send the completed Approval Record to
+%   gradcssh@northeastern.edu."
+%   COS: "Finalize your edits and obtain signatures on the NU Graduate Approval
+%   Record", submitted with the Department Chair's signature.
+%
+% COE is the only one that forbids the page in so many words; the other two
+% route signatures to the same separate record. No Northeastern source read
+% requires an approval page inside the manuscript.
+\thesisnoapprovalpage
