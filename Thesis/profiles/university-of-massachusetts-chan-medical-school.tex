@@ -1,0 +1,162 @@
+% profiles/university-of-massachusetts-chan-medical-school.tex
+%     — University of Massachusetts Chan Medical School
+% ============================================================================
+% source: https://www.umassmed.edu/globalassets/morningside-graduate-school-of-biomedical-sciences/documents/forms/forms/gsbs_12_doctoral_diss_prep_guide.pdf
+%         ("Preparing for your Doctoral Dissertation and Graduation", Morningside
+%          Graduate School of Biomedical Sciences, 17 pp, footer "Updated
+%          10/13/2024")
+% source: https://www.umassmed.edu/globalassets/morningside-graduate-school-of-biomedical-sciences/documents/gsbs-student-handbook.pdf
+%         (Morningside GSBS Student Handbook 2025–2026, 64 pp — checked for
+%          formatting and accessibility rules; it carries none for the
+%          dissertation. Its margin figures are for qualifying-exam proposals.)
+% accessed: 2026-09-15
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page and the reviewer
+% (approval) page, both reproduced from the guide's own specimens.
+% NOT set: \thesissetchapteropening (no deeper opening is required) and the
+% typeface (see below). Accessibility is recorded as not published.
+%
+% FETCHING THIS SOURCE. www.umassmed.edu answers plain curl AND WebFetch with
+% 403, and handing the PDF URL to a browser starts a download rather than a
+% page. It serves the file to a request carrying a browser User-Agent plus
+% `Sec-Fetch-Dest: document`, `Sec-Fetch-Mode: navigate`,
+% `Sec-Fetch-Site: same-origin` and a same-site Referer. Worth knowing before a
+% later pass records this institution as unreachable.
+%
+% TWO REQUIREMENTS THIS CLASS CANNOT ENCODE, both stated by the guide:
+%   * "The numbers should appear in the upper right corner of the page, flush
+%     with the upper margin and should not be followed by a period."
+%     Page-number placement is not a profile field.
+%   * "Chapters should be numbered in Roman numerals... with the word 'CHAPTER'
+%     used as part of the designation" — chapter-heading style is likewise not a
+%     profile field.
+%
+% AN AMBIGUITY LEFT FOR THE REVIEWER. The page-numbering paragraph describes a
+% COVER page distinct from the title page — "The cover page should be considered
+% page 'i' but should not be numbered, nor should the title page be numbered (as
+% 'ii')" — and the table of contents is to exclude it. But the guide's own front
+% matter list begins at the Title Page and never describes a cover page, and no
+% specimen for one is printed. This profile emits the title page it does specify
+% and no cover page.
+
+\thesisinstitution{University of Massachusetts Chan Medical School}
+
+% "Margins must be at least 1 1/2 inches wide at the top and left, and 1-inch
+% wide at the bottom and right. Illustrations, tables and figures should conform
+% to these margins as well." These are minima; the profile takes the minimum.
+\thesissetgeometry{left=1.5in, right=1in, top=1.5in, bottom=1in}
+
+% "All main text should be double spaced (3 lines per vertical inch)". The guide
+% permits single spacing for "the table of contents, tables, figure legends,
+% long quotations, footnotes, and bibliographical citations" — those are local
+% choices in the document, not a document-wide setting.
+\thesissetspacing{double}
+
+% The typeface rule is a PREFERENCE, not a requirement -- "The preferred font
+% size is 12 in either the Times New Roman or Arial styles" -- so nothing is
+% forced here. A candidate who wants to follow it selects the face in their own
+% preamble.
+
+% --- Accessibility -----------------------------------------------------------
+% Searched the preparation guide and the 64-page student handbook for
+% "accessib", "alt text", "tagged", "WCAG", "PDF/A" and "screen reader": no
+% match in either. Neither document asks for anything.
+\thesisaccessibilityrequirement{Not published}
+	{The Morningside Graduate School publishes no accessibility requirement for
+	 a filed dissertation in either the preparation guide or the student
+	 handbook.}
+
+% The Dean signs off on the reviewer page BY NAME in the guide's specimen. A
+% named officer is the part of this file most likely to go stale, so it is a
+% macro rather than a literal: \umasschandean{...} to override.
+\newcommand{\thesis@umc@dean}{Mary Ellen Lane, Ph.D.}
+\newcommand{\umasschandean}[1]{\renewcommand{\thesis@umc@dean}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% "Sample Title Page – Formatting for the Title Page", reproduced. The guide's
+% parenthesised placeholders — (NAME IN FULL), (MONTH, DAY AND YEAR),
+% (MAJOR SUBJECT) — mark fields, not literal text, and are filled from the
+% document's metadata.
+%
+% The title page is not numbered: "nor should the title page be numbered".
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{2\baselineskip}
+		A \thesis@DocNoun{} Presented\par
+		\vspace{2\baselineskip}
+		By\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\@author}\par
+		\vspace{3\baselineskip}
+		Submitted to the Faculty of the\par
+		\vspace{\baselineskip}
+		Morningside Graduate School of Biomedical Sciences at
+		UMass Chan Medical School\par
+		\vspace{\baselineskip}
+		in partial fulfillment of the requirements for the degree of\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\thesis@degree}\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\thesis@date}\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\thesis@program}\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Reviewer page (this school's approval page) ------------------------------
+% "Reviewer Page – Formatting for the Page", reproduced.
+%
+% NAMING INCONSISTENCY, left as found: the guide's front-matter list calls this
+% the "Reviewer Page" and then points at the "Sample Signature Page", while the
+% specimen is headed "Reviewer Page" and every line on it reads "(Name Typed)",
+% closing with a bare "(Typed)". Typed names, no signature rules, is what the
+% specimen shows and what this page emits. If UMass Chan does in fact collect
+% wet signatures on this leaf, this is the field to revisit.
+%
+% The class's default \thesis@memberline draws a rule, so it is replaced. Roles
+% come from the document's \committeemember: the specimen's own roles are
+% "Dissertation Advisor", "Member of Committee", "External Member of Committee"
+% and "Chair of Committee".
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\begin{center}
+		\thesis@tagtitle{H1}{{\color{white}\tiny Reviewer Page}}\par
+		\vspace*{\fill}
+		\MakeUppercase{\@title}\par
+		\vspace{2\baselineskip}
+		A \thesis@DocNoun{} Presented\par
+		\vspace{2\baselineskip}
+		By\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\@author}\par
+		\vspace{3\baselineskip}
+		This work was undertaken in the Morningside Graduate School of
+		Biomedical Sciences\par
+		\vspace{\baselineskip}
+		\thesis@program\par
+		\vspace{2\baselineskip}
+		Under the mentorship of\par
+		\vspace{\baselineskip}
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par\vspace{0.5\baselineskip}%
+		}%
+		\thesis@committee
+		\endgroup
+		\vspace{\baselineskip}
+		\thesis@umc@dean,\par
+		Dean of the Morningside Graduate School of Biomedical Sciences\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{center}%
+	\loadgeometry{normal}\doublespacing\clearpage
+}
