@@ -1,0 +1,232 @@
+% profiles/brown-university.tex — Brown University
+% ============================================================================
+% source: https://graduateschool.brown.edu/academics/rules-regulations/dissertation-guidelines
+%         ("Dissertation Guidelines", the Graduate School — a live page)
+% source: https://graduateschool.brown.edu/sites/default/files/pdfs/Sample%20-%20Dissertation%20Signature%20Page.pdf
+% source: https://graduateschool.brown.edu/sites/default/files/pdfs/Sample%20-%20Dissertation%20Copyright%20Notice(1).pdf
+% source: https://graduateschool.brown.edu/sites/default/files/pdfs/Sample%20-%20Dissertation%20Abstract.pdf
+%         (the three official sample pages the guidelines link)
+% source: https://graduateschool.brown.edu/sites/default/files/pdfs/Guidelines%20for%20Dissertation%20Titles.pdf
+%         ("Guidelines for Dissertation Titles", The Graduate School, March 2009)
+% accessed: 2026-09-14
+% checked:  texlib-thesis-profile-round
+%
+% SCOPE: the DOCTORAL dissertation. Brown publishes separate "Master's Thesis
+% Guidelines" whose own sample pages were not read; its type and spacing rules
+% are worded almost identically but its approval page is not assumed to be the
+% one below.
+%
+% VERIFIED and set here: geometry, spacing, chapter openings, and the signature
+% page.
+% NOT SET, because Brown does not publish it: \thesistitlepage. See the note at
+% the foot of this file — this is the one real gap.
+%
+% THE MARGINS COME FROM THE SAMPLE PAGES, NOT FROM PROSE, and that is worth
+% knowing because the prose page states no margin at all. All three official
+% samples carry the same four annotations in their own artwork — "1-inch top
+% margin", "1-inch bottom margin", "1.5-inch left margin", "1-inch right margin"
+% — and the abstract sample adds "USES SAME PAPER AND FORMATTING AS THE
+% DISSERTATION", which is what makes them the document's margins rather than
+% three pages' margins.
+
+\thesisinstitution{Brown University}
+
+% See the note above: 1.5in on the left, 1in on the other three. The wider left
+% margin is a binding margin and, unlike UNR's case, Brown does not say the
+% filed document must not carry it — it is what its own samples show.
+%
+% twoside remains a LAYOUT option only. The class does not mirror margins, so an
+% odd/even build would put the 1.5in on the wrong edge of every verso; leave the
+% binding offset asymmetric as Brown draws it.
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "All text should be double-spaced, except for block quotations, captions, long
+% headings, and footnotes. All these should be single-spaced with a blank line
+% between items." Not a choice.
+%
+% Type size is the author's, within a range: "Standard typefaces set to print at
+% 10-, 11-, or 12-point font are acceptable."
+\thesissetspacing{double}
+
+% "Do not place headers on each page. Use them only as appropriate to indicate
+% major sections of the thesis (e.g., INTRODUCTION, CHAPTER 1, BIBLIOGRAPHY).
+% They should be centered and placed two inches from the top of the paper in
+% uppercase type."
+%
+% Two things follow, and only one of them is this key:
+%   * the 2in figure is a TOTAL from the paper's edge, which is exactly what
+%     \thesissetchapteropening takes — the class subtracts the geometry's own
+%     1in top itself;
+%   * "Do not place headers on each page" is a prohibition on RUNNING heads,
+%     which this class does not emit on chapter openings anyway. A Brown author
+%     using a page style that adds them is out of spec, and the profile cannot
+%     prevent that.
+%
+% Brown also wants those headings in uppercase and centred. The class's chapter
+% head is neither, and a profile cannot restyle it through the hooks it owns —
+% recorded here rather than silently half-done.
+\thesissetchapteropening{2in}
+
+% --- Accessibility -----------------------------------------------------------
+% NONE PUBLISHED for a filed dissertation. Searched on the access date: neither
+% the Dissertation Guidelines nor the Master's Thesis Guidelines carries an
+% accessibility requirement — the only occurrences of the word on either page
+% are the sitewide footer link — and none of the three sample pages mentions
+% one. The ETD system is described only as collecting "final dissertations as
+% text-based PDF files".
+%
+% "Text-based" is the closest Brown comes, and it is a statement about the ETD
+% system rather than a requirement laid on the author, so it is recorded below
+% rather than turned into \thesisrequiretagging. None of the three checkable
+% declarations is set.
+\thesisaccessibilityrequirement{Not published}
+	{No Brown accessibility requirement for a filed dissertation was found on
+	 2026-09-14, in the Dissertation Guidelines, the Master's Thesis Guidelines
+	 or any of the three official sample pages. Treat this as "this graduate
+	 school asks for nothing", not as "nobody looked". The one adjacent
+	 statement is about the repository, not the author: Brown's ETD system
+	 "collects and archives final dissertations as text-based PDF files".}
+
+% --- Profile-local metadata ---------------------------------------------------
+% The signature page ends with the Dean's line, and the Graduate School requires
+% that "The typed names of the director and readers must appear under their
+% signature lines" — so an unnamed line is not merely ugly, it is incomplete.
+\newcommand{\thesis@brown@dean}{}
+\newcommand{\browndean}[1]{\renewcommand{\thesis@brown@dean}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% LEFT UNSET, and this is the gap in this profile rather than an oversight.
+%
+% Brown publishes sample pages for the abstract, the copyright notice and the
+% signature page, and NOT for the title page. The Dissertation Guidelines
+% mention the title page four times — it is preliminary page i, its number is
+% suppressed, it must be dated with the date the degree is conferred, and it
+% "may be sent by email" to the Academic Affairs Manager — but never say what is
+% on it or how it is laid out. Nothing on graduateschool.brown.edu was found
+% that does.
+%
+% So the class's institution-neutral title page renders, which is the honest
+% outcome: it is a conformant page that makes no claim about Brown's rules.
+%
+% WHAT *IS* PUBLISHED about the title page, and applies whatever layout is used:
+%
+%   * The title is set in title case, not full capitals, and this changed at
+%     some point: "Note that in the past titles set in full capitals were
+%     accepted. We request that titles be prepared in upper and lower case."
+%     Brown gives Chicago 14th ed. §§7.126-7.131 as the rule — "Articles (a, an,
+%     the), coordinating conjunctions (and, but, or, for, nor), and prepositions,
+%     regardless of length, are lowercased unless they are the first or last word
+%     of the title or subtitle. The to in infinitives is also lowercased. Only
+%     acronyms should be set in full capitals." Also "Use and for &", spell out
+%     centuries and numbers, and keep accents on non-English words. This is a
+%     rule about \title's CONTENT, so \MakeUppercase must not be applied to it.
+%   * The date is the conferral date, not the submission date: "Because degrees
+%     are conferred three times during the calendar year, the title page and
+%     abstract of a dissertation completed at any point during the academic year
+%     must be dated on the date the degree is conferred."
+%   * It is page i and prints no number.
+%
+% TO FINISH THIS PROFILE: get the title-page layout from the Graduate School's
+% Academic Affairs Manager (ETD@brown.edu), or from a title page the Graduate
+% School has accepted, and write \thesistitlepage from it.
+
+% --- Signature page ------------------------------------------------------------
+% Brown's approval page, required, and unusual in that the FILED copy is
+% deliberately UNSIGNED: "An unsigned copy of the signature page should be
+% uploaded to ETD system", while "the signed signature page … may be sent by
+% email to barbara_bennett@brown.edu". So this page draws the rules and the
+% typed names and is meant to be filed blank — which is exactly what it does.
+%
+% Reproduced from the Graduate School's own sample page:
+%
+%   This dissertation by <author> is accepted in its present form
+%   by <the Department of X> as satisfying the
+%   dissertation requirement for the degree of <degree>.
+%
+%   Date________  ______________________
+%                 <Typed name of Advisor>, Advisor
+%
+%   Recommended to the Graduate Council
+%
+%   Date________  ______________________
+%                 <Typed name of Reader>, Reader          (once per reader)
+%
+%   Approved by the Graduate Council
+%
+%   Date________  ______________________
+%                 <Typed name of Dean>, Dean of the Graduate School
+%
+% The advisor comes from \gradadvisor and the readers from \committeemember, so
+% pass the advisor with \gradadvisor and each reader with
+% \committeemember{Name}{Reader}. \gradprogram supplies the degree-granting unit
+% INCLUDING its noun — the sample reads "by the Department of Chemistry", so set
+% \gradprogram{Department of Chemistry} for this profile.
+%
+% NO HEADING. The sample page carries no title of its own; the acceptance
+% sentence is the first thing on it. A hidden tagged heading is emitted for a
+% screen reader, as on the class's own approval page.
+%
+% "Recommended to the Graduate Council" and "Approved by the Graduate Council"
+% are centred in the sample; the Date/rule blocks are not.
+%
+% PAGE NUMBER iii, and it prints: "Each page, including blank ones, must have a
+% number. The number should not appear on the title page or the copyright page
+% but, these pages are assigned numbers and are included in the pagination." The
+% guidelines' page list is explicit — Title Page (do not number), Copyright Page
+% (do not number), Signature Page (iii) — so this page sets roman numbering with
+% the counter at 3. Brown also fixes the folio's position: "centered at the foot
+% of the page, three-fourths of an inch from the bottom edge", which the class
+% approximates but does not pin; noted rather than silently claimed.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage
+	\loadgeometry{normal}%
+	\pagenumbering{roman}\setcounter{page}{3}\thispagestyle{plain}%
+	\singlespacing
+	\thesis@tagtitle{H1}{{\color{white}\tiny Signature Page}}\par
+	\vspace*{2\baselineskip}
+	{\centering
+		This \thesis@docnoun{} by \@author{} is accepted in its present form\\
+		by the \thesis@program{} as satisfying the\\
+		\thesis@docnoun{} requirement for the degree of \thesis@degree.\par
+	}%
+	\vspace{3\baselineskip}
+	\thesis@brown@sigline{\thesis@advisor}{Advisor}%
+	\vspace{2\baselineskip}
+	{\centering Recommended to the Graduate Council\par}%
+	\vspace{\baselineskip}
+	\begingroup
+	\renewcommand{\thesis@memberline}[2]{%
+		\thesis@brown@sigline{##1}{##2}\vspace{1.5\baselineskip}%
+	}%
+	\thesis@committee
+	\endgroup
+	\vspace{\baselineskip}
+	{\centering Approved by the Graduate Council\par}%
+	\vspace{\baselineskip}
+	\ifx\thesis@brown@dean\@empty
+		\ClassWarningNoLine{texlib-thesis}{Brown's signature page ends with the
+			Dean's line, and^^J%
+			"the typed names ... must appear under their signature lines".^^J%
+			Set \string\browndean{} or that line will be filed incomplete}%
+	\fi
+	\thesis@brown@sigline{\thesis@brown@dean}{Dean of the Graduate School}%
+	\vfill
+	\clearpage\doublespacing
+}
+
+% One "Date______  ____________ / typed name, role" block. Defined after the
+% page that uses it only for readability; TeX resolves it at use time.
+% Both minipages are TOP-aligned so the "Date______" rule lands on the same line
+% as the signature rule, the way Brown's sample draws it. A [b]-aligned right
+% box instead lines Date up with the typed name underneath, which reads as a
+% second signature line.
+\newcommand{\thesis@brown@sigline}[2]{%
+	\par\noindent
+	\begin{minipage}[t]{1.9in}
+		\raggedright Date\rule{1.2in}{0.4pt}
+	\end{minipage}\hfill
+	\begin{minipage}[t]{3.4in}
+		\rule{3.4in}{0.4pt}\par
+		#1\ifx\relax#2\relax\else, #2\fi
+	\end{minipage}\par
+}
