@@ -1,0 +1,148 @@
+% profiles/albany-college-of-pharmacy-and-health-sciences.tex
+%     — Albany College of Pharmacy and Health Sciences
+% ============================================================================
+% source: https://www.acphs.edu/wp-content/uploads/2026/08/Graduate-Student-Handbook-Updated-AUG-2026.pdf
+%         (ACPHS Graduate Student Handbook, 48 pp, PDF ModDate 2026-08-11;
+%          "Appendix C: Master of Science Thesis Formatting Guidelines" is the
+%          governing section, and it opens "This document sets forth the format
+%          for the preparation of all master's theses.")
+% accessed: 2026-09-15
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, and the title page — which at ACPHS
+% is also the approval page, because the committee signs it.
+% NOT set: the chapter opening (not required) and the typeface (see below).
+%
+% AN AMBIGUITY LEFT FOR THE REVIEWER: WHICH DEGREES THIS COVERS. The appendix is
+% titled "Master of Science Thesis Formatting Guidelines" and opens "the format
+% for the preparation of all master's theses" — but its own prose slips into
+% "Each thesis or dissertation contains a preliminary section...", and the
+% title-page paragraph says "the date on which final approval of the thesis or
+% dissertation is granted". A doctoral candidate at ACPHS should confirm that
+% this appendix governs them before relying on this profile. Nothing here is
+% degree-conditional, so the figures apply either way if it does.
+%
+% Note also that Appendix D covers the non-thesis CAPSTONE track, which this
+% profile does not touch.
+%
+% FINDING THIS DOCUMENT. ACPHS moved off Drupal: every `/sites/default/files/`
+% URL that search engines still return — including the 2022–23 graduate
+% handbook — now 404s. The live documents are under `/wp-content/uploads/`
+% with an unguessable date path, and the way to get them is to read the links
+% off https://www.acphs.edu/current-students/ .
+%
+% THE TYPE RULE IS NOT SET, and its wording is why: "Type sizes of 10 - 12
+% characters per inch or point are acceptable." Characters per inch and points
+% are different measures, and 10–12 characters per inch is a typewriter pitch,
+% not a font size. The only unambiguous half — "The same type size and font
+% style must be used throughout the entire document" — the class already does.
+%
+% REQUIREMENTS THIS CLASS CANNOT ENCODE, all stated in Appendix C:
+%   * "Every page of a thesis is assigned a number, although a number may not
+%     appear on every page. The position of the page number must be consistent
+%     from page to page." Preliminary pages take lowercase roman numerals, the
+%     rest Arabic. Page-number placement is not a profile field.
+%   * Page numbers in the lists of figures and tables and in the table of
+%     contents "should be flush with the right margin".
+%   * Table numbers go above the table, figure numbers below the figure, and
+%     equation numbers "at the right margin".
+%   * "Students must purchase a minimum of two bound copies of the thesis."
+
+\thesisinstitution{Albany College of Pharmacy and Health Sciences}
+
+% "All margins must be one inch except the left, which must be 1.5 inches to
+% allow for binding."
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "The text of a thesis must be double spaced throughout except for footnotes,
+% references, and extended quotations, which are single spaced." Those three
+% exceptions are local choices in the document, not a document-wide setting.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Appendix C and the rest of the 48-page handbook were searched for "accessib",
+% "WCAG", "tagged", "alt text" and "screen reader": no match.
+\thesisaccessibilityrequirement{Not published}
+	{ACPHS publishes no accessibility requirement for a filed thesis. The
+	 handbook's formatting appendix does not mention accessible or tagged PDFs,
+	 alt text, document language or any PDF standard.}
+% Recorded separately because it is the one ACPHS rule with an accessibility
+% EFFECT while having a different stated purpose. It is quoted rather than
+% paraphrased so nobody upgrades it into a WCAG claim ACPHS never made.
+\thesisaccessibilityrequirement{Colour is not the only channel}
+	{"Black and white figures are preferred. Colored figures must be of
+	 sufficient contrast such that information conveyed by different colors can
+	 be distinguished in black and white copies." ACPHS gives this for the sake
+	 of photocopies, not screen readers — but a figure that satisfies it also
+	 satisfies the do-not-encode-by-colour-alone rule other schools state as an
+	 accessibility requirement.}
+
+% --- Title page, which is also the approval page ------------------------------
+% Reproduced from "Sample Thesis Title Page" in Appendix C. Its prose:
+%
+%   "The title page includes the thesis title, author, date, submission phrase
+%    (submitted to ACPHS faculty in partial fulfillment of the degree of Master
+%    of Science in...) and printed names and signatures... The date is provided
+%    in month and year format and is the date on which final approval of the
+%    thesis or dissertation is granted by the committee. The printed names and
+%    signatures are those of the advisor and committee members. Signatures must
+%    be done in blue or black ink ONLY."
+%
+% So this page is signed in wet ink, and the signature grid is four columns --
+% Printed Name, Signature, Date, role -- one row per committee member.
+%
+% The grid is built from \makebox rules rather than a tabular on purpose: it is
+% a layout arrangement of blank lines, not tabular data, and tagging it as a
+% table would tell a screen reader to announce rows and columns of nothing.
+\newcommand{\thesis@acphs@sigrow}{%
+	\rule{1.5in}{0.4pt}\hspace{0.15in}%
+	\rule{1.5in}{0.4pt}\hspace{0.15in}%
+	\rule{0.8in}{0.4pt}\hspace{0.15in}%
+	\rule{1.5in}{0.4pt}\par
+	\nobreak
+	\makebox[1.5in][l]{\small Printed Name}\hspace{0.15in}%
+	\makebox[1.5in][l]{\small Signature}\hspace{0.15in}%
+	\makebox[0.8in][l]{\small Date}\hspace{0.15in}%
+	\makebox[1.5in][l]{\small\thesis@acphs@role}\par
+	\vspace{1.5\baselineskip}%
+}
+\newcommand{\thesis@acphs@role}{}
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		% The specimen runs the title and the author together -- "<title> by
+		% <author>" -- as one centred block.
+		\thesis@tagtitle{Title}{\@title{} by \@author}\par
+		\vspace{2\baselineskip}
+		Submitted to the faculty of the Albany College of Pharmacy and Health
+		Sciences in partial fulfillment of the Degree of \thesis@degree{} in
+		\thesis@program\par
+		\vspace{2\baselineskip}
+		Date: \rule{2in}{0.4pt}\par
+		\vspace{\baselineskip}
+		Approved By: \rule{2in}{0.4pt}\par
+		\vspace{2\baselineskip}
+		% One signature row per committee member, the roles taken from the
+		% document's \committeemember declarations.
+		\begingroup
+		\raggedright
+		\renewcommand{\thesis@memberline}[2]{%
+			\renewcommand{\thesis@acphs@role}{##2}%
+			\thesis@acphs@sigrow
+		}%
+		\thesis@committee
+		\endgroup
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% ACPHS has no separate one. Appendix C lists the preliminary section as "the
+% signed title page, abstract, list of figures, list of tables and a table of
+% contents" -- the signatures live on the title page above, and no approval leaf
+% appears anywhere in the appendix.
+\thesisnoapprovalpage
