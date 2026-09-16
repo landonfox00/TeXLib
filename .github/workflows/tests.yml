@@ -40,6 +40,12 @@ jobs:
         run: python bump_version.py --check
       - name: Native runner (fake Popen; async driver + post-build delegation)
         run: python Sublime/test_texlib_runner.py
+      - name: Viewer decision matrix (which PDF a build opens, and when)
+        # The outcome axis neither neighbouring suite covers: failed, cancelled
+        # and skipped-as-unchanged builds against what reaches the viewer. Its
+        # fake engine writes a .log, which is what makes the failed-compile
+        # paths (early preview, freshness stamp) observable at all.
+        run: python Sublime/test_texlib_viewer.py
       - name: Derived TEXINPUTS default (how builds find the classes)
         # Unset `texinputs` used to mean "inherit the environment", which for
         # Sublime meant nothing -- so every document failed at \documentclass

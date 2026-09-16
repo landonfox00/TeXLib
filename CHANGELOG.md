@@ -60,6 +60,45 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Fixed
 
+- **A failed build stamped itself as current, so the NEXT build did nothing.**
+  The freshness stamp is written only after a clean pass, and "clean" was
+  decided by scanning the log for a line starting with `!`. Every TeXLib pass
+  carries `-file-line-error`, which writes the error's origin *instead* of the
+  bang — `./doc.tex:12: Undefined control sequence.` — so a broken document
+  logs no such line at all (verified against TL2026 pdflatex: a two-error
+  document, zero bangs). The guard never fired. Pressing Ctrl+B again after a
+  failed build therefore ran no engine, reported `doc.pdf is already current --
+  nothing to rebuild`, and opened the stale PDF; the error was simply gone. It
+  could also strand a genuinely stale PDF, since a failing pass may never reach
+  an `\input` and its `.fls` is then an incomplete dependency list — the exact
+  case the guard exists for. Error detection now lives in `LOG_ERROR_RE` /
+  `log_reports_error()` and recognises both shapes, and an unreadable log is no
+  longer treated as clean.
+
+- **A failed fan-out build still raised the viewer, on the previous build's
+  PDF.** `default`/`full` — plain Ctrl+B — offer `<base>.pdf` the moment the
+  base compile ends, and that offer was made with no check that the compile had
+  succeeded. The host's own classification is correct and withholds the
+  post-build open on an error, but it is reached at the *end* of the build,
+  while the preview fires in the middle: SumatraPDF came forward showing a
+  document that compiled while the panel reported the one that did not. The
+  preview now reads the base compile's log (same helper as above) and declines.
+  Single-compile modes were never affected — they offer no preview.
+
+- **An unchanged rebuild pulled the viewer off the copy `preferred_pdf` had
+  chosen.** `"solutions"` and `"student"` are resolved by searching the PDFs the
+  build produced, and a skipped build produces none, so they fell back to the
+  combined `<base>.pdf` — and `_remember_preferred` then stored that, sending
+  the standalone *View PDF* command after it. The stamp now carries the
+  producing build's output list and the skip restores it, so a no-op rebuild
+  answers exactly as the build that wrote the stamp did. Each name is still
+  checked against the disk, a slice deleted since falls back as before, and a
+  stamp written by an older version restores nothing rather than failing.
+
+  All three are covered by a new suite, `Sublime/test_texlib_viewer.py`, whose
+  fake engine writes a `.log` holding what it printed — two of the three are
+  invisible to a harness whose engine leaves none behind.
+
 - **The inline key was only half inline: a full-problem `{solution}` still
   displaced the page.** `\ShowKeyInline` exists so a key page *is* its student
   page with the answers drawn into the blanks — same pagination, same problem
