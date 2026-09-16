@@ -447,6 +447,36 @@ RERUN_RE = re.compile(
 BIBER_RERUN_RE = re.compile(r"Please \(?re\)?(?:run|rerun) Biber", re.IGNORECASE)
 MODE_OPT_RE = re.compile(r"^--texlib-mode=(.+)$")
 
+# An error in an engine LOG, in both of the shapes TeX writes one.
+#
+# `-file-line-error' -- which every TeXLib pass carries -- REPLACES the leading
+# bang with the error's origin: "! Undefined control sequence." is written
+# "./doc.tex:12: Undefined control sequence.", and a thoroughly broken run can
+# then contain no line beginning with a bang at all (verified against TL2026
+# pdflatex: a two-error document logged zero of them). A scan for the bang alone
+# therefore read every such run as CLEAN, which is the wrong direction for both
+# of the questions asked of it below.
+#
+# The file:line form is anchored on a real source extension rather than on
+# "anything:digits:", because a log is full of version banners and package
+# paths and the loose form matches some of them.
+LOG_ERROR_RE = re.compile(
+    r"^(?:\.[\\/])?[^:\n\r]*\.(?:tex|ltx|sty|cls|def|lua|bbl|aux):\d+: "
+    r"|^!\s|! LaTeX Error|Emergency stop|Fatal error")
+
+
+def log_reports_error(log_path):
+    """True when `log_path` is readable AND records an error.
+
+    False for an unreadable or absent log: this answers "did the engine report
+    an error", not "did the build go well", and each caller decides what an
+    unanswerable question means for it."""
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as fh:
+            return any(LOG_ERROR_RE.search(line) for line in fh)
+    except OSError:
+        return False
+
 
 class TexlibBuildCore:
     """The single source of TeXLib build LOGIC -- host-agnostic.
@@ -1054,7 +1084,16 @@ class TexlibBuildCore:
             "TeXLib: %s.pdf is already current -- nothing to rebuild.\n"
             % self.base_name
         )
-        self.produced_pdfs = []
+        # What the build being skipped would have produced, restored from its
+        # own stamp. The host resolves preferred_pdf against this list, so
+        # clearing it made an unchanged rebuild answer "solutions" with the
+        # combined PDF -- pulling the viewer off the slice the author keeps open
+        # and, through _remember_preferred, off the one View PDF would reopen.
+        # Every name is still checked against the disk by preferred_pdf_path, so
+        # a slice deleted since simply falls back as it always did.
+        stamp = _fresh.read_stamp(pdf) or {}
+        produced = stamp.get("produced")
+        self.produced_pdfs = list(produced) if isinstance(produced, list) else []
         return True
 
     def _stamp_freshness(self, engine, mode, tex_dir):
@@ -1062,22 +1101,28 @@ class TexlibBuildCore:
 
         Only after a CLEAN pass: a run that emitted errors may never have
         reached an \\input or an \\includegraphics, so its .fls is not a
-        trustworthy dependency list. Cheap to skip and expensive to get wrong.
+        trustworthy dependency list. Cheap to skip and expensive to get wrong --
+        and wrong here is the worst outcome this file has, because a stamp from
+        a failed build licenses the NEXT build to be skipped: the error never
+        reappears, nothing is rebuilt, and the viewer is opened on the stale PDF
+        with "already current" in the panel.
+
+        "Clean" is LOG_ERROR_RE, not a leading bang -- see its comment; the bang
+        scan this used to do never matched under -file-line-error, so every
+        failed build stamped. An unreadable log is not clean either: no log
+        means no evidence, and the .fls cannot be trusted without it.
         """
         if os.environ.get("TEXLIB_NO_FRESHNESS", "") in ("1", "true", "yes"):
             return
         if getattr(self, "_aux_target", None) and self._aux_target != tex_dir:
             return
         log = os.path.join(tex_dir, self.base_name + ".log")
-        try:
-            with open(log, encoding="utf-8", errors="replace") as fh:
-                if any(line.startswith("!") for line in fh):
-                    return
-        except OSError:
+        if not os.path.isfile(log) or log_reports_error(log):
             return
         pdf = os.path.join(tex_dir, self.base_name + ".pdf")
         try:
-            _fresh.write_stamp(pdf, self._freshness_key(engine, mode))
+            _fresh.write_stamp(pdf, self._freshness_key(engine, mode),
+                               produced=getattr(self, "produced_pdfs", ()) or ())
         except Exception:               # noqa: BLE001 -- best-effort
             pass
 
@@ -1781,12 +1826,29 @@ class TexlibBuildCore:
         Skipped for a .spl build: _postprocess replaces <base>.pdf with its two
         halves there, so previewing it would put up a file about to vanish. The
         signal is written by the base compile, so it is already knowable here.
+
+        Skipped for a FAILED compile too, which is the whole reason this reads
+        the log. The host classifies the build from the output stream and
+        withholds its post-build open on an error -- but that verdict is reached
+        at the END, and this fires in the middle, so the fan-out (plain Ctrl+B)
+        used to raise the viewer on <base>.pdf while the build went on to report
+        the errors. The file it raised was the PREVIOUS build's, which is the
+        worst of both: the author is looking at a document that compiled, being
+        told the one on screen did not. Single-compile modes never had this,
+        having no preview to offer.
+
+        The log is the only evidence available here (nothing hands the core the
+        host's classification), and an absent one leaves the question
+        unanswered -- so it previews, exactly as before, rather than regressing
+        the common case on missing evidence.
         """
         hook = getattr(self, "preview_ready", None)
         if hook is None:
             return
         aux = getattr(self, "_aux_target", None) or tex_dir
         if os.path.exists(os.path.join(aux, self.base_name + ".spl")):
+            return
+        if log_reports_error(os.path.join(aux, self.base_name + ".log")):
             return
         src = os.path.join(aux, self.base_name + ".pdf")
         dst = os.path.join(tex_dir, self.base_name + ".pdf")
