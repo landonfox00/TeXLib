@@ -1,0 +1,219 @@
+% profiles/university-of-delaware.tex — University of Delaware
+% ============================================================================
+% source: https://www.udel.edu/content/dam/udelImages/grad-college/graduate-college-pdfs/UD-Thesis-Manual-1-21.pdf
+%         (Graduate College, "UD Thesis and Dissertation Manual"; its own cover
+%         page reads "LAST UPDATED Jan 2026")
+% source: https://www.udel.edu/academics/colleges/grad/current-students/academic-support/steps-to-graduation/
+%         (Graduate College, "Steps to Graduation" — the page that links the
+%         manual above, and the reason this edition and not another was used)
+% accessed: 2026-09-13
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, chapter-opening margin, spacing, title page,
+% the absence of an approval page, and the absence of any published
+% accessibility rule. NOT set: the typeface — UD asks for "any standard font
+% such as Courier, Times Roman, Times, or Helvetica" at 12 point, which is a
+% choice rather than a requirement, so the class default stands.
+%
+% TWO EDITIONS ARE ON THE SERVER AND THE FILENAME IS MISLEADING. Do not
+% "correct" the source URL above to a newer-looking one. The live Steps to
+% Graduation page links UD-Thesis-Manual-1-21.pdf, whose filename suggests
+% January 2021 but whose cover says January 2026 — that is the current manual.
+% Also still reachable, and NOT to be used: UD-Thesis-Manual-7-19.pdf on the
+% same server, and UD-Thesis-Manual-19-1.pdf on grad.udel.edu (the latter's
+% cover says January 2019). The 2026 edition is the one that carries the
+% approval-page change encoded at the bottom of this file; the older editions
+% predate it and would take a reader back to a signature page UD has removed.
+
+\thesisinstitution{University of Delaware}
+
+% "(1) The left margin (bound-in side) and bottom margin for all pages,
+% including tables, figures and appendices, must be at least 1 1/2''. The top
+% margin and right margin must be at least 1"."
+%
+% Note that the wide margin is the LEFT one and it is not optional: UD calls it
+% the bound-in side and states it as a floor for all pages, so this is not the
+% "wider inner margin only if you order bound copies" case that some schools
+% make conditional. These are minima ("at least"), and the profile takes each
+% one exactly; going wider is in spec but would be a silent choice.
+%
+% The bottom figure interacts with pagination: "(2) Center all page numbers.
+% There must be at least 3/4" from the bottom of the page number to the bottom
+% of each page." A 1.5in bottom margin with the folio inside it satisfies that
+% with room to spare, which is why no separate footskip is set here.
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1.5in}
+
+% "(3) Use a 2" top margin on the title page and on the first pages of major
+% sections such as acknowledgments, table of contents, list of tables, list of
+% figures, abstract, list of symbols (or abbreviations, terms, or
+% nomenclature), chapter, bibliography/references, and appendix."
+%
+% \thesissetchapteropening takes the TOTAL top margin, which is the 2in figure
+% UD prints; the class subtracts the geometry's own 1in. The title page below
+% applies the same 2in by hand, since it does not go through the chapter
+% opening mechanism.
+\thesissetchapteropening{2in}
+
+% "(1) Use standard double-spacing for the text of all preliminary pages such
+% as acknowledgments and the abstract, for the body of the paper, and for text
+% in the chapters and appendices."
+%
+% UD's narrower exceptions are the document's business, not the class's: list
+% items, notes, table headings, figure captions and block quotations of four
+% or more lines are single-spaced, with double spacing between items.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Recorded as an absence, and the absence was looked for. The 2026 manual and
+% the Steps to Graduation page were both read in full on the access date. The
+% manual contains the string "accessible" exactly once, in "UDThesis-Styles
+% which is accessible from campus computing sites" — a statement about where to
+% get the Word macros, not about the filed PDF. Neither document contains
+% "alt text", "WCAG", "tagged", "screen reader" or "PDF/A", and the only
+% accessibility links on the web page are the university-wide footer notices.
+%
+% One near miss, deliberately not encoded: the manual does say "All fonts used
+% should be embedded in the document." That sentence sits inside the section on
+% submitting to ProQuest Dissertation Publishing, it describes what ProQuest
+% needs rather than what the Graduate College requires of the filing, and its
+% verb is "should". Under RESEARCHING.md ProQuest boilerplate is not the
+% institution's requirement, so it does not become a declaration here.
+\thesisaccessibilityrequirement{Not published}
+	{The UD Graduate College publishes no accessibility requirement for a filed
+	 thesis or dissertation. Checked against the January 2026 Thesis and
+	 Dissertation Manual and the Steps to Graduation page on 2026-09-13.}
+
+% --- Title page --------------------------------------------------------------
+% UD prints two annotated specimens (thesis, and dissertation/educational
+% leadership portfolio) with a numbered explanation facing each. The layout
+% below is those annotations:
+%
+%   "TITLE: CENTERED LEFT TO RIGHT, DOUBLE SPACED, 2" DOWN FROM TOP OF PAGE
+%    BOLD, UPPERCASE LETTERS (12 POINT)"
+%   "Writer's name centered, as it will appear on diploma uppercase/lowercase
+%    letter (12pt)"
+%   "Correct name of degree and correct term of graduation (12pt) Terms are one
+%    of the following: Summer, Fall, Winter or Spring"
+%   "Electronic Version Approved left aligned (12pt): Committee: Right aligned
+%    (12pt) full list of committee members"
+%   "Copyright date and statement (12 point)"
+%
+% and the specimen's own body text, which the profile reproduces verbatim:
+% "A thesis submitted to the Faculty of the University of Delaware in partial
+% fulfillment of the requirements for the degree of XXX in XXX."
+%
+% The title page is where UD records approval — hence no separate approval page
+% (see the bottom of this file). The left column is the Graduate College dean,
+% the right column the committee.
+%
+% THE DEAN'S NAME IS A FIELD, NOT A CONSTANT. UD's specimen prints the sitting
+% dean's name and the facing explanation generalises it to "Correct Name of
+% Dean", so this profile does not hardcode a person who will leave office.
+% Set it with \udgraddean{...}; unset, the page prints a placeholder loud
+% enough to catch in proof.
+\newcommand{\thesis@ud@dean}{[SET THE DEAN'S NAME WITH \string\udgraddean]}
+\newcommand{\udgraddean}[1]{\renewcommand{\thesis@ud@dean}{#1}}
+% The month and year under the dean's block, which UD lists as its own line
+% ("Month Year") separate from the graduation term above. Defaults to the
+% graduation date already set with \graddate.
+\newcommand{\thesis@ud@approvaldate}{\thesis@date}
+\newcommand{\udapprovaldate}[1]{\renewcommand{\thesis@ud@approvaldate}{#1}}
+% Copyright year for the notice at the foot of the page. Defaults to the
+% current year rather than to a placeholder, because a wrong-looking year is
+% easier to notice in proof than a missing line.
+\newcommand{\thesis@ud@copyrightyear}{\the\year}
+\newcommand{\udcopyrightyear}[1]{\renewcommand{\thesis@ud@copyrightyear}{#1}}
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing
+		% 2in total from the top of the page; the geometry supplies 1in.
+		% Landing the title on UD's 2in mark takes three deliberate choices,
+		% all measured off the rendered page rather than calculated:
+		%   * \centering, not the {center} ENVIRONMENT — center is a trivlist
+		%     and contributes \topsep above its first line;
+		%   * \setstretch, not the {spacing} ENVIRONMENT, which adds a
+		%     \baselineskip of its own before the first line;
+		%   * a \vbox after \nointerlineskip, because the doubled \baselineskip
+		%     the stretch introduces is otherwise inserted ABOVE the first line
+		%     too, and at 12pt that alone is another 0.4in.
+		% Together with the 1in the geometry supplies, this puts the top of the
+		% title's capitals 2.0in from the top of the page. Leaving any one of
+		% the three out pushes it 0.4-0.6in low, which is the sort of error a
+		% format check catches and a reader does not.
+		%
+		% \topskip is zeroed for the same reason: it is inserted before the
+		% page's first box and would add its 10pt (0.14in) on top of the 2in.
+		% The assignment is local to the titlepage environment's group.
+		\topskip=0pt\relax
+		\vspace*{1in}%
+		\nointerlineskip
+		\thesis@tagtitle{Title}{%
+			\vbox{\setstretch{2}\centering\bfseries
+				\MakeUppercase{\@title}\par}%
+		}%
+		{\centering
+			\vspace{2\baselineskip}
+			by\par
+			\vspace{\baselineskip}
+			\@author\par
+			\vspace{2\baselineskip}
+			% The specimen's sentence, with the XXX slots filled from metadata.
+			\begin{minipage}{0.86\textwidth}
+				\centering
+				A \thesis@docnoun{} submitted to the Faculty of the University
+				of Delaware in partial fulfillment of the requirements for the
+				degree of \thesis@degree{} in \thesis@program.\par
+			\end{minipage}\par
+			\vspace{\baselineskip}
+			\thesis@date\par
+		\par}
+		\vspace{2\baselineskip}
+		% Two columns: approval on the left, committee on the right. The class
+		% default \thesis@memberline draws a signature rule and appends the
+		% role; both are wrong here, because UD removed signature pages (see
+		% below) and the specimen lists members as bare names.
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{##1\par}%
+		\noindent
+		\begin{minipage}[t]{0.48\textwidth}
+			\raggedright
+			Electronic Version Approved:\par
+			\vspace{\baselineskip}
+			\thesis@ud@dean\par
+			Dean of the Graduate College\par
+			The University of Delaware\par
+			\thesis@ud@approvaldate\par
+		\end{minipage}%
+		\hfill
+		\begin{minipage}[t]{0.48\textwidth}
+			\raggedright
+			Committee:\par
+			\vspace{\baselineskip}
+			\thesis@committee
+		\end{minipage}%
+		\endgroup
+		\vfill
+		\begin{center}
+			Copyright \thesis@ud@copyrightyear{} \@author\par
+			All Rights Reserved\par
+		\end{center}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% UD removed it, and says so in as many words:
+%
+%   "Approval Pages
+%    Effective Fall 2026, with the implementation of an electronic approval
+%    process, the signature pages have been removed from the final paper
+%    submission of a thesis/dissertation."
+%
+% Approval is collected on an electronic form outside the document, and the
+% title page above carries the "Electronic Version Approved:" block that
+% records it. Emitting a signature page into a UD filing would now be an error,
+% which is what \thesisnoapprovalpage prevents. Note this is an unusually recent
+% change: the 2019 editions still on the server prescribe the page.
+\thesisnoapprovalpage
