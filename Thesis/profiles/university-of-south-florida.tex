@@ -1,0 +1,239 @@
+% profiles/university-of-south-florida.tex — University of South Florida
+% ============================================================================
+% source: https://www.usf.edu/graduate-studies/students/electronic-thesis-dissertation/etd-formatting-requirements/general/index.aspx
+%         (Office of Graduate Studies, ETD Formatting Requirements → General →
+%         Page Margins)
+% source: .../etd-formatting-requirements/general/line-spacing.aspx
+% source: .../etd-formatting-requirements/general/font-options.aspx
+% source: .../etd-formatting-requirements/general/organization.aspx
+% source: .../etd-formatting-requirements/section-specific/index.aspx
+%         (Overview, and "Key Requirements for ADA Compliant PDFs")
+% source: .../etd-formatting-requirements/section-specific/title-page.aspx
+%         (the title-page specification, which is prescriptive down to the
+%         number of blank lines between blocks)
+% accessed: 2026-09-12
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set: geometry, spacing, the title page, the absence of an
+% approval page, tagging, and the accessibility requirements. Nothing is left to
+% the neutral fallback.
+%
+% USF IS UNUSUALLY BLUNT ABOUT LaTeX, and anyone filing here with this class
+% should read it first, quoted in full:
+%
+%   "Due to the difficulty creating Accessible PDFs through LaTex, we are
+%    currently discouraging the use of LaTex. Please note that many of the
+%    resources and supports availble for LaTex are limited or out of date. USF
+%    does not have any official LaTex support or an official LaTex Template.
+%    Please use an outside source to check your PDF for accessibilty before
+%    submitting to USF. Please do not use Adobe's auto tagging feature as it mis
+%    identifies many aspects of the navigational structureand is particularly
+%    problematic for equations inappropriatly tagged as text. For this reason, we
+%    encourage the use of Word instead." [sic throughout]
+%
+% and, in the ADA section: "In LaTex there are packages that allow for the
+% document structure to be read and converted into a tagged PDF when compiled."
+% That is what this class does, and USF names veraPDF as an acceptable checker —
+% "We recommend using PAC or VeraPDF to confirm your PDF is fully accessible
+% before submitting to ProQuest" — which is the same tool the TeXLib build gate
+% runs. A tagged build from this class is therefore aimed squarely at what USF
+% asks for, but the discouragement is USF's own position and is recorded here
+% rather than argued with.
+
+\thesisinstitution{University of South Florida}
+
+% "Page margins must be set to 1\" on each side throughout the entire
+% manuscript. All sections of the manuscript have the same margin requirements."
+% and "Ensure that content (tables, figures, text) does not overflow into the
+% margins." No binding allowance is offered and none is implied — submission is
+% electronic, through ProQuest.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "The majority of your thesis/dissertation should be double-spaced", with the
+% dedication, acknowledgments, abstract and body listed as double and the front
+% matter lists as single. The title page is single-spaced and sets its own
+% spacing below. \thesissetchapteropening is NOT called: USF states no
+% chapter-opening exception, and in fact "does not require a specific structure
+% or organization of the content in the main body".
+\thesissetspacing{double}
+
+% NOT set, for want of a hook, but worth knowing: "Choose one primary font size,
+% 10 pt., 11 pt., or 12 pt., and use this one chosen size throughout for main
+% body text, headings, and page numbers." The typeface rule ends with an
+% explicit permission this class happens to satisfy by default: "Students using
+% LaTeX may use Computer Modern Roman."
+
+% --- Accessibility -----------------------------------------------------------
+% USF's ADA section is a requirement, not advice: "Please check your PDF for
+% accessibility compliance prior to submission", and the Overview warns that
+% students must "ensure that the headings are bookmarked, accurate, and that the
+% PDF is ADA compliant".
+%
+% \thesisrequirepdfstandard is NOT called. PDF/UA appears only inside the name of
+% a tool USF recommends ("We recommend using PAC or VeraPDF"), never as a
+% standard the document must declare. \thesisrequiredocumentlanguage is NOT
+% called either: no USF page asks for the document language, even though it
+% names WCAG 2.1 AA for contrast.
+%
+% USF's WCAG citation is scoped to colour contrast specifically, and it carries
+% no ADA compliance date at all. Nothing here to reconcile against another
+% profile's date.
+\thesisrequiretagging
+\thesisaccessibilityrequirement{Tagging and structure}
+	{"Use Styles in Word to define headings (Heading 1, Heading 3,...) and tag
+	 the Title (as Title) ... so that screen readers can interpret the document
+	 structure." The title must be tagged as Title, "different from Heading 1".
+	 "Do not use Adobe's Auto Tagging feature, it erroneously tags structural
+	 elements and is not ADA compliant as of yet."}
+\thesisaccessibilityrequirement{Bookmarks}
+	{"all level headings must be bookmarked in the PDF to reflect the
+	 organization of the manuscript" — "PDFs submitted to ETD must be
+	 bookmarked, as this brings the organizational structure from the Word
+	 document into the PDF".}
+\thesisaccessibilityrequirement{Searchable text}
+	{"PDFs must contain actual text, not just images of text. Tables must be
+	 actual text and not images of text. Formulas and equations should be
+	 inserted as such, and searchable."}
+\thesisaccessibilityrequirement{Alt text}
+	{"Please make sure all figures have accurate Alt Text present to ensure that
+	 your PDF is ADA Compliant ... One to two sentences that describe the figure
+	 is all that is needed."}
+\thesisaccessibilityrequirement{Reading order}
+	{"Ensure the document flows in a logical sequence for assistive technology.
+	 Follow the organizational structure required by USF's Institutional
+	 Guidelines."}
+\thesisaccessibilityrequirement{Colour contrast}
+	{"Text must meet WCAG 2.1 AA color contrast ratios. For USF, black font on a
+	 white background must be used for body text, headings, and Figure/Table
+	 titles and captions." And: "When using color to convey information, do not
+	 rely on color alone."}
+\thesisaccessibilityrequirement{Checking}
+	{"Please check your PDF for accessibility compliance prior to submission. We
+	 recommend using PAC or VeraPDF to confirm your PDF is fully accessible
+	 before submitting to ProQuest."}
+
+% --- Title page --------------------------------------------------------------
+% "The Title Page format is very specific ... Even the amount of space between
+% text is specified." USF means it: the page below is that specification, block
+% by block, with its blank-line counts reproduced as multiples of \baselineskip.
+%
+%   Line spacing: single. Page number: none. Alignment: every line centred.
+%   Title starts 2in from the top edge, "(1" below the 1" margin)", in Title
+%   Case, "no special text format such as Bold or Italics", faux double-spaced
+%   if it runs to a second line, and no more than two lines.
+%   Then 3 blank lines / "by" / 3 blank lines / the author's full name, with
+%   "no credentials" / 4 blank lines.
+%   Then the degree block, broken exactly as USF breaks it, ending "University
+%   of South Florida".
+%   Then 3 blank lines — or 2 if the optional concentration line is present,
+%   which this file switches automatically.
+%   Then the committee, "One professor per line", the Major Professor first and
+%   the only one carrying a title.
+%   Then 2 blank lines / "Date of Approval:" / the defence date.
+%   Then 3 blank lines / the keywords / 1 blank line / the copyright line.
+%
+% FIVE THINGS A FILER MUST SET. USF's title page names more fields than the
+% class's metadata model holds, so the profile provides them; each is empty by
+% default and an empty one simply drops its line.
+%   \usfdepartment{...}  — "Confirm your proper Department name is listed
+%                          correctly and spelled out completely." Defaults to
+%                          \thesis@program, which is often right but is not the
+%                          same field.
+%   \usfcollege{...}     — "Make sure the College is listed correctly and
+%                          spelled out."
+%   \usfconcentration{...} — optional; printed as "with a concentration in X",
+%                          and its presence is what changes the following gap
+%                          from 3 blank lines to 2.
+%   \usfkeywords{...}    — "4-6 words or phrases not used in the Title ...
+%                          separated by commas."
+%   \usfcopyrightyear{...} — USF uses TWO dates on this page: the Date of
+%                          Approval is "the date the thesis or dissertation was
+%                          successfully defended" (that is \graddate, formatted
+%                          "Month Day, Year"), while the copyright year is "the
+%                          year matching the year of the final submission".
+%                          Defaults to \thesis@date so an unset value shows up
+%                          as a full date where a bare year belongs, rather than
+%                          quietly printing the wrong one.
+%
+% The committee: "Only the Major Professor or Co-Major Professors have titles
+% before their names", and everyone else is "Name, Degree Credentials". So the
+% Major Professor line is built from \gradadvisor and the remaining members from
+% \committeemember — do NOT also list the major professor as a \committeemember,
+% or they appear twice. Roles passed to \committeemember are dropped here,
+% because USF lists none.
+\newcommand{\thesis@usf@dept}{\thesis@program}
+\newcommand{\usfdepartment}[1]{\renewcommand{\thesis@usf@dept}{#1}}
+\newcommand{\thesis@usf@college}{}
+\newcommand{\usfcollege}[1]{\renewcommand{\thesis@usf@college}{#1}}
+\newcommand{\thesis@usf@conc}{}
+\newcommand{\usfconcentration}[1]{\renewcommand{\thesis@usf@conc}{#1}}
+\newcommand{\thesis@usf@keywords}{}
+\newcommand{\usfkeywords}[1]{\renewcommand{\thesis@usf@keywords}{#1}}
+\newcommand{\thesis@usf@cryear}{\thesis@date}
+\newcommand{\usfcopyrightyear}[1]{\renewcommand{\thesis@usf@cryear}{#1}}
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		% "Title should start 2\" from the top edge of the page (1in below the
+		% 1in margin)."
+		\vspace*{1in}%
+		% "Title is faux double-spaced if it extends to more than one line."
+		\begingroup\doublespacing
+		\thesis@tagtitle{Title}{\@title}\par
+		\endgroup
+		\vspace{3\baselineskip}
+		by\par
+		\vspace{3\baselineskip}
+		\@author\par
+		\vspace{4\baselineskip}
+		A \thesis@docnoun{} submitted in partial fulfillment\\
+		of the requirements for the degree of\\
+		\thesis@degree\\
+		\ifx\thesis@usf@conc\@empty\else with a concentration in \thesis@usf@conc\\\fi
+		\thesis@usf@dept\\
+		\ifx\thesis@usf@college\@empty\else \thesis@usf@college\\\fi
+		University of South Florida\par
+		% "Add 3 single-spaced lines ... if no concentration is listed"; "Add 2
+		% ... if the (optional) concentration line is listed".
+		\ifx\thesis@usf@conc\@empty
+			\vspace{3\baselineskip}
+		\else
+			\vspace{2\baselineskip}
+		\fi
+		\begingroup
+		% "One professor per line", no roles after the names.
+		\renewcommand{\thesis@memberline}[2]{##1\par}%
+		Major Professor: \thesis@advisor\par
+		\thesis@committee
+		\endgroup
+		\vspace{2\baselineskip}
+		Date of Approval:\\
+		\thesis@date\par
+		\vspace{3\baselineskip}
+		\ifx\thesis@usf@keywords\@empty\else
+			Keywords: \thesis@usf@keywords\par
+			\vspace{\baselineskip}
+		\fi
+		Copyright \textcopyright\ \thesis@usf@cryear, \@author\par
+		\vfill
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% USF prescribes none, and the committee is named on the title page instead —
+% "(Co-)Major Professor(s) and committee members' full names and degree
+% credentials are listed" there, together with the "Date of Approval", which is
+% "the date the thesis or dissertation was successfully defended".
+%
+% The Office of Graduate Studies enumerates the sections of an ETD one page at a
+% time — Title Page, Table of Contents, List of Tables, List of Figures,
+% Abstract, Main Body, Tables, Figures, References, Optional Sections — and no
+% approval, committee or signature page appears among them, nor among the
+% optional sections.
+%
+% This rests on an absence rather than a sentence, and is flagged as such for the
+% reviewer: deleting this line restores the class's neutral page.
+\thesisnoapprovalpage
