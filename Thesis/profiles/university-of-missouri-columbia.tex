@@ -1,0 +1,171 @@
+% profiles/university-of-missouri-columbia.tex — University of Missouri-Columbia
+% ============================================================================
+% source: https://gradschool.missouri.edu/academics/thesis-dissertation/formatting-guidelines/
+%         (Graduate School, "Formatting Your Thesis or Dissertation" — the
+%         section-by-section guide, with links to a specimen of every page)
+% source: https://gradschool.missouri.edu/policy/body-format-for-thesis-or-dissertation/
+%         (Graduate School policy, "Body Format for Thesis or Dissertation" —
+%         the same figures stated as policy)
+% source: https://gradschool.missouri.edu/policy/electronic-dissertation-and-thesis-basics/
+% source: https://gradschool.missouri.edu/academics/thesis-dissertation/technology/
+%         (both read for accessibility, which neither mentions)
+% source: https://gradschool.missouri.edu/wp-content/uploads/2025/05/Example-Dissertation-Title-Page.pdf
+% source: https://gradschool.missouri.edu/wp-content/uploads/2025/05/Example-thesis-title-page.pdf
+% source: https://gradschool.missouri.edu/wp-content/uploads/2025/05/approval-page.pdf
+%         (the three specimens the guide links; uploaded 2025-05)
+% accessed: 2026-09-12
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set: geometry, spacing, the title page and the approval page.
+% Accessibility is recorded as an absence — see below.
+%
+% NOT set, for want of a hook: the font rules. "The font used should be a
+% commonly available font, such as Arial, Veranda [sic], Times New Roman, etc.";
+% "Use 10-point or 12-point fonts for regular text. Headings may be 14-point or
+% 16-point. Tables, figures, etc., may be smaller than 10-point." The list is
+% open ("etc."), so Latin Modern is not excluded, but it is not named either.
+%
+% Mizzou's two sources say the same thing in the same words, which is unusually
+% convenient: the policy page and the formatting guide agree on every figure
+% here, so there is no prose-versus-specimen conflict to resolve.
+
+\thesisinstitution{University of Missouri-Columbia}
+
+% "Margins: Left Margin – 1.5 inches; Top, Bottom, and Right Margins – 1 inch",
+% stated identically on the policy page and the formatting guide. No reason is
+% given for the wider left margin and no exception is offered; it applies to the
+% filed research.pdf. Being a LEFT margin rather than an inner one, a twoside
+% build would put it on the wrong side of even pages — keep Mizzou documents
+% oneside.
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "Line Spacing: All standard text should be double-spaced. References,
+% bibliographic works, and endnotes should be consistent with the formatting
+% standards of your selected style manual." The front matter has its own rules
+% (the List of Illustrations is "Single-space lines within entries, and
+% double-space between entries"), which are not profile fields.
+% \thesissetchapteropening is NOT called: no source mentions one.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% NOT PUBLISHED. The formatting guide, the two policy pages and the "Technology
+% & Your Submission" page were all read on the access date and none of them
+% mentions accessibility, tagging, alt text, WCAG, PDF/A or the ADA. The
+% Technology page is where such a rule would sit — it is the page about file
+% formats and PDF creation — and it goes from "All thesis and dissertation
+% materials must be submitted in pdf format" straight to multimedia formats and
+% copyright.
+%
+% So no \thesisrequiretagging, no \thesisrequiredocumentlanguage, no
+% \thesisrequirepdfstandard. This class emits a tagged PDF regardless; declaring
+% that Mizzou asked for one would be inventing a requirement.
+\thesisaccessibilityrequirement{Not published}
+	{The Graduate School's filing requirements state no accessibility rule. The
+	 only related instruction is the file format itself: "All thesis and
+	 dissertation materials must be submitted in pdf format", in a single file
+	 named exactly "research.pdf", all lowercase.}
+
+% --- Title page --------------------------------------------------------------
+% "The body of the text should be centered on the page, both vertically and
+% horizontally", the page is counted as Roman numeral i but carries no number,
+% and — a trap worth naming — "Use the month and year of your graduation, not
+% the month and year of your defense." So \graddate is the GRADUATION date here,
+% and the specimen sets it in capitals ("MAY 2001").
+%
+% The block below is the specimen, which is the same page for a thesis and a
+% dissertation with the noun swapped: the title in capitals, a rule, the
+% "presented to" block, a rule, the partial-fulfilment block, the degree, a
+% rule, then "by", the author in capitals, and the supervisor line.
+%
+% The specimen draws its three rules at three slightly different widths. That
+% reads as an artifact of the Word original rather than a rule — nothing in the
+% prose mentions the rules at all — so one consistent width is used here.
+%
+% The supervisor line is "Dr. Thomas Sink, Dissertation Supervisor", i.e. the
+% name exactly as \gradadvisor gives it, followed by the role. Mizzou's specimen
+% writes the courtesy title as "Dr."; the class makes no assumption, so put
+% whatever form is wanted into \gradadvisor.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{2\baselineskip}
+		\rule{0.6\textwidth}{0.4pt}\par
+		\vspace{2\baselineskip}
+		A \thesis@DocNoun\\
+		presented to\\
+		the Faculty of the Graduate School\\
+		at the University of Missouri-Columbia\par
+		\vspace{2\baselineskip}
+		\rule{0.6\textwidth}{0.4pt}\par
+		\vspace{2\baselineskip}
+		In Partial Fulfillment\\
+		of the Requirements for the Degree\par
+		\vspace{2\baselineskip}
+		\thesis@degree\par
+		\vspace{2\baselineskip}
+		\rule{0.6\textwidth}{0.4pt}\par
+		\vspace{2\baselineskip}
+		by\par
+		\MakeUppercase{\@author}\par
+		\thesis@advisor, \thesis@DocNoun{} Supervisor\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\thesis@date}\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Mizzou REQUIRES one, and it is the third page of research.pdf — after the
+% title page, and after the optional copyright page if there is one. Its rules:
+%
+%   "The approval page is not counted, numbered, or listed in the Table of
+%    Contents." / "The title must be centered." / "Each person on your committee
+%    must be listed." / "The approval page in your thesis/dissertation should
+%    not have committee signatures."
+%
+% That last line is the important one: NO SIGNATURE RULES. Signatures are
+% collected outside the document; the filed page carries typed names only. The
+% class's default member line draws a rule, so it is replaced here.
+%
+% The wording below is the specimen's, with its bracketed placeholders filled
+% from the class's metadata. The specimen's opening paragraph is flush left and
+% the title is centred, exactly as the prose requires.
+%
+% ONE THING TO KNOW ABOUT THE NAMES: the specimen prefixes each with
+% "Professor" — "Professor Jane Doe", "Professor Vijay Kumar". This file does
+% NOT add that prefix, because it would be wrong for a committee member who is
+% not a professor, and the class cannot tell. Put the form you want into
+% \committeemember, e.g. \committeemember{Professor Jane Doe}{}.
+%
+% The specimen also writes the degree in lower case inside its placeholder
+% ("a candidate for the degree of [doctor of philosophy, doctor of education or
+% master of ________]"). Since that is a placeholder listing the options rather
+% than a typographic instruction, \thesis@degree is printed as the filer set it.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\noindent The undersigned, appointed by the dean of the Graduate School, have
+	examined the \thesis@docnoun{} entitled\par
+	\vspace{\baselineskip}
+	\begin{center}
+		\MakeUppercase{\@title}
+	\end{center}
+	\vspace{\baselineskip}
+	\noindent presented by \@author,\\
+	a candidate for the degree of \thesis@degree,\\
+	and hereby certify that, in their opinion, it is worthy of acceptance.\par
+	\vspace{3\baselineskip}
+	\begin{center}
+		\begingroup
+		% No signature rules: "The approval page in your thesis/dissertation
+		% should not have committee signatures."
+		\renewcommand{\thesis@memberline}[2]{##1\par\vspace{\baselineskip}}%
+		\thesis@committee
+		\endgroup
+	\end{center}%
+	\loadgeometry{normal}\doublespacing\clearpage
+}
