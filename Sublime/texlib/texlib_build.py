@@ -2686,7 +2686,7 @@ class TexlibBuildCore:
         template_A.pdf for autoexam). Aux/log/etc. stay in the aux dir.
 
         .schedmeta is here because its consumer is OUTSIDE the build (the
-        standalone TeXLib Sync program reads it from beside the source, like a
+        standalone Kalends program reads it from beside the source, like a
         reader opens the PDF from beside the source). Without this it lands in
         %TEMP%\\texlib-aux\\<hash> on every builder build and the sync tool either
         reports "build the schedule first" for a schedule just built, or reads a

@@ -2204,7 +2204,7 @@ def main():
 
     # ====================================================================== #
     # Copy-back from the aux dir. The .schedmeta case is the one with an
-    # out-of-build consumer: TeXLib Sync reads it from beside the source, so a
+    # out-of-build consumer: Kalends reads it from beside the source, so a
     # builder build that left it in %TEMP% would look to that tool like "the
     # schedule was never built" -- or worse, hand it a stale in-place copy.
     # ====================================================================== #
