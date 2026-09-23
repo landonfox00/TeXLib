@@ -1,0 +1,208 @@
+% profiles/north-carolina-state-university-at-raleigh.tex — North Carolina State University
+% ============================================================================
+% source: https://grad.ncsu.edu/students/etd/etd-guide/introduction-to-etd-requirements/
+%         (The Graduate School, ETD Guide, "Introduction to ETD Requirements")
+% source: https://grad.ncsu.edu/students/etd/etd-guide/title-page/
+% source: https://grad.ncsu.edu/wp-content/uploads/2017/12/Title-Page-Sample-3.pdf
+%         (the Title Page sample the guide says the page "must exactly match")
+% source: https://grad.ncsu.edu/wp-content/uploads/2018/03/Title-Page-Annotated-Sample.pdf
+%         (the annotated version of the same page)
+% source: https://grad.ncsu.edu/students/etd/digital-accessibility-requirements/
+% source: https://grad.ncsu.edu/students/etd/digital-accessibility-requirements/guidelines-for-digitally-accessible-files/
+% accessed: 2026-09-10
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page (which carries the
+% committee), the absence of a separate approval page, tagging, document
+% language, and six accessibility requirements.
+% NOT set: nothing is left to the neutral fallback.
+%
+% NC State is the strongest accessibility case in this directory so far, and the
+% only one to date whose own words reach the two machine-checkable flags. See
+% the accessibility block below before touching them.
+
+\thesisinstitution{North Carolina State University}
+
+% "The top, bottom, and right margins are required to be 1 inch, but the left
+% margin can either be 1 inch or 1.25 inches."
+%
+% A CHOICE, recorded rather than presented as a rule. This profile takes the
+% symmetric 1in, which is what an electronically filed PDF wants; the wider
+% 1.25in left margin is equally in spec and is the one to take if the manuscript
+% will also be bound. Change the `left' key alone.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Body text must be 1.5- or double-spaced."
+%
+% ALSO A CHOICE. This profile takes double, which is the class default;
+% \thesissetspacing{onehalf} is equally in spec.
+\thesissetspacing{double}
+
+% No chapter-opening exception: NC State states one set of margins and no deeper
+% top margin for chapters. \thesissetchapteropening is deliberately not called.
+%
+% Two rules the class already satisfies, worth knowing because a document can
+% break them: "Your document should not have a running header that appears in
+% the top margin of each page", and "All body text must be the same font and
+% font size ... black on a white background", with "All page numbers ... the
+% same size as the body text".
+
+% --- Accessibility -----------------------------------------------------------
+% NC State does not hedge, and it names the mechanism as well as the standard:
+%
+%   "ADA Title II mandates that all digital content provided by state
+%    institutions, including Electronic Theses and Dissertations (ETDs), must
+%    meet WCAG 2.1 Level AA accessibility standards."
+%
+% and, on the checklist, the tag tree and the document language are named
+% outright -- which is why \thesisrequiretagging and
+% \thesisrequiredocumentlanguage ARE set here, unlike in most profiles in this
+% directory. NC State asks for a tagged PDF in as many words ("Document
+% structure tags for accessibility") and for the language to be specified. It
+% names no PDF standard, so \thesisrequirepdfstandard stays unset.
+\thesisrequiretagging
+\thesisrequiredocumentlanguage
+\thesisaccessibilityrequirement{Standard}
+	{"ADA Title II mandates that all digital content provided by state
+	 institutions, including Electronic Theses and Dissertations (ETDs), must
+	 meet WCAG 2.1 Level AA accessibility standards."}
+\thesisaccessibilityrequirement{Tagged PDF}
+	{The "No Print-to-PDF" rule: "Using 'Print to PDF' strips a document of its
+	 accessibility tags. You will need to use the 'Save As' or 'Export' function
+	 and ensure 'Document structure tags for accessibility' is selected." A
+	 LaTeX author's equivalent is what this class already does -- tagging is on
+	 and the structure is written by the engine, not by a print driver.}
+\thesisaccessibilityrequirement{PDF properties}
+	{After conversion, "review the properties and check that: The accessibility
+	 permission flag is checked / The text language of the PDF is specified /
+	 The document has a title."}
+\thesisaccessibilityrequirement{Headings}
+	{"Use the Styles feature in your word processor (Heading 1, Heading 2, etc.)
+	 rather than manually bolding text. This generates a 'tag tree' that allows
+	 assistive technology to navigate the document."}
+\thesisaccessibilityrequirement{Alt text}
+	{Figures, tables and other visual elements "Must have Alternative Text
+	 ('Alt Text'), a short description of that element", and: "Requirement:
+	 Alt-text should be embedded in the source file before PDF export."}
+\thesisaccessibilityrequirement{Tables and equations}
+	{"Tables must be created using the 'Insert Table' tool (not images or tabs).
+	 You will need to define the Header Row so that the relationship between
+	 data and labels is preserved for screen readers." Likewise "Insert real
+	 equations or formulas ... (rather than images of those equations or
+	 formulas)."}
+\thesisaccessibilityrequirement{LaTeX}
+	{NC State addresses LaTeX authors directly: "Use accessibility packages to
+	 create document structure, tags, and alt text" and "Use Adobe Acrobat Pro
+	 for an accessibility check after exporting to PDF." This class is that
+	 first item; veraPDF is a substitute for the second and is not NC State's
+	 named tool.}
+
+% --- Title page --------------------------------------------------------------
+% "Title Page formatting and spacing must exactly match that of the Title Page
+% sample". Reproduced from that sample and its annotated twin.
+%
+% The annotations, verbatim: "Title starts at the very top of the page, on the
+% first line after the 1 inch margin."; "Spacing should be equal here." (twice,
+% around the submission block); "This block of text must be spaced exactly like
+% this."; "Type your degree title here."; "Type your official program name here
+% (do not include concentration)."
+%
+% From the guide's prose: "If it is long enough, the title should fill the
+% entire first line, before assuming an inverted pyramid format ... If the title
+% has multiple lines, these lines should be single-spaced." and "Capitalize the
+% first letter of all important words in your title." -- so the title is TITLE
+% CASE, not capitals, and this profile does not uppercase it. The inverted
+% pyramid is a line-breaking decision only the author can make; write the breaks
+% into \title with \\ if the title runs to more than one line.
+%
+% "Your degree should read 'Master of...' or 'Doctor of...' rather than
+% 'Master's of...' or 'Doctorate in...'." and "The year listed should be the
+% year in which you will graduate" -- \graddate carries the YEAR ALONE.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{4\baselineskip}
+		by\\
+		\@author\par
+		\vspace{4\baselineskip}
+		A \thesis@docnoun{} submitted to the Graduate Faculty of\\
+		North Carolina State University\\
+		in partial fulfillment of the\\
+		requirements for the degree of\\
+		\thesis@degree\par
+		\vspace{3\baselineskip}
+		\thesis@program\par
+		\vspace{3\baselineskip}
+		Raleigh, North Carolina\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+		\vspace{3\baselineskip}
+		APPROVED BY:\par
+		\vspace{3\baselineskip}
+		\begingroup
+		\let\thesis@memberline\ncsu@memberline
+		\setcounter{ncsu@sigcol}{0}%
+		\thesis@committee
+		\ncsu@closerow
+		\endgroup
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% The signature block is two columns, and the annotated sample is specific about
+% it: "Signature lines should be balanced on the page. Left-sided lines should
+% be left-aligned -- right-side lines should be right-aligned.", and "Spacing
+% and alignment of names below signature lines must be consistent for all
+% signature lines."
+%
+% The role goes UNDER the name: "Indicate your chair with 'Chair of Advisory
+% Committee' or 'Committee Chair' below their signature line and name." An
+% external member gets "External Member". NC State also excludes two roles
+% outright -- "Do not include signature lines or names of Graduate School
+% Representatives or Technical Consultants" -- which the class cannot enforce,
+% so do not pass them to \committeemember.
+\newcounter{ncsu@sigcol}
+\newcommand{\ncsu@sigbox}[2]{%
+	% \strut keeps the box its full width even when both arguments are empty: a
+	% \parbox with no lines is 0pt wide, not 0.45\textwidth.
+	\parbox[t]{0.45\textwidth}{%
+		\rule{\linewidth}{0.4pt}\par
+		\strut #1\ifx\relax#2\relax\else\\#2\fi
+	}%
+}
+\newcommand{\ncsu@memberline}[2]{%
+	\stepcounter{ncsu@sigcol}%
+	\ifodd\value{ncsu@sigcol}%
+		\noindent\ncsu@sigbox{#1}{#2}\hfill
+	\else
+		\ncsu@sigbox{#1}{#2}\par
+		\vspace{2.5\baselineskip}%
+	\fi
+}
+% An odd number of members leaves a row open. Close it with an EMPTY BOX of the
+% right-hand column's width, not with a bare \par: the title page is centred, so
+% a lone box on its own line would be centred too, and the annotated sample says
+% "Left-sided lines should be left-aligned". The invisible partner keeps the
+% last line the same width as a full row, which puts its one signature line back
+% at the left margin.
+\newcommand{\ncsu@closerow}{%
+	\ifodd\value{ncsu@sigcol}\makebox[0.45\textwidth]{}\par\fi
+}
+
+% --- Committee approval page --------------------------------------------------
+% NC State's filed document contains none: the committee is on the TITLE PAGE,
+% under "APPROVED BY:", as the signature block above.
+%
+% The Required and Optional Pages list is exhaustive -- Abstract, Copyright,
+% Title page, Dedication, Biography, Acknowledgements, Table of Contents, List
+% of Tables, List of Figures, List of Schemes/Symbols/Terminology, Authorship
+% Statement, Body text, References, Appendices Intro Page -- and no approval
+% page appears in it.
+%
+% NO SIGNATURES ANYWHERE IN THE DOCUMENT, twice stated: the title page "Should
+% not be signed by your committee", and "Do not include actual signatures from
+% your committee. Approval is now entered electronically, via MyPack portal."
+% The rules on the title page are blank by requirement.
+\thesisnoapprovalpage
