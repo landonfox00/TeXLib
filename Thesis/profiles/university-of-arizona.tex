@@ -1,0 +1,253 @@
+% profiles/university-of-arizona.tex — University of Arizona
+% ============================================================================
+% source: https://grad.arizona.edu/gsas/dissertations-theses/dissertation-and-thesis-formatting-guides
+%         (Graduate College, the page that links the two governing guides)
+% source: https://arizona.box.com/grad-gsas-dissformat
+%         ("Dissertation Formatting Guide", Graduate College; page 1 footed
+%          "Updated 04/17/2024", the remaining pages "Updated 03/31/2022")
+% source: https://arizona.box.com/grad-gsas-thesisformat
+%         ("Thesis Formatting Guide", Graduate College; footed
+%          "Revised 03/20/2024")
+% source: https://grad.arizona.edu/gsas/dissertations-theses/sample-pages
+%         (Graduate College, "Sample Pages" — the prescribed specimens)
+% source: https://arizona.box.com/grad-gsas-disstitlepage
+%         ("Sample Doctoral Title Page for website.doc")
+% source: https://arizona.box.com/grad-gsas-thesistitlepage
+%         ("Sample Thesis Title Page for website.doc")
+% source: https://arizona.box.com/v/grad-gsas-dissaproveonechair
+%         ("Sample Doctoral Approval Page PhD One Chair.docx")
+% accessed: 2026-09-09
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry (as a CHOICE — read the next paragraph), the
+% title page, and the approval page.
+% NOT set, and each for a different reason:
+%   * \thesissetspacing — the Graduate College states NO line-spacing rule. Both
+%     guides were read end to end; neither contains the word "spacing". The
+%     class's neutral double spacing renders.
+%   * \thesissetchapteropening — no deeper chapter-opening margin is prescribed.
+%   * every checkable accessibility declaration — nothing is published.
+%
+% ARIZONA REQUIRES NO MARGINS, AND THAT IS THE UNUSUAL PART OF THIS FILE.
+% Verbatim, III.C of both guides:
+%
+%     "Dissertations that are archived and retrieved electronically in .PDF
+%      format do not need to abide by specific margins."
+%     "If you are ordering bound copies of your dissertation from ProQuest/UMI
+%      when you submit it for archiving, you will want to use margins
+%      appropriate for binding: 1" on all sides."
+%
+% (The thesis guide says "1\" all the way around" for the same clause.) So the
+% filed electronic document has no margin requirement at all, and 1in is a
+% conditional recommendation attached to ordering bound copies. This profile
+% TAKES the 1in figure — it is the only figure the Graduate College names, it is
+% already the class's neutral default so the choice is inert for the electronic
+% filing, and pinning it keeps a bound-copy filer safe if the class default ever
+% moves. Anything else is equally in spec electronically. Do not read the line
+% below as "Arizona requires 1 inch"; it does not.
+%
+% TWO REQUIREMENTS THIS PROFILE CANNOT EXPRESS.
+%
+%   1. PAGE NUMBERING. "The title page is considered page 1 of the dissertation,
+%      with all other pages numbered successively" and "Page numbers should
+%      appear on all pages (although the title page does not need to display its
+%      page number), in the same place on each page." That is ONE arabic
+%      sequence beginning at the title page — not the roman-then-arabic front
+%      matter this class produces, and not something a profile field can change.
+%      A filer at Arizona must set the page numbering themselves. The approval
+%      page specimen shows a bare "2" at the top right, which is what that
+%      sequence looks like in practice.
+%   2. TYPEFACE. "It is best to use a standard serif font, as they reproduce
+%      well." That is advice, not a requirement, and there is no profile field
+%      for it either way. The class's Latin Modern is a standard serif face.
+%
+% THE APPROVAL PAGE THIS FILE TYPESETS IS A PREPARATION SHEET, NOT THE FILED
+% LEAF. The Graduate College collects signatures on its OWN specimen, by one of
+% two routes, and the signed artifact is then inserted as page 2:
+%
+%     Option 1: "Your Graduate Coordinator will use Adobe Sign to gather
+%     signatures for your approval page. Once the chair/co-chairs and committee
+%     members have all signed, you will include that signed approval page as
+%     page 2 in your dissertation."
+%     Option 2: "print out a hard copy to take to your defense and get the
+%     signatures of all your committee members. Note: Make sure you print this
+%     page in color for the watermark to show properly. ... When all signatures
+%     are received, scan the signed approval page and insert is [sic] as page 2
+%     of your dissertation."
+%
+% The specimen carries a large University of Arizona wordmark watermark, which
+% this page deliberately does NOT reproduce: it is the university's mark, and
+% the class's stated position is to draw no borrowed insignia. So what is
+% typeset below is the prescribed WORDING and signature-block layout — useful
+% for drafting and for checking a title against the approval page — and the
+% document that is actually filed must carry the signed specimen instead.
+%
+% SIGNATURES ARE STILL COLLECTED, one way or the other. Adobe Sign is the
+% default route; wet signatures on a colour print remain an option the Graduate
+% College spells out.
+
+\thesisinstitution{The University of Arizona}
+
+% The bound-copy figure, taken as a choice and not as a requirement. See the
+% header: electronically archived documents "do not need to abide by specific
+% margins".
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% --- Accessibility -----------------------------------------------------------
+% Both formatting guides were read end to end on the access date. Neither
+% contains the words accessible, accessibility, alt text, tagged, WCAG, PDF/UA,
+% PDF/A, screen reader or Title II, and neither states a document-language or
+% heading-structure rule. No separate Graduate College accessibility page for
+% filed theses was located either.
+\thesisaccessibilityrequirement{Not published}
+	{The Graduate College's Dissertation Formatting Guide and Thesis Formatting
+	 Guide state no accessibility requirement. Both were read in full on the
+	 access date. This records that the Graduate College asks for nothing on
+	 accessibility, not that nobody looked.}
+
+% --- Optional major line ---------------------------------------------------
+% "You should reference your department by its official name. If your major does
+% not match the name of the department, you need to include ``WITH A MAJOR IN
+% ____'' below the degree name." \thesis@program carries the DEPARTMENT, as the
+% specimens show it; \uamajor supplies the major only when the two differ.
+\newcommand{\ua@major}{}
+\newcommand{\uamajor}[1]{\renewcommand{\ua@major}{#1}}
+
+% --- Title page ----------------------------------------------------------------
+% Reproduced from the two specimens, which are prescriptive on capitalization:
+% "Follow the capitalization shown in the sample." Doctoral specimen, in order:
+%
+%     IRRIGATING SONORAN DESERT CROPS
+%     by
+%     Sara Jones
+%     ______________________________
+%       Copyright (c) Sara Jones 2016
+%     A Dissertation Submitted to the Faculty of the
+%     DEPARTMENT OF AGRICULTURAL AND BIOSYSTEMS ENGINEERING
+%     In Partial Fulfillment of the Requirements
+%     For the Degree of
+%     DOCTOR OF PHILOSOPHY
+%     In the Graduate College
+%     THE UNIVERSITY OF ARIZONA
+%     2016
+%
+% The master's specimen is the same page with "A Thesis Submitted to the Faculty
+% of the" and "MASTER OF ARTS", so \thesis@docnoun and \thesis@degree carry the
+% whole difference and no branch is needed here.
+%
+% The rule above the copyright line is in both specimens and is reproduced. The
+% year is \thesis@date: the specimens show a BARE YEAR, so set \graddate{2027},
+% not a month and year.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{2\baselineskip}
+		\@author\par
+		\vspace{2\baselineskip}
+		\rule{2.6in}{0.4pt}\par
+		{\small Copyright \textcopyright\ \@author\ \thesis@date}\par
+		\vspace{1.5\baselineskip}
+		A \thesis@DocNoun\ Submitted to the Faculty of the\par
+		\vspace{1.5\baselineskip}
+		\MakeUppercase{\thesis@program}\par
+		\vspace{1.5\baselineskip}
+		In Partial Fulfillment of the Requirements\par
+		\vspace{0.6\baselineskip}
+		For the Degree of\par
+		\vspace{1.5\baselineskip}
+		\MakeUppercase{\thesis@degree}\par
+		\ifx\ua@major\@empty\else
+			\vspace{0.6\baselineskip}
+			WITH A MAJOR IN \MakeUppercase{\ua@major}\par
+		\fi
+		\vspace{1.5\baselineskip}
+		In the Graduate College\par
+		\vspace{1.5\baselineskip}
+		THE UNIVERSITY OF ARIZONA\par
+		\vspace{2.5\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page ------------------------------------------------
+% Reproduced from "Sample Doctoral Approval Page PhD One Chair.docx". The
+% wording, verbatim:
+%
+%     THE UNIVERSITY OF ARIZONA
+%     GRADUATE COLLEGE
+%
+%     As members of the Dissertation Committee, we certify that we have read the
+%     dissertation prepared by [Enter Student Name], titled [Enter Dissertation
+%     Title] and recommend that it be accepted as fulfilling the dissertation
+%     requirement for the Degree of Doctor of Philosophy.
+%
+%     [signature rules, one per committee member, each with "Date: ____"]
+%
+%     Final approval and acceptance of this dissertation is contingent upon the
+%     candidate's submission of the final copies of the dissertation to the
+%     Graduate College.
+%
+%     I hereby certify that I have read this dissertation prepared under my
+%     direction and recommend that it be accepted as fulfilling the dissertation
+%     requirement.
+%
+%     [one more signature rule, "Date: ____"]
+%     [Committee Chair Name]
+%     Dissertation Committee Chair
+%     [Academic Department]
+%
+% The chair signs TWICE — once in the member block and once at the foot, which
+% the Option 2 instructions state outright: "Your committee chair/co-chairs will
+% need to sign the form twice (as a member and as chair/co-chair)." That is why
+% the chair block below is separate rather than a member line with a label.
+%
+% The Graduate College publishes a separate specimen for every committee size
+% (one chair with 2--5 members, co-chairs with 1--4) and for eight degree types.
+% They differ only in how many member rules are drawn and in the degree named,
+% both of which fall out of \thesis@committee and \thesis@degree here.
+%
+% \thesis@memberline is replaced for this page: the class default puts the name
+% BELOW a bare rule with no date field, and Arizona's specimen pairs each rule
+% with "Date: ____" and sets the name in italics beneath.
+\newcommand{\ua@sigrule}[1]{%
+	\vspace{2.2\baselineskip}
+	\noindent\rule{3.6in}{0.4pt}\hfill Date: \rule{1.2in}{0.4pt}\par
+	\noindent\textit{#1}\par
+}
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\thesis@tagtitle{H1}{{\color{white}\tiny Committee Approval Page}}\par
+	\begin{center}
+		THE UNIVERSITY OF ARIZONA\par
+		GRADUATE COLLEGE
+	\end{center}
+	\vspace{0.5\baselineskip}
+	\noindent As members of the \thesis@DocNoun\ Committee, we certify that we
+	have read the \thesis@docnoun\ prepared by \@author, titled \textit{\@title}
+	and recommend that it be accepted as fulfilling the \thesis@docnoun\
+	requirement for the Degree of \thesis@degree.\par
+	\begingroup
+	\renewcommand{\thesis@memberline}[2]{\ua@sigrule{##1}}%
+	\thesis@committee
+	\endgroup
+	\vspace{2\baselineskip}
+	\noindent Final approval and acceptance of this \thesis@docnoun\ is
+	contingent upon the candidate's submission of the final copies of the
+	\thesis@docnoun\ to the Graduate College.\par
+	\vspace{\baselineskip}
+	\noindent I hereby certify that I have read this \thesis@docnoun\ prepared
+	under my direction and recommend that it be accepted as fulfilling the
+	\thesis@docnoun\ requirement.\par
+	\ua@sigrule{\thesis@advisor}%
+	\noindent \thesis@DocNoun\ Committee Chair\par
+	\noindent \thesis@program\par
+	\loadgeometry{normal}\doublespacing\clearpage
+}
