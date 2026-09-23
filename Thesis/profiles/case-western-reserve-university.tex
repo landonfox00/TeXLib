@@ -1,0 +1,171 @@
+% profiles/case-western-reserve-university.tex — Case Western Reserve University
+% ============================================================================
+% source: https://case.edu/gradstudies/current-students/electronic-theses-and-dissertation-guidelines
+%         (School of Graduate Studies, "Electronic Thesis and Dissertation
+%          Guidelines" — the requirements themselves)
+% source: https://case.edu/gradstudies/sites/default/files/2023-04/Sample-Title-Page_0.pdf
+%         (the "sample title page" that page links)
+% source: https://case.edu/gradstudies/sites/default/files/2018-04/ETD-Sample-Committee-Page.pdf
+%         (the "sample Committee Approval Sheet" that page links)
+% accessed: 2026-09-11
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, the committee
+% approval sheet, and the accessibility requirements. Nothing is left to the
+% neutral fallback except \thesissetchapteropening, for which no rule exists.
+%
+% The guidelines page carries no revision date; its linked assets are dated in
+% their paths (title page 2023-04, committee sheet 2018-04, accessibility guide
+% 2025-04), and the accessibility section is dated internally to Spring 2023.
+% This is the live page under Current Students and there is no second edition.
+
+\thesisinstitution{Case Western Reserve University}
+
+% --- Filing figures ----------------------------------------------------------
+% "The margins on the left side of all pages should be at least 1.5 inches. Top,
+% bottom and right margins should be at least 1 inch. All photographs, charts,
+% tables, graphs, drawings, etc. must fit within these specified margins."
+%
+% MINIMA, so a wider margin is in spec and a narrower one is not; the minima are
+% the safe setting. The 1.5in left is unconditional -- it is not offered as a
+% binding-only option -- so `twoside' must not alternate it.
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "Double space all text. Long quotations, captions, footnotes, and endnotes may
+% be single-spaced." A may, so the document default is double.
+\thesissetspacing{double}
+
+% No face is set: "Any standard typeface is acceptable; font size should be 12."
+% The class default satisfies both. CWRU adds that "The font size may be reduced
+% for captions on figures and tables", which is a document's choice, not a
+% profile's.
+
+% --- Accessibility -----------------------------------------------------------
+% CWRU's Minimum Digital Accessibility Standards (MDAS), in force "Beginning
+% Spring 2023" and "Established based on CWRU guidelines and the new OhioLINK
+% recommendations on digital accessibility". Note the date is CWRU's own and has
+% nothing to do with the ADA Title II dates other profiles carry.
+%
+% The MDAS list is introduced with "should meet", but the filing requirement is
+% a must: "A final PDF document meeting accessibility requirements, along with
+% the accompanying Digital Accessibility Report (DAR), must be submitted to
+% Graduate Studies as part of the required format check and submission
+% approval." Graduate Studies deletes an ETD uploaded without that approval.
+%
+% \thesisrequiredocumentlanguage is set on the strength of a verbatim MDAS item.
+% \thesisrequiretagging is set because two further MDAS items -- headings for
+% major sections, and alternative text on figures -- are PDF structure and
+% cannot exist in an untagged file; CWRU never uses the word "tagged", so a
+% reviewer who reads that more narrowly should drop this one line.
+\thesisrequiretagging
+\thesisrequiredocumentlanguage
+\thesisaccessibilityrequirement{Standard}
+	{Electronic theses and dissertations must meet the School of Graduate
+	 Studies' Minimum Digital Accessibility Standards (MDAS), in force since
+	 Spring 2023.}
+\thesisaccessibilityrequirement{Full text}
+	{The PDF file must include full text — not page images.}
+\thesisaccessibilityrequirement{Permission flag}
+	{The PDF accessibility permission flag must be checked.}
+\thesisaccessibilityrequirement{Language}
+	{The text language of the PDF must be specified.}
+\thesisaccessibilityrequirement{Title and headings}
+	{The PDF must include a title and headings for the major sections of the
+	 document.}
+\thesisaccessibilityrequirement{Alt text}
+	{Figures and images must include alternative text.}
+\thesisaccessibilityrequirement{Accessibility report}
+	{A Digital Accessibility Report (DAR) must be submitted to Graduate Studies
+	 alongside the final PDF, as part of the required format check.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduces the linked sample title page. Its own annotations are the spec: the
+% title goes "IN ALL CAPS" and "DOUBLE - SPACED", the author's name goes in all
+% caps, and the required elements from the guidelines page are "Title, Name,
+% Degree, Department, University Name, Month and Year of Graduation".
+%
+% The date is the GRADUATION month and year and CWRU is explicit that it is not
+% the defence date: "The month of graduation will either be January, May or
+% August (month, year), NOT the date of your defense." The defence date belongs
+% on the committee sheet below, which is why this profile mints a separate
+% \thesisdefensedate rather than reusing \thesis@date for both.
+\providecommand{\thesisdefensedate}{\thesis@date}
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\centering
+		\vspace*{\fill}
+		% The sample annotates the title block itself as double-spaced, which is
+		% the one place on this page where the spacing is prescribed.
+		\begingroup\doublespacing
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\endgroup
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\@author}\par
+		\vspace{3\baselineskip}
+		Submitted in partial fulfillment of the requirements for the\\
+		degree of \thesis@degree\par
+		\vspace{3\baselineskip}
+		\thesis@program\par
+		\vspace{3\baselineskip}
+		CASE WESTERN RESERVE UNIVERSITY\par
+		\vspace{3\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% REQUIRED, and its position is fixed: "A Committee Approval Sheet must be
+% included as the second page of your PDF document." The guidelines' order of
+% contents likewise runs Title page, Committee Approval Sheet, Copyright page,
+% ... — so a document filing here calls \thesisapprovalpage immediately after
+% \thesistitlepage and before anything else.
+%
+% NO SIGNATURES, and that is stated rather than inferred: "This form should only
+% have the typed names of your committee, not signatures." The class's default
+% \thesis@memberline draws a signature rule, so it is replaced for this page.
+%
+% The sample puts the ROLE ABOVE THE NAME -- "Committee Chair" on one line,
+% "(Name)" on the next -- which is the reverse of the class's default order, and
+% it ends with "Date of Defense" over the date. The trailing footnote is the
+% sample's own, keyed to the asterisk after the degree.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\begin{center}
+		\thesis@tagtitle{H1}{{\color{white}\tiny Committee Approval Sheet}}\par
+		\vspace*{\fill}
+		CASE WESTERN RESERVE UNIVERSITY\\
+		SCHOOL OF GRADUATE STUDIES\par
+		\vspace{3\baselineskip}
+		We hereby approve the \thesis@docnoun{} of\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{2\baselineskip}
+		candidate for the degree of \thesis@degree\textsuperscript{*}.\par
+		\vspace{2\baselineskip}
+		\begingroup
+		% Role first, name beneath, no rule — the sample's layout exactly.
+		\renewcommand{\thesis@memberline}[2]{%
+			\ifx\relax##2\relax\else##2\par\fi
+			##1\par
+			\vspace{1.5\baselineskip}%
+		}%
+		\thesis@committee
+		\endgroup
+		Date of Defense\par
+		\thesisdefensedate\par
+		\vspace*{\fill}
+		\begin{minipage}{0.86\textwidth}
+			\centering\footnotesize
+			\textsuperscript{*}We also certify that written approval has been
+			obtained for any proprietary material contained therein.\par
+		\end{minipage}
+	\end{center}%
+	\loadgeometry{normal}\doublespacing\clearpage
+}
