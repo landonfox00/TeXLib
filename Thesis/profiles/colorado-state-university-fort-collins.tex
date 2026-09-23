@@ -1,0 +1,154 @@
+% profiles/colorado-state-university-fort-collins.tex — Colorado State University
+% ============================================================================
+% source: https://graduateschool.colostate.edu/thesis-dissertation/organizing-and-formatting-your-thesis-and-dissertation/
+%         (Graduate School, "Organizing and Formatting Your Thesis and Dissertation")
+% source: https://graduateschool.colostate.edu/wp-content/uploads/2025/04/Dissertation-Title-Page-Sample.pdf
+%         (the annotated specimen that page links as "a sample of a Dissertation
+%         title page pdf"; a matching Thesis-Title-Page-Sample.pdf sits beside it)
+% accessed: 2026-09-13
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, title page, the absence of an
+% approval page, and the absence of any published accessibility rule.
+% NOT set: chapter-opening margin (CSU states no deeper opening margin — 1in
+% applies to every page), and the typeface (CSU names Times New Roman and Arial
+% as *examples*, not as the requirement, so the class default stands).
+%
+% The formatting page carries no revision date. Its linked sample pages were
+% re-uploaded in April 2025; the dissertation specimen still prints "Spring
+% 2014" as its example graduating term, which is the specimen's sample value
+% and not evidence that the rules are stale — the prose page and the specimen
+% agree on every item encoded below.
+
+\thesisinstitution{Colorado State University}
+
+% "Margins are one inch on all sides (top, bottom, left, and right)." The
+% specimen repeats it as an annotation: "All margins must be one inch". No
+% exception is stated for binding, chapter openings, tables or appendices; the
+% one exception CSU does state is about text depth, not margin size ("Always
+% continue the text to the bottom margin except at the end of a chapter").
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "The text of the thesis is double-spaced." The exceptions CSU lists are all
+% narrower than the body and are the document's business, not the class's:
+% bibliography entries and large-table data "may be single-spaced", footnotes
+% "should be single spaced", and quoted material over three lines "is indented
+% and single-spaced".
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Recorded as an absence, and the absence was looked for. Three Graduate School
+% URLs were read on the access date — the formatting page, the thesis/
+% dissertation landing page, and the electronic-submission/copyright page — and
+% none contains the words accessible, tagged, alt text, WCAG or PDF/A outside
+% the site-wide footer link. CSU Libraries does publish encouragement language
+% about accessible ETDs, but a library page is not the graduate school and
+% under RESEARCHING.md is not a source for this field, so it is not quoted here.
+\thesisaccessibilityrequirement{Not published}
+	{The CSU Graduate School publishes no accessibility requirement for a filed
+	 thesis or dissertation. Checked against its formatting, submission and
+	 copyright pages on 2026-09-13.}
+
+% --- Title page --------------------------------------------------------------
+% Prescriptive, and the prose and the specimen agree line for line:
+%   "The heading 'Thesis' or 'Dissertation' is in all capital letters, centered
+%    one inch from the top of the page."
+%   "Your title must be in all capital letters, double spaced and centered."
+%   "Divide this section exactly as shown on the sample page. One blank line
+%    must separate each line of text."  (twice: the Submitted-by block and the
+%    Degree/Graduating-term block)
+%   "Do not use bold."  "Center all text except the advisor and committee
+%    information."  "Do not print a number on this page."
+%   "The Master's Committee and Doctoral Committee headings begin at the left
+%    margin."  "Advisor and committee member names are indented approximately
+%    half an inch from the left margin."
+%   "Titles before or after the names of your advisor and your members are not
+%    permitted (Examples — Dr., Professor, Ph.D.)."
+%
+% Two mappings a filer should know. The department line is taken from
+% \gradprogram, because the class has no separate department field and CSU wants
+% the department there ("Type the official name of your department"); set
+% \gradprogram to the department, not to a specialization — "Areas of Study or
+% specializations within a program are not listed on the Title Page". And the
+% committee heading follows \doctype, since CSU splits it by degree level.
+%
+% The class default \thesis@memberline draws a signature rule and appends the
+% role after the name. Both are wrong here — CSU collects no signatures in the
+% document and forbids titles after a name — so it is replaced for this page.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing
+		% "centered one inch from the top of the page": the geometry already
+		% puts the text block at 1in, so the heading is simply the first line.
+		\begin{center}
+			\MakeUppercase{\thesis@DocNoun}\par
+			\vspace{2\baselineskip}
+			% Double-spaced per CSU, hence the 2x leading on a multi-line title.
+			\thesis@tagtitle{Title}{%
+				\begin{spacing}{2}%
+					\MakeUppercase{\@title}%
+				\end{spacing}%
+			}\par
+			\vspace{\baselineskip}
+			% Submitted-by block: one blank line between each line of text.
+			Submitted by\par
+			\vspace{\baselineskip}
+			\@author\par
+			\vspace{\baselineskip}
+			\thesis@program\par
+			\vspace{2\baselineskip}
+			% Degree and graduating-term block, same one-blank-line rule.
+			In partial fulfillment of the requirements\par
+			\vspace{\baselineskip}
+			For the Degree of \thesis@degree\par
+			\vspace{\baselineskip}
+			Colorado State University\par
+			\vspace{\baselineskip}
+			Fort Collins, Colorado\par
+			\vspace{\baselineskip}
+			\thesis@date\par
+		\end{center}
+		\vspace{2\baselineskip}
+		% Left-aligned, names indented ~0.5in, no rules, no roles.
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{\hspace*{0.5in}##1\par}%
+		\raggedright
+		\ifx\thesis@docnoun\thesis@csu@dissertation
+			Doctoral Committee:%
+		\else
+			Master's Committee:%
+		\fi
+		\par
+		\vspace{\baselineskip}
+		\hspace*{0.5in}Advisor: \thesis@advisor\par
+		\vspace{\baselineskip}
+		\thesis@committee
+		\endgroup
+		\vfill
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% The comparison string for the committee-heading branch above. Defined after
+% the page so the \ifx reads as prose there; \thesis@docnoun is "dissertation"
+% or "thesis", set by \doctype.
+\newcommand{\thesis@csu@dissertation}{dissertation}
+
+% --- Committee approval page --------------------------------------------------
+% CSU prescribes none, and the committee is named on the title page above.
+%
+% This is the one inference in the file, so it is stated plainly. CSU does not
+% write "the document must not contain an approval page". What it publishes is
+% an exhaustive ordered contents list — "Each part is to be organized as
+% explained below and in the order indicated below" — which names every
+% preliminary page, marks Title page, Copyright page, Abstract and Table of
+% Contents "(required)" and marks Acknowledgments, Preface, Autobiography,
+% Dedication, the four Lists and "Other Preliminaries" optional. No approval,
+% committee or signature page appears in it, and the word "signature" does not
+% occur anywhere on the formatting page. A page absent from a complete ordered
+% list has no position to be filed in, which is why this is \thesisnoapprovalpage
+% rather than the neutral fallback — but a reviewer who wants the stricter
+% standard of an explicit prohibition should downgrade this line, not the rest
+% of the file.
+\thesisnoapprovalpage
