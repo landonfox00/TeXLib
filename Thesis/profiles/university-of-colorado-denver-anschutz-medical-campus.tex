@@ -1,0 +1,186 @@
+% profiles/university-of-colorado-denver-anschutz-medical-campus.tex
+%   — University of Colorado Denver/Anschutz Medical Campus
+% ============================================================================
+% source: https://graduateschool.cuanschutz.edu/docs/librariesprovider138/denver-anschutz-graduate-school/resources/2024-november-format-guide.pdf
+%         (Denver | Anschutz Graduate School, "Format Guidelines for Theses and
+%         Dissertations", "Effective November 2024" on its own title page)
+% source: https://graduateschool.cuanschutz.edu/forms-resources/resources
+%         (the Graduate School's Resources & Forms index, which links the guide
+%         above as the current "Format Guide for Theses and Dissertations")
+% accessed: 2026-09-10
+% checked:  texlib-thesis-profile-round
+%
+% BEWARE THE ARCHIVE. Two superseded editions of this guide are still served,
+% under .../resources/ARCHIVE/format-requirements-and-guidelines.pdf and
+% .../resources/ARCHIVE/format-guide.pdf, and search engines return both above
+% the current one. The Resources & Forms page links only the November 2024
+% edition, which is the one this file follows.
+%
+% VERIFIED and set here: geometry, spacing, title page, approval page, and the
+% (absent) accessibility requirement.
+% NOT set: nothing is left to the neutral fallback.
+%
+% TWO REQUIREMENTS THIS CLASS CANNOT EXPRESS, recorded here rather than
+% silently dropped. The guide's Quick Start Guide says to set, along with the
+% margins and spacing below:
+%   * "Alignment: Left" -- the body is to be RAGGED RIGHT. This class justifies.
+%     A document filing here should add \raggedright after \documentclass.
+%     It is not set here because a profile's remit is the fields listed in
+%     Thesis/profiles/RESEARCHING.md and body alignment is not one of them.
+%   * "Paragraph indent: 0.5\"" -- likewise a document-level setting
+%     (\setlength{\parindent}{0.5in}).
+% The guide is unusually TeX-aware and worth quoting on the point: "Font: any
+% easily legible and widely used font (e.g. Arial or Helvetica 11, Calibri 12,
+% Times New Roman 12) If using TeX or LaTeX typesetting, avoid Type 3 fonts."
+% This class embeds Latin Modern as Type 1/OpenType, so that is satisfied.
+
+\thesisinstitution{University of Colorado Denver/Anschutz Medical Campus}
+
+% "Margins: 1\" all around".
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Spacing: Double (but no more)" -- the parenthesis is the Graduate School's,
+% and it rules out the 1.5-line and extra-space-between-paragraphs habits the
+% guide lists under Common Mistakes ("Extra space between paragraphs. -- Remove
+% extra space from Word's default 'Normal' style before you start.").
+% References are the one exception: "no indent, single-spaced within entries,
+% double-spaced between entries".
+\thesissetspacing{double}
+
+% No deeper chapter opening: "Each chapter starts at the top of a new page" and
+% the chapter title is simply "centered, all caps, double-spaced and bold" with
+% "only regular double space before and after". \thesissetchapteropening is
+% deliberately not called.
+
+% --- Accessibility -----------------------------------------------------------
+% The 22-page format guide was searched on the access date for "accessib",
+% "alt text", "alternative text", "tagged", "WCAG", "PDF/A", "screen reader",
+% "508", "Title II" and "color". The only hits are the word "accessible" in the
+% embargo section (about library ACCESS, not accessibility) and "University of
+% Colorado" matching the substring. There is no accessibility requirement.
+\thesisaccessibilityrequirement{Not published}
+	{No accessibility requirement for a filed thesis or dissertation appears in
+	 the Denver | Anschutz Graduate School's Format Guidelines (November 2024
+	 edition) or on its Resources \& Forms index, as of the access date. This is
+	 "the Graduate School publishes none", not "nobody looked".}
+\thesisaccessibilityrequirement{Fonts}
+	{"If using TeX or LaTeX typesetting, avoid Type 3 fonts." The one rule the
+	 Graduate School addresses to LaTeX authors directly. Bitmapped Type 3 fonts
+	 have no reliable character mapping, so a PDF using them cannot be searched
+	 or read aloud; this class's Latin Modern is not one.}
+
+% --- Author-facing fields this profile adds ----------------------------------
+% The title page lists the author's PREVIOUS degrees, and the approval page
+% carries a date that is not the title page's year. The class models neither.
+%
+% "List each of your previous degrees (but not the one you are about to earn) in
+% chronological order. Use the degree abbreviation (with or without periods),
+% but do not include your major." One per line, separated with \\.
+\providecommand{\cupriordegrees@list}{}
+\newcommand{\cupriordegrees}[1]{\renewcommand{\cupriordegrees@list}{#1}}
+% The approval page's date, which the template annotates "<last day of the
+% semester>" -- not the defense date and not the title page's year. It defaults
+% to that annotation rather than to nothing: the line is required, so an unset
+% value must be visibly wrong on the page rather than silently absent.
+\providecommand{\cuapprovaldate@text}{$\langle$last day of the semester$\rangle$}
+\newcommand{\cuapprovaldate}[1]{\renewcommand{\cuapprovaldate@text}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% From the guide's "Template Title Page - Required", which it says to "follow
+% ... exactly (content, alignment, spacing, bold, capitalization)" while
+% maintaining "double spacing throughout".
+%
+% "The title and your name should be all caps but not bold."
+% The four-line submission statement is the template's, line for line:
+%   "A thesis submitted to the"
+%   "Faculty of the Graduate School of the"
+%   "University of Colorado in partial fulfillment"
+%   "of the requirements for the degree of"
+% then the full degree name ("<full degree name>", and under Common Mistakes:
+% "Use your proper degree name, not your department or colloquial program names.
+% Don't include tracks."), then the program ("<program or college if College of
+% Nursing>", e.g. "Structural Biology and Biochemistry Program"), then the year.
+%
+% The template says "A thesis submitted to the" for a doctoral dissertation too
+% -- the guide uses "thesis" throughout "to broadly refer to all scholarly works
+% produced by masters & doctoral students" -- so this line is FIXED and does not
+% follow \doctype.
+%
+% \graddate should hold the YEAR ALONE here; the template prints "2015".
+%
+% \gradprogram must carry the program's full name INCLUDING the word "Program",
+% because that is how the template prints it -- "Structural Biology and
+% Biochemistry Program", annotated "<program or college if College of Nursing>".
+% So \gradprogram{Mathematics Program}, not \gradprogram{Mathematics}. The same
+% value is reused on the approval page, where the template reads "has been
+% approved for the / Ecology Program".
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\doublespacing\centering
+		\vspace*{\baselineskip}
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		by\par
+		\MakeUppercase{\@author}\par
+		\ifx\cupriordegrees@list\@empty\else\cupriordegrees@list\par\fi
+		\vfill
+		A thesis submitted to the\\
+		Faculty of the Graduate School of the\\
+		University of Colorado in partial fulfillment\\
+		of the requirements for the degree of\par
+		\vspace{\baselineskip}
+		\thesis@degree\par
+		\vspace{\baselineskip}
+		\thesis@program\par
+		\thesis@date\par
+		\vspace{1in}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Approval page -------------------------------------------------------------
+% REQUIRED and it is page ii: the organization list marks "3. Approval Page*"
+% with the asterisk that means "required in every thesis and dissertation", and
+% the guide says "the title page is page 'i' but it is not numbered as such, so
+% page numbering begins on the second page with 'ii.'"
+%
+% NO SIGNATURES ON THIS PAGE. The abstract template makes it explicit: "Just
+% type the advisor's name for approval; signature actually appears on the
+% Statement of Approval page." Approval itself is collected on a DocuSign
+% "Thesis Approval Form" the Graduate School issues, linked from Resources &
+% Forms -- not on a leaf of the manuscript.
+%
+% Committee order, from the doctoral template and its notes: chair first
+% (", Chair"), then the advisor (", Advisor") if the advisor is on the
+% committee, then the remaining members. "If the advisor is not part of the
+% committee, list their name last instead of after the chair." And: "Do not
+% include degrees (PhD, MD, etc.) or titles (Dr., Professor, etc.) on committee
+% member names." The class's \committeemember{Name}{Role} maps onto this
+% directly -- pass an empty role for a plain member -- so no Colorado-specific
+% committee macro is needed.
+%
+% The date sits alone at the right. Under Common Mistakes: "Approval statement
+% isn't aligned correctly. -- Align the approval statement to the right."
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\doublespacing
+	\begin{center}
+		\thesis@tagtitle{H1}{This thesis for the \thesis@degree{} degree by}\par
+		\@author\par
+		has been approved for the\par
+		\thesis@program\par
+		by\par
+	\end{center}
+	\vspace{2\baselineskip}
+	\begingroup
+	\renewcommand{\thesis@memberline}[2]{%
+		\begin{center}##1\ifx\relax##2\relax\else, ##2\fi\end{center}%
+	}%
+	\thesis@committee
+	\endgroup
+	\vspace{2\baselineskip}
+	\ifx\cuapprovaldate@text\@empty\else
+		{\raggedleft Date: \cuapprovaldate@text\par}%
+	\fi
+	\loadgeometry{normal}%
+}
