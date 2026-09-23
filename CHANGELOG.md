@@ -6,6 +6,19 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Added
 
+- **`\shuffle[pages]` — permute whole PAGES between versions, not individual
+  problems.** Plain `\shuffle` preserves the authored per-page *counts* and
+  refills them from a permutation of every problem in the section, so a page
+  authored as "two short problems" can receive two full-page ones and overflow.
+  The new grain permutes the page **blocks**: each page keeps the problems
+  authored on it, in their authored order, and only its position in the paper
+  changes. A paper that fits in one version therefore fits in all of them, which
+  is what a page-laid-out exam needs. Under `[pages]` the `\newpage`s in the
+  driver become structure rather than layout — they define the blocks that
+  travel. MC option shuffling is on either way, and `\shuffle` with no argument
+  is unchanged. Written for a twelve-version exam whose two graph-bearing
+  problems each own a page.
+
 - **The viewer opens on `<base>.pdf` as soon as the base compile ends, not when
   the fan-out does.** That PDF is final at that moment — everything after it
   writes *other* files (the tagged twins, the variant copies, the per-version

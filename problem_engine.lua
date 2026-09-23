@@ -261,6 +261,14 @@ local function pbank_texify(s)
 end
 
 autoexam_shuffle_pages = false  -- set true by \shuffle in the preamble
+-- Granularity of that shuffle: 'problems' (the default -- every problem is
+-- movable, the authored per-page COUNTS are refilled in the new order) or
+-- 'pages' (\shuffle[pages] -- each authored page keeps its own problems, in
+-- their authored order, and the PAGE BLOCKS are permuted).  Page mode is what
+-- an exam wants when a page was laid out to fit: problem-level shuffling can
+-- land two full-page problems in one page's two slots and overflow it, while
+-- permuting whole pages cannot change any page's contents.
+autoexam_shuffle_grain = 'problems'
 pbank_first_on_page = true   -- reset by \begin{problems} and patched \newpage;
 								-- read by pbank_problem_item to decide separator
 -- Render mode of the active problem-section: 'mc' inside {mcproblems}, 'fr'
@@ -1711,22 +1719,37 @@ function pbank_emit_section(partno)   -- `partno` arg unused; see pbank_emit_par
 	local function flush()
 		if #run == 0 then return end
 		subno = subno + 1
-		-- Authored per-page counts (item.brk marks a new page; first never does).
-		local page_sizes, cur = {}, 0
+		-- The authored pages, as lists of item indices (item.brk marks a new
+		-- page; the first item never does).  Problem-grain shuffling needs only
+		-- their SIZES -- it refills those counts from a permutation of all the
+		-- items -- while page-grain shuffling permutes these lists themselves.
+		local pages = {}
 		for i, it in ipairs(run) do
-			if i > 1 and it.brk then page_sizes[#page_sizes + 1] = cur; cur = 0 end
-			cur = cur + 1
+			if i == 1 or it.brk then pages[#pages + 1] = {} end
+			local pg = pages[#pages]
+			pg[#pg + 1] = i
 		end
-		page_sizes[#page_sizes + 1] = cur
 
-		local order
-		if autoexam_shuffle_pages then
-			local seed = ((current_exam_seed or 0) * 33 + sect * 97 + subno)
-				% 2147483647
-			order = problem_shuffle.permute(run, seed)
+		local seed = ((current_exam_seed or 0) * 33 + sect * 97 + subno)
+			% 2147483647
+		local order, page_sizes = {}, {}
+		if autoexam_shuffle_pages and autoexam_shuffle_grain == 'pages' then
+			-- Permute the page BLOCKS. Each page emits its own problems in
+			-- authored order, so no page's contents (and so no page's fit)
+			-- changes -- only which page of the paper it becomes.  `pages` has
+			-- no .xc entries (extra credit is deferred TeX-side and never
+			-- reaches the collect stream), so permute just Fisher-Yates it.
+			for _, pi in ipairs(problem_shuffle.permute(pages, seed)) do
+				page_sizes[#page_sizes + 1] = #pages[pi]
+				for _, idx in ipairs(pages[pi]) do order[#order + 1] = idx end
+			end
 		else
-			order = {}
-			for i = 1, #run do order[i] = i end
+			for _, pg in ipairs(pages) do page_sizes[#page_sizes + 1] = #pg end
+			if autoexam_shuffle_pages then
+				order = problem_shuffle.permute(run, seed)
+			else
+				for i = 1, #run do order[i] = i end
+			end
 		end
 
 		-- Emit each item as a \@problem@item macro call (via the @-free
@@ -1880,6 +1903,15 @@ end
 --   Called by \shuffle in the preamble.
 function set_autoexam_shuffle_pages()
 	autoexam_shuffle_pages = true
+end
+
+-- set_autoexam_shuffle_grain(grain)
+--   Called by \shuffle[<grain>].  Anything other than the literal 'pages'
+--   keeps the default problem-level grain, so a typo degrades to the
+--   documented behaviour rather than to no shuffle at all.
+function set_autoexam_shuffle_grain(grain)
+	autoexam_shuffle_pages = true
+	autoexam_shuffle_grain = (grain == 'pages') and 'pages' or 'problems'
 end
 
 -- ============================================================
