@@ -1,0 +1,2 @@
+slug,date,reason
+university-at-albany,2026-09-12,"graduate school requirements page behind a Cloudflare Turnstile bot-detection challenge; unreachable by curl, WebFetch and the in-app browser"
