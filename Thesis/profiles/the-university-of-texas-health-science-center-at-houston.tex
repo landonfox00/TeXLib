@@ -1,0 +1,134 @@
+% profiles/the-university-of-texas-health-science-center-at-houston.tex
+% — The University of Texas Health Science Center at Houston (UTHealth Houston)
+% ============================================================================
+% source: https://web.sph.uth.edu/student-forms/Student%20Research/Guide.All.Formatting_Checklist.pdf
+%         (UTHealth Houston School of Public Health, "CHECKLIST FOR Final
+%         Thesis and Dissertation" — its filing requirements)
+% source: https://gsbs.uth.edu/academics/graduation
+%         (MD Anderson Cancer Center UTHealth Houston Graduate School of
+%         Biomedical Sciences, "Formatting requirements")
+% accessed: 2026-09-13
+% checked:  texlib-thesis-profile-round
+%
+% ============================================================================
+% READ THIS BEFORE CHANGING ANYTHING: UTHEALTH HAS NO SINGLE FILING STANDARD.
+% ============================================================================
+% This institution does not have one graduate school. Its doctoral degrees are
+% filed under at least two different, incompatible sets of rules:
+%
+%   * the MD Anderson Cancer Center UTHealth Houston Graduate School of
+%     Biomedical Sciences (GSBS), jointly run with MD Anderson — margins
+%     "Left margin must be 1.25 inches or greater. Top, bottom, and right
+%     margins must be 0.8 inches or greater", with an Approval Page placed
+%     FIRST, ahead of the title page;
+%
+%   * the UTHealth Houston School of Public Health — margins stated exactly,
+%     "TOP: 1.25" / LEFT: 1.25" / BOTTOM: 1.1" / RIGHT: 1"", with a required
+%     Signature Page laid out quite differently.
+%
+% GSBS's rules are already encoded, under the institution IPEDS records as the
+% degree grantor for that school: see
+% profiles/the-university-of-texas-md-anderson-cancer-center.tex. This file is
+% the OTHER half of the same institution, and it must not pretend the two
+% agree.
+%
+% A third school, McWilliams School of Biomedical Informatics, awards a PhD and
+% publishes no formatting requirements that were findable on the access date.
+%
+% THIS PROFILE IS THEREFORE A DELIBERATE PARTIAL:
+%   SET     — institution name, geometry, spacing, accessibility (an absence).
+%   NEUTRAL — the title page and the approval page, because the two schools
+%             prescribe genuinely different ones and picking either would hand
+%             the other school's students a wrong page that looks official.
+% ============================================================================
+
+\thesisinstitution{The University of Texas Health Science Center at Houston}
+
+% --- Geometry: the School of Public Health's exact figures, and why -----------
+% These are SPH's four numbers, verbatim: "TOP: 1.25" / LEFT: 1.25" /
+% BOTTOM: 1.1" / RIGHT: 1"". SPH states them as exact values and applies them
+% everywhere: "Margins must be adhered to on all pages, including front matter,
+% table of contents, body of text, tables, figures, references and appendices
+% pages".
+%
+% THEY ALSO SATISFY GSBS, which is the reason they are safe to use as this
+% institution's default. GSBS states MINIMA — left >= 1.25in, and top, bottom
+% and right >= 0.8in — and every figure above clears them: left 1.25 meets the
+% 1.25 floor exactly, and 1.25 / 1.1 / 1.0 all exceed 0.8. So a document built
+% with this geometry is in spec at BOTH schools.
+%
+% The alternative was to leave geometry unset. That is strictly worse here: the
+% class's neutral 1in-all-round is OUT of spec at both schools, because both
+% require more than 1in on the left. A conformant-at-both figure beats a
+% non-conformant fallback, which is why this file sets a figure at all rather
+% than following the Stanford pattern throughout.
+%
+% A GSBS filer may relax top, bottom and right toward 0.8in and remain in spec;
+% an SPH filer may not, since SPH's numbers are exact. Do not "simplify" these
+% four values toward the GSBS minima — that would break SPH.
+%
+% SPH even publishes the LaTeX form of its own rule, which is the same numbers:
+% "\usepackage[inner=1.25in,outer=1in,bottom=1.1in, top=1.25in]{geometry}".
+\thesissetgeometry{left=1.25in, right=1in, top=1.25in, bottom=1.1in}
+
+% Double-spaced at both schools. GSBS: "The text must be double-spaced." SPH,
+% section by section: "Body text is double spaced; upper and lower case; one
+% return between paragraphs", with the title on the signature and title pages
+% likewise double spaced.
+\thesissetspacing{double}
+
+% No chapter-opening margin: neither school states a deeper opening, and SPH's
+% "Margins must be adhered to on all pages" language leaves no room for one.
+
+% --- Accessibility -----------------------------------------------------------
+% Recorded as an absence, and the absence was looked for in BOTH schools'
+% requirements. The SPH checklist contains no occurrence of "accessible",
+% "accessibility", "alt text", "WCAG", "tagged" or "PDF/A". The same was
+% separately established for GSBS on 2026-09-05 and is recorded in the MD
+% Anderson profile.
+\thesisaccessibilityrequirement{Not published}
+	{Neither UTHealth Houston graduate school publishes an accessibility
+	 requirement for a filed thesis or dissertation. Checked against the School
+	 of Public Health's formatting checklist on 2026-09-13, and against the
+	 GSBS filing requirements on 2026-09-05. This is a finding, not a licence:
+	 an untagged PDF is still an inaccessible one.}
+
+% --- Title page: deliberately left to the class's neutral page ----------------
+% Both schools prescribe one and they are not the same page, so neither is
+% encoded. What is known, for whoever finishes this:
+%
+% SPH (from the checklist): title in ALL CAPS, "Set in an inverted pyramid
+% shape, double spaced, centered"; the student's name in ALL CAPS as "First
+% name, middle name (or initial - no periods), last name, followed by previous
+% degree(s) earned", with commas after the name and between degrees and no
+% periods; a line naming the campus of graduation, single spaced, with a month
+% selected from a fixed list; "All text on page is in caps, except the word
+% 'by.'"; "No bold or italic text."
+%
+% GSBS: see profiles/the-university-of-texas-md-anderson-cancer-center.tex,
+% which encodes it from the GSBS Word template.
+%
+% TO FINISH THIS PROFILE someone has to decide what a single UTHealth profile
+% should print when its two schools disagree — most likely by splitting it into
+% two profiles once the class can express that, rather than by choosing a
+% winner here.
+
+% --- Approval page: deliberately left to the class's neutral page -------------
+% BOTH schools require one, so \thesisnoapprovalpage would be flatly wrong — the
+% class's neutral approval page renders instead, which at least puts a page
+% where both schools expect a page.
+%
+% SPH calls it the Signature Page and marks it REQUIRED, with real signature
+% lines and typed names beneath them: the chair's name and degrees below the
+% first signature line, the academic advisor/chair below the second, committee
+% members below the third and subsequent lines "in alphabetical order (based on
+% last name)", everything in ALL CAPS, no "Dr." in addition to a degree, and
+% "only ONE signature line is needed for each committee member, even if they
+% serve more than one 'role'". External reviewers are excluded from it. The page
+% carries no printed number "but counting of page numbers begins".
+%
+% GSBS calls it the Approval Page and places it FIRST, ahead of the title page —
+% the reverse of this library's usual order.
+%
+% Both are recorded here rather than implemented because implementing either
+% would put one school's page under the other school's students' names.
