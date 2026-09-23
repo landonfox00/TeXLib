@@ -1,0 +1,157 @@
+% profiles/university-of-virginia-main-campus.tex — University of Virginia-Main Campus
+% ============================================================================
+% source: https://graduate.as.virginia.edu/thesis-submission-and-graduation
+%         (UVA, The Graduate School [of Arts & Sciences], "Thesis Submission
+%         and Graduation")
+% source: https://graduate.as.virginia.edu/sites/graduate.as.virginia.edu/files/inline-files/thesisTitlePageTemplate-2017.pdf
+%         (that page's "Example Title Page", filename dated 2017)
+% source: https://library.virginia.edu/libra/etds/etds-checklist
+%         (UVA Library, "Electronic thesis/dissertation (ETD) submission
+%         checklist" -- the university-wide deposit instructions)
+% source: https://library.virginia.edu/libra/etds
+% accessed: 2026-09-10
+% checked:  texlib-thesis-profile-round
+%
+% PARTIAL, and the gap is a fact about UVA rather than a gap in the research.
+%
+% VERIFIED and set here: the institution name, the title page, and the
+% accessibility finding.
+%
+% NOT SET, because UVA PUBLISHES NO SUCH RULE: margins and line spacing. This is
+% not "nobody looked". UVA does not run a single university-wide graduate
+% school, and the deposit system says so out loud -- the ETD checklist's step 2
+% is headed "Know your school's instructions" and reads "Check with your school
+% for information on the proper process, workflow, and timing for submitting
+% your thesis or dissertation", then lists nine schools with nine separate
+% procedures. The Graduate School of Arts & Sciences, the largest of them,
+% publishes a title-page template and nothing else: no margin, no spacing, no
+% typeface, no page-numbering rule. The Library's checklist adds only file
+% format. Three URLs were read on the access date and none carried a figure.
+%
+% The class's neutral 1in geometry and double spacing therefore render, and this
+% file makes no claim that they are UVA's. Under RESEARCHING.md an unverified
+% figure stays unset; third-party sites state margins for UVA confidently and
+% none of them is a uva.edu page.
+%
+% TO FINISH THIS PROFILE you would have to pick a school. If the filing is in
+% Engineering, Education, Nursing, Medicine, Architecture, Darden or Data
+% Science, read THAT school's procedure (all nine are linked from the ETD
+% checklist) and, if it states figures, they belong in a school-specific profile
+% rather than in this one -- the IPEDS slug covers the whole university.
+
+\thesisinstitution{University of Virginia}
+
+% --- Accessibility -----------------------------------------------------------
+% Read on the access date: the Graduate School's submission page, its title-page
+% template, the Library's ETD landing page and its full submission checklist.
+% None asks anything of the PDF beyond the file format.
+%
+% The one file-format sentence is a PREFERENCE, not a requirement, and is
+% recorded as such -- which is why \thesisrequirepdfstandard is NOT called:
+% "If the approved version is a document, it MUST be in PDF format (PDF/a
+% preferred)." The MUST governs "PDF"; the parenthesis governs PDF/A.
+\thesisaccessibilityrequirement{Not published}
+	{No UVA accessibility requirement for a filed thesis or dissertation was
+	 found on the access date, on either the Graduate School's submission page
+	 or the Library's ETD checklist. Treat this as "UVA publishes none centrally"
+	 -- a school-level requirement may exist for one of the nine schools that run
+	 their own procedure.}
+\thesisaccessibilityrequirement{File format}
+	{"If the approved version is a document, it MUST be in PDF format (PDF/a
+	 preferred)." PDF/A is preferred, not required, so this profile declares no
+	 PDF standard. The class already emits PDF/A-4f alongside PDF/UA-2 when the
+	 document asks for it.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduced from the Graduate School's own Example Title Page. It is a Word
+% specimen with the fields spelled out as placeholder text and no annotations
+% beyond them, so the wording below is the specimen's and the vertical spacing
+% approximates the specimen's measured positions on US Letter.
+%
+% The specimen's lines, in order:
+%   Title of Thesis or Dissertation
+%   Full Legal Name
+%   Hometown and State
+%   Previous degree(s), Name of University, Year of Graduation
+%   A Dissertation (or Thesis) presented to the Graduate Faculty
+%   of the University of Virginia in Candidacy for the Degree of
+%   Doctor of Philosophy or Master of Arts or Master of Science or Master of Fine Arts
+%   Department of (your department)
+%   University of Virginia
+%   Month, Year Degree will be Conferred
+%   (Optional) / Committee Member Names / (no signatures)
+%
+% Note the title is NOT set in capitals here: the specimen prints it in title
+% case, unlike most of the profiles in this directory.
+%
+% "Month, Year Degree will be Conferred" is the specimen's own emphasis, and the
+% Graduate School repeats the point in prose: the date must be the
+% degree-granting month and year, not the defense date. \graddate carries it.
+%
+% Two fields the class has no macro for, because no other profile needs them.
+% Both default to empty and their lines then vanish, so a document that does not
+% set them still builds and simply omits what UVA asks for -- set them.
+\providecommand{\uvahometown}{}
+\providecommand{\uvapriordegrees}{}
+\providecommand{\thesisuvahometown}[1]{\renewcommand{\uvahometown}{#1}}
+\providecommand{\thesisuvapriordegrees}[1]{\renewcommand{\uvapriordegrees}{#1}}
+
+% The committee block is optional and, where present, carries NO signature
+% rules: the specimen annotates it "(Optional)" and "(no signatures)". It sits
+% low and right on the specimen page, which is what the \hfill below reproduces.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{1in}%
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{5\baselineskip}
+		\@author\par
+		\ifx\uvahometown\@empty\else\uvahometown\par\fi
+		\vspace{3\baselineskip}
+		\ifx\uvapriordegrees\@empty\else\uvapriordegrees\par\fi
+		\vspace{5\baselineskip}
+		A \thesis@DocNoun{} presented to the Graduate Faculty\\
+		of the University of Virginia in Candidacy for the Degree of\\
+		\thesis@degree\par
+		\vspace{3\baselineskip}
+		Department of \thesis@program\par
+		\vspace{2\baselineskip}
+		University of Virginia\par
+		\thesis@date\par
+		\vfill
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\par
+		}%
+		\hspace*{0.45\textwidth}%
+		\begin{minipage}{0.5\textwidth}
+			\raggedright
+			\thesis@committee
+		\end{minipage}\par
+		\endgroup
+		\vspace{0.75in}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% LEFT AT THE CLASS'S NEUTRAL FALLBACK, and this is a deliberate third state
+% that the class cannot express, so read this before "finishing" the file.
+%
+% It is NOT "unchecked". UVA's Graduate School prescribes no approval or
+% signature page inside the manuscript: approval is collected on a separate
+% instrument -- "Upon completion of the dissertation defense, the Final Exam
+% Form must be submitted to the Graduate School as a requirement of the degree"
+% -- and the only committee element in the filed document is the OPTIONAL block
+% on the title page, annotated "(no signatures)".
+%
+% \thesisnoapprovalpage is nevertheless not called, because UVA never says the
+% filed document may not contain an approval page, and that macro's contract is
+% a quote to that effect (Washington's "Don't include a committee signature or
+% approval page in the body of your thesis"). "Not prescribed" and "forbidden"
+% are different findings.
+%
+% PRACTICAL ADVICE FOR ANYONE FILING AT UVA: do not call \thesisapprovalpage.
+% The neutral page it renders is a reasonable-looking page that UVA did not ask
+% for. Put the committee names in the optional title-page block instead.
