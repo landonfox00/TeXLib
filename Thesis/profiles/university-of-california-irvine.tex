@@ -1,0 +1,193 @@
+% profiles/university-of-california-irvine.tex — University of California-Irvine
+% ============================================================================
+% source: https://guides.lib.uci.edu/gradmanual/pagination   (margins, spacing)
+% source: https://guides.lib.uci.edu/gradmanual/fonts        (typeface rules)
+% source: https://guides.lib.uci.edu/gradmanual/preliminary-overview
+%                                                   (page order; signature page)
+% source: https://guides.lib.uci.edu/gradmanual/title-page   (required elements)
+% source: https://d2jv02qf7xgjwx.cloudfront.net/customers/926/images/Dissertation_Template_Title_Page.jpg
+%                     (the "Title Page example" image embedded on that page)
+% source: https://guides.lib.uci.edu/gradmanual/accessibility
+% source: https://grad.uci.edu/current-students/thesisdissertationelectronicsubmission/
+%                     (Graduate Division; names guides.lib.uci.edu/gradmanual as
+%                      THE formatting manual, and states the same ADA rule)
+% accessed: 2026-09-11
+% checked:  texlib-thesis-profile-round
+%
+% Every manual page above carries "Last Updated: Sep 10, 2026" — one day before
+% the access date, so this is the current edition by a wide margin.
+%
+% ON THE SOURCE HOST: the manual is served from the Libraries' LibGuides, which
+% RESEARCHING.md would normally exclude. It is used because the GRADUATE
+% DIVISION's own submission page names it as the manual, and because the manual
+% describes itself as established by the Graduate Division, the Graduate Council
+% and the University Libraries jointly. It is not a librarian's study guide to
+% someone else's rules; it is the rules.
+%
+% VERIFIED and set here: geometry, spacing, the title page, the ABSENCE of an
+% approval page, and the accessibility requirements.
+% NOT set: \thesissetchapteropening (no deeper opening is required — the 1in
+% minimum applies to every page) and \thesisrequirepdfstandard (no PDF standard
+% is named; UCI names WCAG, which is not one).
+
+\thesisinstitution{University of California, Irvine}
+
+% --- Filing figures ----------------------------------------------------------
+% "Minimum 1-inch margins from the top, left, right, and bottom edges of each
+% page", on 8.5x11 letter, and "Tables, figures, graphs, photographs, and
+% appendices are also included in these margin requirements."
+%
+% MINIMUM, not exact — a wider margin is in spec and a narrower one is not, so
+% the minimum is the safe setting. One wrinkle the class already handles: "All
+% manuscript text, EXCLUDING MANUSCRIPT PAGE NUMBERS, must fit within these
+% specified margin requirements", and page numbers are "centered at the bottom
+% of each manuscript page", i.e. the folio may sit in the bottom margin.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Your manuscript must be double-spaced, with the exception of
+% footnotes/endnotes, bibliographic entries, long quotations, data in lists and
+% tables, lists in appendices and figure/table captions, all of which should be
+% single-spaced." The exceptions are per-element, so the document default is
+% double.
+\thesissetspacing{double}
+
+% No font is set here, because UCI requires none: it gives a list of SUGGESTED
+% fonts and sizes, on which "Computer Modern (Tex/LaTex) 12pt" appears — the
+% class's default face is already in spec. What UCI does require is that
+% "embedded fonts are required" for electronic submissions, which this class
+% satisfies through fontspec, and that ornate, script, calligraphic, gothic or
+% italic display faces are not acceptable.
+
+% --- Accessibility -----------------------------------------------------------
+% "As of April 2026, all electronic theses and dissertations (ETDs) must conform
+% to WCAG 2.1 Level AA web accessibility requirements prior to submission in
+% order to comply with nondiscrimination provisions outlined in Title II of the
+% Americans with Disabilities Act."
+%
+% NOTE ON THAT DATE: April 2026 is UCI's own published figure. Title II
+% compliance dates differ legitimately between institutions by size, so do not
+% reconcile it against a different date in a neighbouring profile.
+%
+% A must, and UCI names PDF tags and document language explicitly, which is what
+% justifies both checkable declarations below. No PDF standard is named.
+\thesisrequiretagging
+\thesisrequiredocumentlanguage
+\thesisaccessibilityrequirement{Standard}
+	{As of April 2026, all electronic theses and dissertations must conform to
+	 WCAG 2.1 Level AA web accessibility requirements prior to submission, under
+	 Title II of the Americans with Disabilities Act.}
+\thesisaccessibilityrequirement{Certification}
+	{As part of the degree completion process, students are required to certify
+	 that their PDF meets accessibility requirements.}
+\thesisaccessibilityrequirement{PDF tags}
+	{The PDF must carry tags — headings, lists, links, tables, paragraphs and
+	 other document elements — so that it can be read and navigated by
+	 assistive technology.}
+\thesisaccessibilityrequirement{Tables}
+	{The PDF must have table headers for columns and rows.}
+\thesisaccessibilityrequirement{Reading order}
+	{Tags and headings must be ordered to support the logical reading order.}
+\thesisaccessibilityrequirement{Alt text}
+	{All images, figures and other visual elements must be described.}
+\thesisaccessibilityrequirement{Colours}
+	{Choose colours with sufficient contrast, and do not rely on colour alone to
+	 convey information.}
+\thesisaccessibilityrequirement{Metadata}
+	{Add a document description — author, title, and language — in the file
+	 properties.}
+\thesisaccessibilityrequirement{LaTeX specifically}
+	{UCI warns that manuscripts authored in LaTeX are usually untagged, and
+	 strongly recommends its own Accessible LaTeX Template; a student who uses
+	 any other route "is responsible for ensuring the accessibility" of the
+	 manuscript.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduces the "Title Page example" image embedded on the manual's Title Page
+% page, which that page introduces with "Your Title Page must conform to
+% specific standards. This is an example of what it should look like (from the
+% templates)". The required elements and their wording come from the prose list
+% on the same page.
+%
+% Three details are from the specimen rather than the prose, and are followed
+% because the specimen is prescriptive here:
+%   * the institution line is broken after the comma — "UNIVERSITY OF
+%     CALIFORNIA," / "IRVINE" — and uppercased;
+%   * the document noun and the degree are uppercased, but the TITLE IS NOT;
+%   * the committee block is RIGHT-ALIGNED low on the page, below the author,
+%     with the year centred beneath it.
+%
+% The committee heading is "Dissertation Committee:" on the specimen, which is
+% the doctoral document; \thesis@DocNoun makes it "Thesis Committee:" for a
+% master's filing.
+%
+% UCI dictates how a member is named: "Full name and rank of each committee
+% member — e.g., use 'Associate Professor Peter Anteater' and not 'Prof.
+% Anteater, PhD,' etc." The rank belongs in the NAME argument of
+% \committeemember; the second argument carries only "Chair" or "Co-Chair",
+% which is how the specimen reads ("Professor Oski T. Bear, Chair") and why
+% members without a role print bare. No signature rules: UCI collects none in
+% the manuscript (see the approval note below).
+%
+% "Do not use any stylized fonts, different font weights/colors/sizes, or images
+% on the Title Page" — so nothing here is bold, resized or coloured, and the
+% class's neutral \bfseries title is dropped.
+%
+% The last line is a BARE YEAR, not a month and year: "Year — This must
+% correspond to the year in which your degree will be conferred." The class's
+% \graddate default is "May, 20XX", so a document filing at UCI must set
+% \graddate{2027} or the page goes out of spec. A profile cannot fix that for
+% the document, but it is the single easiest thing to get wrong here.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{0.5in}
+		UNIVERSITY OF CALIFORNIA,\\
+		IRVINE\par
+		\vspace{3\baselineskip}
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\thesis@DocNoun}\par
+		\vspace{2\baselineskip}
+		submitted in partial satisfaction of the requirements\\
+		for the degree of\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\thesis@degree}\par
+		\vspace{\baselineskip}
+		in \thesis@program\par
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{2\baselineskip}
+		\@author\par
+		\vfill
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par
+		}%
+		\raggedleft
+		\thesis@DocNoun{} Committee:\par
+		\thesis@committee
+		\endgroup
+		\vspace{2\baselineskip}
+		\centering
+		\thesis@date\par
+		\vspace*{0.5in}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Forbidden outright, in the manual's own words:
+%
+%   "Note: A Signature Page is NOT a valid part of your manuscript and is not
+%    included in the submission of your thesis or dissertation. Committee
+%    signatures are now included on the 'Ph.D. Form II/Signature Page' or the
+%    'Master's Thesis/Signature Page' that you submit to the Graduate Division."
+%
+% The same page also closes the list: "Only the pages listed below may be
+% included as part of the Preliminary Pages section, and they must appear in
+% this order. No other pages are permitted."
+%
+% Signatures are therefore still collected — on a Graduate Division form,
+% never in the manuscript.
+\thesisnoapprovalpage
