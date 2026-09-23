@@ -1,0 +1,231 @@
+% profiles/icahn-school-of-medicine-at-mount-sinai.tex — Icahn School of Medicine at Mount Sinai
+% ============================================================================
+% source: https://icahn.mssm.edu/files/ISMMS/Assets/Education/Student%20Life%20and%20Resources/Depositing_Your_Doctoral_Dissertation_2021.pdf
+%         (Graduate School of Biomedical Sciences, "Depositing your Doctoral
+%          Dissertation"; the asset name carries _2021 and its page footer reads
+%          "Updated 0" — see CURRENCY below)
+% source: https://icahn.mssm.edu/files/ISMMS/Assets/Education/Student%20Life%20and%20Resources/Depositing_Your_Masters_Thesis_2021.pdf
+%         (the same series for the master's degree, footer "Updated 4/21")
+% source: https://icahn.mssm.edu/files/ISMMS/Assets/Education/Student%20Resources/DepositingMasterThesis.pdf
+%         (the SUPERSEDED master's edition, footer "Updated 07/13", still served
+%          — read only to confirm it does not disagree; see CURRENCY)
+% accessed: 2026-09-09
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the approval
+% page. Both degree levels are covered: the two deposit guides prescribe the
+% same margins, spacing and font range and differ only in the wording of those
+% two pages, so the pages below branch on \doctype.
+%
+% NOT set, and deliberately:
+%   * \thesissetchapteropening — neither guide prescribes a deeper margin on
+%     chapter openings. The margin rule is flat: "Top, bottom, left and right
+%     margins must be 1 inch."
+%   * \thesisrequiretagging / \thesisrequiredocumentlanguage /
+%     \thesisrequirepdfstandard — GSBS publishes no such requirement. See the
+%     accessibility note below.
+%
+% CURRENCY. The doctoral guide's own footer is truncated to the literal string
+% "Updated 0" on every page — verified by rendering the footer region at 150dpi,
+% not just by text extraction, because a clipped extraction was the obvious
+% first suspicion. The document does not date itself completely; only the asset
+% name (_2021) and its master's twin's "Updated 4/21" place it. Treat the
+% substance as current-as-published but expect a reviewer to want it re-checked
+% against whatever GSBS serves today.
+%
+% A SUPERSEDED EDITION IS STILL ON THE SERVER, at a different path
+% (…/Student Resources/DepositingMasterThesis.pdf, "Updated 07/13"). It was read
+% in full. On every figure this profile encodes it AGREES with the 2021 edition;
+% it differs only in naming ProQuest's predecessor UMI, in omitting the "reformat
+% previously published articles" clause, and in the staff contact for the Dean's
+% signature. Nothing here needs to be reconciled — but a later pass that finds
+% the 07/13 file first should not treat it as the governing text.
+%
+% ONE REQUIREMENT THIS PROFILE CANNOT EXPRESS, satisfied by the class anyway:
+% "The font must be uniform throughout the work. The font size should be 10 to
+% 12 point." There is no profile field for type size. texlib-thesis loads report
+% at 12pt, which is the top of that range, so a document built with this class
+% already complies. If the class's base size ever changes, this institution's
+% requirement breaks silently — hence the note.
+%
+% SIGNATURES ARE PHYSICAL, AND THE FILED PAGE IS A SCAN. "You must include a
+% scanned copy of your signed Approval Page in your thesis (page iii...). Merge
+% the scanned, signed Approval Page into your dissertation document." The
+% approval page typeset below is therefore the sheet to PRINT AND SIGN, not the
+% leaf that ends up in the deposited PDF. A filer who typesets it and does not
+% replace it with the scan has not met the requirement.
+
+\thesisinstitution{Icahn School of Medicine at Mount Sinai}
+
+% "Margins: Top, bottom, left and right margins must be 1 inch." Stated
+% identically in both guides, with no binding allowance and no exception for
+% tables, appendices or landscape pages.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Spacing: The text and the abstract should be double-spaced. Each footnote,
+% note, and bibliographical entry should be single-spaced with double-spacing
+% between entries." The profile sets the body rule; the footnote and
+% bibliography exception is a per-environment matter the class already handles
+% by not double-spacing them.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Both deposit guides were read end to end. Neither contains the words
+% accessible, accessibility, alt text, tagged, WCAG, PDF/UA or Title II, and
+% neither names a document-language or heading-structure rule. That is an
+% ABSENCE OF A PUBLISHED REQUIREMENT, recorded as such rather than left blank.
+%
+% The one adjacent statement is about font embedding, and it is attributed to
+% the vendor rather than to GSBS: "ETD Administrator requires you to embed all
+% fonts." The Word 2010 instructions beneath it say to "check the box next to
+% ISO 19005-1 Compliant" (PDF/A-1) — but that appears as one of several ways to
+% embed fonts on one obsolete Word version, NOT as a named standard for the
+% filed PDF. \thesisrequirepdfstandard is therefore NOT set. Declaring PDF/A-1
+% on the strength of that sentence would be inventing a requirement.
+\thesisaccessibilityrequirement{Not published}
+	{The Graduate School of Biomedical Sciences deposit guides for the doctoral
+	 dissertation and the master's thesis state no accessibility requirement.
+	 Both were read in full on the access date. This records that GSBS asks for
+	 nothing on accessibility, not that nobody looked.}
+\thesisaccessibilityrequirement{Embedded fonts}
+	{All fonts must be embedded in the PDF. GSBS attributes this to the ETD
+	 Administrator submission system rather than stating it as its own rule:
+	 ``ETD Administrator requires you to embed all fonts.''}
+
+% --- Degree-level wording ------------------------------------------------------
+% GSBS publishes a separate guide per degree level and the two pages below are
+% the only place they diverge. \doctype{dissertation} switches \thesis@docnoun
+% to `dissertation'; the class exposes no boolean, so the pages test that macro.
+% Anything that is not `dissertation' takes the master's wording, which matches
+% the class's own default of a master's thesis.
+\newcommand{\ismms@ifdoctoral}[2]{%
+	\def\ismms@tmp{dissertation}%
+	\ifx\thesis@docnoun\ismms@tmp #1\else #2\fi
+}
+
+% The Dean signs the approval page, and the guides prescribe "Dean - [Typed
+% Name]". The name is a person and rots, so it is not baked in: set it with
+% \ismmsdean{...} in the document preamble. Left empty the page prints the role
+% alone, which is the neutral outcome rather than a wrong name.
+% The guides also name the staff member who collects the Dean's signature
+% (Arjana Gjokaj for the doctorate, Colleen Baldino for the master's, with
+% "Please do not email Dean Filizola directly" in both). Those are routing
+% instructions for a human, not page content, so they stay in this comment.
+\newcommand{\ismms@dean}{}
+\newcommand{\ismmsdean}[1]{\renewcommand{\ismms@dean}{#1}}
+
+% --- Title page ----------------------------------------------------------------
+% Reproduced from the "Sample Title Page" appendix of each guide, which is
+% prescriptive: "Title page: must include the full thesis title, the complete
+% name of the author (which should match the name on record with the School),
+% the Master's Thesis statement, and the year of the degree. See appendix for
+% template."
+%
+% The doctoral statement, verbatim from the sample: "A dissertation submitted to
+% the Graduate Faculty of the Graduate School of Biomedical Sciences,
+% [Biomedical Sciences/Neuroscience] Doctoral Program, in partial fulfillment of
+% the requirements for the degree of Doctor of Philosophy, Icahn School of
+% Medicine at Mount Sinai".
+%
+% The master's statement, verbatim: "A Master's Thesis submitted in partial
+% fulfillment of the requirements for the MS degree in [Biomedical Sciences /
+% Clinical Research / Genetic Counseling], at Graduate School of Biomedical
+% Sciences, Icahn School of Medicine at Mount Sinai".
+%
+% The bracketed program list is a CHOICE the student fills in, so it is fed from
+% \gradprogram rather than reproduced. \thesis@date supplies "the year of the
+% degree"; the sample shows a bare year, so set \graddate{2027}, not a month.
+%
+% The sample sets the whole page centred with no bold and no page number. The
+% title is NOT bolded here, unlike the class's neutral page, because the sample
+% shows plain type throughout.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{{\large\@title}}\par
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{2\baselineskip}
+		\@author\par
+		\vspace{3\baselineskip}
+		\begin{minipage}{0.86\textwidth}
+			\centering
+			\ismms@ifdoctoral
+				{A dissertation submitted to the Graduate Faculty of the
+				 Graduate School of Biomedical Sciences, \thesis@program\
+				 Doctoral Program, in partial fulfillment of the requirements
+				 for the degree of \thesis@degree, Icahn School of Medicine at
+				 Mount Sinai}%
+				{A Master's Thesis submitted in partial fulfillment of the
+				 requirements for the MS degree in \thesis@program, at Graduate
+				 School of Biomedical Sciences, Icahn School of Medicine at
+				 Mount Sinai}%
+			\par
+		\end{minipage}\par
+		\vspace{3\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Approval page --------------------------------------------------------------
+% From the "Sample Approval Page" appendix. Doctoral, verbatim: "This manuscript
+% has been read and accepted by the Graduate Faculty of the Graduate School of
+% Biomedical Sciences, in satisfaction of the dissertation requirement for the
+% degree of Doctor of Philosophy." Master's, verbatim: "This manuscript has been
+% read and accepted by the Graduate Faculty of the Mount Sinai Graduate School
+% of Biomedical Sciences, in satisfaction of the thesis requirement for the
+% Master's degree." Note the master's text inserts "Mount Sinai" and names the
+% degree differently — that is why this branches rather than substituting a noun.
+%
+% TWO signatures, and only two: "The approval page requires two signatures,
+% those of the student's [dissertation] advisor and the Dean of the Graduate
+% School. It also lists names of faculty members who supervised the writing of
+% the [dissertation]." The remaining committee members are therefore TYPED NAMES
+% with no rule, which is why \thesis@memberline is replaced for this page — the
+% class's default draws a signature rule under every member and would invite
+% signatures the Graduate School does not collect.
+%
+% The sample places the institution name at the foot of the page, above the
+% folio iii.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\thesis@tagtitle{H1}{{\color{white}\tiny Approval Page}}\par
+	\vspace*{1\baselineskip}
+	\noindent
+	\ismms@ifdoctoral
+		{This manuscript has been read and accepted by the Graduate Faculty of
+		 the Graduate School of Biomedical Sciences, in satisfaction of the
+		 dissertation requirement for the degree of \thesis@degree.}%
+		{This manuscript has been read and accepted by the Graduate Faculty of
+		 the Mount Sinai Graduate School of Biomedical Sciences, in satisfaction
+		 of the thesis requirement for the Master's degree.}%
+	\par
+	\vspace{4\baselineskip}
+	% Advisor: signature rule + date rule, labels beneath, as the sample shows.
+	\noindent\rule{3.1in}{0.4pt}\hfill\rule{1.6in}{0.4pt}\par
+	\noindent\thesis@DocNoun\ Advisor --- \thesis@advisor\hfill
+		\makebox[1.6in][l]{Date}\par
+	\vspace{4\baselineskip}
+	\noindent\rule{3.1in}{0.4pt}\hfill\rule{1.6in}{0.4pt}\par
+	\noindent Dean\ifx\ismms@dean\@empty\else\ --- \ismms@dean\fi\hfill
+		\makebox[1.6in][l]{Date}\par
+	\vspace{3\baselineskip}
+	% Typed names only, no rules.
+	\begingroup
+	\renewcommand{\thesis@memberline}[2]{%
+		\noindent ##1\ifx\relax##2\relax\else, ##2\fi\par
+		\vspace{0.6\baselineskip}%
+	}%
+	\thesis@committee
+	\endgroup
+	\vfill
+	\begin{center}
+		Icahn School of Medicine at Mount Sinai
+	\end{center}%
+	\loadgeometry{normal}\doublespacing\clearpage
+}
