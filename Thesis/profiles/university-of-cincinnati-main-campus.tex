@@ -1,0 +1,177 @@
+% profiles/university-of-cincinnati-main-campus.tex — University of Cincinnati
+% ============================================================================
+% source: https://www.grad.uc.edu/student-life/etd/formatting.html
+%         (UC Graduate College, "Formatting Guidelines")
+% source: https://www.grad.uc.edu/student-life/etd/page-order.html
+%         ("Required Page Order" -- the title-page content list and the order of
+%         sections)
+% source: https://www.grad.uc.edu/student-life/etd/accessibility.html
+%         ("ETD Digital Accessibility Guidelines")
+% source: https://uc.edu/content/dam/refresh/grad-62/docs/student-forms/dissertation-title-page.pdf
+%         (the Graduate College's sample Doctoral title page)
+% source: https://www.grad.uc.edu/student-life/etd.html
+% accessed: 2026-09-10
+% checked:  texlib-thesis-profile-round
+%
+% READ THIS BEFORE TRUSTING THE FIGURES BELOW. Cincinnati is a school that
+% deliberately does NOT set binding format requirements centrally, and says so
+% in the first line of its own guidelines:
+%
+%   "While specific formatting requirements are determined by your committee
+%    and/or department, the following information provides 'best practice'
+%    guidelines"
+%
+% and again under General Formatting: "You and your committee should agree on
+% formatting requirements for the ETD."
+%
+% So the geometry and spacing set here are the Graduate College's RECOMMENDATION,
+% not a rule it will enforce, and a department may require something else. They
+% are set anyway because they are what the Graduate College publishes and they
+% happen to match this class's neutral defaults -- so the effect is to record a
+% citation, not to move anybody's margins. Anyone filing at UC must check with
+% their committee and department.
+%
+% What UC DOES require centrally is narrower and is set here as such: the title
+% page's content, the order of pages, and embedded fonts.
+%
+% VERIFIED and set here: geometry and spacing (as recommendations), the title
+% page, the absence of an approval page, and four accessibility items.
+% NOT set: nothing is left to the neutral fallback.
+
+\thesisinstitution{University of Cincinnati}
+
+% "Approximately one inch of white space should be included at the top, bottom
+% and sides of each page." Note "approximately" and "should" -- see the header.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Double-space all text. Long quotations and footnotes may be single-spaced."
+\thesissetspacing{double}
+
+% No chapter-opening exception: UC states no deeper top margin for chapters or
+% major sections. \thesissetchapteropening is deliberately not called.
+
+% Type size: "An 11-point or larger font is recommended for readability."
+% Recommended, and the class's 12pt already exceeds it, so nothing is set.
+% "All fonts must be embedded in your final PDF" is a MUST and is recorded under
+% accessibility below; this class embeds everything.
+
+% --- Accessibility -----------------------------------------------------------
+% UC publishes a dedicated ETD accessibility page, and every item on it is a
+% SHOULD or a RECOMMENDATION -- "The students at the University of Cincinnati
+% should make their electronic thesis and dissertations (ETDs) accessible", and
+% the list is headed "Recommended Minimum Guidelines for Digitally Accessible
+% PDF Files in the OhioLINK ETD Center". Not one of them is stated as required.
+%
+% \thesisrequiretagging and \thesisrequiredocumentlanguage are therefore NOT
+% set, even though UC's list names both searchable text and a specified language:
+% a recommendation is not a requirement, and declaring one would put words in
+% the Graduate College's mouth. The list is recorded verbatim instead.
+\thesisaccessibilityrequirement{Recommended minimum (OhioLINK)}
+	{"Recommended Minimum Guidelines for Digitally Accessible PDF Files in the
+	 OhioLINK ETD Center: File includes full searchable text. Headings are
+	 included for major sections of the document. Figures and images include
+	 alternative text. The accessibility permission flag is checked in Document
+	 Properties. Text language of the PDF is specified. The document has a
+	 title."}
+\thesisaccessibilityrequirement{Status of the above}
+	{Recommended, not required. "The students at the University of Cincinnati
+	 should make their electronic thesis and dissertations (ETDs) accessible."
+	 UC names no PDF standard and does not require a tagged PDF.}
+\thesisaccessibilityrequirement{Embedded fonts}
+	{"All fonts must be embedded in your pdf." One of the few central MUSTs in
+	 UC's guidelines. This class embeds every face.}
+\thesisaccessibilityrequirement{Document of Defense}
+	{The committee-approval page is made accessible BY THE GRADUATE COLLEGE and
+	 needs nothing from the author: "the Graduate College has created a feature
+	 in the Graduation Checklist to make your ETD Document of Defense (DoD) page
+	 accessible for assistive technologies ... The practice above has been
+	 established and implemented on behalf of the students; no action is
+	 required."}
+
+% --- Author-facing fields this profile adds ----------------------------------
+% UC's title page names the department AND the college on separate lines -- "in
+% the Department of Communication / of the College of Arts and Sciences" -- and
+% the class has one \gradprogram. It also lists previous degrees. Both default
+% to empty and their lines vanish, so a document that ignores them still builds;
+% the Required Page Order says they must not be ignored.
+\providecommand{\ucdepartment@name}{}
+\providecommand{\uccollege@name}{}
+\providecommand{\ucpriordegrees@list}{}
+\newcommand{\ucdepartment}[1]{\renewcommand{\ucdepartment@name}{#1}}
+\newcommand{\uccollege}[1]{\renewcommand{\uccollege@name}{#1}}
+% "Previous degrees" -- one per line, in the sample's form: "M.A. University of
+% Cincinnati". Separate lines with \\.
+\newcommand{\ucpriordegrees}[1]{\renewcommand{\ucpriordegrees@list}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% REQUIRED, with its content fixed: "Each document must have a full title page
+% with the following information: The title of the document ... Author name and
+% date / Previous degrees / Degree to be conferred / Department (if applicable)
+% and college in which the degree is earned / Name of committee chair".
+%
+% The layout is the Graduate College's own sample Doctoral title page, line for
+% line. The submission statement is broken exactly as the sample breaks it.
+%
+% "Do not use all capital letters for your title. Capital letters in the title
+% are still appropriate for acronyms, proper nouns, first letter, etc." -- so,
+% unusually for this directory, the title is NOT uppercased here.
+%
+% AN AMBIGUITY LEFT FOR THE READER RATHER THAN RESOLVED. The required-content
+% list names both "Author name and date" and "Previous degrees", and the sample
+% prints, on consecutive lines, "M.A. University of Cincinnati" then "June
+% 2008". That date can be read as the date of the previous degree or as the date
+% of the document, and UC does not say which. This profile emits
+% \ucpriordegrees and then \thesis@date, i.e. it reads the sample's date line as
+% the DOCUMENT's date. If your department reads it the other way, put the year
+% inside \ucpriordegrees and set \graddate to the same value; the page then
+% matches the sample either way.
+%
+% The committee chair line takes \gradadvisor, and the sample keeps the
+% post-nominal: "Committee Chair: A. B. Cooper, Ph.D."
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{0.5in}%
+		\thesis@tagtitle{Title}{{\large\@title}}\par
+		\vspace{4\baselineskip}
+		\doublespacing
+		A \thesis@docnoun{} submitted to the\\
+		Graduate College\\
+		of the University of Cincinnati\\
+		in partial fulfillment of the\\
+		requirements for the degree of\par
+		\vspace{\baselineskip}
+		\thesis@degree\par
+		\vspace{\baselineskip}
+		\ifx\ucdepartment@name\@empty\else in the \ucdepartment@name\\ \fi
+		\ifx\uccollege@name\@empty\else of the \uccollege@name\\ \fi
+		by\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{\baselineskip}
+		\ifx\ucpriordegrees@list\@empty\else\ucpriordegrees@list\\ \fi
+		\thesis@date\par
+		\vspace{\baselineskip}
+		Committee Chair: \thesis@advisor\par
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% UC's filed document contains none, and the reason is unusually clean: the
+% approval page is generated by the Graduate College, not written by the author.
+%
+% The Required Page Order is exhaustive -- fifteen numbered entries from Title
+% Page through Index -- and contains no approval or signature page. What exists
+% instead is the DOCUMENT OF DEFENSE: "The DoD is a version of the Committee
+% Approval Form, and it includes printed names of the thesis or dissertation
+% committee", produced through the Graduation Checklist, and the Graduate
+% College states of the whole arrangement: "The practice above has been
+% established and implemented on behalf of the students; no action is required."
+%
+% PRINTED NAMES, NOT SIGNATURES -- the DoD "includes printed names of the thesis
+% or dissertation committee". Approval itself is recorded in the ETD system:
+% "Your chair will need to review and submit the ETD to the Graduate College by
+% the deadline date."
+\thesisnoapprovalpage
