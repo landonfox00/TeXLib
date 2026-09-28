@@ -60,6 +60,24 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Fixed
 
+- **A tagged PDF listed every formula's MathML file as an attachment.** Under
+  `mathml-AF` LaTeX writes one MathML file per distinct formula into the `/AF`
+  entry of its Formula structure element, and by default (`viewer/pane/mathml`,
+  latex-lab-math) it also adds each file to the document's `EmbeddedFiles` name
+  tree, which viewers show as the attachment list. SumatraPDF shows that list in
+  its bookmarks pane, one top-level row per file after the outline: 4,036 rows
+  under a 241-page document built with the thesis class, 4,035 of them
+  `mathml-N.xml`. `ACCESSIBLE_DOCMETA` (and with it the AF-only fallback) and
+  both thesis templates now set `viewer/pane/mathml=false`. On that document the
+  name tree went from 4,036 entries to its one real attachment, all 7,700
+  Formula elements kept their `/AF` (4,035 distinct MathML files, as before),
+  and veraPDF still passes PDF/UA-2 and PDF/A-4f; the Notes template's tagged
+  twin keeps all 18 of its Formula `/AF`s and passes both. A document with no
+  attachment of its own now carries LaTeX's PDF/A-4f placeholder,
+  `pdf-A4f.txt`, as the tree's one entry, as a document without mathematics
+  already did. `test_texlib_builder.py` asserts the key in both prefixes and
+  both templates.
+
 - **The inline key was only half inline: a full-problem `{solution}` still
   displaced the page.** `\ShowKeyInline` exists so a key page *is* its student
   page with the answers drawn into the blanks — same pagination, same problem

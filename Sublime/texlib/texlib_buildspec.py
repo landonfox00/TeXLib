@@ -94,9 +94,20 @@ LUALATEX_CLASSES = {
 # path now instead of waiting on upstream. A builder runs the SE prefix first,
 # tests its log with luamml_se_aborted(), and re-runs with the AF-only prefix
 # when that fires. Drop the fallback once a fixed luamml ships.
+#
+# viewer/pane/mathml=false (latex-lab-math) keeps the MathML files out of the
+# Catalog's EmbeddedFiles name tree, which is the list a viewer shows as the
+# document's attachments. Each file stays in the /AF of its Formula structure
+# element, and that is where Firefox and Foxit read it. At the default the tree
+# lists one mathml-N.xml per distinct formula -- 4,035 of them in a 241-page
+# document built with the thesis class -- and SumatraPDF appends every entry to
+# its bookmarks pane, after the outline. A document with no attachment of its
+# own then carries LaTeX's PDF/A-4f placeholder, pdf-A4f.txt, as the tree's one
+# entry, as a document without mathematics already did.
 ACCESSIBLE_DOCMETA = (
     r"\DocumentMetadata{lang=en,tagging=on,"
-    r"tagging-setup={math/setup={mathml-AF,mathml-SE},table/header-rows=1},"
+    r"tagging-setup={math/setup={mathml-AF,mathml-SE},table/header-rows=1,"
+    r"viewer/pane/mathml=false},"
     r"pdfstandard={ua-2,a-4f}}"
 )
 
