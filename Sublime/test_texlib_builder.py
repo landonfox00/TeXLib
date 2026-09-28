@@ -2295,6 +2295,21 @@ def main():
           and _bs.ACCESSIBLE_MACRO_AF_ONLY
           == _bs.ACCESSIBLE_MACRO.replace(",mathml-SE", ""),
           _bs.ACCESSIBLE_MACRO_AF_ONLY)
+    # Each MathML file stays in its Formula's /AF and leaves the EmbeddedFiles
+    # name tree, which viewers list as the document's attachments -- SumatraPDF
+    # in its bookmarks pane, one entry per distinct formula.
+    check("buildspec: MathML files stay out of the attachment list",
+          "viewer/pane/mathml=false" in _bs.ACCESSIBLE_MACRO
+          and "viewer/pane/mathml=false" in _bs.ACCESSIBLE_MACRO_AF_ONLY)
+    # The thesis templates bring their own \DocumentMetadata, which the prefix
+    # never reaches, so they have to set the key themselves.
+    for _tpl in (("examples", "templates", "Thesis", "thesis-template.tex"),
+                 ("examples", "scenarios", "thesis", "frontmatter",
+                  "template.tex")):
+        with open(os.path.join(_repo, *_tpl), encoding="utf-8") as _f:
+            _tpl_src = _f.read()
+        check("buildspec: %s keeps MathML out of the attachment list"
+              % "/".join(_tpl), "viewer/pane/mathml=false" in _tpl_src)
     # The retry fires on luamml's abort and on nothing else -- an ordinary
     # LaTeX error must stay the document's own failure.
     check("buildspec: luamml_se_aborted recognises the abort",

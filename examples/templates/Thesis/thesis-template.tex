@@ -9,10 +9,15 @@
 % document declaring its own \DocumentMetadata owns this choice. Add mathml-SE
 % if your mathematics never puts two \sqrt[n]{...} in one formula; if it does,
 % that build aborts with no PDF and no fallback.
+%
+% viewer/pane/mathml=false keeps the MathML files, one per formula, out of the
+% list PDF viewers show as the document's attachments (SumatraPDF shows it in
+% the bookmarks pane). Each file stays attached to its formula's structure
+% element, which is where Firefox and Foxit read it.
 \DocumentMetadata{
 	lang          = en,
 	tagging       = on,
-	tagging-setup = { math/setup={mathml-AF}, table/header-rows=1 },
+	tagging-setup = { math/setup={mathml-AF}, table/header-rows=1, viewer/pane/mathml=false },
 	pdfstandard   = { ua-2, a-4f },
 }
 \documentclass{thesis}

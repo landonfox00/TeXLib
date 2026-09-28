@@ -25,6 +25,16 @@ wraps are dropped, since their inner list breaks under tagging. The normal PDF
 is the one to print and project; the tagged twin is the one a screen reader can
 navigate.
 
+The MathML travels as one associated file per distinct formula, in the `/AF`
+entry of the formula's structure element, which is where Firefox and Foxit read
+it. LaTeX's default also lists every one of those files in the document's
+`EmbeddedFiles` name tree, the list viewers show as the document's attachments:
+4,035 `mathml-N.xml` entries in a 241-page document, which SumatraPDF appends to its
+bookmarks pane after the outline. The accessible build sets
+`viewer/pane/mathml=false`, so that list holds only the document's real
+attachments. A document with none carries LaTeX's PDF/A-4f placeholder,
+`pdf-A4f.txt`, as the one entry, as a document without mathematics already did.
+
 ## How conformance is verified
 
 - **A required check.** `.github/workflows/accessible.yml` runs
