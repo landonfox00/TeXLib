@@ -584,6 +584,32 @@
 %   \par\medskip; autoexam.cls overrides with a full-width rule.
 \providecommand{\autoexam@problem@sep}{\par\medskip}
 
+% \pbank@sep@marked — that separator with its nodes marked. Inside {problems}
+%   and {mcproblems} \autoexam@problem@sep is this wrapper around the class's
+%   own definition (\pbank@sep@plain; see \@texlib@psection@begin). The
+%   separator's nodes (its space, autoexam's rule) then carry \pbank@sepattr
+%   and nothing else on the page does, so the place where one problem ends and
+%   the next begins can be found on a finished page. The inline key cuts a page
+%   that cannot hold its solutions there (texlib_keyfit.lua). An attribute is
+%   not a node: the page is the same page, in every build.
+%
+%   Only in vertical mode. In horizontal mode the paragraph still open belongs
+%   to the problem above, and its lines would take the mark; the separator then
+%   runs unmarked and that boundary is simply not offered. A problem that ends
+%   in an inline solution ends in vertical mode, and those are the pages cut.
+\ifdefined\directlua
+	\newattribute\pbank@sepattr
+	\edef\pbank@sepattrnum{\the\allocationnumber}
+	\newcommand{\pbank@sep@marked}{%
+		\ifvmode
+			\setattribute\pbank@sepattr{1}%
+			\pbank@sep@plain
+			\unsetattribute\pbank@sepattr
+		\else
+			\pbank@sep@plain
+		\fi}
+\fi
+
 % \begin{problems} / \begin{mcproblems} ... (auto-numbered "Part N" sections)
 %   Drop-in replacements for {questions} that accept \problem items (the
 %   {questions} environment is preserved for backward compat).  They are
@@ -727,6 +753,14 @@
 	\fi
 	% ---- inter-problem separator: first problem on a page gets no rule -------
 	\pbank@lua{pbank_first_on_page = true}%
+	% Mark it, for this section (\pbank@sep@marked). The \ifx keeps a second
+	% pass through here in one group from wrapping the wrapper.
+	\ifdefined\pbank@sep@marked
+		\ifx\autoexam@problem@sep\pbank@sep@marked\else
+			\let\pbank@sep@plain\autoexam@problem@sep
+			\let\autoexam@problem@sep\pbank@sep@marked
+		\fi
+	\fi
 	\let\@problems@saved@newpage\newpage
 	% ---- open the question list, carrying the question number across sections -
 	\begin{questions}%

@@ -8,7 +8,7 @@ guards that). Nothing bounded the overlay: a solution taller than the blank it
 was drawn into printed over the next question. texlib_keyfit.lua now checks
 each finished page.
 
-Three pages, three behaviours:
+Four pages, four behaviours:
 
   * FITS    -- the solution is shorter than its blank. The page must come out
                exactly as the student copy: the problem after it does not move.
@@ -25,6 +25,12 @@ Three pages, three behaviours:
                after it. Making room without splitting the page pushes its
                last items past the bottom margin and off the paper, at the
                student copy's page count, with nothing in the PDF to show it.
+  * BETWEEN -- two problems whose solutions together are taller than the page,
+               each fitting a page of its own. The page is cut BETWEEN them:
+               the first problem and its solution stay, and the second moves
+               whole to the added page, stem first. Cut at the last break that
+               fits instead, the page keeps the second problem's stem and its
+               part (a) and sends part (b) on alone.
 
 Asserted on word positions from poppler's `pdftotext -bbox`, since the point is
 where things are printed and the text is the same in every case. Soft-skips
@@ -92,6 +98,7 @@ COURSEMETA_TEX = r"""\metasetup{
 
 NOROOM_PARTS = 6
 NOROOM_LINES = 9
+BETWEEN_LINES = 16
 
 TALL_LINES = "\n".join(
     rf"		Line {n} of a long worked solution. TALLLINE{n}\par" for n in range(1, 8))
@@ -105,6 +112,12 @@ def _noroom_part(k: int) -> str:
             r"			\begin{partsolution}" "\n" + lines + "\n"
             r"			\end{partsolution}" "\n"
             r"			\workbox{1}")
+
+
+def _between_lines(tag: str, indent: str) -> str:
+    return "\n".join(
+        rf"{indent}Line {n} of answer {tag}. BT{tag}x{n}\par"
+        for n in range(1, BETWEEN_LINES + 1))
 
 
 BANK_TEX = r"""\begin{problem}{fits}[topic=fits]
@@ -142,6 +155,29 @@ BANK_TEX = r"""\begin{problem}{fits}[topic=fits]
 """ + "\n".join(_noroom_part(k) for k in range(1, NOROOM_PARTS + 1)) + r"""
 	\end{parts}
 \end{problem}
+
+\begin{problem}{first}[topic=first]
+	FIRSTSTEM Explain the first thing.
+	\begin{solution}
+""" + _between_lines("F", "\t\t") + r"""
+	\end{solution}
+\end{problem}
+
+\begin{problem}{second}[topic=second]
+	SECONDSTEM Explain both.
+	\begin{parts}
+		\ppart SECONDA Explain the one.
+			\begin{partsolution}
+""" + _between_lines("A", "\t\t\t\t") + r"""
+			\end{partsolution}
+			\workbox{1}
+		\ppart SECONDB Explain the other.
+			\begin{partsolution}
+""" + _between_lines("B", "\t\t\t\t") + r"""
+			\end{partsolution}
+			\workbox{1}
+	\end{parts}
+\end{problem}
 """
 
 # The second optional argument of \problem is the stretch of the answer space
@@ -162,6 +198,11 @@ EXAM_TEX = r"""\documentclass[exam-number=1, points=50]{autoexam}
 	\newpage
 
 	\problem[1,1,1,1,1,1]{topic=noroom}
+
+	\newpage
+
+	\problem[10][1]{topic=first}
+	\problem[1,1]{topic=second}
 \end{problems}
 \end{document}
 """
@@ -250,12 +291,12 @@ def main() -> int:
                   errors="replace") as fh:
             keylog = fh.read()
 
-        # Page indices: 0 is the cover, then FITS, SHORT, NOROOM; the key has
-        # one more, NOROOM's continuation.
-        check("the key is the student copy plus one continuation page",
-              len(student) == 4 and len(key) == 5,
+        # Page indices: 0 is the cover, then FITS, SHORT, NOROOM, BETWEEN; the
+        # key has two more, a continuation after NOROOM and one after BETWEEN.
+        check("the key is the student copy plus one page for each page split",
+              len(student) == 5 and len(key) == 7,
               f"student {len(student)} page(s), key {len(key)}")
-        if len(student) != 4 or len(key) != 5:
+        if len(student) != 5 or len(key) != 7:
             return report(failures)
 
         s_fit, k_fit = student[1], key[1]
@@ -288,9 +329,10 @@ def main() -> int:
         check("SHORT: the log records the room made",
               "made room for 1 tall solution(s)" in keylog)
 
-        check("NOROOM: the log says the page cannot hold its solutions",
-              "cannot hold its solutions" in keylog
-              and "continues on an added page" in keylog)
+        check("NOROOM, BETWEEN: the log says each page cannot hold its solutions",
+              keylog.count("cannot hold its solutions") == 2
+              and keylog.count("continues on an added page") == 2,
+              f"{keylog.count('cannot hold its solutions')} warning(s), not 2")
         pages = (key[3], key[4])
         where: dict[str, int] = {}
         lost, twice = [], []
@@ -332,6 +374,26 @@ def main() -> int:
                     over.append(k)
         check("NOROOM: no answer runs into the part after it", not over,
               f"answers {over} overlap the next part")
+
+        stay, moved = key[5], key[6]
+        lines = range(1, BETWEEN_LINES + 1)
+        one = ["FIRSTSTEM"] + [f"BTFx{n}" for n in lines]
+        two = ["SECONDSTEM", "SECONDA", "SECONDB"] + [
+            f"BT{part}x{n}" for part in "AB" for n in lines]
+        check("BETWEEN: the first problem and its solution stay on the page",
+              all(t in stay for t in one) and not any(t in moved for t in one),
+              f"not on the page: {[t for t in one if t not in stay][:6]}")
+        check("BETWEEN: the second problem moves whole to the added page",
+              all(t in moved for t in two) and not any(t in stay for t in two),
+              f"left behind: {[t for t in two if t in stay][:6]}, "
+              f"missing: {[t for t in two if t not in moved][:6]}")
+        if all(t in moved for t in two):
+            check("BETWEEN: the added page starts with the second problem's stem",
+                  moved["SECONDSTEM"][0] == min(moved[t][0] for t in two))
+            footer = moved.get("University")
+            check("BETWEEN: nothing is printed past the footer",
+                  footer is not None
+                  and all(moved[t][1] <= footer[0] for t in two))
         return report(failures)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
         log(f"FAIL: build environment failed -- {type(exc).__name__}: {exc}")

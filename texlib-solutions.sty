@@ -161,7 +161,8 @@
 	\newbox\@sol@spill
 	\AddToHook{build/page/before}{%
 		\@sol@spillstate\z@
-		\directlua{texlib_keyfit.fit(\number\@outputbox, \@sol@reachattr)}%
+		\directlua{texlib_keyfit.fit(\number\@outputbox, \@sol@reachattr,
+			\ifdefined\pbank@sepattrnum \pbank@sepattrnum \else -1 \fi)}%
 		\ifnum\@sol@spillstate>\z@
 			\begingroup
 				\vbadness\@M \vfuzz\maxdimen

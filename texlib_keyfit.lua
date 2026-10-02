@@ -28,7 +28,8 @@
 --   fit() reports that through \@sol@spillstate and the caller splits the list
 --   at the page height: what fits is shipped, the rest becomes a continuation
 --   page. Making room on such a page without splitting it would push its last
---   items past the bottom margin and off the paper.
+--   items past the bottom margin and off the paper. A page of several problems
+--   is cut between two of them where it can be (cut_between_problems).
 --
 -- Called from the kernel's build/page/before hook, on \@outputbox.
 
@@ -108,7 +109,64 @@ local function fix(g, size)
 	g.shrink, g.shrink_order = 0, 0
 end
 
-function M.fit(boxnumber, attr)
+-- The natural size of a top-level node: what it adds to an unset list.
+local function natural(n)
+	local id = n.id
+	if id == HLIST or id == VLIST then return n.height + n.depth end
+	if id == RULE then return dim(n.height) + dim(n.depth) end
+	if id == GLUE then return n.width end
+	if id == KERN then return n.kern end
+	return 0
+end
+
+-- Where a page that cannot hold its solutions is cut. Left to itself \vsplit
+-- takes the last break that fits, and that can be the line under a problem's
+-- stem: the stem stays at the foot of the page and its work goes to the next.
+-- When the page holds more than one problem it is cut between two of them
+-- instead, at the last separator (the nodes carrying `sepattr`,
+-- \pbank@sep@marked) such that what stands before it fits the page and what
+-- stands after it fits the added one. The separator goes, as it does before a
+-- problem that starts a page, and a forced break takes its place. With no such
+-- separator the list is left as it is and \vsplit chooses.
+local function cut_between_problems(box, items, sepattr)
+	local n, before, total = #items, {}, 0
+	for i = 1, n do
+		before[i] = total
+		total = total + natural(items[i].node)
+	end
+	local function marked(k)
+		return items[k] and node.get_attribute(items[k].node, sepattr)
+	end
+	-- Natural sizes, so both estimates are on the safe side of what \vsplit
+	-- and the page builder will accept; \topskip covers the added page's top.
+	local room = tex.dimen["@colht"]
+	local top = tex.getglue("topskip")
+	local first, last, solid_seen, i = nil, nil, false, 1
+	while i <= n do
+		if marked(i) then
+			local j = i
+			while marked(j + 1) do j = j + 1 end
+			local after = total - before[j] - natural(items[j].node)
+			if solid_seen and before[i] <= room and after + top <= room then
+				first, last = i, j
+			end
+			i = j + 1
+		else
+			if items[i].solid then solid_seen = true end
+			i = i + 1
+		end
+	end
+	if not first then return end
+	local pen = node.new("penalty")
+	pen.penalty = -10000
+	box.head = node.insert_before(box.head, items[first].node, pen)
+	for k = first, last do
+		box.head = node.remove(box.head, items[k].node)
+		node.flush_node(items[k].node)
+	end
+end
+
+function M.fit(boxnumber, attr, sepattr)
 	local box = tex.getbox(boxnumber)
 	if not box or box.id ~= VLIST or not box.head then return end
 
@@ -231,6 +289,7 @@ function M.fit(boxnumber, attr)
 			n.depth = n.depth + r
 		end
 		for _, m in ipairs(markers) do node.unset_attribute(m.node, attr) end
+		if sepattr and sepattr >= 0 then cut_between_problems(box, items, sepattr) end
 		tex.count["@sol@spillstate"] = 1
 		texio.write_nl("term and log", string.format(
 			"Package texlib-solutions Warning: Page %d cannot hold its solutions:", page))
