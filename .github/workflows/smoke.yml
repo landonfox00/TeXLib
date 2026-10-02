@@ -68,6 +68,10 @@ jobs:
             # Asserted on word positions from `pdftotext -bbox`, also from
             # poppler-utils.
             python3 test_solution_inline_fit.py
+            # A tagged key: no TeX errors when a solution ends in a display, and
+            # the compact layout even under \keylayout{inline}. Reads the log,
+            # because nonstopmode recovers from these errors and exits 0.
+            python3 test_solution_tagged_key.py
             python3 smoke_test.py -v ${{ github.event.inputs.modules }}
 
       - name: Upload failed-build logs

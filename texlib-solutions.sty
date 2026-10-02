@@ -433,6 +433,17 @@
 	\fi
 }{%
 	\ifsolutions
+			% ACCESSIBLE: end the body's last paragraph with a real \par before
+			% the box closes. A closing brace ends a paragraph too, but without
+			% the \par token, so the tagging code's end-of-paragraph hook never
+			% runs and the paragraph's structure is left open across the box.
+			% A body that ends in running text hides this (the next \par outside
+			% closes it, in the wrong place but in balance). A body that ends in
+			% a DISPLAY does not: the paragraph that resumes after \] is the one
+			% left open, and the inline layout, which sets no \par between here
+			% and the boxes it builds next, then fails with "there is no open
+			% structure on the stack". Same family as the discard branch below.
+			\ifdefined\TeXLibAccessibleMode\par\fi
 			% Still inside \@sol@box's \vbox: every \rubric call and the
 			% {commonerrors} capture have run by now, and emitting here (rather
 			% than after \box\@sol@box below) is what puts the panels INSIDE the
@@ -614,6 +625,10 @@
 	\fi
 }{%
 	\ifsolutions
+		% ACCESSIBLE: a real \par before the box closes, for the reason given at
+		% {solution}'s. Here it bites in BOTH layouts: a part solution that ends
+		% in a display raised twelve tagpdf errors in a tagged key.
+		\ifdefined\TeXLibAccessibleMode\par\fi
 		\egroup
 		\@in@partsolutionfalse
 		% Same container-stamping as {solution}, and in the same ORDER, which is
