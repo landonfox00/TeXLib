@@ -71,7 +71,9 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   (Math 126 Unit 1, 27 pages) fail 84. A one-column grid passed, as loose
   paragraphs with every label placed after its task. The defect is upstream: a
   bare `article` with `\DocumentMetadata{tagging=on}` and one `{tasks}` list
-  fails with the same 16 checks.
+  fails with the same 16 checks. The LaTeX Team tracks it as
+  [latex3/tagging-project#370](https://github.com/latex3/tagging-project/issues/370),
+  open since 2024-07-30.
 
   The new `texlib-tasks.sty` wraps four functions of `tasks` and calls each
   original, so `tasks` still does all of the typesetting. In the tagged PDF a

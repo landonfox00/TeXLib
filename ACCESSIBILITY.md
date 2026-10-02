@@ -121,7 +121,9 @@ you need the higher score.
   `texlib-tasks.sty` whenever `tasks` is loaded, by a class or by your own
   preamble, and the grid is tagged as a list with one item per task. The log
   says so if that package could not install itself, which happens when `tasks`
-  or the LaTeX tagging code is not a version it knows.
+  or the LaTeX tagging code is not a version it knows. The defect is upstream
+  and is tracked as
+  [latex3/tagging-project#370](https://github.com/latex3/tagging-project/issues/370).
 
 **Conformance covers structure only.** PDF/UA-2 means the document's structure
 is machine-checkable and correct. It says nothing about the quality of your alt
