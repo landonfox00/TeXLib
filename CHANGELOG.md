@@ -126,6 +126,27 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   `exam1_review_instructor.pdf`, a different document that merely starts with
   the same characters.
 
+- **`Sublime/test_texlib_build.py` had failed on `main` since 2026-09-05, and no
+  workflow ran it.** PR #120 put the deferral prefix (`\def\TeXLibNo<Name>{}`,
+  one per package the scanner defers) at the front of the engine argument and
+  added `without_defer()` to `test_texlib_builder.py` to strip it. This file
+  kept comparing against the old argument, so `autoexam/base: bare \input arg`
+  and `pset/key: \ShowKey macro injected before \input` failed. Both now strip
+  the prefix with the same helper, which moved to `Sublime/_testkit.py` so the
+  two suites share one copy; the first is relabelled `autoexam/base: no mode
+  macro before \input`, since the argument is no longer bare. Against
+  deliberately broken builders, the base check fails when base mode injects a
+  macro, and the key check fails when the macro is dropped or lands ahead of
+  the deferral prefix. The file now runs in the `builder-logic` job of
+  `tests.yml`. It holds the only tests of the A → B → A oscillation stop, the
+  filter for biblatex's own rerun flags, and the `TEXLIB_STATE_RERUN=0` opt-out.
+
+  It also switches the format cache off, as `test_texlib_builder.py` already
+  did. With the cache on, the quick-mode case started `pdftex -ini` to dump a
+  format wherever TeX was on `PATH`; the `builder-logic` job installs no TeX, so
+  a local run and CI took different paths. The file took 1.3s with the cache on
+  and 0.3s with it off, measured locally.
+
 ## [0.9.0] — 2026-09-08
 
 ### Fixed

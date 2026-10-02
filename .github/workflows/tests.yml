@@ -21,6 +21,10 @@ jobs:
         run: python -m pip install --quiet pypdf==6.16.2
       - name: Builder logic + orchestration tests
         run: python Sublime/test_texlib_builder.py
+      - name: Build-brain smoke (native host, fake engine)
+        # The only test of the oscillation stop, the filter for biblatex's own
+        # rerun flags, and the TEXLIB_STATE_RERUN=0 opt-out.
+        run: python Sublime/test_texlib_build.py
       - name: Thesis queue bookkeeping (blocked institutions)
         # A block that fails to load does not error -- it un-blocks the
         # institution, and the nightly profile round loops on it.

@@ -42,7 +42,7 @@ if "sublime" in sys.modules:  # only true inside Sublime's plugin host
 
 # --- 1. Stub the LaTeXTools PdfBuilder base class ---------------------------
 
-from _testkit import install_native_builder  # noqa: E402
+from _testkit import install_native_builder, without_defer  # noqa: E402
 TexlibBuilder = install_native_builder()
 from texlib_build import (  # noqa: E402  (native core)
     GRADEBOOK_SHEETS, MAX_RERUNS, STATE_ONLY_RERUNS, TexlibBuildCore, _surname,
@@ -227,30 +227,6 @@ def check(label, condition, detail=""):
         print(f"  FAIL  {label}")
         if detail:
             print(f"        {detail}")
-
-
-# A document argument carries a deferral prefix whenever the preamble scanner
-# found something this document never uses -- which, for the synthetic one-line
-# documents in this file, is everything. That prefix is not a MODE macro, and
-# the cases below are about mode macros, so they compare against the argument
-# with any prefix stripped.
-_DEFER_PREFIX_RE = re.compile(r"^(?:\\def\\TeXLibNo[A-Za-z]+\{\})+")
-
-
-def without_defer(arg):
-    r"""`arg` minus its \def\TeXLibNo... prefix, unwrapped from \input{...}.
-
-    "doc.tex" -> "doc.tex"
-    "\def\TeXLibNoBib{}\input{doc.tex}" -> "doc.tex"
-    "\def\ShowKey{}\input{doc.tex}" -> "\def\ShowKey{}\input{doc.tex}"  (a mode
-    macro survives, which is exactly what these assertions must still catch.)
-    """
-    arg = str(arg)
-    stripped = _DEFER_PREFIX_RE.sub("", arg)
-    if stripped == arg:
-        return arg                      # nothing was stripped; leave it alone
-    match = re.fullmatch(r"\\input\{(.*)\}", stripped)
-    return match.group(1) if match else stripped
 
 
 # --- 3. Test cases ---------------------------------------------------------
