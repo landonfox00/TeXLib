@@ -100,8 +100,9 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
     gives the same tree and changes the page: a label reads its counter, and a
     grid nested in the task has moved the counter by then.
   - `tasks` typesets every label a second time, into a box it measures and
-    discards. Tagging is suspended between tasks, so a label that holds a
-    formula leaves no empty `<Formula>` under the `<L>`.
+    discards. Tagging is suspended between tasks. With tagging live there, a
+    label that holds a formula leaves an empty `<Formula>` under the `<L>` for
+    every task, and veraPDF fails `<L> shall not contain <Formula>`.
 
   Guarded by `examples/fixtures/Notes/tasks-tagging.tex`, nine grids in the
   accessible gate. veraPDF passing shows that the nesting is legal. It does not

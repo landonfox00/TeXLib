@@ -87,8 +87,9 @@
 %
 % Tagging is suspended around the code BETWEEN tasks, and resumed for each task
 % by \__texlib_tasks_task:nnn. tasks typesets every label twice, once into a box
-% it measures and throws away. A label holding a formula would leave that
-% formula's structure element, empty, as a child of the <L>.
+% it measures and throws away. With tagging live there, a label holding a
+% formula leaves that formula's structure element, empty, as a child of the <L>
+% for every task, and veraPDF fails the file: "<L> shall not contain <Formula>".
 \cs_new_protected:Npn \__texlib_tasks_environment:nnnn #1#2#3#4 {
 	\exp_args:NnV \AssignStructureRole { block/list }       \l__texlib_tasks_scaffold_tag_tl
 	\exp_args:NnV \AssignStructureRole { block/list/item }  \l__texlib_tasks_item_tag_tl
