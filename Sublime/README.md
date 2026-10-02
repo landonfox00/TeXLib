@@ -102,6 +102,7 @@ The builder has three layers of automated tests (none deployed to Sublime):
 |--------|-----------|--------|
 | `test_texlib_builder.py` | No | Decision logic + **full multi-pass orchestration** (biber-skip cache, rerun detection, the state-fingerprint veto / silent-log settling pass / oscillation + `MAX_RERUNS` stops, per-version biber, aux routing, hidden-file recovery, schedmap rewrite, per-version/solutions `.vmap` PDF slicing). Drives `commands()` with a scripted side-effect timeline — per-pass output *and* the aux files each pass writes — so the biber/rerun branches actually execute. |
 | `test_biber_integration.py` | Yes (`pdflatex`/`lualatex` + `biber`) | Real end-to-end: drives the actual builder coroutine against the real toolchain on a biblatex fixture. Proves a fresh build settles with no undefined refs, an unchanged rebuild **skips biber** in one pass, and editing the `.bib` re-runs biber. Soft-skips if the tools are absent. |
+| `test_accessible_settle_integration.py` | Yes (`pdflatex` + `lualatex`; `pypdf`, poppler's `pdftotext` and veraPDF each optional) | Real end-to-end **tagged build**, twice from an empty directory, of a document that trips the luamml mathml-SE abort and gains a page once its table of contents is read. Checks that the tagged lane keeps its `.aux` and `.toc` across the abort and that the pass which gains the page is run again: no duplicated parent-tree key, contents page numbers that match, veraPDF's verdict when it is installed. Soft-skips if the engines are absent. |
 | `test_synctex_integration.py` | Yes (`lualatex` + poppler's `pdftotext` + `synctex`) | Real end-to-end **inverse search**: drives the real builder against a real build, then uses TeX Live's own `synctex edit -o page:x:y:pdf` CLI to simulate a Sumatra double-click and check where it actually lands — the fabricated-data unit tests above can't catch a real engine/table-package quirk (for example, xltabular deferring shipout) that only shows up against genuine output. Soft-skips if the tools (or a poppler-flavored `pdftotext` specifically — an xpdf build earlier on `PATH` silently lacks `-bbox`) are absent. |
 | `smoke_test.py` (repo root) | Yes (`lualatex`) | Builds every module template; content/visual regression for shared `.sty`/`.cls` refactors. |
 
@@ -110,6 +111,7 @@ Run them directly:
 ```sh
 python Sublime/test_texlib_builder.py        # fast, no TeX
 python Sublime/test_biber_integration.py     # real pdflatex + biber
+python Sublime/test_accessible_settle_integration.py  # real tagged build, twice
 python Sublime/test_synctex_integration.py   # real lualatex + synctex CLI
 python smoke_test.py                          # full template builds
 ```

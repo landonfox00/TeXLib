@@ -194,6 +194,17 @@ EXAMPLES = [
                  "in the corpus that exercises the AF-only fallback end to "
                  "end: it passes by falling back, and a broken fallback shows "
                  "up here as a hard failure rather than as quieter math."),
+    Example("examples/fixtures/MathML", "nth-root-toc.tex", "fixture", _FIXTURE,
+            expect=["Contents", "TOPICMARK1:", "TOPICMARK48:", "RADTOCMARK"],
+            note="The nth-root abort in a document whose table of contents "
+                 "adds a page: 5 pages on a pass that starts with no .toc, 6 "
+                 "after. The aborted pass leaves the .toc empty, and the pass "
+                 "that gains the page writes a PDF whose last page fails "
+                 "clause 8.2.2 (54 checks) until one more pass runs. It passes "
+                 "here because this harness retries in an empty directory and "
+                 "reruns while the log asks. The builder core is held to the "
+                 "same shape, across two builds, by "
+                 "Sublime/test_accessible_settle_integration.py."),
 
     # -- Course folders: end-to-end realism ------------------------------------
     # Build-only (no expect): they share one coursemeta.tex across several

@@ -116,6 +116,14 @@ jobs:
   # toolchain. Proofs run here:
   #   * test_biber_integration.py    -- pdflatex + biber on a biblatex fixture,
   #     proving the biber-skip cache and rerun handling.
+  #   * test_accessible_settle_integration.py -- a real accessible build
+  #     (pdflatex, then tagged lualatex), twice from an empty directory, of a
+  #     document that trips the luamml mathml-SE abort and gains a page once
+  #     its table of contents is read. Asserts that the lane keeps its state
+  #     across the abort and that the pass which gains the page is run again,
+  #     by the kernel's own message and by the tagged PDF's parent tree
+  #     (pypdf) and contents page numbers (pdftotext). veraPDF is not
+  #     installed in this job, so that one check skips here.
   #   * test_shuffle_integration.py -- drives a real lualatex build of a
   #     3-version exam and reads the PDF back to assert the autoexam shuffle
   #     GUARANTEES at the rendered-PDF level (same set per version, points
@@ -170,6 +178,7 @@ jobs:
               || pip install --quiet pypdf==6.16.2
             texlua test_exam_seed.lua
             python3 Sublime/test_biber_integration.py
+            python3 Sublime/test_accessible_settle_integration.py
             python3 Sublime/test_shuffle_integration.py
             python3 Sublime/test_synctex_integration.py
             python3 test_engine_correctness.py
