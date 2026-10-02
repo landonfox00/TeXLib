@@ -2405,10 +2405,10 @@ def main():
     _pair = [
         _mf.Example("examples/fixtures/Shared", "first.tex", "fixture", ("smoke",),
                     expect=["FIRSTMARK"], absent=["FIRSTLEAK"],
-                    artifact=["*_first_grid.tex"]),
+                    artifact=["*_first_grid.tex"], tagged={"L": 1}),
         _mf.Example("examples/fixtures/Shared", "second.tex", "fixture", ("smoke",),
                     expect=["SECONDMARK"], absent=["SECONDLEAK"],
-                    artifact=["*_second_grid.tex"]),
+                    artifact=["*_second_grid.tex"], tagged={"LI": 2}),
     ]
     _k1 = ("examples/fixtures/Shared", "first.tex")
     _k2 = ("examples/fixtures/Shared", "second.tex")
@@ -2418,6 +2418,7 @@ def main():
         _v_text = _mf.expect_text()
         _v_absent = _mf.expect_absent()
         _v_artifact = _mf.expect_artifact_nonempty()
+        _v_tagged = _mf.expect_tagged()
     finally:
         _mf.EXAMPLES = _real_examples
 
@@ -2431,6 +2432,9 @@ def main():
           _v_artifact.get(_k1) == ["*_first_grid.tex"]
           and _v_artifact.get(_k2) == ["*_second_grid.tex"],
           str(_v_artifact))
+    check("manifest: two examples in one module keep both tagged sets",
+          _v_tagged.get(_k1) == {"L": 1} and _v_tagged.get(_k2) == {"LI": 2},
+          str(_v_tagged))
 
     # The same claim against the REAL corpus, as a conservation law: every
     # declared assertion set survives into its view. This is the form that
@@ -2440,6 +2444,7 @@ def main():
         ("absent", _mf.expect_absent(), [e for e in _mf.EXAMPLES if e.absent]),
         ("artifact", _mf.expect_artifact_nonempty(),
          [e for e in _mf.EXAMPLES if e.artifact]),
+        ("tagged", _mf.expect_tagged(), [e for e in _mf.EXAMPLES if e.tagged]),
     ) if len(view) != len(declared)]
     check("manifest: no declared assertion set is dropped by its view", not _lost,
           "collapsed views: " + ", ".join(_lost))
@@ -2453,6 +2458,102 @@ def main():
         _dupe_raised = True
     check("manifest: a duplicated (module, template) declaration is a hard error",
           _dupe_raised)
+
+    # -----------------------------------------------------------------------
+    # The tagged-structure check behind a manifest entry's `tagged=`.
+    #
+    # It counts structure elements by STANDARD type, so it has to resolve the
+    # LaTeX tagging code's own tag names ("item", "itembody") through their
+    # namespace -- and it has to do so WITHOUT the document-level /RoleMap,
+    # which is the PDF 1.7 fallback and maps Artifact down to Private. The
+    # synthetic tree carries both maps, laid out the way tagpdf writes them, an
+    # item whose label comes first and an item whose body does.
+    # -----------------------------------------------------------------------
+    if _have_pypdf:
+        from pypdf.generic import (ArrayObject, DictionaryObject, NameObject,
+                                   NumberObject, TextStringObject)
+        sys.path.insert(0, _repo)
+        import smoke_test as _st  # noqa: E402
+
+        def _pn(s):
+            return NameObject("/" + s)
+
+        _ns_pdf2 = DictionaryObject({
+            _pn("Type"): _pn("Namespace"),
+            _pn("NS"): TextStringObject("http://iso.org/pdf2/ssn"),
+        })
+        _ns_latex = DictionaryObject({
+            _pn("Type"): _pn("Namespace"),
+            _pn("NS"): TextStringObject("https://www.latex-project.org/ns/dflt"),
+            _pn("RoleMapNS"): DictionaryObject({
+                _pn(_tag): ArrayObject([_pn(_role), _ns_pdf2])
+                for _tag, _role in (("enumerate", "L"), ("item", "LI"),
+                                    ("itemlabel", "Lbl"), ("itembody", "LBody"))
+            }),
+        })
+
+        def _se(tag, ns, *kids):
+            return DictionaryObject({
+                _pn("Type"): _pn("StructElem"), _pn("S"): _pn(tag),
+                _pn("NS"): ns, _pn("K"): ArrayObject(kids),
+            })
+
+        # Marked content sits among the children as a bare id or as an /MCR
+        # dictionary. Neither is a structure element and neither is counted.
+        _mcr = DictionaryObject({_pn("Type"): _pn("MCR"),
+                                 _pn("MCID"): NumberObject(1)})
+        _tw = PdfWriter()
+        _tw.add_blank_page(width=72, height=72)
+        _tw.root_object[_pn("StructTreeRoot")] = DictionaryObject({
+            _pn("Type"): _pn("StructTreeRoot"),
+            _pn("RoleMap"): DictionaryObject({_pn("Artifact"): _pn("Private"),
+                                              _pn("item"): _pn("LI")}),
+            _pn("K"): _se(
+                "Document", _ns_pdf2,
+                _se("enumerate", _ns_latex,
+                    _se("item", _ns_latex,
+                        _se("itemlabel", _ns_latex, NumberObject(0)),
+                        _se("itembody", _ns_latex, _mcr)),
+                    _se("item", _ns_latex,
+                        _se("itembody", _ns_latex),
+                        _se("itemlabel", _ns_latex))),
+                _se("Artifact", _ns_pdf2)),
+        })
+        _tagged_pdf = os.path.join(tempfile.mkdtemp(prefix="texlib_tagged_"),
+                                   "tagged.pdf")
+        with open(_tagged_pdf, "wb") as fh:
+            _tw.write(fh)
+        _tw.close()
+
+        _tk = ("examples/fixtures/Synthetic", "tagged.tex")
+
+        def _tagged_case(expected):
+            _st.EXPECT_TAGGED[_tk] = expected
+            try:
+                return _st.check_tagged_structure(_tk[0], _tk[1], _tagged_pdf)
+            finally:
+                del _st.EXPECT_TAGGED[_tk]
+
+        _tprobs, _tskip = _tagged_case(
+            {"Document": 1, "L": 1, "LI": 2, "Lbl": 2, "LBody": 2,
+             "Artifact": 1, "Private": 0})
+        check("tagged: tags resolve through their namespace, not the 1.7 RoleMap",
+              not _tskip and len(_tprobs) == 1 and " x" not in _tprobs[0],
+              str(_tprobs))
+        check("tagged: an item whose body precedes its label is reported",
+              _tprobs == ["tagged structure: 1 list item(s) not a label then a body"],
+              str(_tprobs))
+        _tprobs, _ = _tagged_case({"LI": 3})
+        check("tagged: a wrong count names the type, the count and the expectation",
+              len(_tprobs) == 1 and "LI x2 (expected 3)" in _tprobs[0],
+              str(_tprobs))
+        check("tagged: a document that declares nothing is not opened",
+              _st.check_tagged_structure("examples/fixtures/Synthetic",
+                                         "undeclared.tex",
+                                         os.path.join(_repo, "no-such.pdf"))
+              == ([], False))
+    else:
+        print("  SKIP  pypdf not installed -- tagged-structure tests skipped")
 
     # -----------------------------------------------------------------------
     # (y) Accessibility report. The accessible build writes veraPDF's

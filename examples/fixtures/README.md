@@ -37,8 +37,14 @@ it needs), then add an entry to `EXAMPLES` in `examples/manifest.py` — with
 (`smoke_test.py` derives its module list and `EXPECT_TEXT` from the manifest).
 Run `python smoke_test.py examples/fixtures/<Module>` to check it.
 
+A fixture about the tagged PDF can also declare `tagged=`, the exact number of
+structure elements of each standard type its accessible build must carry, for
+example `tagged={"L": 11, "LI": 27}`. veraPDF checks that a structure tree is
+legal; `tagged=` checks that it is the tree the page calls for. It is read only
+by `python smoke_test.py --accessible`.
+
 A directory may hold **several** fixtures: expectations are keyed by
-`(module, template)`, so each one keeps its own `expect`/`absent`/`artifact`
+`(module, template)`, so each one keeps its own `expect`/`absent`/`artifact`/`tagged`
 list. Put a fixture in the directory of the module it builds on, and reach for a
 new `<Module>` directory only when it genuinely builds on a different class —
 not to dodge a name collision. (Until 2026-08-31 those lists were keyed by

@@ -69,14 +69,16 @@ class Example:
     expect    substrings that must appear in the rendered PDF text
     absent    substrings that must NOT appear (the negative mirror of expect)
     artifact  glob patterns for sidecars that must exist and be non-empty
+    tagged    {standard structure type: count} the ACCESSIBLE build's structure
+              tree must carry exactly, e.g. {"L": 11, "LI": 27}
     note      why this example exists at all -- the thing a list of paths loses
     """
 
     __slots__ = ("module", "template", "kind", "tags", "expect", "absent",
-                 "artifact", "note")
+                 "artifact", "tagged", "note")
 
     def __init__(self, module, template, kind, tags,
-                 expect=(), absent=(), artifact=(), note=""):
+                 expect=(), absent=(), artifact=(), tagged=None, note=""):
         self.module = module
         self.template = template
         self.kind = kind
@@ -84,6 +86,7 @@ class Example:
         self.expect = tuple(expect)
         self.absent = tuple(absent)
         self.artifact = tuple(artifact)
+        self.tagged = dict(tagged or {})
         self.note = note
 
 
@@ -287,6 +290,11 @@ def expect_absent():
 def expect_artifact_nonempty():
     """{(module, template): [glob]} -- sidecars that must exist and be non-empty."""
     return {(e.module, e.template): list(e.artifact) for e in EXAMPLES if e.artifact}
+
+
+def expect_tagged():
+    """{(module, template): {structure type: count}} for the accessible build."""
+    return {(e.module, e.template): dict(e.tagged) for e in EXAMPLES if e.tagged}
 
 
 def visual_modules():
