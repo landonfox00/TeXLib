@@ -126,33 +126,6 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Fixed
 
-- **A tagged key raised TeX errors when a solution ended in a display.** A
-  shown solution's body is collected into a box, and the closing brace ends its
-  last paragraph without the `\par` token, so the tagging code's
-  end-of-paragraph hook never ran. After running text the next `\par` outside
-  closed the structure. After `\[ … \]` nothing did, and tagpdf stopped with
-  `there is no open structure on the stack`: twelve errors for a
-  `{partsolution}` in either layout, two for a `{solution}` in the inline
-  layout, a PDF written anyway, exit 0. Both render branches now end the body
-  with a real `\par` in an accessible build, under the guard the discard
-  branches already use. `test_solution_tagged_key.py` reads the log for it.
-
-- **An inline `{partsolution}` moved what followed it.** The layout's contract
-  is that a key page is its student page with the answers drawn in, and for a
-  part solution it did not hold. Two causes. The overlay ended with
-  `\nointerlineskip`, which left `\prevdepth` at −1000pt, so the line after the
-  answer space got no interline glue and sat about 3pt high, once per part
-  solution. And an overlay that was the last thing in its list (a part answer
-  ending a `{cols}` column) changed the enclosing box's depth, because the
-  question line's depth was no longer the list's last depth. Both inline
-  solutions now go through one macro, `\@sol@overlay`, which carries
-  `\prevdepth` across the overlay and closes the list with an empty box of the
-  depth it had. On a twelve-version exam the key's 48 problem pages kept between
-  70.3% and 97.2% of the student page's ink in place (1px tolerance at 100 dpi);
-  they now keep 100.000%, every page. `test_solution_inline_parity.py` gained
-  the two pages that tell the cases apart: one fails on the old code at 81.6%,
-  the other on the `\prevdepth` fix alone at 86.9%.
-
 - **The inline key was only half inline: a full-problem `{solution}` still
   displaced the page.** `\ShowKeyInline` exists so a key page *is* its student
   page with the answers drawn into the blanks — same pagination, same problem
@@ -192,6 +165,33 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   displaced box at the bottom of an otherwise empty page only eats its own
   stretch and the unfixed library scores 100% on it; and the cover is excluded,
   because the key's red "Solutions" badge is supposed to reflow it.
+
+- **An inline `{partsolution}` moved what followed it.** The layout's contract
+  is that a key page is its student page with the answers drawn in, and for a
+  part solution it did not hold. Two causes. The overlay ended with
+  `\nointerlineskip`, which left `\prevdepth` at −1000pt, so the line after the
+  answer space got no interline glue and sat about 3pt high, once per part
+  solution. And an overlay that was the last thing in its list (a part answer
+  ending a `{cols}` column) changed the enclosing box's depth, because the
+  question line's depth was no longer the list's last depth. Both inline
+  solutions now go through one macro, `\@sol@overlay`, which carries
+  `\prevdepth` across the overlay and closes the list with an empty box of the
+  depth it had. On a twelve-version exam the key's 48 problem pages kept between
+  70.3% and 97.2% of the student page's ink in place (1px tolerance at 100 dpi);
+  they now keep 100.000%, every page. `test_solution_inline_parity.py` gained
+  the two pages that tell the cases apart: one fails on the old code at 81.6%,
+  the other on the `\prevdepth` fix alone at 86.9%.
+
+- **A tagged key raised TeX errors when a solution ended in a display.** A
+  shown solution's body is collected into a box, and the closing brace ends its
+  last paragraph without the `\par` token, so the tagging code's
+  end-of-paragraph hook never ran. After running text the next `\par` outside
+  closed the structure. After `\[ … \]` nothing did, and tagpdf stopped with
+  `there is no open structure on the stack`: twelve errors for a
+  `{partsolution}` in either layout, two for a `{solution}` in the inline
+  layout, a PDF written anyway, exit 0. Both render branches now end the body
+  with a real `\par` in an accessible build, under the guard the discard
+  branches already use. `test_solution_tagged_key.py` reads the log for it.
 
 - **A luaotfload cache-path race cost roughly one parallel build in five.** The
   lane died before LaTeX started, with a traceback and no PDF:
