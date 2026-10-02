@@ -31,6 +31,35 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   box's shape (one line of height, the rest depth), which the inline key relies
   on to hang an answer below its question.
 
+- **`\keylayout{inline}` — a document says once that its keys keep the student
+  copy's page.** Every answer-bearing copy the builder makes of that document
+  (`_solutions`, `_instructor`, their tagged twins) is then laid out with the
+  inline layout: the answer space stays, each solution is drawn into it, and
+  every problem prints where the student copy prints it. The plain build is
+  still the student copy, pixel for pixel, cover included. The layout existed
+  only as the `solutions-inline` build mode, chosen by hand at each build and
+  never planned by the default fan-out; a preference in the source needs no
+  builder change, and the key lands under the names every tool already reads.
+  `\keylayout{compact}`, the default, is the layout keys had: the space closes
+  and the solutions flow.
+
+- **The inline key makes room for a solution taller than its blank.** The
+  overlay was unbounded: a solution taller than the answer space it was drawn
+  into printed over the next question, and nothing reported it. Whether it fits
+  cannot be known where the solution is typeset, because the blank is `\stretch`
+  glue and is sized when the page is. Each overlay now ends in a marker box
+  carrying how far below it the ink reaches, and `texlib_keyfit.lua`, called
+  from the kernel's `build/page/before` hook, checks the finished page. Where a
+  solution is short of room, the space after it is raised to what it needs and
+  the page's other stretchable spaces give that up in proportion to their
+  stretch; the page height does not change. A page on which everything fits is
+  not touched, so it stays identical to the student copy. A page that cannot
+  hold its solutions at all is reported: `Page N cannot hold its solutions`.
+  Measured on five exams (181 pages) with every solution set solid red: before,
+  black ink inside a solution block on one page of each of six versions of one
+  exam and on two pages of another; after, none on any page.
+  `test_solution_inline_fit.py` asserts it on word positions.
+
 - **The viewer opens on `<base>.pdf` as soon as the base compile ends, not when
   the fan-out does.** That PDF is final at that moment — everything after it
   writes *other* files (the tagged twins, the variant copies, the per-version
@@ -84,6 +113,22 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   leaves no blank strut behind.
 
 ### Fixed
+
+- **An inline `{partsolution}` moved what followed it.** The layout's contract
+  is that a key page is its student page with the answers drawn in, and for a
+  part solution it did not hold. Two causes. The overlay ended with
+  `\nointerlineskip`, which left `\prevdepth` at −1000pt, so the line after the
+  answer space got no interline glue and sat about 3pt high, once per part
+  solution. And an overlay that was the last thing in its list (a part answer
+  ending a `{cols}` column) changed the enclosing box's depth, because the
+  question line's depth was no longer the list's last depth. Both inline
+  solutions now go through one macro, `\@sol@overlay`, which carries
+  `\prevdepth` across the overlay and closes the list with an empty box of the
+  depth it had. On a twelve-version exam the key's 48 problem pages kept between
+  70.3% and 97.2% of the student page's ink in place (1px tolerance at 100 dpi);
+  they now keep 100.000%, every page. `test_solution_inline_parity.py` gained
+  the two pages that tell the cases apart: one fails on the old code at 81.6%,
+  the other on the `\prevdepth` fix alone at 86.9%.
 
 - **The inline key was only half inline: a full-problem `{solution}` still
   displaced the page.** `\ShowKeyInline` exists so a key page *is* its student

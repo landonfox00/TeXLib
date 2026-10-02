@@ -230,6 +230,28 @@ default. `\renewcommand{\texlibpartsolheader}{}` in the preamble removes it from
 part solutions and leaves `{solution}`'s in place; use it when a page of short
 part answers runs a key onto an extra page.
 
+`\keylayout{inline}` (preamble)
+Lay this document's keys out on the student copy's page. The answer space
+stays and each solution is drawn into it, so a key page is the student page
+with the answers showing: same pagination, every problem where the student
+copy prints it. It applies to every answer-bearing copy the builder makes
+(`<base>_solutions.pdf`, the per-version `_solutions` slices, `_instructor`,
+the tagged twins). The plain build is still the student copy.
+
+Where a solution is taller than the blank it is drawn into, the space after it
+grows to hold it and the page's other answer spaces give that up in proportion
+to their stretch. The page height does not change, and a page on which every
+solution fits is left exactly as the student copy. A page whose solutions cannot
+fit at all is reported in the log:
+
+```
+Package texlib-solutions Warning: Page 3 cannot hold its solutions:
+(texlib-solutions)                they need 41.5pt more room than it has.
+```
+
+`\keylayout{compact}` is the default: the answer space closes and the solutions
+flow, which is what a review sheet with no work space wants.
+
 `\rubric{points}{description}`
 Add a rubric line. Rendered as an overlay in rubric builds.
 
