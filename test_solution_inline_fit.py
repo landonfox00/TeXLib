@@ -6,8 +6,7 @@ The inline layout draws each solution as a zero-size overlay, so a key page is
 its student page with the answers in the blanks (test_solution_inline_parity.py
 guards that). Nothing bounded the overlay: a solution taller than the blank it
 was drawn into printed over the next question. texlib_keyfit.lua now checks
-each finished page and, where a solution is short of room, raises the space
-after it and takes the difference from the page's other answer spaces.
+each finished page.
 
 Three pages, three behaviours:
 
@@ -17,9 +16,15 @@ Three pages, three behaviours:
                problem below it on the same page. Without the fit pass the
                solution's last line prints BELOW the next problem's stem. With
                it, every line of the solution is above that stem, the stem has
-               moved down, and the page count is unchanged.
-  * NOROOM  -- a solution taller than the whole page. Nothing can make room; the
-               build must say so in the log rather than fail quietly.
+               moved down, and nothing left the page.
+  * NOROOM  -- six parts whose solutions together are taller than the page. No
+               sharing-out can hold them. The key must say so, continue on ONE
+               added page, and lose nothing: every solution line is printed
+               once, above the footer of the page it is on, each part is on the
+               same page as its own answer, and no answer runs into the part
+               after it. Making room without splitting the page pushes its
+               last items past the bottom margin and off the paper, at the
+               student copy's page count, with nothing in the PDF to show it.
 
 Asserted on word positions from poppler's `pdftotext -bbox`, since the point is
 where things are printed and the text is the same in every case. Soft-skips
@@ -85,10 +90,22 @@ COURSEMETA_TEX = r"""\metasetup{
 }
 """
 
+NOROOM_PARTS = 6
+NOROOM_LINES = 9
+
 TALL_LINES = "\n".join(
     rf"		Line {n} of a long worked solution. TALLLINE{n}\par" for n in range(1, 8))
-HUGE_LINES = "\n".join(
-    rf"		Line {n} of a solution no page can hold. HUGELINE\par" for n in range(1, 90))
+
+
+def _noroom_part(k: int) -> str:
+    lines = "\n".join(
+        rf"				Line {n} of answer {k}. NRLINE{k}x{n}\par"
+        for n in range(1, NOROOM_LINES + 1))
+    return (rf"		\ppart NRPART{k} Explain step {k}." "\n"
+            r"			\begin{partsolution}" "\n" + lines + "\n"
+            r"			\end{partsolution}" "\n"
+            r"			\workbox{1}")
+
 
 BANK_TEX = r"""\begin{problem}{fits}[topic=fits]
 	FITSSTEM Evaluate $2 + 2$.
@@ -120,10 +137,10 @@ BANK_TEX = r"""\begin{problem}{fits}[topic=fits]
 \end{problem}
 
 \begin{problem}{noroom}[topic=noroom]
-	NOROOMSTEM State everything.
-	\begin{solution}
-""" + HUGE_LINES + r"""
-	\end{solution}
+	NOROOMSTEM Explain each step.
+	\begin{parts}
+""" + "\n".join(_noroom_part(k) for k in range(1, NOROOM_PARTS + 1)) + r"""
+	\end{parts}
 \end{problem}
 """
 
@@ -144,7 +161,7 @@ EXAM_TEX = r"""\documentclass[exam-number=1, points=50]{autoexam}
 
 	\newpage
 
-	\problem[10][1]{topic=noroom}
+	\problem[1,1,1,1,1,1]{topic=noroom}
 \end{problems}
 \end{document}
 """
@@ -233,12 +250,14 @@ def main() -> int:
                   errors="replace") as fh:
             keylog = fh.read()
 
-        check("the key has the student copy's page count",
-              len(key) == len(student), f"student {len(student)}, key {len(key)}")
-        if len(key) != len(student) or len(key) < 4:
+        # Page indices: 0 is the cover, then FITS, SHORT, NOROOM; the key has
+        # one more, NOROOM's continuation.
+        check("the key is the student copy plus one continuation page",
+              len(student) == 4 and len(key) == 5,
+              f"student {len(student)} page(s), key {len(key)}")
+        if len(student) != 4 or len(key) != 5:
             return report(failures)
 
-        # Page indices: 0 is the cover, then the three problem pages.
         s_fit, k_fit = student[1], key[1]
         check("FITS: the solution is on the page", "FITSANSWER" in k_fit)
         if "FITSAFTERSTEM" in s_fit and "FITSAFTERSTEM" in k_fit:
@@ -269,8 +288,50 @@ def main() -> int:
         check("SHORT: the log records the room made",
               "made room for 1 tall solution(s)" in keylog)
 
-        check("NOROOM: a solution no page can hold is reported",
-              "cannot hold its solutions" in keylog)
+        check("NOROOM: the log says the page cannot hold its solutions",
+              "cannot hold its solutions" in keylog
+              and "continues on an added page" in keylog)
+        pages = (key[3], key[4])
+        where: dict[str, int] = {}
+        lost, twice = [], []
+        tokens = [f"NRPART{k}" for k in range(1, NOROOM_PARTS + 1)]
+        tokens += [f"NRLINE{k}x{n}" for k in range(1, NOROOM_PARTS + 1)
+                   for n in range(1, NOROOM_LINES + 1)]
+        for t in tokens:
+            hits = [i for i, pg in enumerate(pages) if t in pg]
+            if not hits:
+                lost.append(t)
+            elif len(hits) > 1:
+                twice.append(t)
+            else:
+                where[t] = hits[0]
+        check("NOROOM: every part and every solution line is printed, once",
+              not lost and not twice,
+              f"missing {lost[:6]}{'...' if len(lost) > 6 else ''}, "
+              f"repeated {twice[:6]}")
+        check("NOROOM: the continuation page is used",
+              any(i == 1 for i in where.values()),
+              "everything is still on the first page")
+        below = []
+        for t, i in where.items():
+            footer = pages[i].get("University")
+            if footer and pages[i][t][1] > footer[0]:
+                below.append(t)
+        check("NOROOM: nothing is printed past the footer", not below,
+              f"{below[:6]} sit below the footer line")
+        apart = [k for k in range(1, NOROOM_PARTS + 1)
+                 if where.get(f"NRPART{k}") != where.get(f"NRLINE{k}x1")]
+        check("NOROOM: each part is on the same page as its answer", not apart,
+              f"parts {apart} were split from their answers")
+        over = []
+        for k in range(1, NOROOM_PARTS):
+            last, nxt = f"NRLINE{k}x{NOROOM_LINES}", f"NRPART{k + 1}"
+            if where.get(last) is not None and where.get(last) == where.get(nxt):
+                pg = pages[where[last]]
+                if pg[last][1] >= pg[nxt][0]:
+                    over.append(k)
+        check("NOROOM: no answer runs into the part after it", not over,
+              f"answers {over} overlap the next part")
         return report(failures)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
         log(f"FAIL: build environment failed -- {type(exc).__name__}: {exc}")

@@ -106,6 +106,10 @@
 		\parskip\z@skip
 		\par
 		\@sol@prevdepth\prevdepth
+		% No page break between a line and the answer drawn under it. A penalty
+		% takes no space, so the student geometry is untouched; it matters only
+		% when a page that cannot hold its solutions is split (see below).
+		\nobreak
 		\nointerlineskip
 		\noindent\box#1\par
 		\nointerlineskip
@@ -140,8 +144,40 @@
 		end
 		texlib_keyfit = dofile(find("texlib_keyfit.lua"))
 	}%
+	% A page that cannot hold its solutions comes back from fit() set solid --
+	% each solution's reach is real depth on the box that owns it -- with
+	% \@sol@spillstate raised. It is split at the column height: the part that
+	% fits is shipped as this page, and the rest is returned to the main
+	% vertical list from build/page/after, where the output routine's own
+	% material goes back to the front of the recent contributions. It is
+	% followed by a page break, so the continuation is a page of its own and
+	% the pages after it keep their contents. Both halves keep their \stretch
+	% glue, so each shares out its own free space the way the student page
+	% does. The split runs in a group so that \vbadness and \vfuzz stay its
+	% own: a page with no stretch in it splits underfull, and that is not
+	% worth a warning on top of the one fit() has already given.
+	\newcount\@sol@spillstate
+	\newbox\@sol@head
+	\newbox\@sol@spill
 	\AddToHook{build/page/before}{%
-		\directlua{texlib_keyfit.fit(\number\@outputbox, \@sol@reachattr)}}
+		\@sol@spillstate\z@
+		\directlua{texlib_keyfit.fit(\number\@outputbox, \@sol@reachattr)}%
+		\ifnum\@sol@spillstate>\z@
+			\begingroup
+				\vbadness\@M \vfuzz\maxdimen
+				\splittopskip\topskip \splitmaxdepth\maxdepth
+				\setbox\@tempboxa\vbox{\unvbox\@outputbox}%
+				\global\setbox\@sol@head\vsplit\@tempboxa to\@colht
+				\global\setbox\@sol@spill\box\@tempboxa
+			\endgroup
+			\setbox\@outputbox\vbox to\@colht{\unvbox\@sol@head\vfil}%
+		\fi}
+	\AddToHook{build/page/after}{%
+		\ifvoid\@sol@spill\else
+			\unvbox\@sol@spill
+			\vfil\penalty-\@M
+			\global\setbox\@sol@spill\box\voidb@x
+		\fi}
 \fi
 \gdef\@partsol@rubric{}
 \gdef\@sol@rubric{}

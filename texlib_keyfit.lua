@@ -13,13 +13,22 @@
 -- (texlib-solutions.sty, \@sol@overlay). fit() lays out the page's top-level
 -- list with the glue as it was set, and for every marker compares that reach
 -- with the space actually standing between the marker and the next thing with
--- size. A page on which every solution fits is left untouched, node for node,
--- which is what keeps the common case identical to the student copy.
+-- size. There are three outcomes.
 --
--- On a page where one does not fit, the space after that solution is raised to
--- what the solution needs and the page's other stretchable spaces give it up
--- in proportion to their stretch -- the same rule TeX used to hand the space
--- out, with a floor under the short ones. The page height does not change.
+--   Every solution fits. The page is left untouched, node for node, which is
+--   what keeps the common case identical to the student copy.
+--
+--   Some do not, and the page has the room. The space after each solution gets
+--   a floor (what that solution needs) and the page's stretch is handed out
+--   again in proportion, as TeX handed it out, above those floors. The page
+--   height does not change.
+--
+--   The page cannot hold its solutions at all. Each solution's reach becomes
+--   real depth on the box that owns it, so the list is as tall as its ink.
+--   fit() reports that through \@sol@spillstate and the caller splits the list
+--   at the page height: what fits is shipped, the rest becomes a continuation
+--   page. Making room on such a page without splitting it would push its last
+--   items past the bottom margin and off the paper.
 --
 -- Called from the kernel's build/page/before hook, on \@outputbox.
 
@@ -66,7 +75,7 @@ local function markers_in(b, top, attr, out, owner)
 				local size = n.height + n.depth
 				local need = node.get_attribute(n, attr)
 				if need then
-					out[#out + 1] = { bottom = y + size, need = need, owner = owner }
+					out[#out + 1] = { node = n, bottom = y + size, need = need, owner = owner }
 				end
 				markers_in(n, y, attr, out, owner)
 				y = y + size
@@ -85,12 +94,18 @@ local function markers_in(b, top, attr, out, owner)
 				local ntop = base + n.shift - n.height
 				local need = node.get_attribute(n, attr)
 				if need then
-					out[#out + 1] = { bottom = ntop + n.height + n.depth, need = need, owner = owner }
+					out[#out + 1] = { node = n, bottom = ntop + n.height + n.depth, need = need, owner = owner }
 				end
 				markers_in(n, ntop, attr, out, owner)
 			end
 		end
 	end
+end
+
+local function fix(g, size)
+	g.width = size
+	g.stretch, g.stretch_order = 0, 0
+	g.shrink, g.shrink_order = 0, 0
 end
 
 function M.fit(boxnumber, attr)
@@ -109,7 +124,7 @@ function M.fit(boxnumber, attr)
 			local size = n.height + n.depth
 			local need = node.get_attribute(n, attr)
 			if need then
-				markers[#markers + 1] = { bottom = y + size, need = need, owner = index }
+				markers[#markers + 1] = { node = n, bottom = y + size, need = need, owner = index }
 			end
 			markers_in(n, y, attr, markers, index)
 			y = y + size
@@ -131,50 +146,104 @@ function M.fit(boxnumber, attr)
 	end
 	if #markers == 0 then return end
 
-	-- What each solution is short by. The space it has is everything between
-	-- its owner and the next solid item. If that run holds stretchable glue,
-	-- the glue gets a floor; if it holds none, a kern is added after the owner.
-	local floor_of, extra, short_count = {}, {}, 0
+	-- How far below each owner its solutions reach.
+	local reach = {}
 	for _, m in ipairs(markers) do
-		local need = m.bottom + m.need - items[m.owner].bottom
-		if need > 0 then
-			local avail, flex_i = 0, nil
-			local k = m.owner + 1
-			while items[k] and not items[k].solid do
-				avail = avail + items[k].bottom - items[k].top
-				if items[k].flex and not flex_i then flex_i = k end
-				k = k + 1
-			end
-			if need > avail then
-				local short = need - avail
-				if flex_i then
-					floor_of[flex_i] = math.max(floor_of[flex_i] or 0, items[flex_i].size + short)
-				else
-					extra[m.owner] = math.max(extra[m.owner] or 0, short)
-				end
-				short_count = short_count + 1
-			end
+		local r = m.bottom + m.need - items[m.owner].bottom
+		if r > (reach[m.owner] or 0) then reach[m.owner] = r end
+	end
+
+	-- The room each owner has is everything between it and the next solid
+	-- item. If that run holds stretchable glue, the glue gets a floor: the
+	-- size at which the solution still fits. Every owner sets one, not only
+	-- the short ones, because the spaces that are generous now are the ones
+	-- that will be asked to give. A run with no stretchable glue can only be
+	-- helped by a kern after the owner.
+	local floor_of, extra, short_count = {}, {}, 0
+	for owner, r in pairs(reach) do
+		local avail, flex_i = 0, nil
+		local k = owner + 1
+		while items[k] and not items[k].solid do
+			avail = avail + items[k].bottom - items[k].top
+			if items[k].flex and not flex_i then flex_i = k end
+			k = k + 1
 		end
+		local lack = r - avail
+		if flex_i then
+			floor_of[flex_i] = math.max(floor_of[flex_i] or 0, items[flex_i].size + lack)
+		elseif lack > 0 then
+			extra[owner] = lack
+		end
+		if lack > 0 then short_count = short_count + 1 end
 	end
 	if short_count == 0 then return end
 
-	-- Hand the page's stretch out again: x = max(floor, natural + stretch * u),
-	-- with u chosen so the total is what it was, less the kerns.
-	local flex, total = {}, 0
+	-- TEXLIB_KEYFIT_TRACE=1 writes the page as fit() read it to the log: one
+	-- line per top-level item, in points. The decisions below are arithmetic
+	-- on these numbers, so this is the thing to read when one looks wrong.
+	if os.getenv("TEXLIB_KEYFIT_TRACE") then
+		texio.write_nl("log", string.format("keyfit: page %d, column %.1fpt",
+			tex.count[0], box.height / 65536))
+		for i, it in ipairs(items) do
+			local size = it.bottom - it.top
+			if size ~= 0 or reach[i] or it.flex then
+				texio.write_nl("log", string.format(
+					"keyfit: %3d %-5s top %7.1f size %7.1f%s%s%s",
+					i, node.type(it.node.id), it.top / 65536, size / 65536,
+					it.solid and " solid" or "", it.flex and " flex" or "",
+					reach[i] and string.format(" reach %.1f", reach[i] / 65536) or ""))
+			end
+		end
+	end
+
+	local flex, total, floors = {}, 0, 0
 	for i, it in ipairs(items) do
 		if it.flex then
 			local nat = it.node.width
-			flex[#flex + 1] = {
+			local f = {
 				node = it.node, nat = nat, str = it.node.stretch,
 				floor = math.max(floor_of[i] or nat, nat),
 			}
+			flex[#flex + 1] = f
 			total = total + it.size
+			floors = floors + f.floor
 		end
 	end
 	local kerns = 0
 	for _, e in pairs(extra) do kerns = kerns + e end
 	local budget = total - kerns
+	local page = tex.count[0]
 
+	-- Each message line is kept under the engine's 79-column wrap, which would
+	-- otherwise break it mid-word wherever the numbers put it.
+	--
+	-- SLACK: a page short by less than this is squeezed, not split. Every
+	-- reach carries 6pt of clearance below the ink, so a page 6pt short still
+	-- prints nothing over anything, and an added page is a high price for it.
+	local SLACK = 6 * 65536
+	if floors - budget > SLACK then
+		-- No room. Make each solution solid and hand the list back to be
+		-- split. The stretch is left in the glue: the caller repacks both
+		-- halves, and each then shares its own free space among its own
+		-- blanks, which is the student copy's rule applied to what is left.
+		for owner, r in pairs(reach) do
+			local n = items[owner].node
+			n.depth = n.depth + r
+		end
+		for _, m in ipairs(markers) do node.unset_attribute(m.node, attr) end
+		tex.count["@sol@spillstate"] = 1
+		texio.write_nl("term and log", string.format(
+			"Package texlib-solutions Warning: Page %d cannot hold its solutions:", page))
+		texio.write_nl("term and log", string.format(
+			"(texlib-solutions)                they need %.1fpt more room than it has;",
+			(floors - budget) / 65536))
+		texio.write_nl("term and log",
+			"(texlib-solutions)                the key continues on an added page.")
+		return
+	end
+
+	-- Hand the stretch out again: x = max(floor, natural + stretch * u), with u
+	-- chosen so the total is what it was, less the kerns.
 	local clamped, u = {}, 0
 	while true do
 		local held, nat, str = 0, 0, 0
@@ -198,14 +267,8 @@ function M.fit(boxnumber, attr)
 		if not again then break end
 	end
 
-	local used = 0
 	for j, f in ipairs(flex) do
-		local x = clamped[j] and f.floor or round(f.nat + f.str * u)
-		used = used + x
-		local g = f.node
-		g.width = x
-		g.stretch, g.stretch_order = 0, 0
-		g.shrink, g.shrink_order = 0, 0
+		fix(f.node, clamped[j] and f.floor or round(f.nat + f.str * u))
 	end
 	for owner, e in pairs(extra) do
 		local k = node.new(KERN)
@@ -213,22 +276,9 @@ function M.fit(boxnumber, attr)
 		box.head = node.insert_after(box.head, items[owner].node, k)
 	end
 	box.glue_set, box.glue_sign, box.glue_order = 0, 0, 0
-
-	-- Each line is kept under the engine's 79-column wrap, which would
-	-- otherwise break the message mid-word wherever the numbers put it.
-	local page = tex.count[0]
-	local over = used + kerns - total
-	if over > 65536 then
-		texio.write_nl("term and log", string.format(
-			"Package texlib-solutions Warning: Page %d cannot hold its solutions:", page))
-		texio.write_nl("term and log", string.format(
-			"(texlib-solutions)                they need %.1fpt more room than it has.",
-			over / 65536))
-	else
-		texio.write_nl("log", string.format(
-			"texlib-solutions: page %d: made room for %d tall solution(s).",
-			page, short_count))
-	end
+	texio.write_nl("log", string.format(
+		"texlib-solutions: page %d: made room for %d tall solution(s).",
+		page, short_count))
 end
 
 return M
