@@ -5,6 +5,7 @@ deploy.ps1 excludes it. Because Python puts a script's own directory on sys.path
 `import _testkit` resolves from any Sublime/test_*.py with no extra path setup."""
 import glob
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -38,6 +39,30 @@ def report(ok):
     """Family-A footer: print the verdict and exit 0 (pass) / 1 (fail)."""
     print("\nALL PASS" if ok else "\nFAILURES ABOVE")
     sys.exit(0 if ok else 1)
+
+
+# A document argument carries a deferral prefix whenever the preamble scanner
+# found something this document never uses -- which, for the synthetic one-line
+# documents the suites build, is everything. That prefix is not a MODE macro,
+# and the assertions about mode macros compare against the argument with any
+# prefix stripped.
+_DEFER_PREFIX_RE = re.compile(r"^(?:\\def\\TeXLibNo[A-Za-z]+\{\})+")
+
+
+def without_defer(arg):
+    r"""`arg` minus its \def\TeXLibNo... prefix, unwrapped from \input{...}.
+
+    "doc.tex" -> "doc.tex"
+    "\def\TeXLibNoBib{}\input{doc.tex}" -> "doc.tex"
+    "\def\ShowKey{}\input{doc.tex}" -> "\def\ShowKey{}\input{doc.tex}"  (a mode
+    macro survives, which is exactly what these assertions must still catch.)
+    """
+    arg = str(arg)
+    stripped = _DEFER_PREFIX_RE.sub("", arg)
+    if stripped == arg:
+        return arg                      # nothing was stripped; leave it alone
+    match = re.fullmatch(r"\\input\{(.*)\}", stripped)
+    return match.group(1) if match else stripped
 
 
 def touch(root, rel, body=""):
