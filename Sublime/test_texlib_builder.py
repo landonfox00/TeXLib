@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sys
 import types
 import tempfile
@@ -861,39 +862,45 @@ def main():
         sees the lane exactly as the pass would, may rewrite it as the pass
         would, and returns the output to feed back. `seed` maps a path under
         the tex dir to the text an earlier build left there.
+
+        Returns (commands, display). The scratch directory is removed before
+        returning, so anything a case wants from a lane it reads in `script`.
         """
         tmp = tempfile.mkdtemp(prefix="texlib_lane_")
-        files = dict(seed or {})
-        files["doc.tex"] = doc
-        if meta:
-            files["doc.buildmeta"] = meta
-        for rel, text in files.items():
-            path = os.path.join(tmp, *rel.split("/"))
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8", newline="") as fh:
-                fh.write(text)
-        b = TexlibBuilder()
-        b.tex_root = os.path.join(tmp, "doc.tex")
-        b.tex_name, b.base_name, b.tex_dir = "doc.tex", "doc", tmp
-        b.engine, b.out = "pdflatex", ""
-        b.options = list(options)
-        if runner is not None:
-            b.builder_settings = {"build_jobs": 4}
-            b.run_parallel = runner
-        cmds = []
-        gen = b.commands()
         try:
-            item = next(gen)
-            while True:
-                cmds.append(item)
-                out_dir = next((str(x).split("=", 1)[1] for x in item[0]
-                                if str(x).startswith("-output-directory=")),
-                               tmp)
-                b.out = script(item, out_dir) or ""
-                item = gen.send(0)
-        except StopIteration:
-            pass
-        return cmds, getattr(b, "_displayed", ""), tmp
+            files = dict(seed or {})
+            files["doc.tex"] = doc
+            if meta:
+                files["doc.buildmeta"] = meta
+            for rel, text in files.items():
+                path = os.path.join(tmp, *rel.split("/"))
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w", encoding="utf-8", newline="") as fh:
+                    fh.write(text)
+            b = TexlibBuilder()
+            b.tex_root = os.path.join(tmp, "doc.tex")
+            b.tex_name, b.base_name, b.tex_dir = "doc.tex", "doc", tmp
+            b.engine, b.out = "pdflatex", ""
+            b.options = list(options)
+            if runner is not None:
+                b.builder_settings = {"build_jobs": 4}
+                b.run_parallel = runner
+            cmds = []
+            gen = b.commands()
+            try:
+                item = next(gen)
+                while True:
+                    cmds.append(item)
+                    out_dir = next(
+                        (str(x).split("=", 1)[1] for x in item[0]
+                         if str(x).startswith("-output-directory=")), tmp)
+                    b.out = script(item, out_dir) or ""
+                    item = gen.send(0)
+            except StopIteration:
+                pass
+            return cmds, getattr(b, "_displayed", "")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def lane_files(d):
         """{name: text} for the files in one lane directory."""
@@ -1027,6 +1034,7 @@ def main():
           lane_files(shared) == {"doc.aux": _CUT,
                                  "sibling.aux": "another document's"},
           lane_files(shared))
+    shutil.rmtree(shared, ignore_errors=True)
 
     # (k1e) THE SETTLE RULE. tagpdf numbers the parent tree from the page count
     # the previous pass recorded, so a tagged pass that ships a page more than
@@ -1055,7 +1063,7 @@ def main():
     def tagged_of(cmds):
         return [c for c in cmds if is_tagged(c)]
 
-    cmds, disp, _ = drive_lanes(_ACC_OPT, tagged_outputs(["", _WRONG]))
+    cmds, disp = drive_lanes(_ACC_OPT, tagged_outputs(["", _WRONG]))
     tagged = tagged_of(cmds)
     check("settle: a second pass on the wrong last page buys a third",
           len(tagged) == 3, [c[1] for c in tagged])
@@ -1068,24 +1076,23 @@ def main():
     check("settle: a lane that settles on its third pass reports no ceiling",
           len(tagged) == 3 and "unsettled" not in disp, repr(disp))
 
-    cmds, _, _ = drive_lanes(_ACC_OPT, tagged_outputs(["", _EXTRA]))
+    cmds, _ = drive_lanes(_ACC_OPT, tagged_outputs(["", _EXTRA]))
     check("settle: a temporary extra page buys a third pass too",
           len(tagged_of(cmds)) == 3, [c[1] for c in tagged_of(cmds)])
 
     #   The page count is the only trigger. Changed labels are not one.
-    cmds, _, _ = drive_lanes(_ACC_OPT, tagged_outputs(["", _LABELS]))
+    cmds, _ = drive_lanes(_ACC_OPT, tagged_outputs(["", _LABELS]))
     check("settle: changed labels alone do not buy a pass",
           len(tagged_of(cmds)) == 2, [c[1] for c in tagged_of(cmds)])
 
     #   Only the last pass's verdict counts. On a cold lane half the example
     #   corpus ends run 1 with one of the two messages and run 2 clean.
-    cmds, _, _ = drive_lanes(_ACC_OPT, tagged_outputs([_WRONG, ""]))
+    cmds, _ = drive_lanes(_ACC_OPT, tagged_outputs([_WRONG, ""]))
     check("settle: a wrong last page in run 1 alone costs nothing",
           len(tagged_of(cmds)) == 2, [c[1] for c in tagged_of(cmds)])
 
     #   After an abort on a cold lane: probe, AF, AF with a page more, AF.
-    cmds, _, _ = drive_lanes(_ACC_OPT,
-                             tagged_outputs([_ABORT, "", _WRONG, ""]))
+    cmds, _ = drive_lanes(_ACC_OPT, tagged_outputs([_ABORT, "", _WRONG, ""]))
     tagged = tagged_of(cmds)
     check("settle: abort on a cold lane -> probe plus three AF passes",
           len(tagged) == 4
@@ -1099,13 +1106,13 @@ def main():
           [c[1] for c in tagged])
 
     #   A document that never settles stops at the ceiling and says so.
-    cmds, disp, _ = drive_lanes(_ACC_OPT, tagged_outputs([], then=_WRONG))
+    cmds, disp = drive_lanes(_ACC_OPT, tagged_outputs([], then=_WRONG))
     check("settle: a lane that never settles stops at MAX_RERUNS passes",
           len(tagged_of(cmds)) == MAX_RERUNS,
           "%d tagged passes" % len(tagged_of(cmds)))
     check("settle: and the ceiling is reported",
           "still unsettled after %d passes" % MAX_RERUNS in disp, repr(disp))
-    cmds, _, _ = drive_lanes(_ACC_OPT, tagged_outputs([_ABORT], then=_WRONG))
+    cmds, _ = drive_lanes(_ACC_OPT, tagged_outputs([_ABORT], then=_WRONG))
     check("settle: the aborted probe does not count toward the ceiling",
           len(tagged_of(cmds)) == 1 + MAX_RERUNS,
           "%d tagged passes" % len(tagged_of(cmds)))
@@ -1117,7 +1124,7 @@ def main():
             return next((o for key, o in outs.items() if key in item[1]), "")
         return script
 
-    cmds, _, _ = drive_lanes(
+    cmds, _ = drive_lanes(
         ["--texlib-mode=default"],
         by_message({"[student-a11y] run 2": _WRONG,
                     "[student] run 2": _WRONG}),
@@ -1180,7 +1187,7 @@ def main():
           [[l for l, _c, _a in w] for w, _n in waves])
 
     waves = []
-    _, disp, _ = drive_lanes(
+    _, disp = drive_lanes(
         ["--texlib-mode=default"], quiet, doc=PSET, meta=FULL_META,
         runner=lane_runner(waves, lambda label, n: _WRONG))
     check("settle/parallel: lanes that never settle stop at MAX_RERUNS passes",
