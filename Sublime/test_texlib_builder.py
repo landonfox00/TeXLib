@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sys
 import types
 import tempfile
@@ -2552,6 +2553,85 @@ def main():
     check("a11y report: report name pairs with the tagged PDF",
           _bs.VERAPDF_REPORT_SUFFIX.startswith("_accessible"),
           _bs.VERAPDF_REPORT_SUFFIX)
+
+    # ====================================================================== #
+    # Poppler lookup.
+    #
+    # A content suite that finds no poppler pdftotext soft-skips with exit 0,
+    # so a lookup that misses an installed one fails nothing. Two ways it has
+    # missed: Git Bash puts Git's xpdf pdftotext ahead of TeX Live's on PATH,
+    # and the fallback path named TeX Live 2025 on a machine that has 2026.
+    # ====================================================================== #
+    print("\n-- poppler lookup --")
+    _ptmp = tempfile.mkdtemp(prefix="texlib_poppler_")
+    _sfx = ".exe" if os.name == "nt" else ""
+
+    def _tool(*parts):
+        p = os.path.join(_ptmp, *parts) + _sfx
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        open(p, "wb").close()
+        return p
+
+    _xpdf = _tool("git", "pdftotext")
+    _engine = _tool("tl", "bin", "lualatex")
+    _beside = _tool("tl", "bin", "pdftotext")
+    _y2025 = _tool("texlive", "2025", "bin", "windows", "pdftotext")
+    _y2026 = _tool("texlive", "2026", "bin", "windows", "pdftotext")
+    _globs = [os.path.join(_ptmp, "texlive", "*", "bin", "windows")]
+
+    def _find(on_path, globs=(), poppler=lambda p: p != _xpdf):
+        _old = (_bs.shutil.which, _bs._texlive_bin_globs, _bs._is_poppler)
+        _bs.shutil.which = lambda name, *a, **k: on_path.get(name)
+        _bs._texlive_bin_globs = lambda: list(globs)
+        _bs._is_poppler = poppler
+        try:
+            return _bs.find_poppler("pdftotext")
+        finally:
+            _bs.shutil.which, _bs._texlive_bin_globs, _bs._is_poppler = _old
+
+    check("poppler: an xpdf pdftotext first on PATH loses to the one beside "
+          "the engine",
+          _find({"pdftotext": _xpdf, "lualatex": _engine}) == _beside)
+    check("poppler: a poppler pdftotext on PATH still wins",
+          _find({"pdftotext": _beside, "lualatex": _engine}, _globs) == _beside)
+    check("poppler: with nothing on PATH the newest TeX Live year is taken",
+          _find({}, _globs) == _y2026)
+    os.remove(_y2026)
+    check("poppler: an older year is found when it is the only one",
+          _find({}, _globs) == _y2025)
+    check("poppler: no candidate with a poppler banner means None",
+          _find({"pdftotext": _xpdf}, _globs, poppler=lambda p: False) is None)
+    check("poppler: a candidate that does not exist is never probed",
+          _find({"lualatex": os.path.join(_ptmp, "gone", "lualatex" + _sfx)})
+          is None)
+    shutil.rmtree(_ptmp, ignore_errors=True)
+
+    # The pinned year lived in six private copies of this lookup. A pattern
+    # with the year spelled out matches no line of this file, so the check
+    # cannot trip on its own source.
+    _pinned_re = re.compile(r"texlive[\\/]+20\d\d[\\/]+bin", re.I)
+    _pinned, _scanned = [], set()
+    for _dirpath, _dirnames, _filenames in os.walk(_repo):
+        # Pruned by NAME below the root. Matching on the absolute path would
+        # skip every directory of a checkout that itself lives under .claude/.
+        _dirnames[:] = [d for d in _dirnames if d not in (".git", ".claude")]
+        for _fn in _filenames:
+            if not _fn.endswith(".py"):
+                continue
+            _p = os.path.join(_dirpath, _fn)
+            try:
+                _txt = open(_p, encoding="utf-8", errors="replace").read()
+            except OSError:
+                continue
+            _scanned.add(os.path.relpath(_p, _repo).replace(os.sep, "/"))
+            if _pinned_re.search(_txt):
+                _pinned.append(os.path.relpath(_p, _repo))
+    check("poppler: no Python file pins a TeX Live year in a bin path",
+          not _pinned, "; ".join(_pinned))
+    check("poppler: that scan reached the repo-root suites and the tools",
+          {"test_mode_effects.py", "version_diff.py",
+           "Sublime/_testkit.py"} <= _scanned,
+          "%d files scanned" % len(_scanned))
 
     # ====================================================================== #
     # (y) Preamble deferral + the precompiled-preamble cache.

@@ -26,9 +26,11 @@ this directory to `sys.path`). Sublime does not auto-load `.py` from a package
 subfolder, so adding a module here is import-only and cannot become a plugin.
 """
 
+import glob
 import os
 import re
 import shutil
+import subprocess
 
 # Document classes that MUST be compiled with lualatex.
 #
@@ -268,3 +270,78 @@ def verapdf_report_cmd(exe, pdf_path, fmt="html", itemize=False):
         cmd.append("--success")
     cmd.append(pdf_path)
     return cmd
+
+
+# --- poppler lookup ---------------------------------------------------------
+#
+# The content suites read a built PDF back with poppler's pdftotext, and a
+# suite that cannot find one soft-skips with exit 0. So when the lookup misses
+# an installed poppler, the suite reports green having verified no content.
+# The lookup was a private copy in five repo-root suites and version_diff.py,
+# each ending in a TeX Live path pinned to 2025, and all six went blind
+# together when TeX Live 2026 replaced it. Declared here, once, for every one
+# of them and for Sublime/_testkit.py.
+
+_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
+
+
+def _texlive_bin_globs():
+    """Glob patterns for the bin directory of a default TeX Live install.
+
+    The year is a wildcard. A pinned year works until the next TeX Live and
+    then points at nothing.
+    """
+    if os.name == "nt":
+        return [r"C:\texlive\*\bin\windows"]
+    return []
+
+
+def _poppler_candidates(tool):
+    """Places a poppler `tool` may live, in the order they should win.
+
+    PATH first. Then the directory of the TeX engine on PATH, because TeX Live
+    for Windows ships poppler's tools beside lualatex and that follows the
+    install wherever it is and whatever its year. Then the default TeX Live
+    roots, newest year first, for a shell that has no engine on PATH either.
+    """
+    exe = tool + (".exe" if os.name == "nt" else "")
+    found = shutil.which(tool)
+    if found:
+        yield found
+    for engine in ("lualatex", "pdflatex"):
+        beside = shutil.which(engine)
+        if beside:
+            yield os.path.join(os.path.dirname(beside), exe)
+    for pattern in _texlive_bin_globs():
+        for bindir in sorted(glob.glob(pattern), reverse=True):
+            yield os.path.join(bindir, exe)
+
+
+def _is_poppler(exe):
+    """True when `exe -v` prints a poppler banner."""
+    try:
+        proc = subprocess.run([exe, "-v"], capture_output=True, text=True,
+                              encoding="utf-8", errors="replace",
+                              creationflags=_NO_WINDOW, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return "poppler" in ((proc.stdout or "") + (proc.stderr or "")).lower()
+
+
+def find_poppler(tool="pdftotext"):
+    """Absolute path to a poppler-flavored `tool` (pdftotext/pdftoppm), or None.
+
+    Git for Windows ships an xpdf-flavored pdftotext that shadows poppler's on
+    PATH in Git Bash and silently lacks -bbox (it prints usage instead of
+    erroring), so being first on PATH proves nothing. Each candidate is asked
+    for its -v banner and the first one that says poppler wins.
+    """
+    seen = set()
+    for cand in _poppler_candidates(tool):
+        key = os.path.normcase(os.path.abspath(cand))
+        if key in seen or not os.path.isfile(cand):
+            continue
+        seen.add(key)
+        if _is_poppler(cand):
+            return cand
+    return None

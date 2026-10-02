@@ -40,25 +40,12 @@ TEXLIB_ROOT = os.path.dirname(os.path.abspath(__file__))
 LUALATEX = shutil.which("lualatex")
 
 
-# --- Poppler pdftotext detection (mirrors test_synctex_integration.py) --------
-def _find_poppler_pdftotext() -> str | None:
-    candidates: list[str] = []
-    which = shutil.which("pdftotext")
-    if which:
-        candidates.append(which)
-    candidates.append(r"C:\texlive\2025\bin\windows\pdftotext.exe")
-    for cand in candidates:
-        try:
-            proc = subprocess.run([cand, "-v"], capture_output=True, text=True,
-                                   encoding="utf-8", errors="replace", timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        if "poppler" in ((proc.stdout or "") + (proc.stderr or "")).lower():
-            return cand
-    return None
+# --- Poppler pdftotext detection ----------------------------------------------
+# The lookup is declared once, in Sublime/texlib/texlib_buildspec.py.
+sys.path.insert(0, os.path.join(TEXLIB_ROOT, "Sublime", "texlib"))
+from texlib_buildspec import find_poppler  # noqa: E402
 
-
-PDFTOTEXT = _find_poppler_pdftotext()
+PDFTOTEXT = find_poppler()
 
 
 # --- Shared fixture pieces ----------------------------------------------------

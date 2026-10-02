@@ -217,6 +217,34 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   names. A test that must stay out of CI goes in the file's `EXEMPT` table with
   the reason.
 
+- **Five content suites soft-skipped from Git Bash on a machine with TeX Live
+  2026, and `version_diff.py` could not run there.** `test_mode_effects.py`,
+  `test_engine_correctness.py`, `test_bank_catalog.py`, `test_class_render.py`,
+  `test_mc_schedule_render.py` and `version_diff.py` each carried a private copy
+  of the poppler lookup: `shutil.which("pdftotext")`, then the literal
+  `C:\texlive\2025\bin\windows\pdftotext.exe`. In Git Bash the first resolves to
+  Git's xpdf build (4.06, whose banner does not say poppler), and with TeX Live
+  2026 installed the second does not exist. Each suite printed its `SKIP` line
+  and exited 0, so the build-mode leakage guard and four other content checks
+  verified nothing; `version_diff.py` reported `no poppler pdftotext` for every
+  version.
+
+  The lookup is now `find_poppler` in `Sublime/texlib/texlib_buildspec.py`,
+  declared once and imported by all six. `Sublime/_testkit.py`, which had
+  already moved to a year glob, calls it too. Candidates are tried in this
+  order, and the first whose `-v` banner says poppler wins: the tool on PATH;
+  the directory of the `lualatex` or `pdflatex` on PATH, since TeX Live for
+  Windows ships poppler's tools beside the engines; then
+  `C:\texlive\*\bin\windows`, newest year first.
+
+  Run from Git Bash with PATH untouched, on TeX Live 2026 with poppler 25.02.0:
+  `test_mode_effects.py` 72 passed, `test_engine_correctness.py` 53,
+  `test_bank_catalog.py` 6, `test_class_render.py` 17,
+  `test_mc_schedule_render.py` 12, each of which printed `SKIP` before.
+  `test_texlib_builder.py` gains eight checks on the candidate order, one of
+  which fails if any `.py` file in the repo names a TeX Live year in a `bin`
+  path.
+
 ## [0.9.0] — 2026-09-08
 
 ### Fixed
