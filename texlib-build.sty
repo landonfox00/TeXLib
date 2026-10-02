@@ -73,6 +73,39 @@
 \newcommand{\instructormode}{\instructortrue\studentfalse}
 \newcommand{\accessible}{\TeXLibAccessibletrue}
 
+% \keylayout{inline} -- this document's keys keep the student copy's page.
+%   Every answer-bearing copy of the document (the solutions variant, the
+%   instructor variant, their tagged twins) is laid out with \ifsolinline: the
+%   answer space stays, and each solution is drawn into it. \keylayout{compact}
+%   is the default, where the answer space collapses and the solutions flow.
+%
+%   It is a preference and not a mode. \ShowKeyInline and \keysinline ASK for a
+%   key; this asks for nothing, so the plain build of the same file is still
+%   the student copy, and the builder's ordinary fan-out produces the inline
+%   key under the names every tool already looks for (<base>_solutions.pdf).
+%   The builder's `solutions-inline' mode needs no document change, but it has
+%   to be chosen by hand at every build: the default fan-out never plans it.
+%
+%   The flag is raised only when a key is in fact being built: quiz.cls reads
+%   \ifsolinline for its header mark with no \ifkey around it, so raising it
+%   in a student build would print "Solutions" on the paper. It is resolved
+%   both here and at \begin{document}, because a course preamble that the
+%   class inputs late may hold either this line or a source-level \keys.
+\newif\ifTeXLib@keyinline
+\newcommand{\TeXLib@keylayout@resolve}{%
+	\ifTeXLib@keyinline
+		\ifkey \solinlinetrue \fi
+		\ifsolutions \solinlinetrue \fi
+	\fi}
+\@namedef{TeXLib@keylayout@inline}{\TeXLib@keyinlinetrue}
+\@namedef{TeXLib@keylayout@compact}{\TeXLib@keyinlinefalse}
+\newcommand{\keylayout}[1]{%
+	\@ifundefined{TeXLib@keylayout@#1}%
+		{\PackageError{texlib-build}{Unknown key layout `#1'}%
+			{The layouts are `inline' and `compact'.}}%
+		{\@nameuse{TeXLib@keylayout@#1}\TeXLib@keylayout@resolve}}
+\AtBeginDocument{\TeXLib@keylayout@resolve}
+
 % Header build-mode badge ------------------------------------------------------
 % The centered header indicator that marks an answers/instructor build. The
 % mechanism (italic, header-center slot) is shared; the WORDING is class-specific

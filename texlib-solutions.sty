@@ -64,6 +64,85 @@
 % value makes the overlay invisible to the vertical list, which is the whole
 % contract of the inline layout.
 \newdimen\@sol@prevdepth
+
+% \@sol@overlay{<box>} -- set a zero-size box into the vertical list so that the
+% list reads the same with it as without it. Both inline solutions go through
+% here.
+%
+% Restoring \prevdepth after the box is enough for whatever FOLLOWS in the same
+% list: the next line gets the interline glue it would have had. It is not
+% enough when the box is the LAST thing in its list -- a part answer that ends
+% a {cols} column, a minipage, a \parbox. The enclosing box's depth is the
+% depth of its last item, and the overlay has none, so the question line's
+% depth (about 2pt under a descender) moved from the box's depth into its
+% height. A two-column problem came out that much taller and everything below
+% it on the page moved: measured on a twelve-version exam, 87% to 89% of the
+% student page's ink still in place on the pages with a {cols} problem, against
+% 100% on the pages without one.
+%
+% So the list is closed the way it was open: back up over the depth, then set
+% an empty box that has exactly that depth. The list ends with a box of the
+% depth it ended with before, \prevdepth is that depth without being assigned,
+% and the total length is unchanged. A \prevdepth at its -1000pt sentinel (the
+% top of a list, or after \nointerlineskip) has no depth to give back and is
+% restored as it stood.
+%
+% That closing box is also the overlay's MARKER. #2 is how far below this point
+% the solution's ink reaches, and it rides on the box as an attribute (in sp).
+% Nothing here can tell whether the blank that follows is that tall: it is
+% \stretch glue, sized when the page is. texlib_keyfit.lua reads the markers
+% off the finished page and makes room where a solution came out taller than
+% its blank; see that file. Under an engine without attributes the marker is
+% a plain box and the overlay is unbounded, as it always was.
+\ifdefined\directlua
+	\newattribute\@sol@reach
+	\edef\@sol@reachattr{\the\allocationnumber}
+	\newcommand{\@sol@marker}[2]{\hbox attr\@sol@reachattr=\number\dimexpr#1\relax{#2}}
+\else
+	\newcommand{\@sol@marker}[2]{\hbox{#2}}
+\fi
+\newcommand{\@sol@overlay}[2]{%
+	\begingroup
+		\parskip\z@skip
+		\par
+		\@sol@prevdepth\prevdepth
+		\nointerlineskip
+		\noindent\box#1\par
+		\nointerlineskip
+		\ifdim\@sol@prevdepth>-1000\p@
+			\kern-\@sol@prevdepth
+			\@sol@marker{#2}{\vrule \@width\z@ \@height\z@ \@depth\@sol@prevdepth}%
+		\else
+			\@sol@marker{#2}{}%
+			\prevdepth\@sol@prevdepth
+		\fi
+	\endgroup
+}
+
+% The reach of an inline solution below its marker: the box is lowered one
+% \baselineskip, its depth follows, and the left accent overhangs the fill by
+% 6pt. The interline glue of whatever comes next adds its own clearance.
+\newdimen\@sol@reachdim
+
+% The page-level half of the inline key. No Lua `--' comments inside a
+% \directlua block: TeX folds the newlines away and the comment would swallow
+% the rest of the chunk (same note as texlib-problembank.sty).
+\ifdefined\directlua
+	\directlua{
+		local function find(name)
+			local path = kpse.find_file(name, "lua")
+			if path and lfs.attributes(path) then return path end
+			local sty = kpse.find_file("texlib-solutions.sty")
+			local sep = string.char(92)
+			local dir = sty and sty:match("(.*[/" .. sep .. "])") or ""
+			if lfs.attributes(dir .. name) then return dir .. name end
+			return name
+		end
+		texlib_keyfit = dofile(find("texlib_keyfit.lua"))
+	}%
+	\AddToHook{build/page/before}{%
+		\directlua{texlib_keyfit.fit(\number\@outputbox, \@sol@reachattr)}}
+\fi
 \gdef\@partsol@rubric{}
 \gdef\@sol@rubric{}
 
@@ -444,16 +523,9 @@
 		% Caveat, inherited from {partsolution}: nothing bounds the overlay, so a
 		% solution taller than its answer space overprints what follows.
 		\ifsolinline
+			\@sol@reachdim\dimexpr\baselineskip+\dp\@sol@vtop+6\p@\relax
 			\sbox\@sol@outer{\raisebox{-\baselineskip}[\z@][\z@]{\@sol@frame}}%
-			\begingroup
-				\parskip\z@skip
-				\par
-				\@sol@prevdepth\prevdepth
-				\nointerlineskip
-				\noindent\box\@sol@outer
-				\par
-				\prevdepth\@sol@prevdepth
-			\endgroup
+			\@sol@overlay\@sol@outer\@sol@reachdim
 		\else
 			\noindent\@sol@frame
 			\vspace{\@sol@outervsep}%
@@ -561,6 +633,8 @@
 		% \noindent<parbox> already produced, and the inline branch's \raisebox
 		% is an \hbox to begin with (verified: the answer's PDF bbox is
 		% unchanged, both layouts).
+		% Read before the frame consumes the wrap.
+		\@sol@reachdim\dimexpr\baselineskip+\dp\@partsol@wrap+6\p@\relax
 		\sbox\@partsol@outer{%
 			\ifsolinline
 				\raisebox{-\baselineskip}[\z@][\z@]{\@partsol@frame}%
@@ -571,12 +645,12 @@
 			\directlua{texlib_synctex_stamp_box(\number\@partsol@outer)}%
 		\fi
 		\ifsolinline
-			\begingroup
-				\parskip\z@skip
-				\par\nointerlineskip\noindent
-				\box\@partsol@outer
-				\par\nointerlineskip
-			\endgroup
+			% A trailing \nointerlineskip stood here in place of \@sol@overlay,
+			% and it left \prevdepth at -1000pt: the line after the answer space
+			% got no interline glue and sat about 3pt high, once per part
+			% solution, so a page of four part answers lost 12pt before its next
+			% problem.
+			\@sol@overlay\@partsol@outer\@sol@reachdim
 		\else
 			\par\noindent\box\@partsol@outer\par\smallskip
 		\fi
