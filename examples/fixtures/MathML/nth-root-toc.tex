@@ -1,0 +1,47 @@
+% Feature fixture: the nth-root abort in a document whose table of contents
+% adds a page.
+%
+% nth-root-mathml.tex trips the luamml mathml-SE abort and passes by falling
+% back to MathML associated files. Its page count is the same on every pass.
+% This document's is not: a pass that starts with no .toc ships 5 pages, and a
+% pass that reads the complete .toc ships 6. A tagged build has to get two
+% things right for it.
+%
+%   * The aborted pass has already reopened the .aux and the .toc for writing.
+%     It leaves the .aux cut short and the .toc empty, and every build aborts
+%     again. A retry that starts from that state runs without a table of
+%     contents on every build, so the document never settles.
+%   * tagpdf numbers the parent tree from the page count the previous pass
+%     recorded. The pass that gains the page writes a PDF whose last page fails
+%     ISO 14289-2:2024 clause 8.2.2 (54 checks here), with "6 of 5" in its
+%     footer and every contents entry one page low. One more pass corrects it.
+%
+% Expected to PASS under `smoke_test.py --accessible`, whose retry starts in an
+% empty directory and reruns while the log asks.
+% Sublime/test_accessible_settle_integration.py builds the same shape through
+% the builder core, twice in a row, which is where the two points above are
+% asserted.
+%
+% The gain needs a table of contents longer than one page. 48 one-line entries
+% come to about 1.1 pages; do not trim the count.
+\documentclass[
+	unit        = Unit,
+	unit-number = 1,
+	unit-title  = {Radical Laws},
+]{didactic}
+
+\newcommand{\topic}[1]{%
+	\subsection{Topic #1}
+	TOPICMARK#1: a paragraph of body text for topic #1, long enough to wrap onto a second line of the page so the section has a body.\par}
+
+\begin{document}
+
+\maketitle
+
+\ExplSyntaxOn
+\int_step_inline:nn { 48 } { \topic{#1} }
+\ExplSyntaxOff
+
+RADTOCMARK: $\sqrt[n]{a \cdot b} = \sqrt[n]{a} \cdot \sqrt[n]{b}$
+
+\end{document}

@@ -845,6 +845,355 @@ def main():
           disp.count("luamml mathml-SE bug") == 1,
           "%d times" % disp.count("luamml mathml-SE bug"))
 
+    # (k1d) THE TAGGED LANE ACROSS THE ABORT. The aborted probe has already
+    # reopened <jobname>.aux and <jobname>.toc for writing, so it leaves the
+    # .aux cut short and the .toc empty. The retry used to start from that, and
+    # because the verdict is not kept between builds every build aborted again:
+    # a document whose table of contents adds a page never settled, however
+    # often it was built. The lane's cross-pass state is now read before the
+    # probe and put back after the abort.
+    def drive_lanes(options, script, seed=None, meta=None, runner=None,
+                    doc=_ACC_DOC):
+        """Drive commands() with a callback that plays the engine.
+
+        `script(item, out_dir)` is called for every (argv, message) once the
+        builder has yielded it, with the directory that pass writes into. It
+        sees the lane exactly as the pass would, may rewrite it as the pass
+        would, and returns the output to feed back. `seed` maps a path under
+        the tex dir to the text an earlier build left there.
+        """
+        tmp = tempfile.mkdtemp(prefix="texlib_lane_")
+        files = dict(seed or {})
+        files["doc.tex"] = doc
+        if meta:
+            files["doc.buildmeta"] = meta
+        for rel, text in files.items():
+            path = os.path.join(tmp, *rel.split("/"))
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="") as fh:
+                fh.write(text)
+        b = TexlibBuilder()
+        b.tex_root = os.path.join(tmp, "doc.tex")
+        b.tex_name, b.base_name, b.tex_dir = "doc.tex", "doc", tmp
+        b.engine, b.out = "pdflatex", ""
+        b.options = list(options)
+        if runner is not None:
+            b.builder_settings = {"build_jobs": 4}
+            b.run_parallel = runner
+        cmds = []
+        gen = b.commands()
+        try:
+            item = next(gen)
+            while True:
+                cmds.append(item)
+                out_dir = next((str(x).split("=", 1)[1] for x in item[0]
+                                if str(x).startswith("-output-directory=")),
+                               tmp)
+                b.out = script(item, out_dir) or ""
+                item = gen.send(0)
+        except StopIteration:
+            pass
+        return cmds, getattr(b, "_displayed", ""), tmp
+
+    def lane_files(d):
+        """{name: text} for the files in one lane directory."""
+        found = {}
+        for name in (sorted(os.listdir(d)) if os.path.isdir(d) else []):
+            path = os.path.join(d, name)
+            if os.path.isfile(path):
+                with open(path, "r", encoding="utf-8", newline="") as fh:
+                    found[name] = fh.read()
+        return found
+
+    def put(d, name, text):
+        with open(os.path.join(d, name), "w", encoding="utf-8",
+                  newline="") as fh:
+            fh.write(text)
+
+    def is_tagged(item):
+        return r"\DocumentMetadata" in str(item[0][-1])
+
+    _AUX = "\\relax \n\\newlabel{sec:a}{{1}{2}}\n\\gdef \\@abspage@last{6}\n"
+    _TOC = "\\contentsline {section}{\\numberline {1}A}{2}{}%\n"
+    _CUT = "\\relax \n"
+
+    def aborting_probe(seen):
+        """A script whose first tagged pass truncates its lane and aborts.
+
+        `seen` collects the lane as each tagged pass finds it.
+        """
+        def script(item, out_dir):
+            if not is_tagged(item):
+                return ""
+            seen.append(lane_files(out_dir))
+            if len(seen) > 1:
+                return ""
+            put(out_dir, "doc.aux", _CUT)
+            put(out_dir, "doc.toc", "")
+            put(out_dir, "doc.lof", "")
+            put(out_dir, "doc.log", "aborted")
+            put(out_dir, "doc-luamml-mathml.html", "<math")
+            return _ABORT
+        return script
+
+    seen = []
+    drive_lanes(_ACC_OPT, aborting_probe(seen),
+                seed={"a11y/doc.aux": _AUX, "a11y/doc.toc": _TOC,
+                      "a11y/doc.bbl": "bbl"})
+    probe = seen[0] if seen else {}
+    retry = seen[1] if len(seen) > 1 else {}
+    check("lane state: the probe reads what the last build left",
+          probe.get("doc.aux") == _AUX and probe.get("doc.toc") == _TOC,
+          sorted(probe))
+    check("lane state: after the abort the retry reads the settled .aux",
+          retry.get("doc.aux") == _AUX, repr(retry.get("doc.aux")))
+    check("lane state: and the complete .toc, not the emptied one",
+          retry.get("doc.toc") == _TOC, repr(retry.get("doc.toc")))
+    check("lane state: a state file the aborted pass created is removed",
+          "doc.lof" not in retry, sorted(retry))
+    check("lane state: a state file it left alone keeps its content",
+          retry.get("doc.bbl") == "bbl", repr(retry.get("doc.bbl")))
+    check("lane state: files outside the cross-pass state are not touched",
+          retry.get("doc.log") == "aborted", sorted(retry))
+    check("lane state: the truncated luamml sidecar is still cleared",
+          "doc-luamml-mathml.html" not in retry, sorted(retry))
+
+    #   a cold lane has nothing to put back, so the retry starts from nothing.
+    #   A truncated .aux is not a state any real pass leaves behind.
+    seen = []
+    drive_lanes(_ACC_OPT, aborting_probe(seen))
+    retry = seen[1] if len(seen) > 1 else {}
+    check("lane state: on a cold lane the retry starts from nothing",
+          len(seen) > 1
+          and not any(name.endswith((".aux", ".toc", ".lof")) for name in retry),
+          sorted(retry))
+
+    #   without an abort, run 1's output is run 2's input and must stay.
+    seen = []
+
+    def clean_passes(item, out_dir):
+        if not is_tagged(item):
+            return ""
+        seen.append(lane_files(out_dir))
+        put(out_dir, "doc.aux", "written by pass %d" % len(seen))
+        return ""
+
+    drive_lanes(_ACC_OPT, clean_passes, seed={"a11y/doc.aux": _AUX})
+    check("lane state: without an abort nothing is put back",
+          len(seen) == 2 and seen[1].get("doc.aux") == "written by pass 1",
+          [s.get("doc.aux") for s in seen])
+
+    #   an ordinary error is the document's own, and is not undone.
+    seen = []
+
+    def broken_pass(item, out_dir):
+        if not is_tagged(item):
+            return ""
+        seen.append(lane_files(out_dir))
+        if len(seen) > 1:
+            return ""
+        put(out_dir, "doc.aux", _CUT)
+        return "! Undefined control sequence.\nl.7 \\nope"
+
+    drive_lanes(_ACC_OPT, broken_pass, seed={"a11y/doc.aux": _AUX})
+    check("lane state: an ordinary error does not restore the lane",
+          len(seen) == 2 and seen[1].get("doc.aux") == _CUT,
+          [s.get("doc.aux") for s in seen])
+
+    #   the fan-out's base twin is the same probe in another directory.
+    seen = []
+    drive_lanes(["--texlib-mode=default"], aborting_probe(seen), doc=_FAN_DOC,
+                seed={"variants/base-a11y/doc.aux": _AUX,
+                      "variants/base-a11y/doc.toc": _TOC})
+    retry = seen[1] if len(seen) > 1 else {}
+    check("lane state: the fan-out's base twin gets its state back too",
+          retry.get("doc.aux") == _AUX and retry.get("doc.toc") == _TOC
+          and "doc.lof" not in retry, sorted(retry))
+
+    #   a lane that could not get a directory of its own writes into the one
+    #   the normal half uses (the fallback in _accessible_out_dir). The files
+    #   there are not the lane's, so none is read, rewritten or removed.
+    shared = tempfile.mkdtemp(prefix="texlib_shared_")
+    sb = TexlibBuilder()
+    sb.tex_root = os.path.join(shared, "doc.tex")
+    sb.tex_name, sb.base_name, sb.tex_dir = "doc.tex", "doc", shared
+    put(shared, "doc.aux", _AUX)
+    check("lane state: a directory shared with the normal half is not read",
+          sb._lane_state(shared) is None, sb._lane_state(shared))
+    put(shared, "doc.aux", _CUT)
+    put(shared, "sibling.aux", "another document's")
+    sb._restore_lane_state(shared, sb._lane_state(shared))
+    check("lane state: and nothing in it is rewritten or removed",
+          lane_files(shared) == {"doc.aux": _CUT,
+                                 "sibling.aux": "another document's"},
+          lane_files(shared))
+
+    # (k1e) THE SETTLE RULE. tagpdf numbers the parent tree from the page count
+    # the previous pass recorded, so a tagged pass that ships a page more than
+    # its predecessor writes a PDF whose last page fails PDF/UA (clause 8.2.2).
+    # The kernel says so in that pass's log, and the pass is run again. Two
+    # fixed passes kept that PDF whenever the second was the first to read a
+    # complete table of contents.
+    _WRONG = ("LaTeX Warning: Hook 'shipout/lastpage' executed on wrong page "
+              "(5 not 6).\n               Rerun to correct this.\n")
+    _EXTRA = ("LaTeX Warning: Temporary extra page added at the end. Rerun to "
+              "get it removed.\n")
+    _LABELS = ("LaTeX Warning: Label(s) may have changed. Rerun to get "
+               "cross-references right.\n")
+
+    def tagged_outputs(outs, then=""):
+        """A script feeding outs[i] to the i-th tagged pass, `then` after."""
+        count = [0]
+
+        def script(item, out_dir):
+            if not is_tagged(item):
+                return ""
+            i, count[0] = count[0], count[0] + 1
+            return outs[i] if i < len(outs) else then
+        return script
+
+    def tagged_of(cmds):
+        return [c for c in cmds if is_tagged(c)]
+
+    cmds, disp, _ = drive_lanes(_ACC_OPT, tagged_outputs(["", _WRONG]))
+    tagged = tagged_of(cmds)
+    check("settle: a second pass on the wrong last page buys a third",
+          len(tagged) == 3, [c[1] for c in tagged])
+    check("settle: the third pass is labelled as one",
+          len(tagged) == 3 and "run 3 (settle)" in tagged[2][1],
+          [c[1] for c in tagged])
+    check("settle: and is the same command as the second",
+          len(tagged) == 3 and tagged[2][0] == tagged[1][0],
+          tagged[2][0] if len(tagged) == 3 else "")
+    check("settle: a lane that settles on its third pass reports no ceiling",
+          len(tagged) == 3 and "unsettled" not in disp, repr(disp))
+
+    cmds, _, _ = drive_lanes(_ACC_OPT, tagged_outputs(["", _EXTRA]))
+    check("settle: a temporary extra page buys a third pass too",
+          len(tagged_of(cmds)) == 3, [c[1] for c in tagged_of(cmds)])
+
+    #   The page count is the only trigger. Changed labels are not one.
+    cmds, _, _ = drive_lanes(_ACC_OPT, tagged_outputs(["", _LABELS]))
+    check("settle: changed labels alone do not buy a pass",
+          len(tagged_of(cmds)) == 2, [c[1] for c in tagged_of(cmds)])
+
+    #   Only the last pass's verdict counts. On a cold lane half the example
+    #   corpus ends run 1 with one of the two messages and run 2 clean.
+    cmds, _, _ = drive_lanes(_ACC_OPT, tagged_outputs([_WRONG, ""]))
+    check("settle: a wrong last page in run 1 alone costs nothing",
+          len(tagged_of(cmds)) == 2, [c[1] for c in tagged_of(cmds)])
+
+    #   After an abort on a cold lane: probe, AF, AF with a page more, AF.
+    cmds, _, _ = drive_lanes(_ACC_OPT,
+                             tagged_outputs([_ABORT, "", _WRONG, ""]))
+    tagged = tagged_of(cmds)
+    check("settle: abort on a cold lane -> probe plus three AF passes",
+          len(tagged) == 4
+          and "mathml-SE" in tagged[0][0][-1]
+          and all("mathml-SE" not in c[0][-1] for c in tagged[1:]),
+          [c[1] for c in tagged])
+    check("settle: the passes are numbered through the retry",
+          [c[1].split("] ", 1)[-1] for c in tagged]
+          == ["run 1...", "run 1 (MathML-AF)...", "run 2 (settle)...",
+              "run 3 (settle)..."],
+          [c[1] for c in tagged])
+
+    #   A document that never settles stops at the ceiling and says so.
+    cmds, disp, _ = drive_lanes(_ACC_OPT, tagged_outputs([], then=_WRONG))
+    check("settle: a lane that never settles stops at MAX_RERUNS passes",
+          len(tagged_of(cmds)) == MAX_RERUNS,
+          "%d tagged passes" % len(tagged_of(cmds)))
+    check("settle: and the ceiling is reported",
+          "still unsettled after %d passes" % MAX_RERUNS in disp, repr(disp))
+    cmds, _, _ = drive_lanes(_ACC_OPT, tagged_outputs([_ABORT], then=_WRONG))
+    check("settle: the aborted probe does not count toward the ceiling",
+          len(tagged_of(cmds)) == 1 + MAX_RERUNS,
+          "%d tagged passes" % len(tagged_of(cmds)))
+
+    #   The fan-out, serial: tagged twins only.
+    def by_message(outs):
+        """A script feeding outs[key] to the pass whose message holds key."""
+        def script(item, out_dir):
+            return next((o for key, o in outs.items() if key in item[1]), "")
+        return script
+
+    cmds, _, _ = drive_lanes(
+        ["--texlib-mode=default"],
+        by_message({"[student-a11y] run 2": _WRONG,
+                    "[student] run 2": _WRONG}),
+        doc=PSET, meta=FULL_META)
+    msgs = [c[1] for c in cmds]
+    check("settle/fan-out: an unsettled tagged twin runs a third pass",
+          any("[student-a11y] run 3 (settle)" in m for m in msgs), msgs)
+    check("settle/fan-out: an untagged variant never does",
+          any("[student] run 2" in m for m in msgs)
+          and not any("[student] run 3" in m for m in msgs), msgs)
+    check("settle/fan-out: the settled twins keep their two passes",
+          all(any("[%s-a11y] run 2" % v in m for m in msgs)
+              and not any("[%s-a11y] run 3" % v in m for m in msgs)
+              for v in ("base", "solutions", "instructor")),
+          msgs)
+
+    #   The fan-out, parallel: a lane is a fixed list the host runs, so its
+    #   verdict is read back from the lane's own log once the wave returns.
+    def lane_runner(waves, logs):
+        """A run_parallel that records each wave and leaves every lane the log
+        its last pass would have written: logs(label, wave number) -> text."""
+        def runner(lanes, jobs):
+            waves.append((list(lanes), jobs))
+            for label, _cmds, lane_dir in lanes:
+                put(lane_dir, "doc.log", logs(label, len(waves)))
+        return runner
+
+    def quiet(item, out_dir):
+        return ""
+
+    waves = []
+    drive_lanes(["--texlib-mode=default"], quiet, doc=PSET, meta=FULL_META,
+                runner=lane_runner(
+                    waves, lambda label, n: _WRONG
+                    if "student-a11y" in label and n == 1 else ""))
+    check("settle/parallel: one unsettled twin costs one more wave",
+          len(waves) == 2, len(waves))
+    first = {l: (c, a) for l, c, a in waves[0][0]} if waves else {}
+    again = waves[1][0] if len(waves) > 1 else []
+    check("settle/parallel: the wave holds that lane alone",
+          len(again) == 1 and "student-a11y" in again[0][0],
+          [l for l, _c, _a in again])
+    planned = next((v for l, v in first.items() if "student-a11y" in l),
+                   ([], None))
+    check("settle/parallel: one pass of the command the lane was planned with",
+          len(again) == 1 and again[0][1] == planned[0][:1],
+          again[0][1] if again else "")
+    check("settle/parallel: into the lane's own directory",
+          len(again) == 1 and again[0][2] == planned[1],
+          again[0][2] if again else "")
+
+    waves = []
+    drive_lanes(["--texlib-mode=default"], quiet, doc=PSET, meta=FULL_META,
+                runner=lane_runner(
+                    waves, lambda label, n: _WRONG
+                    if label.endswith("[student]") else ""))
+    check("settle/parallel: an untagged lane is never run again",
+          len(waves) == 1
+          and any(l.endswith("[student]") for l, _c, _a in waves[0][0]),
+          [[l for l, _c, _a in w] for w, _n in waves])
+
+    waves = []
+    _, disp, _ = drive_lanes(
+        ["--texlib-mode=default"], quiet, doc=PSET, meta=FULL_META,
+        runner=lane_runner(waves, lambda label, n: _WRONG))
+    check("settle/parallel: lanes that never settle stop at MAX_RERUNS passes",
+          len(waves) == 1 + (MAX_RERUNS - 2), len(waves))
+    check("settle/parallel: every later wave is the three tagged twins",
+          len(waves) > 1
+          and all(len(w) == 3 and all("-a11y" in l for l, _c, _a in w)
+                  for w, _n in waves[1:]),
+          [[l for l, _c, _a in w] for w, _n in waves[1:]])
+    check("settle/parallel: the ceiling is reported once per lane",
+          disp.count("still unsettled after %d passes" % MAX_RERUNS) == 3,
+          disp.count("still unsettled"))
+
     # (k1c) solutions-inline has to be DISCOVERABLE. It is deliberately never
     # planned into a default set -- it is a layout preference, and
     # PLANNED_VARIANTS excludes it -- so the planner's one job here is to say
@@ -2322,6 +2671,32 @@ def main():
           all(_bs.luamml_se_aborted(
               _bs.LUAMML_SE_ABORT[:i] + "\n" + _bs.LUAMML_SE_ABORT[i:])
               for i in range(1, len(_bs.LUAMML_SE_ABORT))))
+
+    # lastpage_unsettled: the kernel's two verdicts on its own last-page guess,
+    # in the form the engine printed them (TeX Live 2026), and nothing else.
+    # "Label(s) may have changed" has to stay out: a tagged pass prints it
+    # whenever a recorded count moves, and the settle rule would then spend a
+    # pass on documents whose PDF is already right.
+    check("buildspec: lastpage_unsettled recognises the wrong-page warning",
+          _bs.lastpage_unsettled(
+              "LaTeX Warning: Hook 'shipout/lastpage' executed on wrong page "
+              "(37 not 38).\n               Rerun to correct this.\n"))
+    check("buildspec: lastpage_unsettled recognises the temporary page",
+          _bs.lastpage_unsettled(
+              "LaTeX Warning: Temporary extra page added at the end. Rerun to "
+              "get it removed.\n"))
+    check("buildspec: lastpage_unsettled ignores every other rerun request",
+          not _bs.lastpage_unsettled(
+              "LaTeX Warning: Label(s) may have changed. Rerun to get "
+              "cross-references right.\n"
+              "Package rerunfilecheck Warning: Rerun to get outlines right.\n")
+          and not _bs.lastpage_unsettled("Output written on doc.pdf (6 pages).")
+          and not _bs.lastpage_unsettled("")
+          and not _bs.lastpage_unsettled(None))
+    check("buildspec: lastpage_unsettled survives a wrap at any position",
+          all(_bs.lastpage_unsettled(m[:i] + "\n" + m[i:])
+              for m in (_bs.LASTPAGE_WRONG_PAGE, _bs.LASTPAGE_EXTRA_PAGE)
+              for i in range(1, len(m))))
 
     # accessible_macro_for: a document with its OWN \DocumentMetadata (the
     # thesis template's layout) must get the marker only -- the TL2026 kernel

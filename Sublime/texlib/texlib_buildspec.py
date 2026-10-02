@@ -129,6 +129,49 @@ def _FLATTEN(s):
     return re.sub(r"\s+", "", s)
 
 
+# What the LaTeX kernel prints when a pass ends with its last-page guess wrong.
+#
+# A pass takes the page count from the \@abspage@last its predecessor wrote to
+# the .aux and runs the shipout/lastpage hook on that page. tagpdf reads the
+# same count at \begin{document}, from its own @tag@LastPage record, and numbers
+# the parent tree from it: pages hold the keys below the count, annotations the
+# keys from the count up. A pass that ships a different number of pages goes
+# wrong in one of two ways.
+#
+#   * More pages than recorded. A surplus page and an annotation share a
+#     parent-tree key, and veraPDF fails that page's content under ISO
+#     14289-2:2024 clause 8.2.2. Measured on a 6-page document built from a
+#     5-page record: /Nums held key 5 twice (page 6's marked content and the
+#     first link), 54 failed checks, all on page 6. The kernel reports "Hook
+#     'shipout/lastpage' executed on wrong page (5 not 6)".
+#   * Fewer pages than recorded. The hook's page is never shipped, so the
+#     kernel appends a page that reads "Temporary page!" to carry the hook's
+#     material and reports "Temporary extra page added at the end". Measured on
+#     the same document from a 9-page record: 7 pages.
+#
+# The .aux such a pass leaves holds the right count, so one more pass corrects
+# either. A pass that outgrows its record prints stale numbers as well: the
+# 6-page PDF above had "6 of 5" in its last footer and every contents entry one
+# page low.
+LASTPAGE_WRONG_PAGE = "Hook 'shipout/lastpage' executed on wrong page"
+LASTPAGE_EXTRA_PAGE = "Temporary extra page added at the end"
+
+
+def lastpage_unsettled(log_text):
+    """True when a pass ended with the kernel's last-page guess wrong.
+
+    The PDF that pass wrote is then wrong in one of the two ways described at
+    LASTPAGE_WRONG_PAGE, and the pass has to be run again.
+
+    Compared with the whitespace removed from both sides, as luamml_se_aborted
+    does. Neither message is long enough for the engine to wrap it at 79
+    columns today, and the comparison does not depend on that staying true.
+    """
+    flat = _FLATTEN(log_text or "")
+    return (_FLATTEN(LASTPAGE_WRONG_PAGE) in flat
+            or _FLATTEN(LASTPAGE_EXTRA_PAGE) in flat)
+
+
 # luaotfload's verdict when it cannot claim a cache directory. See
 # luaotfload_cache_aborted below for why a parallel build provokes it.
 LUAOTFLOAD_CACHE_ABORT = "no writeable cache path, quiting"

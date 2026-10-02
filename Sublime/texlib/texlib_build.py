@@ -324,6 +324,7 @@ ACCESSIBLE_MACRO = _spec.ACCESSIBLE_MACRO
 ACCESSIBLE_MACRO_AF_ONLY = _spec.ACCESSIBLE_MACRO_AF_ONLY
 accessible_macro_for = _spec.accessible_macro_for
 luamml_se_aborted = _spec.luamml_se_aborted
+lastpage_unsettled = _spec.lastpage_unsettled
 
 # The luamml sidecars a crashed tagged run can leave truncated; removed before
 # the AF-only retry so it does not read back a half-written file.
@@ -345,6 +346,7 @@ MODE_QUICK = "quick"
 # genuinely refuses to converge -- which is why it can afford headroom (a
 # three-deep toc/pageref chain settles on pass 4) where the old log-only loop
 # had to stay tight at 3 to bound the "Label(s) may have changed" oscillation.
+# A tagged lane's passes stop at the same ceiling (see _settle_tagged).
 MAX_RERUNS = 5
 
 # How many passes may be justified by a state change ALONE (no rerun request in
@@ -1150,15 +1152,19 @@ class TexlibBuildCore:
         be enabled -- and pinning --jobname also stops LuaTeX naming the output
         after the support file DocumentMetadata opens before the \\input.
 
-        Two fixed passes settle cross-references and the "page X of Y" footer;
-        no biber loop on the tagged half yet, so a bibliography-bearing class may
-        need one when the rollout reaches it.
+        Two passes settle cross-references and the "page X of Y" footer, and
+        further passes follow while the kernel reports its last-page guess wrong
+        (see _settle_tagged). No biber loop on the tagged half yet, so a
+        bibliography-bearing class may need one when the rollout reaches it.
 
         Run 1 asks for both MathML methods. A document that trips the luamml
         mathml-SE bug (see ACCESSIBLE_DOCMETA) aborts there without a PDF, and
         run 1 is spent again on the AF-only prefix, which is unaffected. That
         costs one wasted pass on the few documents with two nth-roots in a
-        formula, and gives every other document the Acrobat path.
+        formula, and gives every other document the Acrobat path. The aborted
+        pass has by then reopened the lane's .aux and .toc for writing, so the
+        lane's cross-pass state is read before run 1 and put back after the
+        abort (see _restore_lane_state).
         """
         yield from self._build_once(base, engine, None)
 
@@ -1184,7 +1190,9 @@ class TexlibBuildCore:
                            + f"\\input{{{self.tex_name}}}"]
 
         cmd = tagged_cmd(self._mathml_se_ok is not False)
-        yield (cmd, f"{ACCESSIBLE_ENGINE} [accessible] run 1...")
+        label = f"{ACCESSIBLE_ENGINE} [accessible]"
+        state = self._lane_state(out_dir)
+        yield (cmd, f"{label} run 1...")
         if luamml_se_aborted(self.out):
             self._mathml_se_ok = False
             self.display(
@@ -1195,10 +1203,133 @@ class TexlibBuildCore:
                 "flattened text for this document.\n"
             )
             self._clear_luamml_sidecars(out_dir, tex_dir)
+            self._restore_lane_state(out_dir, state)
             self._forget_last_pass = True
             cmd = tagged_cmd(False)
-            yield (cmd, f"{ACCESSIBLE_ENGINE} [accessible] run 1 (MathML-AF)...")
-        yield (cmd, f"{ACCESSIBLE_ENGINE} [accessible] run 2 (settle)...")
+            yield (cmd, f"{label} run 1 (MathML-AF)...")
+        yield (cmd, f"{label} run 2 (settle)...")
+        yield from self._settle_tagged(cmd, label)
+
+    def _lane_state(self, out_dir):
+        """A lane's cross-pass state files, as {name: bytes}.
+
+        Read before a pass that may abort, so that _restore_lane_state can put
+        the lane back. Covers every STATE_EXTS file at the top level of the
+        lane's output directory, which the lane owns: an \\include'd chapter
+        keeps an .aux of its own there. A file that cannot be read is left out.
+
+        None when the lane has no directory of its own, which is what
+        _accessible_out_dir and _variant_out_dir fall back to when theirs
+        cannot be created. That directory is shared with the normal half, or
+        with the source, and the files in it are not this lane's to rewrite or
+        remove.
+        """
+        if out_dir == (getattr(self, "_aux_target", None) or self._tex_dir()):
+            return None
+        state = {}
+        try:
+            names = os.listdir(out_dir)
+        except OSError:
+            return state
+        for name in names:
+            if os.path.splitext(name)[1].lower() not in STATE_EXTS:
+                continue
+            try:
+                with open(os.path.join(out_dir, name), "rb") as fh:
+                    state[name] = fh.read()
+            except OSError:
+                continue
+        return state
+
+    def _restore_lane_state(self, out_dir, state):
+        """Put a lane's cross-pass state back to what _lane_state read.
+
+        LaTeX reopens <jobname>.aux for writing at \\begin{document}, and
+        \\tableofcontents reopens <jobname>.toc, so a pass that dies
+        mid-document leaves the .aux cut short, with no \\@abspage@last record,
+        and the .toc empty. Measured on a settled 6-page lane: .aux 112 lines
+        -> 95, .toc 48 lines -> 0. A retry that starts from that is a first
+        pass in all but name, and the pass after it is the first to read a
+        complete table of contents.
+
+        The mathml-SE verdict is not kept between builds, so a document that
+        trips the abort trips it on every build. Without the restore its lane
+        carries no state from one build to the next and every build is a cold
+        one, which costs a table of contents that adds a page a third pass
+        every time (see _settle_tagged).
+
+        Files the aborted pass changed are rewritten. STATE_EXTS files it
+        created are removed, so on a cold lane the retry starts from nothing
+        and not from a truncated .aux. Best effort, like _clear_luamml_sidecars:
+        a file that cannot be written stays as the aborted pass left it. A
+        `state` of None (see _lane_state) leaves the directory alone.
+        """
+        if state is None:
+            return
+        try:
+            names = os.listdir(out_dir)
+        except OSError:
+            names = []
+        for name in names:
+            if name in state:
+                continue
+            if os.path.splitext(name)[1].lower() in STATE_EXTS:
+                self._force_remove(os.path.join(out_dir, name))
+        for name, data in state.items():
+            path = os.path.join(out_dir, name)
+            try:
+                with open(path, "rb") as fh:
+                    if fh.read() == data:
+                        continue
+            except OSError:
+                pass
+            try:
+                with open(path, "wb") as fh:
+                    fh.write(data)
+            except OSError:
+                pass
+
+    def _settle_tagged(self, cmd, label, run=2):
+        """Run a tagged lane again while the kernel reports its last-page guess
+        wrong (see lastpage_unsettled), to a ceiling of MAX_RERUNS passes.
+
+        A tagged pass numbers the parent tree from the page count its
+        predecessor recorded. Two passes are enough when the second ships as
+        many pages as the first. They are one short when the first ran without
+        a table of contents and the second, reading the complete one, ships a
+        page more: that second PDF fails PDF/UA on its last page, and it is the
+        one two fixed passes kept. Measured on a cold lane: 5 pages, then 6 with
+        54 failed checks of clause 8.2.2, then 6 with none.
+
+        `run` is the number of passes the lane has completed. A settled lane
+        pays nothing: the test reads output the host already holds.
+        """
+        while run < MAX_RERUNS and lastpage_unsettled(self.out):
+            run += 1
+            yield (cmd, f"{label} run {run} (settle)...")
+        if lastpage_unsettled(self.out):
+            self._warn_tagged_unsettled(label, run)
+
+    def _lane_unsettled(self, out_dir):
+        """lastpage_unsettled for a lane a parallel wave ran.
+
+        Read from the lane's own .log: a wave's output goes to the host and
+        never reaches self.out.
+        """
+        log = os.path.join(out_dir, self.base_name + ".log")
+        try:
+            with open(log, "r", encoding="utf-8", errors="replace") as fh:
+                return lastpage_unsettled(fh.read())
+        except OSError:
+            return False
+
+    def _warn_tagged_unsettled(self, label, run):
+        """Report a tagged lane that reached the ceiling still unsettled."""
+        self.display(
+            f"TeXLib: {label} still unsettled after {run} passes "
+            f"(MAX_RERUNS); its page count changed in the last one, so the "
+            f"tagged PDF may fail PDF/UA on its last page.\n"
+        )
 
     def _clear_luamml_sidecars(self, *dirs):
         """Remove the luamml MathML sidecars from each directory.
@@ -1527,6 +1658,19 @@ class TexlibBuildCore:
             # owns cancellation and output ordering.
             runner([(label, [cmd, cmd], out_dir)
                     for _v, _t, _tag, out_dir, cmd, label in plans], jobs)
+            # The serial path's settle rule (see _settle_tagged), applied to
+            # the tagged lanes whose second pass ended unsettled. Their output
+            # went to the host, so the verdict is read from each lane's log.
+            late = [p for p in plans if p[1] and self._lane_unsettled(p[3])]
+            run = 2
+            while late and run < MAX_RERUNS:
+                run += 1
+                runner([(f"{label} run {run} (settle)", [cmd], out_dir)
+                        for _v, _t, _tag, out_dir, cmd, label in late],
+                       min(jobs, len(late)))
+                late = [p for p in late if self._lane_unsettled(p[3])]
+            for _v, _t, _tag, _out_dir, _cmd, label in late:
+                self._warn_tagged_unsettled(label, run)
             for v, tagged, _tag, out_dir, _cmd, _label in plans:
                 self._copy_back_variant(tex_dir, v, tagged, out_dir)
                 self._variants_built.append((v, tagged))
@@ -1549,18 +1693,24 @@ class TexlibBuildCore:
         digest is keyed on the aux dir the BASE build owns, and a variant
         writing its own .aux there would make every subsequent variant look
         unsettled. Two passes is what the accessible half has always used and
-        settles the "page X of Y" footer and \\pageref the same way.
+        settles the "page X of Y" footer and \\pageref the same way. A tagged
+        twin then runs again while the kernel reports its last-page guess wrong
+        (see _settle_tagged).
         """
         def plan(se):
             return self._variant_plan(variant, macro, engine, tex_dir,
                                       engine_options, tagged, se=se)
 
         tag, out_dir, cmd, label = plan(self._mathml_se_ok is not False)
-        yield (cmd, f"{label} run 1...")
         # Every tagged twin is the same source, so the mathml-SE verdict is a
         # property of the DOCUMENT, not of the variant: probe on the first twin
         # and reuse the answer for the rest of the build. See ACCESSIBLE_DOCMETA.
-        if tagged and self._mathml_se_ok is None:
+        probe = tagged and self._mathml_se_ok is None
+        # The probe may abort after truncating the lane's .aux and .toc; see
+        # _restore_lane_state.
+        state = self._lane_state(out_dir) if probe else None
+        yield (cmd, f"{label} run 1...")
+        if probe:
             if luamml_se_aborted(self.out):
                 self._mathml_se_ok = False
                 self.display(
@@ -1569,12 +1719,15 @@ class TexlibBuildCore:
                     "associated files only. Firefox and Foxit are unaffected; "
                     "Acrobat falls back to the flattened text here.\n")
                 self._clear_luamml_sidecars(out_dir, tex_dir)
+                self._restore_lane_state(out_dir, state)
                 self._forget_last_pass = True
                 _t, _o, cmd, _l = plan(False)
                 yield (cmd, f"{label} run 1 (MathML-AF)...")
             else:
                 self._mathml_se_ok = True
         yield (cmd, f"{label} run 2 (settle)...")
+        if tagged:
+            yield from self._settle_tagged(cmd, label)
         self._copy_back_variant(tex_dir, variant, tagged, out_dir)
 
     def _variant_plan(self, variant, macro, engine, tex_dir, engine_options,

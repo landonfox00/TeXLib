@@ -60,6 +60,72 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Fixed
 
+- **A tagged build never settled for a document that trips the luamml
+  mathml-SE abort and gains a page from its table of contents.** Every build
+  kept a tagged PDF that failed PDF/UA-2 on its last page (ISO 14289-2:2024
+  clause 8.2.2), printed the previous pass's page total in its footer and listed
+  every contents entry one page low. Measured on a 38-page Math 126 unit built
+  three times in a row: 37 pages then 38 on every build, 20 failed checks of
+  that clause, all on page 38, and a last footer reading "38 of 37". Both tagged
+  paths were affected, `accessible` mode and the fan-out's base tagged twin, by
+  two defects in the builder core.
+
+  **Lane state across the abort.** LaTeX reopens `<jobname>.aux` for writing at
+  `\begin{document}` and `\tableofcontents` reopens `<jobname>.toc`, so the
+  probe that dies on the abort leaves the `.aux` cut short, with no
+  `\@abspage@last` record, and the `.toc` empty (on a settled 6-page lane:
+  `.aux` 112 lines → 95, `.toc` 48 lines → 0). The AF-only retry started from
+  that. The mathml-SE verdict is held per build, so the next build aborted and
+  emptied the lane again, and no number of rebuilds helped. The builder now
+  reads the lane's cross-pass state (the `STATE_EXTS` files in its output
+  directory) before the probe and puts it back after the abort. State files the
+  aborted pass created are removed, so a cold lane retries from nothing.
+
+  **Settling the tagged half.** tagpdf numbers the parent tree from the page
+  count the previous pass recorded: pages take the keys below it, annotations
+  the keys from it up. A pass that ships a page more gives that page and the
+  first link one key (`/Nums` held key 5 twice in a 6-page reproduction), and
+  the kernel reports `Hook 'shipout/lastpage' executed on wrong page (5 not
+  6)`. Two fixed passes kept that PDF whenever the second pass was the first to
+  read a complete table of contents. A tagged lane now runs again while its last
+  pass carries that message, or the one the kernel prints when the document has
+  shrunk (`Temporary extra page added at the end`), to a ceiling of `MAX_RERUNS`
+  passes. In a parallel fan-out the verdict is read from each lane's log and the
+  unsettled lanes run again as one more wave. A lane whose second pass is clean
+  keeps its two passes: the 19 other documents of the `accessible` corpus, built
+  through the builder core, take the same two tagged passes as before on cold
+  and on warm lanes.
+
+  Measured on the reproduction (`examples/fixtures/MathML/nth-root-toc.tex`, 6
+  pages), three builds from a cold lane: 5 then 6 pages and 54 failed checks on
+  every build before; 5, 6, 6 pages on the first build and 6, 6 on the next two
+  after, with none failed. Restoring the lane alone still fails the first build,
+  and settling alone pays the third pass on every build. The Math 126 unit has
+  no failed check of clause 8.2.2 on its first build after the change, and
+  "38 of 38" in its last footer.
+
+  Two kinds of lane that never run the probe had the same failure on a first
+  build, and the settle rule fixes both. A document with the same table of
+  contents and no nth-root pair failed 48 checks on its first build and none on
+  its second. A variant's tagged twin (`<base>_student_accessible.pdf`) failed
+  54, with no report to say so, because veraPDF is run on the base twin only.
+
+  The mathml-SE verdict is still not kept between builds. With the lane's state
+  preserved the probe costs time only, about a fifth of the build on the 38-page
+  unit (22 s of 97 s). A stored verdict is sound only if its key covers every
+  file the probe read, and an edit to any of those discards it, so it would save
+  the pass only on builds where nothing read before the abort has changed.
+  `smoke_test.py`'s own retry is unchanged: it builds in a fresh directory, and
+  its rerun loop already spends the third pass (5, 6, 6 pages on the fixture).
+
+  Covered by 40 checks in `Sublime/test_texlib_builder.py` (401 → 441: of the
+  34 that drive the core, 23 fail against the old one and 11 pin what must not
+  change; 6 cover the new helpers), by
+  `Sublime/test_accessible_settle_integration.py`, which drives the real core
+  through two builds of a bare `article` of the same shape and runs in
+  `tests.yml` (18 checks, 12 failing against the old core), and by the fixture
+  in the smoke and accessible gates.
+
 - **The inline key was only half inline: a full-problem `{solution}` still
   displaced the page.** `\ShowKeyInline` exists so a key page *is* its student
   page with the answers drawn into the blanks — same pagination, same problem
