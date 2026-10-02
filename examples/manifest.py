@@ -185,6 +185,19 @@ EXAMPLES = [
                  "counters would renumber Definition to 1.1, a flat scheme "
                  "would drop the '.1', and a missing reset would make the "
                  "section-2 boxes 1.4/1.5."),
+    Example("examples/fixtures/Notes", "tasks-tagging.tex", "fixture", _FIXTURE,
+            expect=["GRIDMARK", "DISPLAYMARK", "COLUMNMARK", "RUNINMARK",
+                    "PARTSMARK", "RICHMARK", "LABELMARK", "GATEDMARK"],
+            tagged={"L": 11, "LI": 27, "LBody": 27},
+            note="Nine {tasks} grids. The tasks package is not tagging-aware: "
+                 "a tagged row was paragraphs nested in a paragraph, and the "
+                 "accessible build failed ISO 32005 Table 5 (P-P and P-Part), "
+                 "50 checks on this document. "
+                 "texlib-tasks.sty retags a grid as a list. veraPDF asserts "
+                 "the nesting; tagged= asserts that each of the 23 tasks is a "
+                 "list item, which a legal tree of loose paragraphs would not "
+                 "be. The other two lists and four items are the fixture's "
+                 "own {parts} and {itemize}."),
     Example("examples/fixtures/MathML", "nth-root-mathml.tex", "fixture", _FIXTURE,
             expect=["RADPRODUCTMARK", "RADQUOTIENTMARK", "RADCANCELMARK",
                     "RADEXPONENTMARK"],

@@ -1,0 +1,141 @@
+% Regression fixture: a {tasks} grid is a list in the tagged PDF.
+%
+% The tasks package sets each task in a box of its own, and a tagged build used
+% to record a row as paragraphs nested in a paragraph: veraPDF failed the file
+% on ISO 32005 Table 5, "<P> shall not contain <Part>" and "<P> shall not
+% contain <P>", once each for the text and for the label of every task after
+% the first in its row. Without texlib-tasks.sty this fixture fails 50 checks.
+% That package retags the grid as a list. The fixture holds one grid for each
+% way that can go wrong, and it is asserted twice, both times in the accessible
+% build (examples/manifest.py, run by smoke_test.py --accessible):
+%
+%   - veraPDF must pass it, which is the nesting;
+%   - tagged= counts its lists and list items, which is the structure. A grid
+%     that validates but is not a list (every task a loose paragraph) passes the
+%     first check and fails the second.
+%
+% The count is 11 lists and 27 items: nine grids of 23 tasks, the {parts} list
+% and the {itemize} of two items each. A grid that came out as one item is 13
+% items; a grid that came out as a list inside a one-item list is 20 lists.
+%
+% What each grid is there for:
+%
+%   GRIDMARK     three columns, two rows: the reported shape, and the one where
+%                most tasks are not first in their row.
+%   DISPLAYMARK  opens straight after a display.
+%   COLUMNMARK   one column, so every task is first in its row. These never
+%                nested, and were still loose paragraphs with the label after
+%                the text.
+%   RUNINMARK    no blank line before or after: the paragraph that follows has
+%                to land in the same text unit as the list.
+%   PARTSMARK    inside a list item, twice. The second opens the item, the one
+%                place tasks takes a different path before its first row.
+%   RICHMARK     a task holding a list, and a task of two paragraphs. The inner
+%                list has to be tagged as a list again.
+%   LABELMARK    a formula for a label (tasks typesets every label twice, and
+%                the measuring copy must leave nothing in the tree), and a label
+%                with no counter, which makes an unordered list.
+%   GATEDMARK    a grid in a {solution} this build discards.
+\documentclass{didactic}
+
+\begin{document}
+
+\section{Grids}
+
+\begin{exercise}
+	GRIDMARK. Factor each polynomial.
+	\begin{tasks}(3)
+		\task $x^2 - 1$
+		\task $x^2 - 4$
+		\task $x^2 - 9$
+		\task $x^2 - 16$
+		\task $x^2 - 25$
+		\task $x^2 - 36$
+	\end{tasks}
+\end{exercise}
+
+\begin{exercise}
+	DISPLAYMARK. Evaluate the function
+	\[
+		f(x) = x^2 + 1
+	\]
+	\begin{tasks}(3)
+		\task $f(1)$
+		\task $f(2)$
+		\task $f(5)$
+	\end{tasks}
+\end{exercise}
+
+\begin{example}
+	COLUMNMARK. Do the following for the function above.
+	\begin{tasks}(1)
+		\task Find the domain.
+		\task Locate the intercepts.
+	\end{tasks}
+
+	\solution Read both off the graph.
+\end{example}
+
+\section{Around other structure}
+
+RUNINMARK. A grid in running text, with no blank line on either side.
+\begin{tasks}(2)
+	\task alpha
+	\task beta
+\end{tasks}
+The paragraph goes on after the grid.
+
+\begin{exercise}
+	\begin{parts}
+		\item PARTSMARK. A grid inside a part.
+		\begin{tasks}(2)
+			\task gamma
+			\task delta
+		\end{tasks}
+		\item
+		\begin{tasks}(2)
+			\task epsilon
+			\task zeta
+		\end{tasks}
+	\end{parts}
+\end{exercise}
+
+\begin{exercise}
+	RICHMARK. Tasks that hold more than a line.
+	\begin{tasks}(2)
+		\task A list:
+		\begin{itemize}
+			\item inner one
+			\item inner two
+		\end{itemize}
+		\task First paragraph.
+
+		Second paragraph.
+	\end{tasks}
+\end{exercise}
+
+\begin{exercise}
+	LABELMARK. Labels that are not the default.
+	\begin{tasks}[label = $\alph*_0$, label-width = 2em](2)
+		\task eta
+		\task theta
+	\end{tasks}
+	\begin{tasks}[label = \textbullet](2)
+		\task iota
+		\task kappa
+	\end{tasks}
+\end{exercise}
+
+\begin{exercise}
+	GATEDMARK. Solve $x^2 - 3x + 2 = 0$.
+\end{exercise}
+
+\begin{solution}[1in]
+	The two roots:
+	\begin{tasks}(2)
+		\task $x = 1$
+		\task $x = 2$
+	\end{tasks}
+\end{solution}
+
+\end{document}
