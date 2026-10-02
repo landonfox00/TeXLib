@@ -53,12 +53,21 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   solution is short of room, the space after it is raised to what it needs and
   the page's other stretchable spaces give that up in proportion to their
   stretch; the page height does not change. A page on which everything fits is
-  not touched, so it stays identical to the student copy. A page that cannot
-  hold its solutions at all is reported: `Page N cannot hold its solutions`.
-  Measured on five exams (181 pages) with every solution set solid red: before,
-  black ink inside a solution block on one page of each of six versions of one
-  exam and on two pages of another; after, none on any page.
-  `test_solution_inline_fit.py` asserts it on word positions.
+  not touched, so it stays identical to the student copy. Measured on five exams
+  (181 pages) with every solution set solid red: before, black ink inside a
+  solution block on one page of each of six versions of one exam and on two
+  pages of another; after, none on any page.
+
+  A page that cannot hold its solutions however the space is shared is split.
+  Each solution's reach becomes real depth on the box that owns it, the list is
+  cut at the column height with `\vsplit`, the part that fits is shipped, and
+  the rest is returned to the main vertical list from `build/page/after`
+  followed by a page break. The key is one page longer there, a part stays with
+  its own answer, and the log carries a warning: `Page N cannot hold its
+  solutions … the key continues on an added page`. On two quizzes whose pages
+  are 94pt and 189pt short, every line of every solution is on the paper and
+  nothing is printed over. `test_solution_inline_fit.py` asserts all three
+  cases on word positions from `pdftotext -bbox`.
 
 - **The viewer opens on `<base>.pdf` as soon as the base compile ends, not when
   the fan-out does.** That PDF is final at that moment — everything after it

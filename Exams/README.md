@@ -241,13 +241,24 @@ the tagged twins). The plain build is still the student copy.
 Where a solution is taller than the blank it is drawn into, the space after it
 grows to hold it and the page's other answer spaces give that up in proportion
 to their stretch. The page height does not change, and a page on which every
-solution fits is left exactly as the student copy. A page whose solutions cannot
-fit at all is reported in the log:
+solution fits is left exactly as the student copy. The log records each page
+where room was made (`made room for N tall solution(s)`).
+
+A page whose solutions cannot fit at all, however the space is shared, is split:
+what fits stays, the rest continues on one added page, and the pages after it
+keep their contents. A part is never separated from its own answer. The key is
+then a page longer than the student copy, and the build says so:
 
 ```
 Package texlib-solutions Warning: Page 3 cannot hold its solutions:
-(texlib-solutions)                they need 41.5pt more room than it has.
+(texlib-solutions)                they need 41.5pt more room than it has;
+(texlib-solutions)                the key continues on an added page.
 ```
+
+To get that key back onto the student copy's pages, give the page the room it is
+short of: a larger stretch on the `\problem` line, a smaller figure, or one
+problem fewer on that page. `TEXLIB_KEYFIT_TRACE=1` in the environment writes
+the page as the fit read it to the log, one line per item, in points.
 
 `\keylayout{compact}` is the default: the answer space closes and the solutions
 flow, which is what a review sheet with no work space wants.
