@@ -33,10 +33,13 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 - **`\keylayout{inline}` — a document says once that its keys keep the student
   copy's page.** Every answer-bearing copy the builder makes of that document
-  (`_solutions`, `_instructor`, their tagged twins) is then laid out with the
-  inline layout: the answer space stays, each solution is drawn into it, and
-  every problem prints where the student copy prints it. The plain build is
-  still the student copy, pixel for pixel, cover included. The layout existed
+  (`_solutions`, `_instructor`) is then laid out with the inline layout: the
+  answer space stays, each solution is drawn into it, and every problem prints
+  where the student copy prints it. The plain build is still the student copy,
+  pixel for pixel, cover included. The tagged twins keep the compact layout:
+  they are read through their structure, and on a probe of whole-problem
+  solutions the compact tagged key passes PDF/UA-2 with 0 failed rules where
+  the inline one fails four. The layout existed
   only as the `solutions-inline` build mode, chosen by hand at each build and
   never planned by the default fan-out; a preference in the source needs no
   builder change, and the key lands under the names every tool already reads.
@@ -122,6 +125,17 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   leaves no blank strut behind.
 
 ### Fixed
+
+- **A tagged key raised TeX errors when a solution ended in a display.** A
+  shown solution's body is collected into a box, and the closing brace ends its
+  last paragraph without the `\par` token, so the tagging code's
+  end-of-paragraph hook never ran. After running text the next `\par` outside
+  closed the structure. After `\[ … \]` nothing did, and tagpdf stopped with
+  `there is no open structure on the stack`: twelve errors for a
+  `{partsolution}` in either layout, two for a `{solution}` in the inline
+  layout, a PDF written anyway, exit 0. Both render branches now end the body
+  with a real `\par` in an accessible build, under the guard the discard
+  branches already use. `test_solution_tagged_key.py` reads the log for it.
 
 - **An inline `{partsolution}` moved what followed it.** The layout's contract
   is that a key page is its student page with the answers drawn in, and for a
