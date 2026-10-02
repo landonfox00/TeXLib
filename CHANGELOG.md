@@ -6,6 +6,82 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Added
 
+- **`{sketchaxes}` — the grid a graphing problem is answered on, with the answer
+  as its body.** `\begin{sketchaxes}[<scale>]{xmin}{xmax}{ymin}{ymax}` …
+  `\end{sketchaxes}` prints a blank labeled grid on a student copy and the same
+  grid with its body drawn on it on every copy that shows solutions. A bank that
+  put a blank grid in the stem and a second, filled grid inside `{partsolution}`
+  printed both in a key: on a twelve-version Math 126 exam the key ran 9 pages a
+  version against the student copy's 7, and with `{sketchaxes}` it runs 7. The
+  body is TikZ in grid units; `\sketchwindow` is the grid's rectangle, for
+  `\clip`; the star drops the y tick labels. A student copy discards the body
+  unread, and `test_mode_effects.py` checks that in every mode of `autoexam` and
+  `quiz`. Defined in `texlib-problembank.sty`, so every class that draws from a
+  bank has it. On a three-problem probe the tagged student copy passes PDF/UA-2
+  with 0 failed checks, and the tagged solutions copy reports the same 10 failed
+  checks with the grids as without them: a shown `{partsolution}` already fails
+  four Table 5 rules there, and `{sketchaxes}` adds none.
+
+- **`\texlibpartsolheader` — a `{partsolution}`'s header, set apart from
+  `{solution}`'s.** It defaults to `\texlibsolheader`, so no document changes
+  until one sets it. `\renewcommand{\texlibpartsolheader}{}` removes the line:
+  the tint and the accent still mark each answer, and a page of one-line part
+  answers gets a line back per part. A sixteen-page Math 126 review whose key
+  ran eighteen pages runs sixteen with it. The headerless box keeps the header
+  box's shape (one line of height, the rest depth), which the inline key relies
+  on to hang an answer below its question.
+
+- **`\keylayout{inline}` — a document says once that its keys keep the student
+  copy's page.** Every answer-bearing copy the builder makes of that document
+  (`_solutions`, `_instructor`) is then laid out with the inline layout: the
+  answer space stays, each solution is drawn into it, and every problem prints
+  where the student copy prints it. The plain build is still the student copy,
+  pixel for pixel, cover included. The tagged twins keep the compact layout:
+  they are read through their structure, and on a probe of whole-problem
+  solutions the compact tagged key passes PDF/UA-2 with 0 failed rules where
+  the inline one fails four. The layout existed
+  only as the `solutions-inline` build mode, chosen by hand at each build and
+  never planned by the default fan-out; a preference in the source needs no
+  builder change, and the key lands under the names every tool already reads.
+  `\keylayout{compact}`, the default, is the layout keys had: the space closes
+  and the solutions flow.
+
+- **The inline key makes room for a solution taller than its blank.** The
+  overlay was unbounded: a solution taller than the answer space it was drawn
+  into printed over the next question, and nothing reported it. Whether it fits
+  cannot be known where the solution is typeset, because the blank is `\stretch`
+  glue and is sized when the page is. Each overlay now ends in a marker box
+  carrying how far below it the ink reaches, and `texlib_keyfit.lua`, called
+  from the kernel's `build/page/before` hook, checks the finished page. Where a
+  solution is short of room, the space after it is raised to what it needs and
+  the page's other stretchable spaces give that up in proportion to their
+  stretch; the page height does not change. A page on which everything fits is
+  not touched, so it stays identical to the student copy. Measured on five exams
+  (181 pages) with every solution set solid red: before, black ink inside a
+  solution block on one page of each of six versions of one exam and on two
+  pages of another; after, none on any page.
+
+  A page that cannot hold its solutions however the space is shared is split.
+  Each solution's reach becomes real depth on the box that owns it, the list is
+  cut at the column height with `\vsplit`, the part that fits is shipped, and
+  the rest is returned to the main vertical list from `build/page/after`
+  followed by a page break. The key is one page longer there, a part stays with
+  its own answer, and the log carries a warning: `Page N cannot hold its
+  solutions … the key continues on an added page`. On two quizzes whose pages
+  are 94pt and 189pt short, every line of every solution is on the paper and
+  nothing is printed over.
+
+  A page of several problems is cut between two of them. Left to `\vsplit`, the
+  cut falls at the last break that fits, and on both quizzes that was the line
+  under the second problem's stem: the stem stayed at the foot of the page and
+  its graph went to the next. Inside `{problems}` the separator between
+  problems now carries an attribute (`\pbank@sep@marked`; no node is added, so
+  the page is the same page), and the page is cut at the last separator that
+  leaves each side a page's worth. The separator is dropped there, as it is
+  before a problem that starts a page. With no such separator `\vsplit`
+  chooses, as before. `test_solution_inline_fit.py` asserts all four cases on
+  word positions from `pdftotext -bbox`.
+
 - **The viewer opens on `<base>.pdf` as soon as the base compile ends, not when
   the fan-out does.** That PDF is final at that moment — everything after it
   writes *other* files (the tagged twins, the variant copies, the per-version
@@ -99,6 +175,33 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   displaced box at the bottom of an otherwise empty page only eats its own
   stretch and the unfixed library scores 100% on it; and the cover is excluded,
   because the key's red "Solutions" badge is supposed to reflow it.
+
+- **An inline `{partsolution}` moved what followed it.** The layout's contract
+  is that a key page is its student page with the answers drawn in, and for a
+  part solution it did not hold. Two causes. The overlay ended with
+  `\nointerlineskip`, which left `\prevdepth` at −1000pt, so the line after the
+  answer space got no interline glue and sat about 3pt high, once per part
+  solution. And an overlay that was the last thing in its list (a part answer
+  ending a `{cols}` column) changed the enclosing box's depth, because the
+  question line's depth was no longer the list's last depth. Both inline
+  solutions now go through one macro, `\@sol@overlay`, which carries
+  `\prevdepth` across the overlay and closes the list with an empty box of the
+  depth it had. On a twelve-version exam the key's 48 problem pages kept between
+  70.3% and 97.2% of the student page's ink in place (1px tolerance at 100 dpi);
+  they now keep 100.000%, every page. `test_solution_inline_parity.py` gained
+  the two pages that tell the cases apart: one fails on the old code at 81.6%,
+  the other on the `\prevdepth` fix alone at 86.9%.
+
+- **A tagged key raised TeX errors when a solution ended in a display.** A
+  shown solution's body is collected into a box, and the closing brace ends its
+  last paragraph without the `\par` token, so the tagging code's
+  end-of-paragraph hook never ran. After running text the next `\par` outside
+  closed the structure. After `\[ … \]` nothing did, and tagpdf stopped with
+  `there is no open structure on the stack`: twelve errors for a
+  `{partsolution}` in either layout, two for a `{solution}` in the inline
+  layout, a PDF written anyway, exit 0. Both render branches now end the body
+  with a real `\par` in an accessible build, under the guard the discard
+  branches already use. `test_solution_tagged_key.py` reads the log for it.
 
 - **A luaotfload cache-path race cost roughly one parallel build in five.** The
   lane died before LaTeX started, with a traceback and no PDF:

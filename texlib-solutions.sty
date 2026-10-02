@@ -64,6 +64,122 @@
 % value makes the overlay invisible to the vertical list, which is the whole
 % contract of the inline layout.
 \newdimen\@sol@prevdepth
+
+% \@sol@overlay{<box>} -- set a zero-size box into the vertical list so that the
+% list reads the same with it as without it. Both inline solutions go through
+% here.
+%
+% Restoring \prevdepth after the box is enough for whatever FOLLOWS in the same
+% list: the next line gets the interline glue it would have had. It is not
+% enough when the box is the LAST thing in its list -- a part answer that ends
+% a {cols} column, a minipage, a \parbox. The enclosing box's depth is the
+% depth of its last item, and the overlay has none, so the question line's
+% depth (about 2pt under a descender) moved from the box's depth into its
+% height. A two-column problem came out that much taller and everything below
+% it on the page moved: measured on a twelve-version exam, 87% to 89% of the
+% student page's ink still in place on the pages with a {cols} problem, against
+% 100% on the pages without one.
+%
+% So the list is closed the way it was open: back up over the depth, then set
+% an empty box that has exactly that depth. The list ends with a box of the
+% depth it ended with before, \prevdepth is that depth without being assigned,
+% and the total length is unchanged. A \prevdepth at its -1000pt sentinel (the
+% top of a list, or after \nointerlineskip) has no depth to give back and is
+% restored as it stood.
+%
+% That closing box is also the overlay's MARKER. #2 is how far below this point
+% the solution's ink reaches, and it rides on the box as an attribute (in sp).
+% Nothing here can tell whether the blank that follows is that tall: it is
+% \stretch glue, sized when the page is. texlib_keyfit.lua reads the markers
+% off the finished page and makes room where a solution came out taller than
+% its blank; see that file. Under an engine without attributes the marker is
+% a plain box and the overlay is unbounded, as it always was.
+\ifdefined\directlua
+	\newattribute\@sol@reach
+	\edef\@sol@reachattr{\the\allocationnumber}
+	\newcommand{\@sol@marker}[2]{\hbox attr\@sol@reachattr=\number\dimexpr#1\relax{#2}}
+\else
+	\newcommand{\@sol@marker}[2]{\hbox{#2}}
+\fi
+\newcommand{\@sol@overlay}[2]{%
+	\begingroup
+		\parskip\z@skip
+		\par
+		\@sol@prevdepth\prevdepth
+		% No page break between a line and the answer drawn under it. A penalty
+		% takes no space, so the student geometry is untouched; it matters only
+		% when a page that cannot hold its solutions is split (see below).
+		\nobreak
+		\nointerlineskip
+		\noindent\box#1\par
+		\nointerlineskip
+		\ifdim\@sol@prevdepth>-1000\p@
+			\kern-\@sol@prevdepth
+			\@sol@marker{#2}{\vrule \@width\z@ \@height\z@ \@depth\@sol@prevdepth}%
+		\else
+			\@sol@marker{#2}{}%
+			\prevdepth\@sol@prevdepth
+		\fi
+	\endgroup
+}
+
+% The reach of an inline solution below its marker: the box is lowered one
+% \baselineskip, its depth follows, and the left accent overhangs the fill by
+% 6pt. The interline glue of whatever comes next adds its own clearance.
+\newdimen\@sol@reachdim
+
+% The page-level half of the inline key. No Lua `--' comments inside a
+% \directlua block: TeX folds the newlines away and the comment would swallow
+% the rest of the chunk (same note as texlib-problembank.sty).
+\ifdefined\directlua
+	\directlua{
+		local function find(name)
+			local path = kpse.find_file(name, "lua")
+			if path and lfs.attributes(path) then return path end
+			local sty = kpse.find_file("texlib-solutions.sty")
+			local sep = string.char(92)
+			local dir = sty and sty:match("(.*[/" .. sep .. "])") or ""
+			if lfs.attributes(dir .. name) then return dir .. name end
+			return name
+		end
+		texlib_keyfit = dofile(find("texlib_keyfit.lua"))
+	}%
+	% A page that cannot hold its solutions comes back from fit() set solid --
+	% each solution's reach is real depth on the box that owns it -- with
+	% \@sol@spillstate raised. It is split at the column height: the part that
+	% fits is shipped as this page, and the rest is returned to the main
+	% vertical list from build/page/after, where the output routine's own
+	% material goes back to the front of the recent contributions. It is
+	% followed by a page break, so the continuation is a page of its own and
+	% the pages after it keep their contents. Both halves keep their \stretch
+	% glue, so each shares out its own free space the way the student page
+	% does. The split runs in a group so that \vbadness and \vfuzz stay its
+	% own: a page with no stretch in it splits underfull, and that is not
+	% worth a warning on top of the one fit() has already given.
+	\newcount\@sol@spillstate
+	\newbox\@sol@head
+	\newbox\@sol@spill
+	\AddToHook{build/page/before}{%
+		\@sol@spillstate\z@
+		\directlua{texlib_keyfit.fit(\number\@outputbox, \@sol@reachattr,
+			\ifdefined\pbank@sepattrnum \pbank@sepattrnum \else -1 \fi)}%
+		\ifnum\@sol@spillstate>\z@
+			\begingroup
+				\vbadness\@M \vfuzz\maxdimen
+				\splittopskip\topskip \splitmaxdepth\maxdepth
+				\setbox\@tempboxa\vbox{\unvbox\@outputbox}%
+				\global\setbox\@sol@head\vsplit\@tempboxa to\@colht
+				\global\setbox\@sol@spill\box\@tempboxa
+			\endgroup
+			\setbox\@outputbox\vbox to\@colht{\unvbox\@sol@head\vfil}%
+		\fi}
+	\AddToHook{build/page/after}{%
+		\ifvoid\@sol@spill\else
+			\unvbox\@sol@spill
+			\vfil\penalty-\@M
+			\global\setbox\@sol@spill\box\voidb@x
+		\fi}
+\fi
 \gdef\@partsol@rubric{}
 \gdef\@sol@rubric{}
 
@@ -318,6 +434,17 @@
 	\fi
 }{%
 	\ifsolutions
+			% ACCESSIBLE: end the body's last paragraph with a real \par before
+			% the box closes. A closing brace ends a paragraph too, but without
+			% the \par token, so the tagging code's end-of-paragraph hook never
+			% runs and the paragraph's structure is left open across the box.
+			% A body that ends in running text hides this (the next \par outside
+			% closes it, in the wrong place but in balance). A body that ends in
+			% a DISPLAY does not: the paragraph that resumes after \] is the one
+			% left open, and the inline layout, which sets no \par between here
+			% and the boxes it builds next, then fails with "there is no open
+			% structure on the stack". Same family as the discard branch below.
+			\ifdefined\TeXLibAccessibleMode\par\fi
 			% Still inside \@sol@box's \vbox: every \rubric call and the
 			% {commonerrors} capture have run by now, and emitting here (rather
 			% than after \box\@sol@box below) is what puts the panels INSIDE the
@@ -444,16 +571,9 @@
 		% Caveat, inherited from {partsolution}: nothing bounds the overlay, so a
 		% solution taller than its answer space overprints what follows.
 		\ifsolinline
+			\@sol@reachdim\dimexpr\baselineskip+\dp\@sol@vtop+6\p@\relax
 			\sbox\@sol@outer{\raisebox{-\baselineskip}[\z@][\z@]{\@sol@frame}}%
-			\begingroup
-				\parskip\z@skip
-				\par
-				\@sol@prevdepth\prevdepth
-				\nointerlineskip
-				\noindent\box\@sol@outer
-				\par
-				\prevdepth\@sol@prevdepth
-			\endgroup
+			\@sol@overlay\@sol@outer\@sol@reachdim
 		\else
 			\noindent\@sol@frame
 			\vspace{\@sol@outervsep}%
@@ -506,6 +626,10 @@
 	\fi
 }{%
 	\ifsolutions
+		% ACCESSIBLE: a real \par before the box closes, for the reason given at
+		% {solution}'s. Here it bites in BOTH layouts: a part solution that ends
+		% in a display raised twelve tagpdf errors in a tagged key.
+		\ifdefined\TeXLibAccessibleMode\par\fi
 		\egroup
 		\@in@partsolutionfalse
 		% Same container-stamping as {solution}, and in the same ORDER, which is
@@ -524,8 +648,19 @@
 		% Header, body and any rubric share one vtop so a single fill backs them.
 		\setbox\@partsol@wrap\vtop{%
 			\hsize\dimexpr\linewidth-12pt\relax
-			\noindent\texlibsolheader\par
-			\noindent\box\@partsol@box
+			\if\relax\detokenize\expandafter{\texlibpartsolheader}\relax
+				% No header line. The body is lowered until its first line sits
+				% where the header's would have, so the wrap keeps the shape the
+				% frame and the inline overlay below both assume: one line of
+				% height, everything else depth. Set on the line as it stands,
+				% the body would be all height, and \ifsolinline would then draw
+				% the answer upward over its own question.
+				\noindent\lower\dimexpr\ht\@partsol@box-\ht\strutbox\relax
+					\box\@partsol@box
+			\else
+				\noindent\texlibpartsolheader\par
+				\noindent\box\@partsol@box
+			\fi
 			\ifrubric
 				\ifx\@partsol@rubric\@empty\else
 					\par\vspace{6pt}\noindent
@@ -550,6 +685,8 @@
 		% \noindent<parbox> already produced, and the inline branch's \raisebox
 		% is an \hbox to begin with (verified: the answer's PDF bbox is
 		% unchanged, both layouts).
+		% Read before the frame consumes the wrap.
+		\@sol@reachdim\dimexpr\baselineskip+\dp\@partsol@wrap+6\p@\relax
 		\sbox\@partsol@outer{%
 			\ifsolinline
 				\raisebox{-\baselineskip}[\z@][\z@]{\@partsol@frame}%
@@ -560,12 +697,12 @@
 			\directlua{texlib_synctex_stamp_box(\number\@partsol@outer)}%
 		\fi
 		\ifsolinline
-			\begingroup
-				\parskip\z@skip
-				\par\nointerlineskip\noindent
-				\box\@partsol@outer
-				\par\nointerlineskip
-			\endgroup
+			% A trailing \nointerlineskip stood here in place of \@sol@overlay,
+			% and it left \prevdepth at -1000pt: the line after the answer space
+			% got no interline glue and sat about 3pt high, once per part
+			% solution, so a page of four part answers lost 12pt before its next
+			% problem.
+			\@sol@overlay\@partsol@outer\@sol@reachdim
 		\else
 			\par\noindent\box\@partsol@outer\par\smallskip
 		\fi
