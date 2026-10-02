@@ -524,8 +524,19 @@
 		% Header, body and any rubric share one vtop so a single fill backs them.
 		\setbox\@partsol@wrap\vtop{%
 			\hsize\dimexpr\linewidth-12pt\relax
-			\noindent\texlibsolheader\par
-			\noindent\box\@partsol@box
+			\if\relax\detokenize\expandafter{\texlibpartsolheader}\relax
+				% No header line. The body is lowered until its first line sits
+				% where the header's would have, so the wrap keeps the shape the
+				% frame and the inline overlay below both assume: one line of
+				% height, everything else depth. Set on the line as it stands,
+				% the body would be all height, and \ifsolinline would then draw
+				% the answer upward over its own question.
+				\noindent\lower\dimexpr\ht\@partsol@box-\ht\strutbox\relax
+					\box\@partsol@box
+			\else
+				\noindent\texlibpartsolheader\par
+				\noindent\box\@partsol@box
+			\fi
 			\ifrubric
 				\ifx\@partsol@rubric\@empty\else
 					\par\vspace{6pt}\noindent
