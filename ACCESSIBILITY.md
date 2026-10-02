@@ -115,6 +115,15 @@ you need the higher score.
   the first definition-style environment dies. TeXLib routes `\cref` through
   `texlib-crossref.sty`, which uses cleveref normally and `zref-clever` in an
   accessible build. If you load cleveref yourself, you will hit this.
+- The `tasks` package is not tagging-aware. It builds, and the tagged PDF
+  fails: a `{tasks}` grid is recorded as paragraphs nested in a paragraph
+  (ISO 32005 Table 5, `P-P` and `P-Part`). In an accessible build TeXLib loads
+  `texlib-tasks.sty` whenever `tasks` is loaded, by a class or by your own
+  preamble, and the grid is tagged as a list with one item per task. The log
+  says so if that package could not install itself, which happens when `tasks`
+  or the LaTeX tagging code is not a version it knows. The defect is upstream
+  and is tracked as
+  [latex3/tagging-project#370](https://github.com/latex3/tagging-project/issues/370).
 
 **Conformance covers structure only.** PDF/UA-2 means the document's structure
 is machine-checkable and correct. It says nothing about the quality of your alt

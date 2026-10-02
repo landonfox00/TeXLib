@@ -60,6 +60,65 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Fixed
 
+- **A `{tasks}` grid failed PDF/UA-2 in an accessible build.** The `tasks`
+  package (1.4a, 2022) is not tagging-aware. It sets each task, and each label,
+  as a paragraph in a box of its own and puts a row's boxes on one line. The
+  first task of a row is boxed between paragraphs. Every later one is boxed
+  after the row's line has begun, so its paragraphs are recorded inside the
+  row's open paragraph, and veraPDF rejects each of them twice, on ISO 32005
+  Table 5: `<P> shall not contain <Part>` and `<P> shall not contain <P>`. Six
+  tasks in three columns fail 16 checks; the ten grids of a real lecture unit
+  (Math 126 Unit 1, 27 pages) fail 84. A one-column grid passed, as loose
+  paragraphs with every label placed after its task. The defect is upstream: a
+  bare `article` with `\DocumentMetadata{tagging=on}` and one `{tasks}` list
+  fails with the same 16 checks. The LaTeX Team tracks it as
+  [latex3/tagging-project#370](https://github.com/latex3/tagging-project/issues/370),
+  open since 2024-07-30.
+
+  The new `texlib-tasks.sty` wraps four functions of `tasks` and calls each
+  original, so `tasks` still does all of the typesetting. In the tagged PDF a
+  grid is one `<L>`, each task is an `<LI>` holding its `<Lbl>` and then its
+  `<LBody>`, and a row carries no structure. `texlib-build.sty` loads the
+  package in an accessible build whenever `tasks` is loaded, by a class or by
+  the document. Both documents above now report 0 failed checks.
+
+  A normal build does not read the file. Measured on the fixture below (2
+  pages) and on the lecture unit (27 pages), built against the library before
+  and after: 0 differing pixels on every page (ImageMagick AE, no fuzz), in the
+  normal PDF and in the tagged twin.
+
+  Three details hold the structure together.
+
+  - `tasks` wraps its grid in `\list{}{}\item` for the margins, and the tagged
+    block code makes that a one-item list around the real one. For the length
+    of that scaffold its structure names are reassigned: list, item and body
+    to `NonStruct`, the empty label to `Artifact`. The label is empty on the
+    page and still carries marked content (the item's link target). As
+    `NonStruct` it puts that content directly under the enclosing section, and
+    veraPDF answers `<Sect> shall not contain content items`.
+  - `tasks` typesets a task's text before its label, and a structure element's
+    children are recorded in the order they are created. The `<LBody>` is
+    opened stashed and attached after the `<Lbl>`. Typesetting the label early
+    gives the same tree and changes the page: a label reads its counter, and a
+    grid nested in the task has moved the counter by then.
+  - `tasks` typesets every label a second time, into a box it measures and
+    discards. Tagging is suspended between tasks. With tagging live there, a
+    label that holds a formula leaves an empty `<Formula>` under the `<L>` for
+    every task, and veraPDF fails `<L> shall not contain <Formula>`.
+
+  Guarded by `examples/fixtures/Notes/tasks-tagging.tex`, nine grids in the
+  accessible gate. veraPDF passing shows that the nesting is legal. It does not
+  show that a grid is a list, so a manifest entry can now declare `tagged=`:
+  exact counts of structure elements by standard type, read from the tagged
+  PDF with pypdf (`check_tagged_structure` in `smoke_test.py`), together with
+  the order of every list item's children. Against the library without the
+  package the fixture fails both ways: `Table 5. P-Part, Table 5. P-P` (50
+  checks), and `LI x13 (expected 27)`.
+
+  The package installs nothing, and says so in the log, when the `tasks`
+  functions it wraps or the tagging interfaces it calls are missing. It was
+  written against `tasks` 1.4a and LaTeX 2026-06-01.
+
 - **The inline key was only half inline: a full-problem `{solution}` still
   displaced the page.** `\ShowKeyInline` exists so a key page *is* its student
   page with the answers drawn into the blanks — same pagination, same problem

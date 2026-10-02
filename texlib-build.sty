@@ -215,4 +215,19 @@
 	\newcommand\texlib@acc@tagresume{}
 \fi
 
+% Tagged list structure for `tasks' --------------------------------------------
+% The tasks package is not tagging-aware: a tagged {tasks} list is paragraphs
+% nested in paragraphs, which PDF/UA-2 rejects. texlib-tasks.sty retags it as a
+% list and has the detail. It is loaded from here because this is the one
+% package every class loads, and the classes do not agree on when tasks arrives:
+% didactic, pset and report-card load it through basic-utilities BEFORE this
+% file, and in every other class it arrives only if a document asks for it. So
+% both orders are handled. A build in which tasks never loads never reads the
+% file.
+\ifdefined\TeXLibAccessibleMode
+	\@ifpackageloaded{tasks}%
+		{\RequirePackage{texlib-tasks}}%
+		{\AddToHook{package/tasks/after}{\RequirePackage{texlib-tasks}}}
+\fi
+
 \endinput

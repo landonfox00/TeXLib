@@ -1,0 +1,261 @@
+% texlib-tasks.sty
+% List structure for the `tasks' package in an accessible (tagged) build.
+%
+% THE DEFECT
+%
+% tasks 1.4a (2022) is not tagging-aware. It sets every task, and every label,
+% as a paragraph in a box of its own, and puts the boxes of one row side by side
+% on a single line. Under \DocumentMetadata{tagging=on} each of those paragraphs
+% opens a <text-unit> holding a <text>. The first task of a row is boxed between
+% paragraphs, where that is legal. Every later task of the row is boxed after
+% the row's line has begun, so the <text-unit> of its text and the <text-unit>
+% of its label both land inside the row's open <text>. veraPDF reports each of
+% them twice, on ISO 32005 Table 5: "<P> shall not contain <Part>" and "<P>
+% shall not contain <P>". Six tasks in three columns cost 16 failed checks.
+% Where the nesting is legal the result is still not a list: the tasks are loose
+% paragraphs, and each label is a paragraph that FOLLOWS its task.
+%
+% This is upstream. A bare `article' with \DocumentMetadata{tagging=on} and one
+% {tasks} list fails with the same 16 checks and no TeXLib file loaded. The
+% LaTeX Team tracks it, open since 2024-07-30, at
+%     https://github.com/latex3/tagging-project/issues/370
+% When tasks tags its own lists this package has to go: the wrappers would tag
+% every grid a second time. The structure counts asserted for the fixture
+% (examples/fixtures/Notes/tasks-tagging.tex, `tagged=' in examples/manifest.py)
+% are exact, so a second set of list elements fails them.
+%
+% WHAT THIS PACKAGE DOES
+%
+% It wraps four functions of tasks. Each wrapper calls the function it replaces,
+% so tasks still does all of the typesetting, in the order it always did; only
+% the tagging changes. A {tasks} list becomes one <L>, each task an <LI> holding
+% its <Lbl> and then its <LBody>, and the paragraphs of a task are tagged inside
+% that <LBody>. The rows themselves carry no structure.
+%
+% It is loaded by texlib-build.sty, and only in an accessible build. It installs
+% nothing unless tagging is active, and it says so in the log when the functions
+% it wraps, or the tagging interfaces it calls, are not there. It was written
+% against tasks 1.4a and LaTeX 2026-06-01.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texlib-tasks}[2026/09/08 v0.9.0 TeXLib tagged list structure for tasks]
+
+\RequirePackage{tasks}
+
+\ExplSyntaxOn
+
+\tl_new:N \l__texlib_tasks_scaffold_tag_tl
+\tl_new:N \l__texlib_tasks_item_tag_tl
+\tl_new:N \l__texlib_tasks_label_tag_tl
+\tl_new:N \l__texlib_tasks_body_tag_tl
+\tl_new:N \l__texlib_tasks_body_num_tl
+
+% ------------------------------------------------------------------------------
+% The scaffold
+% ------------------------------------------------------------------------------
+% tasks wraps its grid in \list{}{...}\item, for the margins. The tagged block
+% code turns that into a one-item list with an empty label, and the real list
+% would sit inside its item. For the length of that \list and \item the block
+% code's structure names are therefore reassigned: list, item and body become
+% NonStruct, which a PDF reader looks through to the children, and the label
+% becomes Artifact.
+%
+% The label cannot be NonStruct. It is empty on the page but it is not empty in
+% the PDF (the item's link target is marked content), and NonStruct would put
+% that content directly under whatever holds the list: "<Sect> shall not contain
+% content items". Artifact may hold content wherever a {tasks} list can stand.
+%
+% The four names are read before they are reassigned. The values are the tags
+% every task uses below, and what \__texlib_tasks_environment:nnnn puts back.
+\cs_new_protected:Npn \__texlib_tasks_body:nnnn #1#2#3#4 {
+	\tl_set:Ne \l__texlib_tasks_scaffold_tag_tl { \UseStructureName { block/list } }
+	\tl_set:Ne \l__texlib_tasks_item_tag_tl     { \UseStructureName { block/list/item } }
+	\tl_set:Ne \l__texlib_tasks_label_tag_tl    { \UseStructureName { block/list/label } }
+	\tl_set:Ne \l__texlib_tasks_body_tag_tl     { \UseStructureName { block/list/body } }
+	\AssignStructureRole { block/list }       { NonStruct }
+	\AssignStructureRole { block/list/item }  { NonStruct }
+	\AssignStructureRole { block/list/label } { Artifact }
+	\AssignStructureRole { block/list/body }  { NonStruct }
+	\__texlib_tasks_orig_body:nnnn {#1} {#2} {#3} {#4}
+}
+
+% ------------------------------------------------------------------------------
+% The list
+% ------------------------------------------------------------------------------
+% Runs inside the scaffold's item, once \list and \item have opened their
+% structures. The names go back first, so that a list inside a task is tagged
+% as a list.
+%
+% Paragraph tagging goes off for the rest of the environment. A row is a
+% paragraph whose only content is boxes; tagged, it is the <text> the tasks used
+% to nest in. The setting is local to the {tasks} group, so the \par that ends
+% the last row (it comes from \endlist, after this function returns) is still
+% covered.
+%
+% Tagging is suspended around the code BETWEEN tasks, and resumed for each task
+% by \__texlib_tasks_task:nnn. tasks typesets every label twice, once into a box
+% it measures and throws away. With tagging live there, a label holding a
+% formula leaves that formula's structure element, empty, as a child of the <L>
+% for every task, and veraPDF fails the file: "<L> shall not contain <Formula>".
+\cs_new_protected:Npn \__texlib_tasks_environment:nnnn #1#2#3#4 {
+	\exp_args:NnV \AssignStructureRole { block/list }       \l__texlib_tasks_scaffold_tag_tl
+	\exp_args:NnV \AssignStructureRole { block/list/item }  \l__texlib_tasks_item_tag_tl
+	\exp_args:NnV \AssignStructureRole { block/list/label } \l__texlib_tasks_label_tag_tl
+	\exp_args:NnV \AssignStructureRole { block/list/body }  \l__texlib_tasks_body_tag_tl
+	\__texlib_tasks_list_begin:n {#1}
+	\tagpdfparaOff
+	\tag_suspend:n { texlib-tasks }
+	\__texlib_tasks_orig_environment:nnnn {#1} {#2} {#3} {#4}
+	\tag_resume:n { texlib-tasks }
+	\tag_struct_end:
+}
+
+% The <L> takes the tag and the ListNumbering class that {enumerate} or
+% {itemize} would. Which one is decided by the label, which is what a screen
+% reader announces: a label that prints the counter (it has a * in it) makes an
+% ordered list. The style name decides only when no label has been set, and
+% TeXLib's own \settasks sets one, so under TeXLib `style=itemize' is still
+% lettered and still ordered. #1 is the style.
+\cs_new_protected:Npn \__texlib_tasks_list_begin:n #1 {
+	\bool_if:NTF \l__tasks_custom_label_bool {
+		\str_if_in:NnTF \l__tasks_custom_label_tl { * }
+			{ \__texlib_tasks_list_begin:nn { block/enumerate } { enumerate } }
+			{ \__texlib_tasks_list_begin:nn { block/itemize } { itemize } }
+	}{
+		\str_if_eq:nnTF {#1} { itemize }
+			{ \__texlib_tasks_list_begin:nn { block/itemize } { itemize } }
+			{ \__texlib_tasks_list_begin:nn { block/enumerate } { enumerate } }
+	}
+}
+\cs_new_protected:Npn \__texlib_tasks_list_begin:nn #1#2 {
+	\tag_struct_begin:n { tag = \UseStructureName {#1} , attribute-class = #2 }
+}
+
+% ------------------------------------------------------------------------------
+% One task
+% ------------------------------------------------------------------------------
+% #1 is the label, #2 the item format, #3 the task's text. tasks boxes the text
+% first and the label second, and a structure element's children are recorded in
+% the order they are created, so the plain order would read body, then label.
+%
+% The <LBody> is therefore opened STASHED: it exists and collects the task's
+% paragraphs, but it is not yet a child of the <LI>. The label code tasks is
+% handed closes it and opens the <Lbl>, which becomes the first child, and the
+% <LBody> is attached after it once tasks returns. Nothing is typeset here, and
+% nothing is typeset earlier or later than tasks would have typeset it.
+%
+% Both ends of the <LBody> test that it is still the open structure. tasks 1.4a
+% typesets the label exactly once, after the text; the test keeps the stack
+% balanced if a later version typesets it twice or not at all.
+\cs_new_protected:Npn \__texlib_tasks_task:nnn #1#2#3 {
+	\tag_resume:n { texlib-tasks }
+	\tag_struct_begin:n { tag = \l__texlib_tasks_item_tag_tl }
+	\tag_struct_begin:n { tag = \l__texlib_tasks_body_tag_tl , stash }
+	\tl_set:Ne \l__texlib_tasks_body_num_tl { \tag_get:n { struct_num } }
+	\__texlib_tasks_orig_task:nnn { \__texlib_tasks_label:n {#1} } {#2} {#3}
+	\__texlib_tasks_body_end:
+	\exp_args:NV \tag_struct_use_num:n \l__texlib_tasks_body_num_tl
+	\tag_struct_end:
+	\tag_suspend:n { texlib-tasks }
+}
+
+\cs_new_protected:Npn \__texlib_tasks_label:n #1 {
+	\__texlib_tasks_body_end:
+	\tag_struct_begin:n { tag = \l__texlib_tasks_label_tag_tl }
+	\tag_mc_begin:n { }
+	#1
+	\tag_mc_end:
+	\tag_struct_end:
+}
+
+\cs_new_protected:Npn \__texlib_tasks_body_end: {
+	\int_compare:nNnT
+		{ \tag_get:n { struct_num } } = { \l__texlib_tasks_body_num_tl }
+		{ \tag_struct_end: }
+}
+
+% tasks runs \__tasks_setup: at the top of the box that holds a task's text, and
+% nowhere else. Paragraph tagging comes back on there, through the socket the
+% kernel uses for the same purpose at the top of a \parbox and a minipage, and
+% it stays on to the end of that box. The label's box and the row never see it.
+\cs_new_protected:Npn \__texlib_tasks_setup: {
+	\UseTaggingSocket { para/restore }
+	\__texlib_tasks_orig_setup:
+}
+
+% ------------------------------------------------------------------------------
+% Installation
+% ------------------------------------------------------------------------------
+% \tasks_environment:Vnnn and \__tasks_task:VVV, the forms tasks itself calls,
+% are expl3 variants: they expand their arguments and then call the base
+% function BY NAME, so redefining the base function is enough.
+\cs_new_protected:Npn \__texlib_tasks_install: {
+	\cs_new_eq:NN \__texlib_tasks_orig_body:nnnn        \tasks_body:nnnn
+	\cs_new_eq:NN \__texlib_tasks_orig_environment:nnnn \tasks_environment:nnnn
+	\cs_new_eq:NN \__texlib_tasks_orig_task:nnn         \__tasks_task:nnn
+	\cs_new_eq:NN \__texlib_tasks_orig_setup:           \__tasks_setup:
+	\cs_set_eq:NN \tasks_body:nnnn        \__texlib_tasks_body:nnnn
+	\cs_set_eq:NN \tasks_environment:nnnn \__texlib_tasks_environment:nnnn
+	\cs_set_eq:NN \__tasks_task:nnn       \__texlib_tasks_task:nnn
+	\cs_set_eq:NN \__tasks_setup:         \__texlib_tasks_setup:
+}
+
+\msg_new:nnn { texlib-tasks } { tasks-changed } {
+	This~version~of~`tasks'~does~not~have~the~functions~the~tagged~list~
+	structure~wraps~(it~was~written~against~v1.4a).~Nothing~was~installed:~
+	a~{tasks}~list~in~this~document~is~tagged~as~nested~paragraphs,~which~
+	PDF/UA-2~rejects.
+}
+\msg_new:nnn { texlib-tasks } { tagging-changed } {
+	The~tagging~code~of~this~LaTeX~release~does~not~have~the~interfaces~the~
+	tagged~list~structure~for~`tasks'~calls~(it~was~written~against~LaTeX~
+	2026-06-01).~Nothing~was~installed:~a~{tasks}~list~in~this~document~is~
+	tagged~as~nested~paragraphs,~which~PDF/UA-2~rejects.
+}
+
+% A structure name is tested by the variable that holds it: an undeclared name
+% expands to \relax, which no expandable test tells from a tag.
+\cs_new_protected:Npn \__texlib_tasks_check: {
+	\bool_lazy_all:nTF {
+		{ \cs_if_exist_p:N \tasks_body:nnnn }
+		{ \cs_if_exist_p:N \tasks_environment:nnnn }
+		{ \cs_if_exist_p:N \__tasks_task:nnn }
+		{ \cs_if_exist_p:N \__tasks_setup: }
+		{ \bool_if_exist_p:N \l__tasks_custom_label_bool }
+		{ \tl_if_exist_p:N \l__tasks_custom_label_tl }
+	}{
+		\bool_lazy_all:nTF {
+			{ \cs_if_exist_p:N \tag_struct_begin:n }
+			{ \cs_if_exist_p:N \tag_struct_end: }
+			{ \cs_if_exist_p:N \tag_struct_use_num:n }
+			{ \cs_if_exist_p:N \tag_get:n }
+			{ \cs_if_exist_p:N \tag_mc_begin:n }
+			{ \cs_if_exist_p:N \tag_mc_end: }
+			{ \cs_if_exist_p:N \tag_suspend:n }
+			{ \cs_if_exist_p:N \tag_resume:n }
+			{ \cs_if_exist_p:N \tagpdfparaOff }
+			{ \cs_if_exist_p:N \UseTaggingSocket }
+			{ \cs_if_exist_p:N \UseStructureName }
+			{ \cs_if_exist_p:N \AssignStructureRole }
+			{ \tl_if_exist_p:c { l__tag_name_block/list_tl } }
+			{ \tl_if_exist_p:c { l__tag_name_block/list/item_tl } }
+			{ \tl_if_exist_p:c { l__tag_name_block/list/label_tl } }
+			{ \tl_if_exist_p:c { l__tag_name_block/list/body_tl } }
+			{ \tl_if_exist_p:c { l__tag_name_block/itemize_tl } }
+			{ \tl_if_exist_p:c { l__tag_name_block/enumerate_tl } }
+			{ \cs_if_exist_p:N \socket_if_exist_p:n }
+			{ \socket_if_exist_p:n { tagsupport/para/restore } }
+		}
+			{ \__texlib_tasks_install: }
+			{ \msg_warning:nn { texlib-tasks } { tagging-changed } }
+	}{
+		\msg_warning:nn { texlib-tasks } { tasks-changed }
+	}
+}
+
+\cs_if_exist:NT \tag_if_active:T {
+	\tag_if_active:T { \__texlib_tasks_check: }
+}
+
+\ExplSyntaxOff
+
+\endinput
