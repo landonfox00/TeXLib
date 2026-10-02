@@ -147,6 +147,35 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   a local run and CI took different paths. The file took 1.3s with the cache on
   and 0.3s with it off, measured locally.
 
+- **Two test guards passed without checking anything.** Both now fail on a
+  planted fault.
+
+  `test_engine_emit_edges.py` feeds the engine-emitted `.vmap` through the
+  builder's real slicer, and printed `SKIP  slicer sub-check (TexlibBuilder /
+  pypdf unavailable)` on every run, with pypdf installed. Its `_load_builder()`
+  kept a private LaTeXTools stub that never registered the `TeXLib` package, so
+  `from texlib_builder import TexlibBuilder` raised `ModuleNotFoundError: No
+  module named 'TeXLib'` and a bare `except Exception` turned that into the
+  skip. It now calls `install_native_builder()` from `_testkit.py`, as
+  `test_synctex_integration.py` and `test_biber_integration.py` do. A missing
+  pypdf is the only soft skip, the message names it, and the summary line
+  counts it; a builder that does not import is a FAIL. The suite goes from 34
+  checks to 52, all passing: emitter and slicer agree. With the sidecar's A and
+  B labels swapped before slicing, 8 of the 18 new checks fail; with every
+  marker moved one page late, 9 do.
+
+  `test_texlib_builder.py`'s "no module redefines the shared constants" scan
+  skipped a directory when `.git` or `.claude` appeared anywhere in its
+  *absolute* path. A checkout under `.claude/worktrees/<name>`, where agent
+  sessions run, had every directory skipped, the repo root included, and the
+  check passed having read 0 files. The walk now prunes those two names below
+  the root, and a companion check requires the scan to have reached
+  `smoke_test.py`, `Sublime/texlib/texlib_build.py` and the test file itself.
+  From such a worktree, a scratch `.py` holding a literal redefinition of
+  `LUALATEX_CLASSES` passed the old scan and fails the new one; restoring the
+  old prune fails the companion check with "0 files scanned". 401 checks
+  become 402.
+
 ## [0.9.0] — 2026-09-08
 
 ### Fixed
