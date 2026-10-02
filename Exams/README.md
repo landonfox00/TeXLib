@@ -251,8 +251,10 @@ where room was made (`made room for N tall solution(s)`).
 
 A page whose solutions cannot fit at all, however the space is shared, is split:
 what fits stays, the rest continues on one added page, and the pages after it
-keep their contents. A part is never separated from its own answer. The key is
-then a page longer than the student copy, and the build says so:
+keep their contents. A part is never separated from its own answer, and a page
+of several problems is cut between two of them when each side fits a page, so
+that no problem is divided. The key is then a page longer than the student
+copy, and the build says so:
 
 ```
 Package texlib-solutions Warning: Page 3 cannot hold its solutions:

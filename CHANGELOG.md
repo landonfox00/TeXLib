@@ -69,8 +69,18 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   its own answer, and the log carries a warning: `Page N cannot hold its
   solutions … the key continues on an added page`. On two quizzes whose pages
   are 94pt and 189pt short, every line of every solution is on the paper and
-  nothing is printed over. `test_solution_inline_fit.py` asserts all three
-  cases on word positions from `pdftotext -bbox`.
+  nothing is printed over.
+
+  A page of several problems is cut between two of them. Left to `\vsplit`, the
+  cut falls at the last break that fits, and on both quizzes that was the line
+  under the second problem's stem: the stem stayed at the foot of the page and
+  its graph went to the next. Inside `{problems}` the separator between
+  problems now carries an attribute (`\pbank@sep@marked`; no node is added, so
+  the page is the same page), and the page is cut at the last separator that
+  leaves each side a page's worth. The separator is dropped there, as it is
+  before a problem that starts a page. With no such separator `\vsplit`
+  chooses, as before. `test_solution_inline_fit.py` asserts all four cases on
+  word positions from `pdftotext -bbox`.
 
 - **The viewer opens on `<base>.pdf` as soon as the base compile ends, not when
   the fan-out does.** That PDF is final at that moment — everything after it
