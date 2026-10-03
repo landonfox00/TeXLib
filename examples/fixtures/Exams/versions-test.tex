@@ -1,0 +1,45 @@
+% versions-test.tex -- six versions x (student + key) = twelve copies in one
+% PDF, for the per-copy assertions in test_engine_correctness.py.
+%
+% Problem 1 is the ONLY problem with parts, and that is what the fixture turns
+% on. {parts} resumes its lettering when the question number equals the one it
+% last saw, and every copy numbers its questions from 1, so a second problem
+% with parts would move the tracker between copies and hide the failure. An
+% exam with two such problems was never affected; an exam with one printed
+% 1a, 1b on its first version and 1k, 1l on its sixth.
+%
+% The second {parts} sits in {cols} in the same question and has to CONTINUE
+% the first (1c, 1d): the resume inside one question is the behaviour the
+% tracker exists for. vparts is defined here, not in the bank, because {cols}
+% is autoexam-only and versions-bank.tex is also drawn by a quiz.
+%
+% \maketitle is load-bearing: it is what restarts the question numbers for each
+% copy. Problem 2 comes from versions-bank.tex and reports the version label.
+\documentclass{autoexam}
+\versions{1301, 1302, 1303, 1304, 1305, 1306}
+\setexamseed{126}
+\solutions
+\examsetup{number=3, date={Engine Test}}
+\loadbank{versions-bank.tex}
+
+\begin{problem}{vparts}[topic=fr]
+	VPSTEM the only problem with parts.
+	\begin{parts}
+		\ppart VPARTA alpha.
+		\ppart VPARTB bravo.
+	\end{parts}
+	\begin{cols}
+		\begin{parts}
+			\ppart VPARTC charlie.
+			\ppart VPARTD delta.
+		\end{parts}
+	\end{cols}
+\end{problem}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem{vparts}
+	\problem{vquery}
+\end{problems}
+\end{document}

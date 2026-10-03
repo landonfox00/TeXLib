@@ -36,6 +36,11 @@ regression anywhere along the engine -> LaTeX -> PDF path is caught:
     by an exam with no \\versions and by a quiz.  \\IfExamVersioned must take
     its unversioned branch there, and a selector keyed to version labels must
     print its fallback.
+  * Stretch (versions-test): the same problem, and one with parts, in a
+    six-version exam with student and key copies, sliced per copy through the
+    engine-emitted .vmap.  The parts must be lettered 1a..1d on EVERY copy (the
+    first {parts} restarting at a, the {cols} list after it continuing at c),
+    and each copy must report its own version label.
 
 Soft-skips (exit 0) if lualatex or a poppler-flavored pdftotext (-bbox / real
 poppler banner, NOT Git-for-Windows' bundled xpdf build) is missing -- matching
@@ -529,6 +534,74 @@ def scenario_unversioned_query():
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+# =============================================================================
+# Stretch: per-copy state of a versioned exam -- part labels + the version label
+# =============================================================================
+_VERSIONS = ["1301", "1302", "1303", "1304", "1305", "1306"]
+# A part label followed by one of the fixture's needles.  Not anchored to a line
+# start: {cols} sets two parts side by side, and pdftotext may give them a line.
+_VPART_RE = re.compile(r"(\d+)([a-z])\.\s+(VPART[A-D])")
+
+
+def read_vmap(path):
+    """The engine's .vmap as [(version, 'stu'|'sol', first page)], in file order."""
+    entries = []
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            parts = line.strip().split("|")
+            if len(parts) == 3:
+                entries.append((parts[0], parts[1], int(parts[2])))
+    return entries
+
+
+def scenario_versioned_copies():
+    print("\n=== Stretch: every copy of a versioned exam (versions-test) ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_engine_versions_")
+    try:
+        pdf, aux, log = build(tmp, "versions-test.tex", "versions-bank.tex",
+                              "coursemeta.tex")
+        check("PDF was produced", os.path.exists(pdf), log[-600:])
+        vmap = os.path.join(aux, "versions-test.vmap")
+        check(".vmap file was emitted by the engine", os.path.exists(vmap))
+        if not (os.path.exists(pdf) and os.path.exists(vmap)):
+            return
+
+        entries = read_vmap(vmap)
+        want = ([(v, "stu") for v in _VERSIONS] + [(v, "sol") for v in _VERSIONS])
+        check("twelve copies: the six student copies, then the six keys",
+              [(v, c) for (v, c, _p) in entries] == want,
+              f"copies={[(v, c) for (v, c, _p) in entries]}")
+
+        for i, (ver, copy, start) in enumerate(entries):
+            end = entries[i + 1][2] - 1 if i + 1 < len(entries) else None
+            text = flat(pdftext(pdf, first=start, last=end))
+            tag = f"{ver}|{copy}"
+
+            # The one problem with parts is Problem 1 on every copy.  Its first
+            # {parts} has to restart at a, and the {cols} list after it has to
+            # carry on at c.  Without the per-copy reset the second copy reads
+            # 1e..1h, and the seventh runs \alph past z and stops lettering.
+            parts = _VPART_RE.findall(text)
+            check(f"{tag}: the parts are lettered 1a, 1b, 1c, 1d in authored order",
+                  parts == [("1", "a", "VPARTA"), ("1", "b", "VPARTB"),
+                            ("1", "c", "VPARTC"), ("1", "d", "VPARTD")],
+                  f"got {[q + l + '. ' + n for (q, l, n) in parts]}")
+
+            # The copy knows it is versioned and which version it is.
+            check(f"{tag}: \\IfExamVersioned takes the versioned branch",
+                  "VQVERSIONED" in text and "VQUNVERSIONED" not in text,
+                  text[:240])
+            check(f"{tag}: \\theExamVersion is this copy's label",
+                  f"VQLABEL[{ver}]" in text, text[:240])
+            check(f"{tag}: the selector prints this version's branch and no other",
+                  _VQSEL_RE.findall(text) == [ver],
+                  f"got {_VQSEL_RE.findall(text)}")
+            check(f"{tag}: the query is expandable (\\setvar read it as 1)",
+                  "VQFLAG1" in text, text[:240])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     print("TeXLib problem-bank engine correctness tests\n")
     print(f"  build root: {_build_root()}  (override with TEXLIB_TEST_ROOT)")
@@ -547,6 +620,7 @@ def main():
     scenario_importproblem()
     scenario_vmap_emission()
     scenario_unversioned_query()
+    scenario_versioned_copies()
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
