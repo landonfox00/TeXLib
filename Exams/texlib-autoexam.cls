@@ -498,12 +498,15 @@
 
 % {cols} keeps its multicols in EVERY build. An accessible build used to drop
 % to a single column ("multicol cannot be tagged"), but multicol now carries
-% latex-lab tagging support: the columns tag as ordinary text-units and
-% veraPDF passes PDF/UA-2 with the two-up layout in place (verified on TeX
-% Live 2025 locally; accessible.yml gates it on the pinned TL2026 container),
-% so the tagged exam now matches the print layout. If a toolchain bump ever
-% regresses this, the old guard was: \ifdefined\TeXLibAccessibleMode skip the
-% two \begin/\end{multicols}.
+% tagging support: the columns tag as ordinary text-units and veraPDF passes
+% PDF/UA-2 with the two-up layout in place, so the tagged exam matches the
+% print layout (verified locally on TeX Live 2025, and on TeX Live 2026 on
+% 2026-10-03). NO workflow builds a tagged {cols}: accessible.yml builds the
+% documents registered in examples/manifest.py, none of which uses the
+% environment, and CI builds the scenario packs untagged. After a toolchain
+% bump, check examples/scenarios/exam/cols with `python a11y_gallery.py exam`.
+% If it regresses, the old guard was: \ifdefined\TeXLibAccessibleMode skip
+% the two \begin/\end{multicols}.
 \DeclareDocumentEnvironment{cols}{O{2}}{%
 	\par
 	\setlength{\columnseprule}{0pt}

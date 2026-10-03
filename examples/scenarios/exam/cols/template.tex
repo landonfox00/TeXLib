@@ -25,10 +25,10 @@
 % cols builds fine in an exam and explodes the moment a quiz draws it, which is
 % why the Math 126 course bans it in bank problems outright. See Bank/README.md.
 %
-% ACCESSIBLE: multicol cannot be tagged (its column balancing rebuilds the
-% galley below the structure layer), so an accessible build drops to a single
-% column and keeps the part labelling. The text assertions below hold either
-% way -- what differs between the two builds is layout, not content.
+% ACCESSIBLE: a tagged build keeps the columns. It sets parts 1a and 1b in the
+% left column and 1c and 1d in the right, as the normal build does, and its
+% structure tree holds the four parts as one list in that order. No workflow
+% builds this scenario tagged; `python a11y_gallery.py exam` does, locally.
 \documentclass[
 	exam-number = {6},
 	exam-date   = {Smoke Test Date},
