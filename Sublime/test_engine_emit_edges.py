@@ -52,7 +52,8 @@ the copy is the only way to guarantee the build tests THIS tree's files.
 Soft-skips (exit 0) if lualatex or a poppler-flavored pdftotext (-layout, not
 Git's xpdf build) is missing, matching test_synctex_integration.py's
 degrade-don't-fail convention. The builder-slicer sub-check additionally
-soft-skips if TexlibBuilder / pypdf can't be imported.
+soft-skips if pypdf can't be imported, and says so in the summary line. A
+TexlibBuilder that can't be imported is a FAIL, not a skip.
 
 Run:  python Sublime/test_engine_emit_edges.py     (exit 0 ok/skipped, 1 fail)
 """
@@ -70,7 +71,6 @@ if "sublime" in sys.modules:
     raise SystemExit
 
 TEXLIB_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SUBLIME_DIR = os.path.dirname(os.path.abspath(__file__))
 
 LUALATEX = shutil.which("lualatex")
 
@@ -232,30 +232,20 @@ def _parse_vmap(path):
 
 
 def _load_builder():
-    """Install the LaTeXTools stub and import TexlibBuilder for the slicer
-    sub-check. Returns the class, or None if unavailable."""
+    """Import TexlibBuilder for the slicer sub-check. Returns (class, None), or
+    (None, <what is missing>) when pypdf is not installed -- the one optional
+    dependency, and so the one soft skip.
+
+    The builder import stays OUTSIDE the `try`. A private stub here once failed
+    to register the `TeXLib` package the shim imports its core from, a bare
+    `except` turned the ModuleNotFoundError into a skip, and the sub-check never
+    ran. A builder that does not import raises, and the caller reports a FAIL."""
     try:
-        import types
-        for name in ("LaTeXTools", "LaTeXTools.plugins",
-                     "LaTeXTools.plugins.builder",
-                     "LaTeXTools.plugins.builder.pdf_builder"):
-            sys.modules.setdefault(name, types.ModuleType(name))
-
-        class _StubPdfBuilder:
-            def __init__(self, *a, **k):
-                self._displayed = ""
-
-            def display(self, msg):
-                self._displayed += str(msg)
-
-        sys.modules["LaTeXTools.plugins.builder.pdf_builder"].PdfBuilder = _StubPdfBuilder
-        if SUBLIME_DIR not in sys.path:
-            sys.path.insert(0, SUBLIME_DIR)
         import pypdf  # noqa: F401  (slicer runs in-process only when present)
-        from texlib_builder import TexlibBuilder
-        return TexlibBuilder
-    except Exception:
-        return None
+    except ImportError as exc:
+        return None, f"pypdf not importable: {exc}"
+    from _testkit import install_native_builder
+    return install_native_builder(), None
 
 
 def _slice_check(combined_pdf, vmap_path, records):
@@ -263,9 +253,14 @@ def _slice_check(combined_pdf, vmap_path, records):
     assert each produced per-copy PDF is exactly its version's cover + content.
     Proves emitter and slicer agree end-to-end (not just that each passes its
     own fabricated fixture)."""
-    Builder = _load_builder()
+    try:
+        Builder, missing = _load_builder()
+    except Exception as exc:
+        check("slicer sub-check: TexlibBuilder imports", False,
+              f"{type(exc).__name__}: {exc}")
+        return
     if Builder is None:
-        print("  SKIP  slicer sub-check (TexlibBuilder / pypdf unavailable)")
+        _c.skip(f"slicer sub-check ({missing})")
         return
     slice_dir = tempfile.mkdtemp(prefix="texlib_emit_slice_")
     try:
@@ -637,7 +632,10 @@ def main():
     scenario_ppart_atomicity()
     scenario_importproblem_stem()
 
-    print(f"\n{_c.passed} passed, {_c.failed} failed")
+    summary = f"\n{_c.passed} passed, {_c.failed} failed"
+    if _c.skipped:
+        summary += f", {_c.skipped} skipped"
+    print(summary)
     return 1 if _c.failed else 0
 
 
