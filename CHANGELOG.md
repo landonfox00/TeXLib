@@ -160,18 +160,87 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   four copies of `vmap-test` is now pixel-identical to a forced `\Version`
   build of that copy; before, each was 3,863 to 4,515 pixels away.
 
-  Not handled: `\maketitle` also resets the page number and clears the header
-  and footer slots and the marks, and `\AutoExamBeginCopy` does not. In a copy
-  with no cover page, text set before the first section prints under the
-  previous copy's running header and page count ("3 of 2"); see "Notes &
-  gotchas" in `Exams/README.md`.
-
   Tests: `nocover-test` in `test_engine_correctness.py` reads the problem
   numbers, Part headings and footers on all four copies of a two-version exam
   with keys, and fails 20 of its 27 checks on the unchanged class.
   `twocover-test` reads a document with two covers, which sets its second
   exam's first problem on the cover page if the resets are moved out of
   `\maketitle`.
+
+- **A copy with no cover page started with the page number, header, footer and
+  marks that the copy before it left.** While it sets a copy the class changes
+  the page number, six header and footer slots, the first-page head rule and
+  the marks. The first problem-section sets the page number to 1 and redefines
+  the slots, `\blankpage` and `\scorepage` empty two of them, and every
+  section heading and every `\blankpage` sets a mark. `\maketitle` put all of
+  that back, for its cover and the pages before the first section, and nothing
+  else did. In a versioned exam that never calls `\maketitle`:
+
+  - Text before the first section printed, on every copy after the first,
+    under the previous copy's running header and page count. On a two-page
+    exam the first copy's page of text has no header and reads "1 of 2"; the
+    others read "Exam 1" and "Part II — Multiple Choice" above the text and
+    "3 of 2" below it.
+  - After a copy that ended in `\blankpage`, that text had no page number and
+    was headed "Scratch Work".
+  - So was the problem page of a copy that opens on an unheaded section
+    (`\begin{problems}*`), which sets no mark of its own.
+  - A centre header set in the preamble printed on the first copy and on no
+    other.
+
+  The class now records the page number and those slots when
+  `\begin{document}` ends, and `\AutoExamBeginCopy` puts them back and clears
+  the marks before each copy. A copy with no cover page starts as the first
+  copy does, with what the document had at the end of its preamble.
+  `\maketitle` is unchanged: it still empties the slots, so a cover and the
+  pages after it carry no page number.
+
+  The marks are cleared in the kernel's record of the page
+  (`\mark_clear_structure:n`, and LuaTeX's `\clearmarks` for a kernel older
+  than 2025-06-01, where `\rightmark` reads TeX's `\firstmark`). They are not
+  cleared with `\markboth{}{}`, which is what `\maketitle` uses. A mark is a
+  node and ships with the next page that has something on it. When a copy
+  opens on a section, an empty mark set at the start of the copy lands on that
+  section's first page ahead of the section's own mark, and `\rightmark` reads
+  the first mark on a page: built that way, all four copies of `vmap-test`
+  lose the section label from their header.
+
+  Measured before and after at 150 dpi (ImageMagick AE, no fuzz) on 166
+  builds: the five exam scenario packs, the exam template, the Math 181 and
+  TeXam example exams and the twelve exam fixtures in eight build modes each
+  (default, student, key, dual, instructor, rubric, a forced `\Version`, its
+  key), and two quizzes in three. Two builds of the unchanged library agree on
+  all 736 pages, so a difference is the change. All 94 builds of a document
+  that calls `\maketitle` are pixel-identical on every page (492 pages,
+  AE = 0, same extracted text). So are 60 of the 72 builds of a fixture with
+  no cover page: every build that sets one copy, and every build of the seven
+  fixtures whose copies open on a headed section. The 12 that differ are
+  `nocover-test` and `nocover-front-test` in the six modes that set more than
+  one copy. They differ on 48 of their 136 pages, each a page of a copy after
+  the first: the text before the first section and, in `nocover-front-test`,
+  the problem page that was headed "Scratch Work". Every copy of the collated
+  `nocover-test`, `nocover-front-test` and `vmap-test` is now pixel-identical
+  to a forced `\Version` build of that copy; before, the later copies of the
+  first two were 827 to 3,921 pixels away on those pages.
+
+  Not changed: what the pages before the first section read on the first
+  copy, and so in a document with no `\versions`. They are numbered apart
+  from the problem pages ("1 of 2" on the text and again on the first problem
+  page), their count is `exam.cls`'s `\numpages`, and a `\blankpage` that
+  opens a copy is page 1 of it and prints the first-page header and footer,
+  with no "Scratch Work" label. Every copy now reads that way; "Notes &
+  gotchas" in `Exams/README.md` lists the three. On a copy after the first
+  such a leaf used to be a labelled scratch page, because it was not page 1.
+
+  Tests: `test_engine_correctness.py` goes from 164 checks to 195.
+  `nocover-test` reads the page of text on all four copies: no header,
+  "1 of 2", and the same text as on the first copy. 6 of those 8 checks fail
+  on the unchanged class. `nocover-front-test` is a new fixture with two pages
+  of text, an unheaded section, `\chead` in the preamble and `\blankpage`
+  last, read page by page on both copies; 5 of its 19 checks fail on the
+  unchanged class. `vmap-test` checks that each copy's header carries its
+  section label, which passes on the unchanged class and fails on all four
+  copies with `\markboth{}{}` as the clearing step.
 
 - **A versioned exam's part labels ran on from one copy to the next.** `{parts}`
   resumes its lettering when the question number equals the one it last saw,
