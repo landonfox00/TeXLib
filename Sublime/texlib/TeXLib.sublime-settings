@@ -157,9 +157,14 @@
     //
     // "a11y_gallery_path": "C:/_texlibjunc/a11y_gallery.py"
 
-    // accessible_report: on an accessible build, run veraPDF over the tagged
-    // PDF and write its conformance report as <base>_accessible-report.html
-    // beside it. Default: true.
+    // accessible_report: run veraPDF over every tagged PDF a build produces
+    // and write each one's conformance report beside it, named after its PDF:
+    // <base>_accessible-report.html, <base>_solutions_accessible-report.html,
+    // and so on. The build ends with one line per tagged PDF giving its
+    // verdict and its number of failed checks. Default: true.
+    //
+    // The cost is one veraPDF launch per tagged PDF, about 5 s each. They run
+    // at once, up to build_jobs wide.
     //
     // A tagged PDF's accessibility is invisible in the render, so the evidence
     // has to be a separate artifact -- UNR requires an accessibility report to
