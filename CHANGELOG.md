@@ -115,6 +115,59 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   hosts recognise the abort and spend the pass again. It is a startup failure,
   so the retry costs a startup and nothing else.
 
+- **A tagged instructor copy printed `2=0 [0 pts]` for a common error's
+  `[-2 pts]`, and no instructor copy has printed a bare `\item`'s bullet.** In a
+  tagged copy every `{commonerrors}` entry was wrong. In an untagged one a bare
+  `\item` printed `=0 [0 pts]` where its square bullet belongs, and has since
+  the deduction labels arrived in v0.6.1. Each entry cost three TeX errors
+  (`Missing number, treated as zero`, `Missing = inserted for \ifnum`, and the
+  first again). The run recovered and wrote its PDF, and veraPDF had nothing to
+  fail, so the log and the page were the only places it showed.
+
+  The panel's `\makelabel` read its argument. It ran `\ifnum#1=0` to choose
+  between a deduction and the muted `[0 pts]`, and it compared the argument
+  with a default label of `\relax` to recognise a bare `\item`. That argument
+  is not the label the author wrote. The kernel's `\item` hands over a bare
+  item's label as the unexpanded `\@itemlabel`, which never compared equal, so
+  the bullet was unreachable and the `\ifnum` ran on `\relax`. The tagged list
+  code (latex-lab-testphase-block, the `item` template) hands over
+  `\MakeLinkTarget[..]{}` and then a token list that holds the label, and the
+  `\ifnum` met `\MakeLinkTarget`.
+
+  `\makelabel` now typesets what it is handed and reads nothing. Inside the
+  panel's list `\item` is `\@cerr@item` (`texlib-solutions.sty`), which takes
+  the number where the author wrote it and passes the kernel's `\item` the
+  deduction already formatted, `\item[\@cerr@pts{2}]`. A bare `\item` goes
+  through unchanged and gets the list's default label, which is the bullet.
+  `\@cerr@item` acts only while `\@itemlabel` is that default label. Every list
+  sets its own, so an `itemize`, an `enumerate` or a `description` nested in an
+  entry keeps its own labels, in a tagged copy and an untagged one.
+
+  TeX errors in the instructor copy, before and after: one panel with one
+  `\item[2]`, tagged 3 → 0; five panels with eight labelled entries, tagged
+  24 → 0, and the same under `quiz`; three panels with five bare entries and a
+  labelled one, tagged 18 → 0 and untagged 15 → 0. veraPDF reports no failed
+  check before or after. In each of these the panels of the tagged and the
+  untagged copy now print the same text, entry for entry. On the `autoexam`
+  pages that carry a panel, the two renders (`pdftoppm`, 200 dpi) differ only
+  on the heading lines that print a point value and on the footer line, and on
+  no row of a panel.
+
+  An untagged copy whose entries are all labelled does not change. Two
+  fixtures' four copies (student, `solutions`, `solutions-inline`,
+  `instructor`) and the `quiz` instructor copy have the same page content
+  streams byte for byte before and after, and the same renders at 200 dpi. An
+  untagged copy with a bare `\item` changes, which is the fix: the bullet,
+  where `=0 [0 pts]` was.
+
+  `test_solution_tagged_conformance.py` covers it. Its fixture now carries two
+  `{commonerrors}` blocks, one in a whole-problem solution and one in a part
+  solution, and the test reads the labels off the page: `[-2 pts]`, `[-1 pt]`,
+  `[0 pts]`, and nothing ahead of a bare entry. It reads them in the tagged
+  instructor copy and in an untagged one that it builds for the comparison, and
+  requires the other three copies to print no common error. Run on the package
+  as it was, four of its checks fail.
+
 - **A tagged key failed PDF/UA-2 at every part solution it showed.** veraPDF
   reported four ISO 32005 Table 5 rules for each shown `{partsolution}`: `LI-P`
   (two checks), `LI-Part`, `P-P` and `P-Part`, five failed checks, in the
