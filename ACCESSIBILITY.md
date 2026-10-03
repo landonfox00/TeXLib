@@ -70,6 +70,24 @@ file broke is the one worth reading. It is the artifact to hand over when
 someone asks for proof; some graduate schools now require one filed with a
 thesis.
 
+A build that produces several tagged PDFs checks each one. A document with
+solutions also builds `<base>_solutions_accessible.pdf`, and one with rubrics
+builds `<base>_instructor_accessible.pdf`. Each is run through veraPDF and gets
+a report of its own beside it, named after its PDF
+(`<base>_solutions_accessible-report.html`). The build ends with one line per
+tagged PDF, giving the verdict and the number of failed checks:
+
+```
+TeXLib: PDF/UA-2 conformance (veraPDF; set accessible_report_full for the itemized form):
+    exam1_accessible.pdf  PASSED, 0 failed checks  -> exam1_accessible-report.html
+    exam1_solutions_accessible.pdf  FAILED, 17 failed checks  -> exam1_solutions_accessible-report.html
+```
+
+A key is checked on its own because it has structure the base copy does not
+have: the solutions. Until 2026-10 a build checked the base copy alone, and
+every `{partsolution}` in a tagged key failed five checks beside a base report
+that passed. A report is deleted when a build stops producing its PDF.
+
 veraPDF exits 0 for a conforming file and 1 for a non-conforming one, and writes
 a valid report either way. Only an exit above 1 is a tool error. Lean by default
 (~20 KB); `accessible_report_full` adds `--success`, which evidences all ~840
@@ -107,14 +125,13 @@ If you need SE on a document that falls back, the workaround is editorial rather
 than technical: split the formula so no two nth-roots share it. The defect is
 upstream, not in TeXLib, and it reproduces on a bare `article`.
 
-**The report covers the base copy only.** A build validates
-`<base>_accessible.pdf` and writes that file's report. The other tagged copies
-it produces (`<base>_solutions_accessible.pdf`,
-`<base>_instructor_accessible.pdf`) are not run through veraPDF, and a key
-carries structure the base copy does not have: the solutions. Until 2026-10
-every `{partsolution}` in a tagged key failed five checks while the base copy's
-report passed. To check a key, run veraPDF on it with the command at the end of
-this page.
+**A failed check does not fail the build.** A tagged PDF that fails is reported
+`FAILED` with its count, in the last lines of the build and in its report. The
+build's exit status and the editor's build status are what they would have been
+without the check. The same holds for a PDF veraPDF could not read, which is
+reported `NOT CHECKED` with the reason. A script that needs conformance enforced
+has to run veraPDF and test its exit status, as `smoke_test.py --accessible`
+does in CI.
 
 **`\tagpdfsetup{math/alt/use}` is deliberately not set.** It raises the score an
 Ally- or UDOIT-style checker reports by replacing the MathML with flat alt text,

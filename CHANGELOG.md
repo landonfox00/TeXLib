@@ -32,6 +32,63 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Changed
 
+- **A build checks every tagged PDF it writes, and reports each one.** A build
+  ran veraPDF over `<base>_accessible.pdf` and no other file. The builder gave
+  its reason: a variant is the same document with different content revealed,
+  so its tag structure is the base copy's, and one run per build keeps a JVM
+  launch per variant out of the edit loop. A key has structure the base copy
+  never has, its solutions. Every shown `{partsolution}` failed five checks in
+  `<base>_solutions_accessible.pdf` while `<base>_accessible-report.html` said
+  `PASSED` (the part-solution entry under Fixed), and a Math 126 review key
+  failed 315 checks with nothing in the build output to say so.
+
+  Every tagged PDF is validated now: the base twin, each variant's twin, and
+  the accessible pair's. Each gets a report beside it, named after its PDF
+  (`<base>_solutions_accessible-report.html`), and the build summary ends with
+  one line per tagged PDF: its name, `PASSED` or `FAILED`, the number of failed
+  checks, and the report. `texlib_cli.py build` on a two-page exam with three
+  part solutions, compiled against `texlib-solutions.sty` as it stood before
+  the part-solution fix, ends with
+  `exam1_accessible.pdf  PASSED, 0 failed checks`,
+  `exam1_solutions_accessible.pdf  FAILED, 17 failed checks` and
+  `exam1_instructor_accessible.pdf  FAILED, 17 failed checks`. veraPDF's XML
+  report gives the same three totals, and with the fix all three lines read
+  `PASSED, 0 failed checks`. Every tagged PDF the build wrote has a line: one
+  veraPDF could not read says `NOT CHECKED` and the reason.
+
+  A report is written for every copy, pass or fail. The cost of a check is the
+  veraPDF launch, and the verdict needs that launch whether or not the report
+  is kept: the HTML is the launch's own output, and the failed-check count is
+  read from it. Keeping a report only for a copy that fails would save no time,
+  and "no report" would then mean either a copy that passed or a copy nothing
+  checked.
+
+  The launches run at once, `build_jobs` wide, after the last copy has landed.
+  On 12 logical cores one copy took 5.0 s (1.6 s of it validation, the rest
+  the JVM starting), and that exam's three copies took 8.0 s together and
+  15.8 s in turn. With a dozen other TeX and Java processes running, the same
+  three measurements were 6.7 s, 9.4 s and 21.2 s. A build with three tagged
+  PDFs therefore ends about 3 s later than it did, and `build_jobs: 1` checks
+  them in turn. One veraPDF launch does take several files (three in 4.8 s, as
+  XML), but its HTML for a batch is a summary table with no rule in it, and the
+  HTML is the report.
+
+  The stale sweep follows the reports: a twin's report is removed with its PDF
+  when a build stops producing it, where the base report alone was removed
+  before. The rest is as it was. `accessible_report: false` runs nothing and
+  prints nothing, a missing veraPDF is a soft skip said once per build, no
+  verdict changes a build's exit status, and exit 1 from veraPDF is a
+  non-conforming file.
+
+  That switch did not work where it is documented. The Sublime build command
+  copies the build settings out of `TeXLib.sublime-settings` by name, and its
+  list held seven of the nine the builder reads. `accessible_report` and
+  `accessible_report_full` were the two missing, so setting either in the
+  editor did nothing, and the report could be switched off only with
+  `TEXLIB_A11Y_REPORT=0`. Both are passed now. `test_texlib_runner.py` reads
+  the builder's keys off its source and fails when the editor's list lacks
+  one.
+
 - **A document with one problem-section is no longer headed "Part I".** The
   `Part N —` prefix now appears only when there really are two or more headed
   sections — in the body heading and the running header both — so a quiz, a
