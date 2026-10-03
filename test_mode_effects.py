@@ -83,9 +83,14 @@ COURSEMETA_TEX = r"""\metasetup{
 """
 
 # One FR (with \begin{solution} + \rubric) and one MC (choices + \rubric), for
-# the bank-driven exam/quiz fixture.
+# the bank-driven exam/quiz fixture. The FR also carries a {sketchaxes} whose
+# body is an answer: it is not inside {solution}, so nothing above gates it, and
+# a drawn answer on a student copy is the same leak as a printed one.
 BANK_TEX = r"""\begin{problem}{fr-one}[topic=fr]
 	Evaluate STEMANCHORFR.
+	\begin{sketchaxes}{-2}{2}{-2}{2}
+		\node at (1,1) {SKETCHLEAKFR};
+	\end{sketchaxes}
 	\begin{solution}
 	SOLLEAKFR is the answer.
 	\rubric{4}{RUBRICLEAKFR criterion}
@@ -152,6 +157,10 @@ SOLUTION_NEEDLES_FR = ["SOLLEAKFR"]
 RUBRIC_NEEDLES = ["RUBRICLEAKFR", "RUBRICLEAKMC"]
 # Asserted absent in every mode: {mcproblems} suppresses rubrics section-wide.
 MC_RUBRIC_NEEDLE = "RUBRICLEAKMC"
+# The {sketchaxes} body. Checked on its own rather than added to
+# SOLUTION_NEEDLES, which pass on ANY needle and would hide a missing sketch
+# behind a present solution.
+SKETCH_NEEDLE = "SKETCHLEAKFR"
 ANSWER_BADGE_RE = re.compile(r"Answer:\s*[A-E]\b")
 STUDENT_BOX_RE = re.compile(r"Show your work here")
 
@@ -297,6 +306,10 @@ def run_class(cfg: dict) -> None:
               sol == expect["sol"], _mismatch("solution", cfg["sols"], text, expect["sol"]))
 
         if cfg["kind"] == "examquiz":
+            sketch = SKETCH_NEEDLE in text
+            check(f"[{cfg['name']}/{label}] sketch answer {'present' if expect['sol'] else 'absent'}",
+                  sketch == expect["sol"],
+                  _mismatch("sketch answer", [SKETCH_NEEDLE], text, expect["sol"]))
             ans = bool(ANSWER_BADGE_RE.search(text))
             check(f"[{cfg['name']}/{label}] MC answer letter {'present' if expect['ans'] else 'absent'}",
                   ans == expect["ans"],

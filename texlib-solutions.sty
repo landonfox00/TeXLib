@@ -24,13 +24,12 @@
 % ===========================================================================
 % \rubric{pts}{text} appends a rubric item to one of two accumulators depending
 % on which environment is active (\@sol@rubric inside {solution}, \@partsol@rubric
-% inside {partsolution}).  The accumulators hold \@rubricline tokens emitted into
-% a right-side overlay box pinned to the "Solution." line via \hfill\llap.  The
-% overlay's height/depth are left natural (a zero-declared version was tried
-% first, but its real ink still extended below the "Solution." line -- just
-% uncounted by TeX's own spacing -- so it visually collided with the solution's
-% own first line whenever that line ran long enough to reach the same right-hand
-% region; see \@emit@rubric@overlay).  The \if@in@* flags tell \rubric which one.
+% inside {partsolution}).  The accumulators hold \@rubricline tokens, and each
+% is set ONCE, in a teal box at the right, beneath the answer it grades:
+% {solution}'s by \@emit@sol@footer, beside the common errors, and
+% {partsolution}'s by \@emit@rubric@overlay.  The box was an overlay on the
+% "Solution." line until the footer replaced that placement, and the names date
+% from then.  The \if@in@* flags tell \rubric which accumulator is active.
 
 \newif\if@in@partsolution  \@in@partsolutionfalse
 \newif\if@in@solution      \@in@solutionfalse
@@ -50,6 +49,96 @@
 % moved there because didactic.cls gates inline worked lead-ins into a discard box
 % the same way and hits the identical violation, but does not load this package.
 
+% ACCESSIBLE: a solution's frame is decoration around content that is ALREADY
+% tagged. The tint and the left accent are drawn in a \parbox around a box that
+% was typeset, and tagged, before the frame existed. The frame has no structure
+% to add, and the kernel's \parbox must not be left to add one. Its tagging
+% socket (parbox/before, latex-lab-testphase-minipage) assumes a paragraph is
+% open: it ends the innermost structure, taking it for that paragraph's, opens a
+% <Div>, and afterwards opens a new paragraph structure. {partsolution} always
+% assembles its frame in a box register (\sbox) between paragraphs, and
+% {solution} does in the inline layout. No paragraph is open there, so what the
+% socket ended was whatever encloses the solution. In the exam-class {parts}
+% list that is the part's <LBody>: the <Div> and the paragraph after it became
+% children of the <LI>, which veraPDF reports as ISO 32005 Table 5 LI-P (twice),
+% LI-Part, P-P and P-Part, five failed checks for every part solution a tagged
+% key shows. The inline {solution} did the same to its problem's <LBody>. It is
+% upstream behaviour (latex3/tagging-project issues 54 and 345, both open): on a
+% bare article, \sbox0{\parbox{1cm}{x}}\noindent\box0 inside a list item fails
+% the same four rules with the same five checks.
+%
+% Between this pair the material is ONE artifact. Tagging is suspended, so no
+% socket runs and the structure stack is left alone; the rules are marked as
+% layout decoration; and the tagged box set inside keeps its own marking, which
+% under LuaTeX (every tagged build) is an attribute a node carries from the
+% moment it is made. The pair may stand in a paragraph or outside one. No-ops in
+% a normal build. The names are tested at each use because a document can define
+% \TeXLibAccessibleMode with no \DocumentMetadata, and \csname would then turn
+% the missing command into \relax and typeset its argument.
+\ifdefined\TeXLibAccessibleMode
+	\newcommand\texlib@acc@artifactbegin{%
+		\ifcsname tag_mc_artifact_group_begin:n\endcsname
+			\csname tag_mc_artifact_group_begin:n\endcsname{layout}%
+		\fi}
+	\newcommand\texlib@acc@artifactend{%
+		\ifcsname tag_mc_artifact_group_end:\endcsname
+			\csname tag_mc_artifact_group_end:\endcsname
+		\fi}
+\else
+	\newcommand\texlib@acc@artifactbegin{}
+	\newcommand\texlib@acc@artifactend{}
+\fi
+
+% ACCESSIBLE: a shown solution is ONE structure element, and it reads its header
+% first. Both environments typeset the body before the header: the body is boxed
+% so that the SyncTeX harvest can run on it before the header
+% line exists. A structure element records its children in the order they are
+% created, so the tree read the answer and then "Solution.", while the page
+% drew the header above the answer. veraPDF checks which element may hold
+% which, and passed it.
+%
+% \texlib@acc@solbegin opens a <Div> before the body is boxed and
+% \texlib@acc@solend closes it once header and body are assembled, so the
+% body's paragraphs are its children as they stand. The header paragraph is set
+% between \texlib@acc@solheadbegin and \texlib@acc@solheadend: a <NonStruct>
+% with tagpdf's `firstkid' key, which puts an element at the FRONT of its
+% parent's children. The kernel's float code puts a caption first with the same
+% key. NonStruct is there only to carry the key (the kernel's paragraph tagging
+% takes none), and a PDF reader looks through it to the paragraph inside.
+%
+% The other way to reorder is to open the body's element with `stash' and
+% attach it after the header with \tag_struct_use_num:n. That needs a second
+% <Div>, around the body, to have something to stash, and tagpdf cannot check
+% the children of a stashed <Div> against a parent it does not know yet: it
+% warns twice for every paragraph of every answer ("Parent-Child 'STASHED' -->
+% 'Part'", and the same for 'P').
+%
+% The <Div> also keeps the grouping the frame shows on the page. The frame is
+% an artifact, so without the <Div> nothing in the tree says which paragraphs
+% are one solution. None of these commands adds a node, so a tagged key's pages
+% do not move, and all four are no-ops in a normal build. Each name is tested
+% at use for the reason given above.
+\ifdefined\TeXLibAccessibleMode
+	\newcommand\texlib@acc@solbegin{%
+		\ifcsname tag_struct_begin:n\endcsname
+			\csname tag_struct_begin:n\endcsname{tag=Div}%
+		\fi}
+	\newcommand\texlib@acc@solheadbegin{%
+		\ifcsname tag_struct_begin:n\endcsname
+			\csname tag_struct_begin:n\endcsname{tag=NonStruct,firstkid}%
+		\fi}
+	\newcommand\texlib@acc@solend{%
+		\ifcsname tag_struct_end:\endcsname
+			\csname tag_struct_end:\endcsname
+		\fi}
+	\let\texlib@acc@solheadend\texlib@acc@solend
+\else
+	\newcommand\texlib@acc@solbegin{}
+	\newcommand\texlib@acc@solheadbegin{}
+	\newcommand\texlib@acc@solend{}
+	\newcommand\texlib@acc@solheadend{}
+\fi
+
 \newbox\@partsol@box
 \newbox\@sol@box
 \newbox\@sol@vtop
@@ -64,6 +153,122 @@
 % value makes the overlay invisible to the vertical list, which is the whole
 % contract of the inline layout.
 \newdimen\@sol@prevdepth
+
+% \@sol@overlay{<box>} -- set a zero-size box into the vertical list so that the
+% list reads the same with it as without it. Both inline solutions go through
+% here.
+%
+% Restoring \prevdepth after the box is enough for whatever FOLLOWS in the same
+% list: the next line gets the interline glue it would have had. It is not
+% enough when the box is the LAST thing in its list -- a part answer that ends
+% a {cols} column, a minipage, a \parbox. The enclosing box's depth is the
+% depth of its last item, and the overlay has none, so the question line's
+% depth (about 2pt under a descender) moved from the box's depth into its
+% height. A two-column problem came out that much taller and everything below
+% it on the page moved: measured on a twelve-version exam, 87% to 89% of the
+% student page's ink still in place on the pages with a {cols} problem, against
+% 100% on the pages without one.
+%
+% So the list is closed the way it was open: back up over the depth, then set
+% an empty box that has exactly that depth. The list ends with a box of the
+% depth it ended with before, \prevdepth is that depth without being assigned,
+% and the total length is unchanged. A \prevdepth at its -1000pt sentinel (the
+% top of a list, or after \nointerlineskip) has no depth to give back and is
+% restored as it stood.
+%
+% That closing box is also the overlay's MARKER. #2 is how far below this point
+% the solution's ink reaches, and it rides on the box as an attribute (in sp).
+% Nothing here can tell whether the blank that follows is that tall: it is
+% \stretch glue, sized when the page is. texlib_keyfit.lua reads the markers
+% off the finished page and makes room where a solution came out taller than
+% its blank; see that file. Under an engine without attributes the marker is
+% a plain box and the overlay is unbounded, as it always was.
+\ifdefined\directlua
+	\newattribute\@sol@reach
+	\edef\@sol@reachattr{\the\allocationnumber}
+	\newcommand{\@sol@marker}[2]{\hbox attr\@sol@reachattr=\number\dimexpr#1\relax{#2}}
+\else
+	\newcommand{\@sol@marker}[2]{\hbox{#2}}
+\fi
+\newcommand{\@sol@overlay}[2]{%
+	\begingroup
+		\parskip\z@skip
+		\par
+		\@sol@prevdepth\prevdepth
+		% No page break between a line and the answer drawn under it. A penalty
+		% takes no space, so the student geometry is untouched; it matters only
+		% when a page that cannot hold its solutions is split (see below).
+		\nobreak
+		\nointerlineskip
+		\noindent\box#1\par
+		\nointerlineskip
+		\ifdim\@sol@prevdepth>-1000\p@
+			\kern-\@sol@prevdepth
+			\@sol@marker{#2}{\vrule \@width\z@ \@height\z@ \@depth\@sol@prevdepth}%
+		\else
+			\@sol@marker{#2}{}%
+			\prevdepth\@sol@prevdepth
+		\fi
+	\endgroup
+}
+
+% The reach of an inline solution below its marker: the box is lowered one
+% \baselineskip, its depth follows, and the left accent overhangs the fill by
+% 6pt. The interline glue of whatever comes next adds its own clearance.
+\newdimen\@sol@reachdim
+
+% The page-level half of the inline key. No Lua `--' comments inside a
+% \directlua block: TeX folds the newlines away and the comment would swallow
+% the rest of the chunk (same note as texlib-problembank.sty).
+\ifdefined\directlua
+	\directlua{
+		local function find(name)
+			local path = kpse.find_file(name, "lua")
+			if path and lfs.attributes(path) then return path end
+			local sty = kpse.find_file("texlib-solutions.sty")
+			local sep = string.char(92)
+			local dir = sty and sty:match("(.*[/" .. sep .. "])") or ""
+			if lfs.attributes(dir .. name) then return dir .. name end
+			return name
+		end
+		texlib_keyfit = dofile(find("texlib_keyfit.lua"))
+	}%
+	% A page that cannot hold its solutions comes back from fit() set solid --
+	% each solution's reach is real depth on the box that owns it -- with
+	% \@sol@spillstate raised. It is split at the column height: the part that
+	% fits is shipped as this page, and the rest is returned to the main
+	% vertical list from build/page/after, where the output routine's own
+	% material goes back to the front of the recent contributions. It is
+	% followed by a page break, so the continuation is a page of its own and
+	% the pages after it keep their contents. Both halves keep their \stretch
+	% glue, so each shares out its own free space the way the student page
+	% does. The split runs in a group so that \vbadness and \vfuzz stay its
+	% own: a page with no stretch in it splits underfull, and that is not
+	% worth a warning on top of the one fit() has already given.
+	\newcount\@sol@spillstate
+	\newbox\@sol@head
+	\newbox\@sol@spill
+	\AddToHook{build/page/before}{%
+		\@sol@spillstate\z@
+		\directlua{texlib_keyfit.fit(\number\@outputbox, \@sol@reachattr,
+			\ifdefined\pbank@sepattrnum \pbank@sepattrnum \else -1 \fi)}%
+		\ifnum\@sol@spillstate>\z@
+			\begingroup
+				\vbadness\@M \vfuzz\maxdimen
+				\splittopskip\topskip \splitmaxdepth\maxdepth
+				\setbox\@tempboxa\vbox{\unvbox\@outputbox}%
+				\global\setbox\@sol@head\vsplit\@tempboxa to\@colht
+				\global\setbox\@sol@spill\box\@tempboxa
+			\endgroup
+			\setbox\@outputbox\vbox to\@colht{\unvbox\@sol@head\vfil}%
+		\fi}
+	\AddToHook{build/page/after}{%
+		\ifvoid\@sol@spill\else
+			\unvbox\@sol@spill
+			\vfil\penalty-\@M
+			\global\setbox\@sol@spill\box\voidb@x
+		\fi}
+\fi
 \gdef\@partsol@rubric{}
 \gdef\@sol@rubric{}
 
@@ -87,19 +292,13 @@
 	#2\par\smallskip
 }
 
-% \@emit@rubric@overlay{accumulator} — right-side overlay box pinned to the
-% "Solution." line via \hfill\llap (right edge at \textwidth).  Height/depth are
-% left natural (NOT zeroed) so \par charges the line for the overlay's real
-% vertical extent, pushing whatever comes next (the solution body) down far
-% enough to clear it -- a zero-height version let the overlay's ink bleed into
-% the solution's own first line whenever that line ran long. Trade-off: a short
-% solution now gets pushed down by however tall the rubric box is, even when it
-% wouldn't have collided -- accepted since this only affects instructor-facing
-% rubric builds, and the alternative (reflowing the solution's own already-
-% \box'd first lines around the overlay) needs a two-pass height measurement
-% that isn't worth it here.
-% Kept for {partsolution}, which emits it BENEATH its prose rather than beside
-% the header; the argument is the accumulator to render.
+% \@emit@rubric@overlay{accumulator} — the rubric box of a {partsolution}:
+% \rubricboxwidth wide, teal, headed "Rubric:".  The argument is the accumulator
+% to render.  The box has no placement of its own.  \end{partsolution} sets it
+% beneath the part's answer, after an \hfill, and nothing else calls it:
+% {solution}'s rubric is \@rubric@panel, in the footer below.  Until the footer,
+% this was the overlay \llap'd onto the "Solution." line of both environments;
+% the footer's comment says why that placement was wrong.
 \newcommand{\@emit@rubric@overlay}[1]{%
 	\setlength{\fboxsep}{4pt}%
 	\colorbox{teal!8}{%
@@ -249,17 +448,17 @@
 % {solution} / {partsolution}
 % ===========================================================================
 % {solution} — full-problem solution block: a green box with a bold "Solution."
-% header and any \rubric items overlaid on the right, shown when \ifsolutions;
-% the content is silently discarded otherwise.  The body is collected into
-% \@sol@box first so \rubric{}{} calls can populate \@sol@rubric before the header
-% is emitted.  The exam class defines a native \solution; \let-ing it to \relax
-% lets \newenvironment redefine it (the engine emits {solution} only when the
-% problem actually has a non-empty solution).
+% header, the worked answer and, when \ifrubric, the grading footer under it,
+% shown when \ifsolutions; the content is silently discarded otherwise.  The
+% body is collected into \@sol@box first: the footer is laid out at the end of
+% that box, the SyncTeX harvest reads the box before the header joins it, and
+% the frame is sized from it.  The exam class defines a native \solution;
+% \let-ing it to \relax lets \newenvironment redefine it (the engine emits
+% {solution} only when the problem actually has a non-empty solution).
 %
 % Rendering is plain \colorbox+\parbox, NOT tcolorbox, despite looking similar:
 % content that reaches a tcolorbox's interior via \unvbox (as this box's content
-% does -- \@sol@box above must be pre-collected so \rubric{}{} can populate the
-% overlay before the header renders) gets SyncTeX-orphaned. \unvbox splices
+% does, \@sol@box being pre-collected) gets SyncTeX-orphaned. \unvbox splices
 % nodes into the current list with no box-open record of its own; the only
 % enclosing record left is the wrapper's OWN self-tag (this .sty file, not the
 % bank), and SyncTeX's reverse search (`synctex edit`, what a PDF viewer's
@@ -295,6 +494,7 @@
 		\gdef\@sol@rubric{}%
 		\gdef\@sol@cerr{}%
 		\@in@solutiontrue
+		\texlib@acc@solbegin
 		\setbox\@sol@box\vbox\bgroup
 			\hsize\dimexpr\textwidth-12pt\relax
 	\else
@@ -318,6 +518,17 @@
 	\fi
 }{%
 	\ifsolutions
+			% ACCESSIBLE: end the body's last paragraph with a real \par before
+			% the box closes. A closing brace ends a paragraph too, but without
+			% the \par token, so the tagging code's end-of-paragraph hook never
+			% runs and the paragraph's structure is left open across the box.
+			% A body that ends in running text hides this (the next \par outside
+			% closes it, in the wrong place but in balance). A body that ends in
+			% a DISPLAY does not: the paragraph that resumes after \] is the one
+			% left open, and the inline layout, which sets no \par between here
+			% and the boxes it builds next, then fails with "there is no open
+			% structure on the stack". Same family as the discard branch below.
+			\ifdefined\TeXLibAccessibleMode\par\fi
 			% Still inside \@sol@box's \vbox: every \rubric call and the
 			% {commonerrors} capture have run by now, and emitting here (rather
 			% than after \box\@sol@box below) is what puts the panels INSIDE the
@@ -338,7 +549,7 @@
 		% exactly as {partsolution} suppresses its opening \smallskip.
 		\ifsolinline\else\par\vspace{\@sol@outervsep}\fi
 		\setlength{\fboxsep}{6pt}%
-		% Collect the "Solution." header (+ any \rubric overlay) and the pre-\box'd
+		% Collect the "Solution." header and the pre-\box'd
 		% body into ONE \vtop, whose reference point is the header baseline. Then
 		% \dp\@sol@vtop is the EXACT distance from that baseline down to the body's
 		% bottom, so the green fill / left accent size to the real rendered content.
@@ -348,13 +559,16 @@
 		% below where the formula assumed), leaving the last line outside the fill.
 		\setbox\@sol@vtop\vtop{%
 			\hsize\dimexpr\textwidth-12pt\relax
-			\noindent\texlibsolheader%
-			\ifrubric
-				\ifx\@sol@rubric\@empty\else
-					\@emit@rubric@overlay{\@sol@rubric}%
-				\fi
-			\fi
-			\par\vskip2pt
+			% ACCESSIBLE: the header line goes to the front of the solution's
+			% <Div>; see \texlib@acc@solbegin.
+			\texlib@acc@solheadbegin
+			% No rubric on this line: \@emit@sol@footer has set it, at the end of
+			% \@sol@box. A call to \@emit@rubric@overlay here prints the rubric a
+			% second time and pushes the answer down by the depth of that box. It
+			% happened: a merge restored the call that the footer had replaced.
+			\noindent\texlibsolheader\par
+			\texlib@acc@solheadend
+			\vskip2pt
 			\box\@sol@box
 			% The 6pt bottom pad lives INSIDE the box, not as rule overhang. The
 			% fill used to be drawn 6pt past \dp\@sol@vtop, and that overhang is
@@ -364,6 +578,7 @@
 			% the difference is whether the rule extends beyond the box it fills.
 			\vskip6pt
 		}%
+		\texlib@acc@solend
 		% Stamp every container and rule in the finished box with the harvested
 		% solution source, so a click anywhere in the green box -- padding,
 		% header, fill -- resolves there instead of dying on a tag-0 wrapper.
@@ -384,7 +599,15 @@
 		% renders its catalogue with \solutionstrue -- lost PDF/UA-2 on the extra
 		% structure level (Table 5 StructTreeRoot-Div / P-P / P-Part). Only the
 		% inline branch boxes it, because only that branch has to raise it.
+		%
+		% ACCESSIBLE: that loss was the \parbox's tagging socket ending a
+		% structure that was not a paragraph's, which is what a \parbox set
+		% into a box does (see \texlib@acc@artifactbegin above), and the inline
+		% branch still had it. The frame is an artifact in both layouts now:
+		% the tint and the accent are decoration, and \@sol@vtop, set inside,
+		% was tagged when it was typeset.
 		\def\@sol@frame{%
+			\texlib@acc@artifactbegin
 			\hspace*{-\@totalleftmargin}%
 			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
 				\noindent
@@ -433,6 +656,7 @@
 							depth \dimexpr\dp\@sol@vtop+6pt\relax}}}%
 				\box\@sol@vtop
 			}%
+			\texlib@acc@artifactend
 		}%
 		% Same geometry contract {partsolution} already honors: under the inline
 		% layout the frame declares ZERO height and depth and is lowered one
@@ -444,16 +668,9 @@
 		% Caveat, inherited from {partsolution}: nothing bounds the overlay, so a
 		% solution taller than its answer space overprints what follows.
 		\ifsolinline
+			\@sol@reachdim\dimexpr\baselineskip+\dp\@sol@vtop+6\p@\relax
 			\sbox\@sol@outer{\raisebox{-\baselineskip}[\z@][\z@]{\@sol@frame}}%
-			\begingroup
-				\parskip\z@skip
-				\par
-				\@sol@prevdepth\prevdepth
-				\nointerlineskip
-				\noindent\box\@sol@outer
-				\par
-				\prevdepth\@sol@prevdepth
-			\endgroup
+			\@sol@overlay\@sol@outer\@sol@reachdim
 		\else
 			\noindent\@sol@frame
 			\vspace{\@sol@outervsep}%
@@ -495,6 +712,7 @@
 		\ifsolinline\else\smallskip\fi
 		\gdef\@partsol@rubric{}%
 		\@in@partsolutiontrue
+		\texlib@acc@solbegin
 		\setbox\@partsol@box\vbox\bgroup
 			\hsize\dimexpr\linewidth-12pt\relax
 	\else
@@ -506,6 +724,10 @@
 	\fi
 }{%
 	\ifsolutions
+		% ACCESSIBLE: a real \par before the box closes, for the reason given at
+		% {solution}'s. Here it bites in BOTH layouts: a part solution that ends
+		% in a display raised twelve tagpdf errors in a tagged key.
+		\ifdefined\TeXLibAccessibleMode\par\fi
 		\egroup
 		\@in@partsolutionfalse
 		% Same container-stamping as {solution}, and in the same ORDER, which is
@@ -524,8 +746,24 @@
 		% Header, body and any rubric share one vtop so a single fill backs them.
 		\setbox\@partsol@wrap\vtop{%
 			\hsize\dimexpr\linewidth-12pt\relax
-			\noindent\texlibsolheader\par
-			\noindent\box\@partsol@box
+			\if\relax\detokenize\expandafter{\texlibpartsolheader}\relax
+				% No header line. The body is lowered until its first line sits
+				% where the header's would have, so the wrap keeps the shape the
+				% frame and the inline overlay below both assume: one line of
+				% height, everything else depth. Set on the line as it stands,
+				% the body would be all height, and \ifsolinline would then draw
+				% the answer upward over its own question.
+				\noindent\lower\dimexpr\ht\@partsol@box-\ht\strutbox\relax
+					\box\@partsol@box
+			\else
+				% ACCESSIBLE: the header goes to the front of the solution's
+				% <Div>. The rubric below is set after it and stays last, which
+				% is where the page has it.
+				\texlib@acc@solheadbegin
+				\noindent\texlibpartsolheader\par
+				\texlib@acc@solheadend
+				\noindent\box\@partsol@box
+			\fi
 			\ifrubric
 				\ifx\@partsol@rubric\@empty\else
 					\par\vspace{6pt}\noindent
@@ -533,6 +771,7 @@
 				\fi
 			\fi
 		}%
+		\texlib@acc@solend
 		% Stamp the assembled FRAME, not just the wrap inside it. {solution} can
 		% stamp its inner vtop and leave its \parbox/\rlap/rules unstamped --
 		% measured residual, documented in SYNCTEX.md as cosmetic slivers -- but
@@ -550,6 +789,8 @@
 		% \noindent<parbox> already produced, and the inline branch's \raisebox
 		% is an \hbox to begin with (verified: the answer's PDF bbox is
 		% unchanged, both layouts).
+		% Read before the frame consumes the wrap.
+		\@sol@reachdim\dimexpr\baselineskip+\dp\@partsol@wrap+6\p@\relax
 		\sbox\@partsol@outer{%
 			\ifsolinline
 				\raisebox{-\baselineskip}[\z@][\z@]{\@partsol@frame}%
@@ -560,12 +801,12 @@
 			\directlua{texlib_synctex_stamp_box(\number\@partsol@outer)}%
 		\fi
 		\ifsolinline
-			\begingroup
-				\parskip\z@skip
-				\par\nointerlineskip\noindent
-				\box\@partsol@outer
-				\par\nointerlineskip
-			\endgroup
+			% A trailing \nointerlineskip stood here in place of \@sol@overlay,
+			% and it left \prevdepth at -1000pt: the line after the answer space
+			% got no interline glue and sat about 3pt high, once per part
+			% solution, so a page of four part answers lost 12pt before its next
+			% problem.
+			\@sol@overlay\@partsol@outer\@sol@reachdim
 		\else
 			\par\noindent\box\@partsol@outer\par\smallskip
 		\fi
@@ -579,7 +820,14 @@
 % its 6pt overhang.  That pairing is empirical and SyncTeX-load-bearing there;
 % it is reused here rather than re-derived, but the measure differs (\linewidth),
 % so re-run sol_probe (SYNCTEX.md) before trusting reverse search inside one.
+%
+% ACCESSIBLE: the frame is an artifact. It is always set into \@partsol@outer
+% with no paragraph open, and the \parbox's tagging socket then ended the part's
+% <LBody> and hung a <Div> and a paragraph on the <LI>; see
+% \texlib@acc@artifactbegin near the top of this file. \@partsol@wrap, set
+% inside, was tagged when it was typeset and keeps that.
 \newcommand{\@partsol@frame}{%
+	\texlib@acc@artifactbegin
 	\parbox[t]{\dimexpr\linewidth-12pt\relax}{%
 		\noindent
 		\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsoltint}{%
@@ -592,6 +840,7 @@
 				depth \dimexpr\dp\@partsol@wrap+6pt\relax}}}%
 		\box\@partsol@wrap
 	}%
+	\texlib@acc@artifactend
 }
 
 % \rubric{pts}{text} — one grading criterion, shown only when \ifrubric.  Appends
