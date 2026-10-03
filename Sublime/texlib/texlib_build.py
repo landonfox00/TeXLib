@@ -501,8 +501,11 @@ class TexlibBuildCore:
 
         # The tagged PDFs this build has copied out and veraPDF has not read
         # yet, and one verdict per file once it has (_check_tagged_copies).
+        # _earlier_reports names the reports an earlier build had left for
+        # those PDFs, each deleted when its PDF was replaced.
         self._tagged_copies = []
         self._conformance = []
+        self._earlier_reports = []
 
         # Variant fan-out state, reset per build so a single-variant build
         # after a Ctrl+B cannot inherit the previous plan and sweep away PDFs
@@ -1754,7 +1757,9 @@ class TexlibBuildCore:
         # mode as a stale _instructor.pdf, and worse in kind: this one is
         # EVIDENCE, and it would be filed with a thesis. Its own loop, because
         # the one above skips a variant whose PDF is already gone, and a report
-        # left behind by a PDF deleted by hand is no less stale.
+        # left behind by a PDF deleted by hand is no less stale. This covers
+        # the PDFs a build stops producing. One it REPLACES lost its earlier
+        # report at the copy (_note_tagged_copy).
         for variant, tagged in candidates:
             if not tagged:
                 continue
@@ -1909,10 +1914,34 @@ class TexlibBuildCore:
         return stem + ACCESSIBLE_REPORT_SUFFIX
 
     def _note_tagged_copy(self, variant, pdf_path):
-        """Queue one tagged PDF, just copied out, for _check_tagged_copies."""
+        """Queue one tagged PDF, just copied out, for _check_tagged_copies, and
+        delete the report an earlier build wrote for the PDF it replaced.
+
+        That report describes a file that no longer exists. Until 2026-10 it
+        was only ever overwritten, by the next report, so it stayed beside the
+        new PDF whenever this build wrote none: accessible_report off, veraPDF
+        not found, a veraPDF error. The sweep's rule for a PDF the build stops
+        producing (_sweep_stale_variants) holds for one it replaces too.
+
+        It is deleted here, at the copy, because the check may never run: a
+        host that stops resuming commands() after this copy (a serial build
+        that is cancelled, Ctrl+C in the CLI) never reaches _postprocess.
+        Nothing is said here, since the check usually writes the next report.
+        _check_tagged_copies names the reports that were not written again.
+        """
         if not isinstance(getattr(self, "_tagged_copies", None), list):
             self._tagged_copies = []
         self._tagged_copies.append((variant, pdf_path))
+        report = os.path.join(
+            os.path.dirname(pdf_path),
+            self._variant_report_name(self.base_name, variant))
+        # isfile, not exists: a folder under that name is nobody's report.
+        if not os.path.isfile(report):
+            return
+        self._force_remove(report)
+        if not isinstance(getattr(self, "_earlier_reports", None), list):
+            self._earlier_reports = []
+        self._earlier_reports.append(os.path.basename(report))
 
     def _check_tagged_copies(self, tex_dir):
         """Run veraPDF over every tagged PDF this build copied out, and write
@@ -1941,21 +1970,35 @@ class TexlibBuildCore:
         file's detail in 4.8 s, but the HTML of a batch is a summary table with
         no rule in it, and the HTML is the report.
 
-        Nothing here is displayed. The verdicts are held for the build summary
-        (_display_conformance_summary), where the lines sit together and in the
-        order the copies were built.
+        No verdict is displayed here. The verdicts are held for the build
+        summary (_display_conformance_summary), where the lines sit together
+        and in the order the copies were built.
+
+        A copy that ends with no report from this build has none at all: the
+        one an earlier build wrote went when its PDF was replaced
+        (_note_tagged_copy). That is said here, once, in each of the three
+        ways it happens. accessible_report off is one of them. The switch
+        means "do not check", and the report it would leave is evidence about
+        a PDF this build has overwritten.
         """
         copies = list(getattr(self, "_tagged_copies", None) or [])
         self._tagged_copies = []
         self._conformance = []
-        if not copies or not self._setting_on(
+        earlier = list(getattr(self, "_earlier_reports", None) or [])
+        self._earlier_reports = []
+        if not copies:
+            return
+        if not self._setting_on(
                 "accessible_report", "TEXLIB_A11Y_REPORT", True):
+            self._display_reports_removed(
+                tex_dir, earlier, "with accessible_report off")
             return
         exe = find_verapdf()
         if not exe:
             self.display(
                 "TeXLib: veraPDF not found -- no accessibility report written. "
                 "Install it or set accessible_report off to silence this.\n")
+            self._display_reports_removed(tex_dir, earlier)
             return
         itemize = self._setting_on(
             "accessible_report_full", "TEXLIB_A11Y_REPORT_FULL", False)
@@ -1982,6 +2025,43 @@ class TexlibBuildCore:
         self._conformance = [
             (os.path.basename(pdf_path),) + tuple(result)
             for (_variant, pdf_path), result in zip(copies, results)]
+        written = {report for _pdf, _verdict, _failed, report, _problem
+                   in self._conformance if report}
+        self._display_reports_removed(
+            tex_dir, [name for name in earlier if name not in written])
+
+    def _display_reports_removed(self, tex_dir, names,
+                                 why="without a new report"):
+        """Say which of an earlier build's reports are gone with nothing in
+        their place: `names`, each deleted when its PDF was replaced
+        (_note_tagged_copy) and not written again by this build.
+
+        One line for the build, naming them in the order their PDFs were
+        copied out. A report that could not be deleted then is tried once more
+        and, if it is still there, named as that: it is in the folder beside a
+        PDF it does not describe, and the output is the only place left to say
+        so.
+
+        `why` is "without a new report" and not "and not checked" because a
+        copy can be checked and still have none: veraPDF's verdict is in the
+        summary, and the report could not be written.
+        """
+        removed, stuck = [], []
+        for name in names:
+            path = os.path.join(tex_dir, name)
+            if os.path.isfile(path):
+                self._force_remove(path)
+            (stuck if os.path.isfile(path) else removed).append(name)
+        for did, which in (("removed", removed), ("could not remove", stuck)):
+            if not which:
+                continue
+            what, whose = (
+                ("a stale accessibility report", "its PDF was")
+                if len(which) == 1 else
+                ("stale accessibility reports", "their PDFs were"))
+            self.display(
+                f"TeXLib: {did} {what} ({whose} rebuilt {why}): "
+                + ", ".join(which) + "\n")
 
     def _write_accessible_report(self, exe, pdf_path, report_path, itemize):
         """One veraPDF run over one tagged PDF: write its report, and return

@@ -2491,21 +2491,44 @@ def main():
                 '               <td>%d</td>\n'
                 '            </tr>\n' % (passed, failed)).encode("utf-8")
 
+    # What the report of an earlier build holds, in the cases that put one in
+    # the folder before this build's copies land.
+    _EARLIER = b"left by an earlier build"
+
     def _report_case(returncode=0, settings=None, exe="VP", stdout=b"<html/>",
-                     copies=("base",), results=None, run=None, blocked=()):
+                     copies=("base",), results=None, run=None, blocked=(),
+                     earlier=(), stuck=False):
         """Queue one tagged PDF per variant in `copies`, then run the check and
         print its summary, with veraPDF stubbed.
 
         Each fake run exits `returncode` and prints `stdout`, unless `results`
         gives its variant another (exit status, output). `run`, if given, is
         called with the command first, on the thread the check runs on.
-        `blocked` names reports that cannot be written.
+        `blocked` names reports that cannot be written. `earlier` names the
+        variants whose report an earlier build left, each holding _EARLIER.
+        `stuck` makes the files in the folder impossible to delete, or, as
+        "once", makes the first attempt on each fail and the next succeed.
         -> ({file: contents} left in the folder, the command lines, the display)
         """
         d = tempfile.mkdtemp(prefix="texlib_a11y_")
         b = TexlibBuilder(); b.tex_dir = d; b.base_name = "doc"
         if settings is not None:
             b.builder_settings = settings
+        if stuck:
+            tried, really = set(), b._force_remove
+
+            def _held(path):
+                if stuck == "once" and path in tried:
+                    really(path)
+                tried.add(path)
+
+            b._force_remove = _held
+        for name in blocked:
+            os.makedirs(os.path.join(d, name))
+        for variant in earlier:
+            with open(os.path.join(
+                    d, b._variant_report_name("doc", variant)), "wb") as fh:
+                fh.write(_EARLIER)
         answers = {}
         for variant in copies:
             pdf = os.path.join(d, b._variant_pdf_name("doc", variant, True))
@@ -2513,8 +2536,6 @@ def main():
                 fh.write(b"%PDF-1.7 tagged")
             b._note_tagged_copy(variant, pdf)
             answers[pdf] = (results or {}).get(variant, (returncode, stdout))
-        for name in blocked:
-            os.makedirs(os.path.join(d, name))
         calls = []
 
         def _fake_run(cmd, **kw):
@@ -2747,6 +2768,215 @@ def main():
           _b._tagged_copies == [] and _b._conformance == [],
           (_b._tagged_copies, _b._conformance))
 
+    # A report describes the PDF it was written for. The sweep further down
+    # takes one away when a build stops producing its PDF. These cases are the
+    # other half: a build REPLACES a tagged PDF and does not check the new
+    # copy. Until 2026-10 the earlier build's report stayed beside the new PDF
+    # in each of the three ways that happens (the switch off, veraPDF missing,
+    # a tool error), and nothing in the build output said so.
+    _R = "doc_accessible-report.html"
+    _RS = "doc_solutions_accessible-report.html"
+    _RI = "doc_instructor_accessible-report.html"
+    _ONE = "a stale accessibility report (its PDF was rebuilt %s): "
+
+    def _removal_lines(disp):
+        """The lines about an earlier build's reports. The sweep's own line
+        ("removed stale artifacts no longer planned") is not one of them."""
+        return [ln for ln in disp.splitlines()
+                if "stale accessibility report" in ln]
+
+    # A check that writes a report, passing or failing, writes it over the
+    # earlier one, and there is no removal to announce.
+    files, calls, disp = _report_case(0, earlier=("base",))
+    check("a11y report: a passing check replaces an earlier build's report",
+          files.get(_R) == b"<html/>" and not _removal_lines(disp),
+          (files, disp))
+    files, calls, disp = _report_case(
+        1, stdout=_report_html(17), earlier=("base",))
+    check("a11y report: a failing check replaces it too",
+          files.get(_R) == _report_html(17) and not _removal_lines(disp),
+          (files, disp))
+
+    # 1. The switch is off. Nothing is run, and the one line printed is the
+    # removal. With no earlier report there is nothing to say.
+    files, calls, disp = _report_case(
+        0, settings={"accessible_report": False}, earlier=("base",))
+    check("a11y report: accessible_report off removes the report of a PDF "
+          "the build replaced", _R not in files and not calls, (files, calls))
+    check("a11y report: accessible_report off says so in one line, and names "
+          "the switch",
+          disp == "TeXLib: removed " + _ONE % "with accessible_report off"
+          + _R + "\n", repr(disp))
+    files, calls, disp = _report_case(0, settings={"accessible_report": False})
+    check("a11y report: accessible_report off with no earlier report prints "
+          "nothing", disp == "", repr(disp))
+    _prev = os.environ.get("TEXLIB_A11Y_REPORT")
+    os.environ["TEXLIB_A11Y_REPORT"] = "0"
+    try:
+        files, calls, disp = _report_case(0, earlier=("base",))
+    finally:
+        if _prev is None:
+            os.environ.pop("TEXLIB_A11Y_REPORT", None)
+        else:
+            os.environ["TEXLIB_A11Y_REPORT"] = _prev
+    check("a11y report: TEXLIB_A11Y_REPORT=0 removes it the same way",
+          _R not in files and not calls and len(_removal_lines(disp)) == 1,
+          (files, calls, disp))
+
+    # 2. veraPDF is not installed.
+    files, calls, disp = _report_case(0, exe=None, earlier=("base",))
+    check("a11y report: a missing veraPDF removes the earlier report",
+          _R not in files, files)
+    check("a11y report: a missing veraPDF names the report it removed",
+          _removal_lines(disp)
+          == ["TeXLib: removed " + _ONE % "without a new report" + _R]
+          and disp.count("veraPDF not found") == 1, repr(disp))
+
+    # 3. veraPDF fails: an exit above 1, a launch that raises, anything else
+    # that stops a check from finishing.
+    for _label, _how in (
+            ("a veraPDF tool error", {"returncode": 2}),
+            ("a launch that fails", {"run": _no_java}),
+            ("a check that does not finish", {"run": _broken})):
+        files, calls, disp = _report_case(earlier=("base",), **_how)
+        check(f"a11y report: {_label} removes the earlier report",
+              _R not in files, files)
+        check(f"a11y report: {_label} names the report it removed, above the "
+              "copy's NOT CHECKED line",
+              _removal_lines(disp)
+              == ["TeXLib: removed " + _ONE % "without a new report" + _R]
+              and 0 <= disp.find("TeXLib: removed")
+              < disp.find("    doc_accessible.pdf  NOT CHECKED"), repr(disp))
+
+    # Several copies. Only a copy left without a report from this build loses
+    # the earlier one, and one line names every report removed.
+    files, calls, disp = _report_case(
+        copies=("base", "solutions", "instructor"),
+        earlier=("base", "solutions", "instructor"),
+        results={"solutions": (2, b"")}, settings={"build_jobs": 4})
+    check("a11y report: beside checked copies, the unchecked one alone loses "
+          "its report",
+          files.get(_R) == b"<html/>" and files.get(_RI) == b"<html/>"
+          and _RS not in files, sorted(files))
+    check("a11y report: and it alone is named",
+          _removal_lines(disp)
+          == ["TeXLib: removed " + _ONE % "without a new report" + _RS],
+          repr(disp))
+    files, calls, disp = _report_case(
+        exe=None, copies=("base", "solutions", "instructor"),
+        earlier=("base", "solutions", "instructor"))
+    check("a11y report: with veraPDF missing, every rebuilt copy loses its "
+          "report", not [n for n in files if n.endswith("-report.html")],
+          sorted(files))
+    check("a11y report: the removals are one line, in build order",
+          _removal_lines(disp) == [
+              "TeXLib: removed stale accessibility reports (their PDFs were "
+              "rebuilt without a new report): " + ", ".join((_R, _RS, _RI))]
+          and disp.count("veraPDF not found") == 1, repr(disp))
+
+    # The report of a PDF this build did not copy out still describes the file
+    # beside it, and is not this check's to touch.
+    files, calls, disp = _report_case(
+        exe=None, copies=("base",), earlier=("base", "solutions"))
+    check("a11y report: the report of a PDF the build did not replace is "
+          "left alone",
+          _R not in files and files.get(_RS) == _EARLIER
+          and _RS not in disp, (sorted(files), disp))
+
+    # A report that cannot be deleted is still stale, and the build says that
+    # instead. A check that then writes over it has nothing to say.
+    files, calls, disp = _report_case(2, earlier=("base",), stuck=True)
+    check("a11y report: a report that cannot be removed is reported as stale",
+          files.get(_R) == _EARLIER and _removal_lines(disp)
+          == ["TeXLib: could not remove " + _ONE % "without a new report" + _R],
+          (files, disp))
+    files, calls, disp = _report_case(0, earlier=("base",), stuck=True)
+    check("a11y report: a check that writes over such a report says nothing "
+          "of it", files.get(_R) == b"<html/>" and not _removal_lines(disp),
+          (files, disp))
+    # A file held for a moment at the copy (a sync client, a scanner) may be
+    # free by the time the check ends, so the removal is tried again there.
+    files, calls, disp = _report_case(2, earlier=("base",), stuck="once")
+    check("a11y report: a report that could not be removed at the copy is "
+          "tried again after the check",
+          _R not in files and _removal_lines(disp)
+          == ["TeXLib: removed " + _ONE % "without a new report" + _R],
+          (files, disp))
+
+    # The list of earlier reports is this build's, like the queue.
+    _b = TexlibBuilder(); _b.tex_dir = tempfile.mkdtemp(prefix="texlib_a11y_")
+    _b.base_name = "doc"; _b.builder_settings = {"accessible_report": False}
+    with open(os.path.join(_b.tex_dir, _R), "wb") as _fh:
+        _fh.write(_EARLIER)
+    _b._note_tagged_copy("base", os.path.join(_b.tex_dir, "doc_accessible.pdf"))
+    _noted = list(getattr(_b, "_earlier_reports", ()))
+    _b._check_tagged_copies(_b.tex_dir)
+    check("a11y report: the earlier reports are noted at the copy and "
+          "forgotten once they are reported",
+          _noted == [_R] and getattr(_b, "_earlier_reports", None) == [],
+          (_noted, getattr(_b, "_earlier_reports", None)))
+
+    # A folder that has the report's name is not a report. It is still there
+    # when the check writes (the write fails on it), and no removal is claimed.
+    files, calls, disp = _report_case(0, blocked=(_R,))
+    check("a11y report: a folder under the report's name is not removed or "
+          "mentioned",
+          "-- could not write " in disp and not _removal_lines(disp),
+          repr(disp))
+
+    # A copy can be checked and still end with no report: veraPDF gave its
+    # verdict and the file could not be written. The earlier report is gone
+    # all the same, and the line about it must not call that copy unchecked.
+    def _in_the_way(cmd):
+        os.makedirs(os.path.join(os.path.dirname(cmd[-1]), _R))
+
+    files, calls, disp = _report_case(0, earlier=("base",), run=_in_the_way)
+    check("a11y report: a checked copy whose report could not be written is "
+          "not called unchecked",
+          "    doc_accessible.pdf  PASSED, 0 failed checks  "
+          "-- could not write " in disp
+          and _removal_lines(disp)
+          == ["TeXLib: removed " + _ONE % "without a new report" + _R]
+          and "not checked" not in disp.lower(), repr(disp))
+
+    # The report goes when its PDF is replaced, at the copy, and not when the
+    # check runs: a serial build that is cancelled after the copy never
+    # reaches the check, and must not leave the report either. Nothing is
+    # printed at the copy, since the check usually writes the next report.
+    def _copied_case(variant, tagged, produced=True):
+        d = tempfile.mkdtemp(prefix="texlib_var_")
+        out = os.path.join(d, "out"); os.makedirs(out)
+        if produced:
+            with open(os.path.join(out, "doc.pdf"), "wb") as fh:
+                fh.write(b"%PDF-1.7 rebuilt")
+        b = TexlibBuilder(); b.tex_dir = d; b.base_name = "doc"
+        b._variant_pdfs = []
+        for name in (b._variant_pdf_name("doc", variant, True),
+                     b._variant_report_name("doc", variant)):
+            with open(os.path.join(d, name), "wb") as fh:
+                fh.write(_EARLIER)
+        b._copy_back_variant(d, variant, tagged, out)
+        return _folder(d), b._displayed
+
+    for _v in ("base", "solutions"):
+        _pdf = TexlibBuilder._variant_pdf_name("doc", _v, True)
+        _rep = TexlibBuilder._variant_report_name("doc", _v)
+        files, disp = _copied_case(_v, True)
+        check(f"a11y report: copying the tagged {_v} PDF out removes its "
+              "earlier report at once",
+              files.get(_pdf) == b"%PDF-1.7 rebuilt" and _rep not in files
+              and disp == "", (sorted(files), disp))
+        files, disp = _copied_case(_v, False)
+        check(f"a11y report: copying the untagged {_v} PDF out leaves the "
+              "tagged pair alone",
+              files.get(_pdf) == _EARLIER and files.get(_rep) == _EARLIER,
+              sorted(files))
+        files, disp = _copied_case(_v, True, produced=False)
+        check(f"a11y report: a tagged {_v} build that produced no PDF keeps "
+              "the earlier pair",
+              files.get(_pdf) == _EARLIER and files.get(_rep) == _EARLIER,
+              sorted(files))
+
     # The stale sweep. A report is evidence about one PDF, so it goes when a
     # build stops producing that PDF, whichever copy it is. Only names the
     # variant scheme owns are touched.
@@ -2812,7 +3042,10 @@ def main():
     # wherever a pass was told to write: the serial base twin, the parallel
     # lanes, and the accessible pair's a11y/ directory.
     def _built_case(options, parallel=True, settings=None, seed=(),
-                    results=None):
+                    results=None, exe="VP", cancel=None):
+        """`cancel`, if given, is asked before each command after the first,
+        with the folder; once it says yes the build is abandoned there, as a
+        host does when it is cancelled: commands() is not resumed."""
         os.environ["TEXLIB_NO_FORMAT_CACHE"] = "1"
         tmp = tempfile.mkdtemp(prefix="texlib_twins_")
         for name, text in (("doc.tex", PSET), ("doc.buildmeta", FULL_META)):
@@ -2820,7 +3053,7 @@ def main():
                 fh.write(text)
         for name in seed:
             with open(os.path.join(tmp, name), "wb") as fh:
-                fh.write(b"left by an earlier build")
+                fh.write(_EARLIER)
         b = TexlibBuilder()
         b.tex_root = os.path.join(tmp, "doc.tex")
         b.tex_name, b.base_name, b.tex_dir = "doc.tex", "doc", tmp
@@ -2848,7 +3081,7 @@ def main():
             calls.append(os.path.basename(cmd[-1]))
             return _Proc(*(results or {}).get(calls[-1], (0, b"<html/>")))
 
-        _tb.find_verapdf = lambda: "VP"
+        _tb.find_verapdf = lambda: exe
         _tb.subprocess.run = _fake_run
         try:
             gen = b.commands()
@@ -2857,6 +3090,9 @@ def main():
                 while True:
                     _typeset(cmd)
                     cmd, _msg = gen.send(0)
+                    if cancel is not None and cancel(tmp):
+                        gen.close()
+                        break
             except StopIteration:
                 pass
         finally:
@@ -2905,6 +3141,97 @@ def main():
           not calls and "PDF/UA-2 conformance" not in disp, (calls, disp[-400:]))
     check("fan-out, tagged_twins off: no tagged PDF and no report is left",
           not [n for n in files if "_accessible" in n], sorted(files))
+    check("fan-out, tagged_twins off: the sweep's line is the only one about "
+          "those reports",
+          not _removal_lines(disp)
+          and "removed stale artifacts no longer planned" in disp,
+          repr(disp[-600:]))
+
+    # The same folder, rebuilt by a build that cannot check what it writes.
+    # Every tagged twin is replaced, so no earlier report may stay, and one
+    # line names the four removed, in the order the twins were built.
+    _REPORTS = [n[:-4] + "-report.html" for n in _ALL]
+    for _host, _par in (("parallel host", True), ("serial host", False)):
+        for _why, _kw, _said in (
+                ("accessible_report off",
+                 {"settings": {"accessible_report": False}},
+                 "with accessible_report off"),
+                ("veraPDF missing", {"exe": None}, "without a new report")):
+            files, calls, disp = _built_case(
+                ["--texlib-mode=default"], parallel=_par,
+                seed=_ALL + _REPORTS, **_kw)
+            check(f"fan-out ({_host}), {_why}: every twin is rebuilt and none "
+                  "keeps the earlier report",
+                  all(files.get(n) == b"%PDF-1.7\n" for n in _ALL)
+                  and not [n for n in files if n.endswith("-report.html")]
+                  and not calls, (sorted(files), calls))
+            check(f"fan-out ({_host}), {_why}: one line names the four "
+                  "reports removed",
+                  _removal_lines(disp) == [
+                      "TeXLib: removed stale accessibility reports (their "
+                      "PDFs were rebuilt " + _said + "): "
+                      + ", ".join(_REPORTS)], repr(disp[-900:]))
+
+    # One twin veraPDF could not read, beside three it could.
+    files, calls, disp = _built_case(
+        ["--texlib-mode=default"], seed=_ALL + _REPORTS,
+        results={"doc_solutions_accessible.pdf": (2, b"")})
+    check("fan-out, one tool error: that twin alone has no report, and the "
+          "other three are this build's",
+          [n for n in _REPORTS if n not in files]
+          == ["doc_solutions_accessible-report.html"]
+          and [files.get(n) for n in _REPORTS if n in files]
+          == [b"<html/>"] * 3, sorted(files))
+    check("fan-out, one tool error: its removed report is named, and its "
+          "line in the summary says NOT CHECKED",
+          _removal_lines(disp) == [
+              "TeXLib: removed a stale accessibility report (its PDF was "
+              "rebuilt without a new report): doc_solutions_accessible-report.html"]
+          and "    doc_solutions_accessible.pdf  NOT CHECKED -- " in disp,
+          repr(disp[-900:]))
+
+    files, calls, disp = _built_case(
+        ["--texlib-mode=accessible"], settings={"accessible_report": False},
+        seed=["doc_accessible.pdf", "doc_accessible-report.html"])
+    check("accessible pair, accessible_report off: the rebuilt PDF keeps no "
+          "earlier report, and the build says so",
+          files.get("doc_accessible.pdf") == b"%PDF-1.7\n"
+          and "doc_accessible-report.html" not in files and not calls
+          and _removal_lines(disp) == [
+              "TeXLib: removed a stale accessibility report (its PDF was "
+              "rebuilt with accessible_report off): "
+              "doc_accessible-report.html"], (sorted(files), disp[-400:]))
+
+    # A serial build cancelled once the base twin has been copied out, before
+    # any check. That twin is new and has no report. The twins the build never
+    # reached are the earlier build's, and so are their reports.
+    def _base_twin_rebuilt(tmp):
+        with open(os.path.join(tmp, "doc_accessible.pdf"), "rb") as fh:
+            return fh.read() != _EARLIER
+
+    files, calls, disp = _built_case(
+        ["--texlib-mode=default"], parallel=False, seed=_ALL + _REPORTS,
+        cancel=_base_twin_rebuilt)
+    check("fan-out (serial host), cancelled after the base twin: its earlier "
+          "report is gone with no check run",
+          files.get("doc_accessible.pdf") == b"%PDF-1.7\n"
+          and "doc_accessible-report.html" not in files and not calls,
+          (sorted(files), calls))
+    check("fan-out (serial host), cancelled after the base twin: the twins "
+          "not yet rebuilt keep their reports",
+          all(files.get(n) == _EARLIER for n in _ALL[1:] + _REPORTS[1:]),
+          sorted(files))
+
+    # A single compile writes no tagged PDF, so a tagged pair in the folder is
+    # still a PDF and the report that describes it.
+    files, calls, disp = _built_case(
+        ["--texlib-mode=base"],
+        seed=["doc_accessible.pdf", "doc_accessible-report.html"])
+    check("single compile: a tagged pair it did not rebuild is left as it was",
+          files.get("doc_accessible.pdf") == _EARLIER
+          and files.get("doc_accessible-report.html") == _EARLIER
+          and not calls and not _removal_lines(disp),
+          (sorted(files), calls, disp[-400:]))
 
     # The finder must not regress to shutil.which: veraPDF's installer does not
     # put it on PATH, which is what made local conformance checks soft-skip.

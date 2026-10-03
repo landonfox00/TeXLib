@@ -178,6 +178,11 @@
     // Program Files. Without it the build is unaffected and says the report was
     // skipped. Set false to silence that.
     //
+    // A report is kept only beside the PDF it was written for. When a build
+    // replaces a tagged PDF and writes no report for it (this setting false,
+    // veraPDF missing, a veraPDF error), it deletes the report an earlier
+    // build left there and names it in the build output.
+    //
     // "accessible_report": true
 
     // accessible_report_full: itemize every PASSED check in the report, not
