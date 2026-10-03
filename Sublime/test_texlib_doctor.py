@@ -52,25 +52,54 @@ class _Settings:
         return self._d.get(k, default)
 
 
-texlib._shadow_warned[0] = False
-# No texinputs preference -> never warn (the install is the intended path).
-ok &= check(texlib._shadow_warning_line(_Settings({})) is None,
-            "N3: no texinputs -> no warning")
+# Every check sets both inputs of the gate itself. The real ones read the
+# machine: _derive_texinputs() walks up from texlib.py, and shadows_checkout()
+# asks kpsewhich for TEXMFHOME, then falls back to ~/texmf. With the real pair
+# the first check passed wherever no TeXLib copy was installed, whatever the
+# gate did, and failed wherever one was.
+_texmfhome_calls = []
+
+
+def _no_texmfhome():
+    _texmfhome_calls.append(1)
+    return os.path.join(HERE, "no-such-texmf")
+
+
+texlib_texmf.texmfhome = _no_texmfhome
+
+
+def _n3(settings, derived, shadowed):
+    """The warning line for these settings, with `derived` as the derived
+    TEXINPUTS and `shadowed` as whether a copy is installed."""
+    texlib._derive_texinputs = lambda: derived
+    texlib_texmf.shadows_checkout = lambda: shadowed
+    texlib._shadow_warned[0] = False
+    return texlib._shadow_warning_line(_Settings(settings))
+
+
+# No checkout path in play (no setting, nothing derivable) -> never warn, even
+# with a copy installed.
+ok &= check(_n3({}, "", True) is None, "N3: no texinputs -> no warning")
+
+# A derived path counts as one in play. Gating on the setting alone would
+# silence the warning for the users who configure nothing by hand.
+derived = _n3({}, "." + os.pathsep + "/repo", True)
+ok &= check(derived is not None and "shadow" in derived.lower(),
+            "N3: derived texinputs + shadow -> warns")
 
 # texinputs set + a shadow present -> warn once, then stay quiet.
-texlib_texmf.shadows_checkout = lambda: True
-texlib._shadow_warned[0] = False
-first = texlib._shadow_warning_line(_Settings({"texinputs": ".;C:/repo//;"}))
+first = _n3({"texinputs": ".;C:/repo//;"}, "", True)
 ok &= check(first is not None and "shadow" in first.lower(),
             "N3: texinputs + shadow -> warns")
 second = texlib._shadow_warning_line(_Settings({"texinputs": ".;C:/repo//;"}))
 ok &= check(second is None, "N3: warns only once per session")
 
 # texinputs set but no shadow -> no warning.
-texlib_texmf.shadows_checkout = lambda: False
-texlib._shadow_warned[0] = False
-ok &= check(texlib._shadow_warning_line(_Settings({"texinputs": "x"})) is None,
+ok &= check(_n3({"texinputs": "x"}, "", False) is None,
             "N3: no shadow -> no warning")
+
+ok &= check(not _texmfhome_calls,
+            "N3: no check consulted the machine's TEXMFHOME")
 
 # --- TEXINPUTS normalization -------------------------------------------------
 # Without an empty segment kpathsea REPLACES its default path (texmf-dist drops

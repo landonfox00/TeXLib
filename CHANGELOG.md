@@ -197,10 +197,16 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   that job, where pypdf is installed and a builder that does not import is a
   failure.
 
-  One check is tied to the machine. `test_texlib_doctor.py` reads the real
-  `TEXMFHOME` for `N3: no texinputs -> no warning`, and exits 1 when a TeXLib
-  copy sits under its `tex/latex/texlib`. The `builder-logic` runner has no TeX
-  and no `~/texmf`, so the check passes there.
+  `test_texlib_doctor.py` had one check tied to the machine. `N3: no texinputs
+  -> no warning` called the real `shadows_checkout()`, which asks `kpsewhich`
+  for `TEXMFHOME`. With a TeXLib copy under its `tex/latex/texlib` the file
+  exited 1, and with none the check passed whatever the gate did: removing the
+  gate from `_shadow_warning_line`, or gating on the `texinputs` setting alone,
+  left all 12 checks passing. Every N3 check now sets the derived TEXINPUTS and
+  the shadow state itself. Each of those two faults fails one check, a copy
+  planted under a throwaway `TEXMFHOME` no longer changes the result, and a new
+  check fails if any N3 check consults the machine's `TEXMFHOME`. 12 checks
+  become 14.
 
 ## [0.9.0] — 2026-09-08
 

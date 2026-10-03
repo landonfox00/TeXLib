@@ -65,9 +65,9 @@ jobs:
         # listed it and a direct dispatch was rejected as an unknown mode.
         run: python Sublime/test_texlib_modes.py
       - name: Plugin command modules (headless, sublime stubbed)
-        # test_texlib_doctor.py's first shadow-install check reads the real
-        # TEXMFHOME, and fails on a machine with a TeXLib copy installed there.
-        # This job installs no TeX, and the runner has no ~/texmf.
+        # One file per plugin module, imported behind stub sublime and
+        # sublime_plugin modules. Seven of the eight modules are imported by no
+        # other test, so one that stops importing headless shows only here.
         run: |
           set -e
           python Sublime/test_texlib_complete.py
