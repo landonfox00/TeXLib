@@ -284,8 +284,8 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   the structure tree, which is the order a screen reader follows, a shown
   `{solution}` or `{partsolution}` had its answer first and its header after
   it. The page drew the header above the answer. Both environments typeset the
-  body into a box before the header exists, so that the body's `\rubric` calls
-  and the SyncTeX harvest can run first, and a structure element lists its
+  body into a box before the header exists, so that the SyncTeX harvest can
+  run on it first, and a structure element lists its
   children in the order they are created. veraPDF checks which element may hold
   which and says nothing about their order, so it passed every key. A part
   solution with no header line (`\renewcommand{\texlibpartsolheader}{}`) had
@@ -297,9 +297,9 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   assembled, so the body's paragraphs are its children as they stand. The
   header paragraph is set inside a `<NonStruct>` that carries tagpdf's
   `firstkid` key, which puts an element at the front of its parent's children.
-  The kernel's float code puts a caption first with the same key. A part
-  solution's rubric stays after its answer and a whole-problem solution's
-  rubric overlay stays on the header line, as on the page. The `<Div>` also
+  The kernel's float code puts a caption first with the same key. A rubric
+  stays after its answer, as on the page: under a part solution's, and in the
+  footer of a whole-problem solution's (the next entry). The `<Div>` also
   keeps the grouping that the frame shows: the frame is an artifact (the entry
   above), and without the `<Div>` nothing in the tree says which paragraphs are
   one solution.
@@ -349,6 +349,45 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   Not changed: a paragraph that holds only a box leaves an empty `<P>`, as it
   did. There is one after each solution, for its frame, and one inside a part
   solution, for its body.
+
+- **An instructor copy printed a whole-problem solution's rubric twice.** A
+  `{solution}` with `\rubric` lines showed the teal "Rubric:" box straight
+  after its "Solution." header and again in the grading footer under the
+  answer, and the first box pushed the answer down by its own depth. A
+  `{partsolution}` printed its rubric once. `autoexam`, `quiz` and a `bank`
+  catalogue built with `\rubrics` all did it, tagged or not, and a tagged copy
+  read the solution as "Solution.", rubric, answer, rubric.
+
+  The first box is the placement that the grading footer replaced in v0.6.1
+  (the entry "The grading rubric moved out from over the solution and under
+  it", under 0.7.0 below). The footer's commit (`f87ee55`) deleted the header
+  line's call to `\@emit@rubric@overlay`. The day before, `main` had moved the
+  header line, call included, into a new `\vtop` (`0661da3`). `main` was merged
+  into the footer's branch eight minutes after that commit (`8fd4f92`), and the
+  `\vtop` merged in with no conflict: the conflict was over the lines the
+  footer's commit had edited, and it could only be settled for main's
+  `\box\@sol@vtop`. So the call came back without a conflict marker ever
+  touching it, and v0.6.1 shipped both boxes. `\end{solution}` no longer makes
+  the call. `\@emit@rubric@overlay` stays for `{partsolution}`, which sets it
+  under the part's answer.
+
+  What changes is a whole-problem solution with a rubric, in a copy that shows
+  rubrics: the first box is gone and the answer starts under the header, as it
+  does in a `solutions` key. Seven fixtures were built before and after in 31
+  copies (`autoexam`, `quiz` and `bank`; compact and inline layouts; tagged and
+  untagged). The eleven copies that print such a rubric changed. The other
+  twenty render identically at 150 dpi, an instructor copy whose only rubric is
+  a part solution's among them: the thirteen untagged ones are byte-identical
+  apart from the trailer `/ID`, and the seven tagged ones differ in three
+  objects, which are the namespace UUID that the tagging code mints on every
+  run, the object stream that holds it and the cross-reference stream. All
+  twelve tagged copies have 0 failed veraPDF checks before and after. An
+  instructor copy under `\keylayout{inline}` went from five pages to three,
+  against the student copy's two: a shorter solution overruns its blank by
+  less. `test_solution_tagged_conformance.py` asserts that the copy that shows
+  rubrics prints each rubric line once and that no other copy prints one. On
+  the code before this change that is its one failing check of 34: "Rubric:"
+  printed three times for the fixture's two rubrics.
 
 - **The stale sweep missed two whole classes of artifact.** It walked
   `VARIANT_MACROS`, which does not contain `base`, so `<base>_accessible.pdf`
