@@ -133,6 +133,46 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   hosts recognise the abort and spend the pass again. It is a startup failure,
   so the retry costs a startup and nothing else.
 
+- **A versioned exam with no cover page numbered straight through its copies.**
+  Three things restart when a copy starts: the Part counter, the question
+  number carried from one problem-section to the next, and the flag that lets a
+  section run on from an `{mcproblems}` without a page break. `\maketitle`
+  restarted them and nothing else did, so a document that never called it kept
+  all three from one copy to the next. Two versions of a one-problem exam with
+  keys read Problem 1, 2, 3, 4 on their four copies, headed "Part I" to
+  "Part IV" although each copy has one section, with footers "1 of 4" to
+  "4 of 4". With text before the first section and an `{mcproblems}` last,
+  every copy after the first also set its first section on the page that
+  carried the text. The version loop is what knows where a copy starts, and
+  `\AutoExamBeginCopy`, which it runs before each copy's body, now makes the
+  three resets through a macro it shares with `\maketitle`. `\maketitle` keeps
+  them because the loop does not reach every cover: a document with no
+  `\versions` is never looped, and a document may set a second cover to open a
+  second exam.
+
+  Measured before and after at 150 dpi (ImageMagick AE, no fuzz) on 100
+  builds: the five exam scenario packs, the exam template and the Math 181 and
+  TeXam example exams in eight build modes each, the Math 181 quiz, and the
+  engine fixtures. All 76 builds of a document that calls `\maketitle` are
+  pixel-identical on every page (378 pages, AE = 0), as are the 8 single-copy
+  builds of a fixture with no cover page. The 16 that differ are the fixtures
+  with no cover page in the builds that typeset more than one copy. Each of the
+  four copies of `vmap-test` is now pixel-identical to a forced `\Version`
+  build of that copy; before, each was 3,863 to 4,515 pixels away.
+
+  Not handled: `\maketitle` also resets the page number and clears the header
+  and footer slots and the marks, and `\AutoExamBeginCopy` does not. In a copy
+  with no cover page, text set before the first section prints under the
+  previous copy's running header and page count ("3 of 2"); see "Notes &
+  gotchas" in `Exams/README.md`.
+
+  Tests: `nocover-test` in `test_engine_correctness.py` reads the problem
+  numbers, Part headings and footers on all four copies of a two-version exam
+  with keys, and fails 20 of its 27 checks on the unchanged class.
+  `twocover-test` reads a document with two covers, which sets its second
+  exam's first problem on the cover page if the resets are moved out of
+  `\maketitle`.
+
 - **A versioned exam's part labels ran on from one copy to the next.** `{parts}`
   resumes its lettering when the question number equals the one it last saw,
   which is how a second list in the same question (`{cols}`, `\splitpage`)
