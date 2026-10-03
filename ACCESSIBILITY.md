@@ -44,6 +44,12 @@ navigate.
 - **A missing validator fails the gate.** If veraPDF is absent the job fails
   instead of skipping, because a skipped check reports the same green as a
   passing one.
+- **Answer keys.** `smoke_test.py --accessible` builds each document's default
+  copy, in which a solution is typeset into a discarded box. The same job runs
+  `test_solution_tagged_conformance.py`, which builds one exam's tagged student
+  copy and its three tagged keys (`solutions`, `solutions-inline`,
+  `instructor`) and requires that none has a failed check and that every list
+  item is a label and a body.
 - **The characters themselves.** Tags and conformance say how a document is
   structured, not whether the letters in it are the right letters. `smoke.yml`
   runs `test_text_layer.py`, which sets 35 non-ASCII characters through
@@ -100,6 +106,15 @@ in separate formulas — or in separate cells of one matrix — are fine.
 If you need SE on a document that falls back, the workaround is editorial rather
 than technical: split the formula so no two nth-roots share it. The defect is
 upstream, not in TeXLib, and it reproduces on a bare `article`.
+
+**The report covers the base copy only.** A build validates
+`<base>_accessible.pdf` and writes that file's report. The other tagged copies
+it produces (`<base>_solutions_accessible.pdf`,
+`<base>_instructor_accessible.pdf`) are not run through veraPDF, and a key
+carries structure the base copy does not have: the solutions. Until 2026-10
+every `{partsolution}` in a tagged key failed five checks while the base copy's
+report passed. To check a key, run veraPDF on it with the command at the end of
+this page.
 
 **`\tagpdfsetup{math/alt/use}` is deliberately not set.** It raises the score an
 Ally- or UDOIT-style checker reports by replacing the MathML with flat alt text,
