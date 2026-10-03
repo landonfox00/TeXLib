@@ -55,6 +55,14 @@ jobs:
             # so it also guards the pdfTeX half of the corepkg font
             # conditional, which is not otherwise covered here.
             python3 test_text_layer.py
+            # Inline-key geometry: the key must be the student page with the
+            # answers drawn into the blanks. Belongs here rather than in
+            # visual.yml because it is NOT a reference-image test -- it builds
+            # both PDFs in this run, with this engine, and compares them only
+            # against each other, so there is no golden image to drift with the
+            # toolchain. Reads the raster as PGM via poppler's pdftoppm
+            # (installed above), so it needs no image package.
+            python3 test_solution_inline_parity.py
             python3 smoke_test.py -v ${{ github.event.inputs.modules }}
 
       - name: Upload failed-build logs
