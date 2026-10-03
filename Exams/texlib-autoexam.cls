@@ -105,6 +105,11 @@
 \@autoexam@versionedfalse
 
 % Handle Versions
+% \theExamVersion is defined in EVERY autoexam document.  With no \versions and
+% no forced \Version it is A: that label seeds the engine (\AtBeginDocument
+% below) and is what \byversion and \vercase select, so changing it would redraw
+% every existing exam that declares no versions.  The macro therefore cannot
+% tell such a document from version A of a versioned one; \IfExamVersioned can.
 \ifdefined\Version
 	\newcommand{\theExamVersion}{\Version}
 \else
@@ -291,11 +296,108 @@
 % True once an {mcproblems} section has just closed; read (and implicitly
 % cleared, by being overwritten) by the NEXT section's \problems@begin@hook to
 % skip its \clearpage -- an MC section flowing straight into the following FR
-% (or MC) section, rather than always forcing a fresh page.  Reset per copy in
-% \maketitle so a new version/instructor-student copy always starts its first
-% section with a \clearpage regardless of how the previous copy ended.
+% (or MC) section, rather than always forcing a fresh page.  Reset per copy
+% (\@autoexam@resetsections) so a new version/instructor-student copy always
+% starts its first section with a \clearpage regardless of how the previous copy
+% ended.
 \newif\if@texlib@prevmc
 \@texlib@prevmcfalse
+
+% \@autoexam@resetsections -- put the problem-section state back to its start:
+% the Part counter, the question number carried from one section to the next,
+% and the flag above.  The next section then opens Part I at question 1 and
+% always \clearpages.
+%   It has two callers.  \AutoExamBeginCopy runs it before every copy the
+%   version loop typesets: the loop is what knows where a copy starts.  While
+%   only \maketitle ran these resets, a versioned document with no cover page
+%   numbered straight through its copies.  Two versions of a one-problem exam
+%   with keys read Problem 1 to Problem 4 on their four copies, headed Part I
+%   to Part IV, with footers "1 of 4" to "4 of 4".
+%   \maketitle runs it as well.  A document may set a second cover inside one
+%   copy to open a second exam, and a document the loop does not typeset (no
+%   \versions, or the single-copy fast path) has no other reset.
+%   Not reset here: the page number, the header and footer slots and the
+%   marks.  The two callers want different values.  \maketitle empties them
+%   itself, for its cover and the pages before the first section.
+%   \AutoExamBeginCopy puts back what the document started with
+%   (\@autoexam@restorepagestate).
+\newcommand{\@autoexam@resetsections}{%
+	\setcounter{texlibpartno}{0}%
+	\setcounter{@texlib@qcarry}{0}%
+	\global\@texlib@prevmcfalse
+}
+
+% \@autoexam@savepagestate, \@autoexam@restorepagestate -- what a copy starts
+% with: the page number, the header and footer slots and the marks.
+%   The class changes all of them while it sets a copy.  The first
+%   problem-section sets the page number to 1 and redefines \@lhead, \@chead,
+%   \@rhead, the first-page head rule, \@cfoot, \run@chead and \run@cfoot
+%   (\problems@begin@hook).  \blankpage and \scorepage empty the two running
+%   slots.  Every section heading and every \blankpage sets a mark.
+%   \maketitle sets the page number to 1, empties the same slots and sets an
+%   empty mark, and nothing else put any of it back.  In a copy with no cover
+%   page, text before the first section printed under whatever the copy before
+%   it left: the second copy of a two-page exam read "Exam 1" and "Part II ---
+%   Multiple Choice" above that text and "3 of 2" below it.
+%   \@autoexam@savepagestate records the page number and those slots when
+%   \begin{document} ends, after anything the preamble set.
+%   \@autoexam@restorepagestate puts them back and clears the marks, and
+%   \AutoExamBeginCopy runs it: a page set before the first section reads on
+%   every copy as it does on the first.  A copy that opens on \maketitle is
+%   not changed, since the cover sets all of this again, and neither is one
+%   that opens on a headed section.  An unheaded section (\begin{problems}*)
+%   sets no mark, so its pages were headed by the last mark of the copy
+%   before, "Scratch Work" after a \blankpage; they are now headed as on the
+%   first copy.
+%   Not saved: the slots the class never changes (the left and right footers,
+%   the left and right running headers, the other three rules).  A body that
+%   redefines one of them hands it to the next copy, as before.
+\newcommand{\@autoexam@savepagestate}{%
+	\xdef\@autoexam@start@page{\the\c@page}%
+	\global\let\@autoexam@start@lhead\@lhead
+	\global\let\@autoexam@start@chead\@chead
+	\global\let\@autoexam@start@rhead\@rhead
+	\global\let\@autoexam@start@cfoot\@cfoot
+	\global\let\@autoexam@start@runchead\run@chead
+	\global\let\@autoexam@start@runcfoot\run@cfoot
+	\if@headrule
+		\gdef\@autoexam@start@headrule{\global\@headruletrue}%
+	\else
+		\gdef\@autoexam@start@headrule{\global\@headrulefalse}%
+	\fi
+}
+\newcommand{\@autoexam@restorepagestate}{%
+	\global\c@page\@autoexam@start@page\relax
+	\global\let\@lhead\@autoexam@start@lhead
+	\global\let\@chead\@autoexam@start@chead
+	\global\let\@rhead\@autoexam@start@rhead
+	\global\let\@cfoot\@autoexam@start@cfoot
+	\global\let\run@chead\@autoexam@start@runchead
+	\global\let\run@cfoot\@autoexam@start@runcfoot
+	\@autoexam@start@headrule
+	\@autoexam@clearmarks
+}
+% \@autoexam@clearmarks -- forget every mark set so far, without setting one.
+%   \markboth{}{} is what \maketitle uses, and it is wrong here.  A mark is a
+%   node, and it ships with the next page that has something on it.  When a
+%   copy opens on a section nothing ships before that section's first page, so
+%   the empty mark lands there ahead of the section heading's mark, and
+%   \rightmark reads the FIRST mark on a page.  Built that way, all four copies
+%   of vmap-test lose the section label from their header.  \maketitle is safe
+%   because its cover is a page of its own.
+%   What \rightmark reads depends on the kernel.  From LaTeX 2025-06-01 it is
+%   the kernel's record of the page region, which \mark_clear_structure:n
+%   empties.  Before that it is TeX's \firstmark, which LuaTeX's \clearmarks
+%   empties.  Both run when they exist, and each was checked alone: the first
+%   is the one that clears the header on the 2026 kernel, the second with
+%   latexrelease rolled back to 2024-11-01.
+\ExplSyntaxOn
+\cs_new_protected:Npn \@autoexam@clearmarks
+	{
+		\cs_if_exist:NT \tex_clearmarks:D { \tex_clearmarks:D \c_zero_int }
+		\cs_if_exist:NT \mark_clear_structure:n { \mark_clear_structure:n { page } }
+	}
+\ExplSyntaxOff
 
 % True while the cover's date line is being emitted (see \maketitle): the
 % build-mode label under it needs to know whether there is a line to break from.
@@ -407,6 +509,19 @@
 	\edef\@vc@want{#1}%
 	\ifx\@vc@cur\@vc@want #2\fi
 }
+% \IfExamVersioned{versioned}{unversioned}
+%   The first branch when the document called \versions (or \examversions), the
+%   second otherwise; expandable.  texlib-problembank.sty documents the query
+%   and supplies the second branch for the classes that have no versions.
+%   A \Version forced on a document that declares none still takes the second
+%   branch: \theExamVersion is then a label the document never declared.
+\renewcommand{\IfExamVersioned}{%
+	\if@autoexam@versioned
+		\expandafter\@firstoftwo
+	\else
+		\expandafter\@secondoftwo
+	\fi
+}
 
 % \importproblem is provided by texlib-problembank.sty.
 
@@ -428,6 +543,8 @@
 	% the declared total (\meta{points}, default 100; extra credit excluded).
 	% Runs in every build mode (independent of the version loop below).
 	\directlua{texlib.autoexam_check_points("\luaescapestring{\GetExamPoints}")}%
+	% What every copy starts with, recorded before the loop sets the first one.
+	\@autoexam@savepagestate
 	% Unconditional: the Lua function checks #autoexam_versions == 0 and
 	% returns immediately when no versions are declared.  Keeping the TeX
 	% side conditional-free avoids an open \ifx on the stack when Lua
@@ -477,6 +594,29 @@
 \newcounter{global_partno_storage}
 \newcounter{tracker_question_no}
 \setcounter{tracker_question_no}{-1}
+
+% \AutoExamBeginCopy -- run by the version loop (autoexam_run_versions in
+% problem_engine.lua) before it reads each copy's body.
+%   {parts} below resumes its lettering when the question number equals the one
+%   it last saw, which is how a second list in the same question ({cols},
+%   \splitpage) carries on from the first.  A question NUMBER does not identify
+%   a question across copies, because every copy numbers from 1: unless the
+%   tracker is cleared here, the first {parts} of a copy resumes the last list
+%   of the copy before it whenever the two questions share a number.  An exam
+%   whose only problem with parts was Problem 1 printed 1a, 1b on its first
+%   version and 1c, 1d on its second.
+%   Not handled: two {questions} lists in ONE copy that each restart at 1 share
+%   a tracker value in the same way.  {problems} numbers continuously, so a
+%   document built on it cannot reach that case.
+\newcommand{\AutoExamBeginCopy}{%
+	\setcounter{tracker_question_no}{-1}%
+	\setcounter{global_partno_storage}{0}%
+	% Parts from I and questions from 1: see \@autoexam@resetsections.
+	\@autoexam@resetsections
+	% The page number, header, footer and marks the document started with: see
+	% \@autoexam@restorepagestate.
+	\@autoexam@restorepagestate
+}
 
 \let\oldparts\parts
 \let\endoldparts\endparts
@@ -883,14 +1023,10 @@
 	% version's \blankpage.  \begin{problems} resets the counter again to 1, so
 	% Q1 is always page 1 of the problem section.
 	\setcounter{page}{1}%
-	% Reset the per-copy Part counter and the cross-section question carry so each
-	% version/copy renumbers its Parts from I and its questions from 1.
-	\setcounter{texlibpartno}{0}%
-	\setcounter{@texlib@qcarry}{0}%
-	% This copy's first problem-section must always \clearpage (ship the title
-	% page just typeset above), regardless of how the PREVIOUS copy's last
-	% section ended.
-	\global\@texlib@prevmcfalse%
+	% Parts from I and questions from 1 for the exam this cover opens.  Its first
+	% problem-section must also always \clearpage (ship the title page typeset
+	% below), regardless of how the section before the cover ended.
+	\@autoexam@resetsections
 	% Clear first-page header slots so nothing appears above the title block.
 	\def\@lhead{}\def\@chead{}\def\@rhead{}%
 	\@headrulefalse%

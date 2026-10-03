@@ -95,6 +95,37 @@ Declare the versions. In standalone mode (no `\Version` defined), the
 class loops over all versions in one compilation. In builder mode
 (`\def\Version{A}` passed externally), only the named version is built.
 
+`\theExamVersion`
+The version label of the copy being typeset. A document that declares no
+versions gets `A`, the label that seeds the engine and the one `\byversion`
+and `\vercase` select. `quiz.cls` does not define the macro.
+
+`\IfExamVersioned{versioned}{unversioned}`
+Takes the first branch in a document that calls `\versions` and the second in
+one that does not. Expandable. `quiz`, `didactic` and `bank` define it as well
+and always take the second branch, so a problem in a shared bank can call it
+whichever class draws it.
+
+A macro that selects content by version label has to ask before it compares.
+`\theExamVersion` alone is wrong in two places. An exam with no `\versions` (a
+final, a review sheet) reports `A`; when the bank's labels are anything else
+(section numbers, say) a selector comparing against it prints nothing, with
+exit code 0 and no warning. A quiz raises `Undefined control sequence`. Name
+the branch a document with no versions prints:
+
+```latex
+\ExplSyntaxOn
+\NewDocumentCommand{\onver}{ m m }{
+	\IfExamVersioned
+		{ \str_if_eq:eeT { #1 } { \theExamVersion } { #2 } }
+		{ \str_if_eq:nnT { #1 } { 1301 } { #2 } }
+}
+\ExplSyntaxOff
+```
+
+Under `\versions{1301, 1302}`, `\onver{1302}{...}` prints on version 1302
+only. A document with no versions prints the `1301` branch.
+
 ### Per-exam metadata via `\meta`
 
 Use `\meta{exam-number=…, exam-date=…, exam-postscript=…}` in the
@@ -337,6 +368,21 @@ Reserved blank space for student work.
 	`<jobname>_A.pdf`, `<jobname>_B.pdf`, ... afterward. Passing
 	`\def\Version{X}` externally (or on a raw command line) forces only
 	that one version to build.
+- **Exams with no cover page:** every copy of a versioned exam numbers its
+	Parts from I, its problems from 1 and its problem pages from "1 of N",
+	with or without `\maketitle`. Every copy also starts with the page number,
+	header, footer and marks the document had when `\begin{document}` ended,
+	so a page set before the first `{problems}` / `{mcproblems}` reads the
+	same on every copy. `\maketitle` empties the header and footer for its
+	cover and for the pages before the first section, so front matter after a
+	cover carries no page number. With no cover, three things to know about
+	those pages:
+	- They are numbered apart from the problem pages. The first is page 1, and
+	  so is the first problem page.
+	- Their "of N" is `exam.cls`'s `\numpages`, the page number the last copy
+	  ends on. It is not the copy's own count.
+	- A `\blankpage` that opens a copy is page 1 of it and reads the first-page
+	  header and footer: no "Scratch Work" label, and a page number.
 - **Filenames the builder produces:** `<jobname>_A.sco`, `<jobname>_autoexam_body_A.tex`, `<jobname>.srcmap`, `<jobname>.vmap`, and similar — these are intermediate artifacts you can ignore between rebuilds.
 
 ## Related
