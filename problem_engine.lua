@@ -1698,13 +1698,15 @@ function pbank_emit_section(partno)   -- `partno` arg unused; see pbank_emit_par
 	pbank_collected = nil
 	if not c then return end
 
-	-- Section index WITHIN THIS COPY, NOT \arabic{texlibpartno}: texlibpartno
-	-- accumulates across a version's student + solutions copies (it doesn't
-	-- reset per copy), so the two copies would seed differently and shuffle
-	-- differently -- but the answer key MUST match the student exam. This Lua
-	-- counter is reset to 0 per copy by autoexam_run_versions, so equal sections
-	-- of the two copies share one order while distinct sections (MC vs FR) still
-	-- desynchronise.
+	-- Section index WITHIN THIS COPY, counted here and NOT read from
+	-- \arabic{texlibpartno}. The seed below has to be the same for a version's
+	-- student and solutions copies -- the answer key MUST match the student
+	-- exam -- and different for the sections of one copy (MC vs FR). This Lua
+	-- counter moves in two places only: here, and in autoexam_run_versions,
+	-- which resets it to 0 per copy. texlibpartno restarts per copy as well
+	-- (\AutoExamBeginCopy), but also at every \maketitle: read from it, the
+	-- sections after a second cover in one copy would repeat the seeds of the
+	-- sections before it.
 	pbank_emit_partno = (pbank_emit_partno or 0) + 1
 	local sect = pbank_emit_partno
 	local run, subno = {}, 0
@@ -2089,7 +2091,9 @@ function autoexam_run_versions()
 		elseif c.sol == false then tex.sprint("\\solutionsfalse") end
 	end
 
-	-- Fast path: a single copy with no page shuffle needs no temp file.
+	-- Fast path: a single copy with no page shuffle needs no temp file. It does
+	-- not run \AutoExamBeginCopy either: no copy precedes this one, so the
+	-- class's per-copy state is still as the class loaded it.
 	if #copies == 1 and not autoexam_shuffle_pages then
 		local c = copies[1]
 		local body = autoexam_read_body()
@@ -2161,8 +2165,9 @@ function autoexam_run_versions()
 		-- Reset the per-copy section counter so this copy's sections shuffle the
 		-- same as any other copy of the same version (e.g. student vs solutions).
 		tex.sprint("\\directlua{local _ENV=texlib;pbank_emit_partno=0}")
-		-- The class resets its own per-copy state (the {parts} resume tracker):
-		-- see \AutoExamBeginCopy in texlib-autoexam.cls.
+		-- The class resets its own per-copy state (Part and question numbers,
+		-- the {parts} resume tracker): see \AutoExamBeginCopy in
+		-- texlib-autoexam.cls.
 		tex.sprint("\\AutoExamBeginCopy")
 		tex.sprint("\\input{" .. body_tmp .. "}")
 		if i < #copies then

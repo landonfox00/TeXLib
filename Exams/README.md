@@ -368,6 +368,12 @@ Reserved blank space for student work.
 	`<jobname>_A.pdf`, `<jobname>_B.pdf`, ... afterward. Passing
 	`\def\Version{X}` externally (or on a raw command line) forces only
 	that one version to build.
+- **Exams with no cover page:** every copy of a versioned exam numbers its
+	Parts from I, its problems from 1 and its problem pages from "1 of N",
+	with or without `\maketitle`. Text set before the first `{problems}` /
+	`{mcproblems}` of a copy with no cover is the exception: it prints under
+	the previous copy's running header and page count ("3 of 2"). `\maketitle`
+	clears both, so put the cover first, or open the body with the section.
 - **Filenames the builder produces:** `<jobname>_A.sco`, `<jobname>_autoexam_body_A.tex`, `<jobname>.srcmap`, `<jobname>.vmap`, and similar — these are intermediate artifacts you can ignore between rebuilds.
 
 ## Related
