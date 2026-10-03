@@ -126,6 +126,97 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   `exam1_review_instructor.pdf`, a different document that merely starts with
   the same characters.
 
+- **`Sublime/test_texlib_build.py` had failed on `main` since 2026-09-05, and no
+  workflow ran it.** PR #120 put the deferral prefix (`\def\TeXLibNo<Name>{}`,
+  one per package the scanner defers) at the front of the engine argument and
+  added `without_defer()` to `test_texlib_builder.py` to strip it. This file
+  kept comparing against the old argument, so `autoexam/base: bare \input arg`
+  and `pset/key: \ShowKey macro injected before \input` failed. Both now strip
+  the prefix with the same helper, which moved to `Sublime/_testkit.py` so the
+  two suites share one copy; the first is relabelled `autoexam/base: no mode
+  macro before \input`, since the argument is no longer bare. Against
+  deliberately broken builders, the base check fails when base mode injects a
+  macro, and the key check fails when the macro is dropped or lands ahead of
+  the deferral prefix. The file now runs in the `builder-logic` job of
+  `tests.yml`. It holds the only tests of the A → B → A oscillation stop, the
+  filter for biblatex's own rerun flags, and the `TEXLIB_STATE_RERUN=0` opt-out.
+
+  It also switches the format cache off, as `test_texlib_builder.py` already
+  did. With the cache on, the quick-mode case started `pdftex -ini` to dump a
+  format wherever TeX was on `PATH`; the `builder-logic` job installs no TeX, so
+  a local run and CI took different paths. The file took 1.3s with the cache on
+  and 0.3s with it off, measured locally.
+
+- **Two test guards passed without checking anything.** Both now fail on a
+  planted fault.
+
+  `test_engine_emit_edges.py` feeds the engine-emitted `.vmap` through the
+  builder's real slicer, and printed `SKIP  slicer sub-check (TexlibBuilder /
+  pypdf unavailable)` on every run, with pypdf installed. Its `_load_builder()`
+  kept a private LaTeXTools stub that never registered the `TeXLib` package, so
+  `from texlib_builder import TexlibBuilder` raised `ModuleNotFoundError: No
+  module named 'TeXLib'` and a bare `except Exception` turned that into the
+  skip. It now calls `install_native_builder()` from `_testkit.py`, as
+  `test_synctex_integration.py` and `test_biber_integration.py` do. A missing
+  pypdf is the only soft skip, the message names it, and the summary line
+  counts it; a builder that does not import is a FAIL. The suite goes from 34
+  checks to 52, all passing: emitter and slicer agree. With the sidecar's A and
+  B labels swapped before slicing, 8 of the 18 new checks fail; with every
+  marker moved one page late, 9 do.
+
+  `test_texlib_builder.py`'s "no module redefines the shared constants" scan
+  skipped a directory when `.git` or `.claude` appeared anywhere in its
+  *absolute* path. A checkout under `.claude/worktrees/<name>`, where agent
+  sessions run, had every directory skipped, the repo root included, and the
+  check passed having read 0 files. The walk now prunes those two names below
+  the root, and a companion check requires the scan to have reached
+  `smoke_test.py`, `Sublime/texlib/texlib_build.py` and the test file itself.
+  From such a worktree, a scratch `.py` holding a literal redefinition of
+  `LUALATEX_CLASSES` passed the old scan and fails the new one; restoring the
+  old prune fails the companion check with "0 files scanned". 401 checks
+  become 402.
+
+- **Fifteen more test files ran in no workflow.** No workflow globs for tests:
+  a file runs in CI only when a workflow names it. Of the 44 tracked
+  `test_*.py` and `test_*.lua` files, fifteen were named by none. Twelve were
+  added between 2026-07-10 and 2026-07-12, the newest on 2026-08-24. The
+  workflows now name all 44.
+
+  Thirteen need no TeX and run in the `builder-logic` job of `tests.yml`, in
+  three steps: `test_texlib_modes.py`; the plugin-module files
+  `test_texlib_complete.py`, `test_texlib_doctor.py`, `test_texlib_editor.py`,
+  `test_texlib_gallery.py`, `test_texlib_locate.py`, `test_texlib_scaffold.py`,
+  `test_texlib_texmf.py` and `test_texlib_tools.py`; and the course-tool files
+  `test_bank_report.py`, `test_collate_keys.py`, `test_coursemeta_lint.py` and
+  `test_version_diff.py`. `Schedule/test_schedule_schedmeta.lua` and
+  `Sublime/test_engine_emit_edges.py` run in `biber-integration`, the job with
+  `texlua`, `lualatex`, poppler and pypdf. That job runs on every push; the
+  Schedule file's two siblings stay in `smoke.yml`, which runs for `main` only.
+
+  With the entry above, `test_engine_emit_edges.py` runs its slicer sub-check in
+  that job, where pypdf is installed and a builder that does not import is a
+  failure.
+
+  `test_texlib_doctor.py` had one check tied to the machine. `N3: no texinputs
+  -> no warning` called the real `shadows_checkout()`, which asks `kpsewhich`
+  for `TEXMFHOME`. With a TeXLib copy under its `tex/latex/texlib` the file
+  exited 1, and with none the check passed whatever the gate did: removing the
+  gate from `_shadow_warning_line`, or gating on the `texinputs` setting alone,
+  left all 12 checks passing. Every N3 check now sets the derived TEXINPUTS and
+  the shadow state itself. Each of those two faults fails one check, a copy
+  planted under a throwaway `TEXMFHOME` no longer changes the result, and a new
+  check fails if any N3 check consults the machine's `TEXMFHOME`. 12 checks
+  become 14.
+
+  A new `test_workflow_coverage.py` runs last in `builder-logic` and fails when
+  a tracked `test_*.py` or `test_*.lua` is not run by a workflow: an
+  interpreter, then the file's path from the repo root, on a line that is not a
+  comment. It also fails when a workflow runs a test path that is not tracked.
+  Each of these fails it: a run line deleted, a run line commented out, a file
+  named only in a job's comment block, and a new tracked file that nothing
+  names. A test that must stay out of CI goes in the file's `EXEMPT` table with
+  the reason.
+
 ## [0.9.0] — 2026-09-08
 
 ### Fixed

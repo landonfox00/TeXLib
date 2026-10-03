@@ -42,7 +42,7 @@ if "sublime" in sys.modules:  # only true inside Sublime's plugin host
 
 # --- 1. Stub the LaTeXTools PdfBuilder base class ---------------------------
 
-from _testkit import install_native_builder  # noqa: E402
+from _testkit import install_native_builder, without_defer  # noqa: E402
 TexlibBuilder = install_native_builder()
 from texlib_build import (  # noqa: E402  (native core)
     GRADEBOOK_SHEETS, MAX_RERUNS, STATE_ONLY_RERUNS, TexlibBuildCore, _surname,
@@ -227,30 +227,6 @@ def check(label, condition, detail=""):
         print(f"  FAIL  {label}")
         if detail:
             print(f"        {detail}")
-
-
-# A document argument carries a deferral prefix whenever the preamble scanner
-# found something this document never uses -- which, for the synthetic one-line
-# documents in this file, is everything. That prefix is not a MODE macro, and
-# the cases below are about mode macros, so they compare against the argument
-# with any prefix stripped.
-_DEFER_PREFIX_RE = re.compile(r"^(?:\\def\\TeXLibNo[A-Za-z]+\{\})+")
-
-
-def without_defer(arg):
-    r"""`arg` minus its \def\TeXLibNo... prefix, unwrapped from \input{...}.
-
-    "doc.tex" -> "doc.tex"
-    "\def\TeXLibNoBib{}\input{doc.tex}" -> "doc.tex"
-    "\def\ShowKey{}\input{doc.tex}" -> "\def\ShowKey{}\input{doc.tex}"  (a mode
-    macro survives, which is exactly what these assertions must still catch.)
-    """
-    arg = str(arg)
-    stripped = _DEFER_PREFIX_RE.sub("", arg)
-    if stripped == arg:
-        return arg                      # nothing was stripped; leave it alone
-    match = re.fullmatch(r"\\input\{(.*)\}", stripped)
-    return match.group(1) if match else stripped
 
 
 # --- 3. Test cases ---------------------------------------------------------
@@ -2255,10 +2231,12 @@ def main():
     _spec_path = os.path.join(_repo, "Sublime", "texlib", "texlib_buildspec.py")
     check("buildspec: the single source exists", os.path.isfile(_spec_path))
 
-    _redefiners = []
+    _redefiners, _spec_scanned = [], set()
     for _dirpath, _dirnames, _filenames in os.walk(_repo):
-        if any(part in _dirpath for part in (os.sep + ".git", os.sep + ".claude")):
-            continue
+        # Pruned by NAME below the root. Matching on the absolute path skipped
+        # every directory of a checkout that itself lives under .claude/, the
+        # root included, and the check passed having read no file.
+        _dirnames[:] = [d for d in _dirnames if d not in (".git", ".claude")]
         for _fn in _filenames:
             if not _fn.endswith(".py") or _fn == "texlib_buildspec.py":
                 continue
@@ -2267,6 +2245,7 @@ def main():
                 _txt = open(_p, encoding="utf-8", errors="replace").read()
             except OSError:
                 continue
+            _spec_scanned.add(os.path.relpath(_p, _repo).replace(os.sep, "/"))
             # Markers assembled at runtime: spelled out literally, this file
             # would match itself and the check would fail on its own source.
             for _marker in ("LUALATEX_CLASSES = " + "{",
@@ -2276,6 +2255,11 @@ def main():
                     _redefiners.append(os.path.relpath(_p, _repo) + " :: " + _marker)
     check("buildspec: no module redefines the shared constants",
           not _redefiners, "; ".join(_redefiners))
+    # The two modules that once held the copies, and this file.
+    check("buildspec: that scan reached the harness and the builder",
+          {"smoke_test.py", "Sublime/texlib/texlib_build.py",
+           "Sublime/test_texlib_builder.py"} <= _spec_scanned,
+          "%d files scanned" % len(_spec_scanned))
 
     # Every lua class must actually be one -- bingo and schedule \directlua at
     # class load, thesis loads fontspec; pdflatex cannot compile any of them.
