@@ -2161,6 +2161,9 @@ function autoexam_run_versions()
 		-- Reset the per-copy section counter so this copy's sections shuffle the
 		-- same as any other copy of the same version (e.g. student vs solutions).
 		tex.sprint("\\directlua{local _ENV=texlib;pbank_emit_partno=0}")
+		-- The class resets its own per-copy state (the {parts} resume tracker):
+		-- see \AutoExamBeginCopy in texlib-autoexam.cls.
+		tex.sprint("\\AutoExamBeginCopy")
 		tex.sprint("\\input{" .. body_tmp .. "}")
 		if i < #copies then
 			tex.sprint("\\clearpage")

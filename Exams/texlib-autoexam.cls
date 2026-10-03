@@ -105,6 +105,11 @@
 \@autoexam@versionedfalse
 
 % Handle Versions
+% \theExamVersion is defined in EVERY autoexam document.  With no \versions and
+% no forced \Version it is A: that label seeds the engine (\AtBeginDocument
+% below) and is what \byversion and \vercase select, so changing it would redraw
+% every existing exam that declares no versions.  The macro therefore cannot
+% tell such a document from version A of a versioned one; \IfExamVersioned can.
 \ifdefined\Version
 	\newcommand{\theExamVersion}{\Version}
 \else
@@ -407,6 +412,19 @@
 	\edef\@vc@want{#1}%
 	\ifx\@vc@cur\@vc@want #2\fi
 }
+% \IfExamVersioned{versioned}{unversioned}
+%   The first branch when the document called \versions (or \examversions), the
+%   second otherwise; expandable.  texlib-problembank.sty documents the query
+%   and supplies the second branch for the classes that have no versions.
+%   A \Version forced on a document that declares none still takes the second
+%   branch: \theExamVersion is then a label the document never declared.
+\renewcommand{\IfExamVersioned}{%
+	\if@autoexam@versioned
+		\expandafter\@firstoftwo
+	\else
+		\expandafter\@secondoftwo
+	\fi
+}
 
 % \importproblem is provided by texlib-problembank.sty.
 
@@ -477,6 +495,24 @@
 \newcounter{global_partno_storage}
 \newcounter{tracker_question_no}
 \setcounter{tracker_question_no}{-1}
+
+% \AutoExamBeginCopy -- run by the version loop (autoexam_run_versions in
+% problem_engine.lua) before it reads each copy's body.
+%   {parts} below resumes its lettering when the question number equals the one
+%   it last saw, which is how a second list in the same question ({cols},
+%   \splitpage) carries on from the first.  A question NUMBER does not identify
+%   a question across copies, because every copy numbers from 1: unless the
+%   tracker is cleared here, the first {parts} of a copy resumes the last list
+%   of the copy before it whenever the two questions share a number.  An exam
+%   whose only problem with parts was Problem 1 printed 1a, 1b on its first
+%   version and 1c, 1d on its second.
+%   Not handled: two {questions} lists in ONE copy that each restart at 1 share
+%   a tracker value in the same way.  {problems} numbers continuously, so a
+%   document built on it cannot reach that case.
+\newcommand{\AutoExamBeginCopy}{%
+	\setcounter{tracker_question_no}{-1}%
+	\setcounter{global_partno_storage}{0}%
+}
 
 \let\oldparts\parts
 \let\endoldparts\endparts

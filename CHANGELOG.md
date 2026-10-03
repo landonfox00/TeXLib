@@ -30,6 +30,24 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   removes the ones a previous build left, rather than leaving a tagged PDF that
   no longer matches its source.
 
+- **`\IfExamVersioned{versioned}{unversioned}` — ask whether the document
+  declares versions.** `\theExamVersion` cannot say. `autoexam` defines it as
+  `A` when no `\versions` is declared, and `quiz` does not define it. A course
+  macro that picked content by comparing a section label with
+  `\theExamVersion`, falling back to the first label when the macro did not
+  exist, printed nothing in an exam with no versions: `A` matched no label and
+  the fallback never ran. A final exam or a review sheet that drew such a
+  problem printed it as a stem with no content, with exit code 0 and no
+  warning. The query takes its first branch in a document that calls
+  `\versions` and its second everywhere else. `texlib-problembank.sty` defines
+  it, so `quiz`, `didactic` and `bank` answer it too and a problem in a shared
+  bank can call it whichever class draws it. It is expandable, so it works
+  inside `\setvar`.
+  `\theExamVersion` keeps its `A`: the label seeds the engine, and changing it
+  would redraw every existing exam that declares no versions. The idiom is
+  under "Versions" in `Exams/README.md`. Tests: `versions-none-test` and
+  `versions-none-quiz` in `test_engine_correctness.py`.
+
 ### Changed
 
 - **A document with one problem-section is no longer headed "Part I".** The
@@ -114,6 +132,27 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   pointed at a private `$TEXMFCACHE` fails the same check outright — so both
   hosts recognise the abort and spend the pass again. It is a startup failure,
   so the retry costs a startup and nothing else.
+
+- **A versioned exam's part labels ran on from one copy to the next.** `{parts}`
+  resumes its lettering when the question number equals the one it last saw,
+  which is how a second list in the same question (`{cols}`, `\splitpage`)
+  continues the first. Neither the tracked number nor the stored count was
+  cleared between copies, and every copy numbers its questions from 1, so the
+  first `{parts}` of a copy resumed the last list of the copy before it
+  whenever the two questions shared a number. An exam whose only problem with
+  parts was Problem 1 printed 1a, 1b on its first version, 1c, 1d on its second
+  and 1k, 1l on its sixth, and a build that typeset the keys in the same pass
+  carried the lettering on through them. An exam was unaffected whenever the
+  last question with parts on one copy and the first on the next had different
+  numbers, which is why an exam with two such problems never showed it. The
+  version loop now runs `\AutoExamBeginCopy` before it reads each copy's body,
+  and that macro clears both counters. Measured on a six-version exam: the
+  first copy and all six covers are pixel-identical before and after
+  (ImageMagick AE = 0), and each later copy differs on the one page that
+  carries the parts, by 203 to 311 pixels at 110 dpi. Test: `versions-test` in
+  `test_engine_correctness.py` reads the labels on all twelve copies of a
+  six-version exam with keys, including a `{cols}` list that has to continue at
+  1c on every copy.
 
 - **The stale sweep missed two whole classes of artifact.** It walked
   `VARIANT_MACROS`, which does not contain `base`, so `<base>_accessible.pdf`
