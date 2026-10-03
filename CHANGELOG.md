@@ -75,10 +75,9 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
   The stale sweep follows the reports: a twin's report is removed with its PDF
   when a build stops producing it, where the base report alone was removed
-  before. The rest is as it was. `accessible_report: false` runs nothing and
-  prints nothing, a missing veraPDF is a soft skip said once per build, no
-  verdict changes a build's exit status, and exit 1 from veraPDF is a
-  non-conforming file.
+  before. The rest is as it was. `accessible_report: false` runs nothing, a
+  missing veraPDF is a soft skip said once per build, no verdict changes a
+  build's exit status, and exit 1 from veraPDF is a non-conforming file.
 
   That switch did not work where it is documented. The Sublime build command
   copies the build settings out of `TeXLib.sublime-settings` by name, and its
@@ -88,6 +87,49 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   `TEXLIB_A11Y_REPORT=0`. Both are passed now. `test_texlib_runner.py` reads
   the builder's keys off its source and fails when the editor's list lacks
   one.
+
+- **A report no longer outlives the PDF it was written for.** A build that
+  replaced a tagged PDF and wrote no report for the new copy left the earlier
+  build's report beside it. That happened three ways: `accessible_report:
+  false` (or `TEXLIB_A11Y_REPORT=0`), veraPDF not installed, and a veraPDF
+  tool error (an exit above 1, or a launch that raises). Each ended with this
+  build's `<base>_accessible.pdf` beside an earlier build's
+  `<base>_accessible-report.html`, and nothing in the build output said the
+  report was about another file. The stale sweep already deleted a report
+  whose PDF a build stopped producing. It did not cover a PDF the build wrote
+  again.
+
+  The earlier report is now deleted as its PDF is replaced, for every tagged
+  PDF a build copies out. A check that runs writes the new report as before,
+  passing or failing. A build that writes none ends with no report beside
+  that PDF and says what it removed, once per build:
+  `TeXLib: removed a stale accessibility report (its PDF was rebuilt without
+  a new report): exam1_solutions_accessible-report.html`. A report that cannot
+  be deleted is named as still there, and the report of a tagged PDF the build
+  did not write is left alone.
+
+  The deletion is at the copy and not at the check, so it holds for a build
+  that never reaches the check. A serial build cancelled after a tagged PDF
+  landed used to leave the old report beside it, and now leaves none. Nothing
+  is printed in that case.
+
+  `accessible_report: false` deletes the earlier report too. The switch means
+  "do not check", and the PDF that report described has been overwritten. The
+  line then reads `rebuilt with accessible_report off`. It is the only line
+  about reports that a build prints with the switch off, and only a build that
+  removes one prints it.
+
+  Run as real builds of the `pset` template through `texlib_cli.py build`. A
+  default build with the check on wrote three reports. The same build with
+  `TEXLIB_A11Y_REPORT=0` rebuilt the three tagged PDFs, left no report, and
+  printed one line naming the three. In `--mode accessible`, a stand-in
+  veraPDF that exits 2 and a veraPDF lookup that finds nothing each ended with
+  a new `ps3_accessible.pdf`, no report, and that line, and the next build
+  with the check on wrote the report again.
+
+  No verdict and no removal changes a build's exit status, a missing veraPDF
+  is still said once per build, and exit 1 from veraPDF still writes its
+  report.
 
 - **A document with one problem-section is no longer headed "Part I".** The
   `Part N —` prefix now appears only when there really are two or more headed

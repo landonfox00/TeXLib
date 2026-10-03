@@ -88,6 +88,21 @@ have: the solutions. Until 2026-10 a build checked the base copy alone, and
 every `{partsolution}` in a tagged key failed five checks beside a base report
 that passed. A report is deleted when a build stops producing its PDF.
 
+A report is kept only beside the PDF it was written for. When a build writes a
+tagged PDF again, it deletes the earlier report as the new PDF lands, and the
+check then writes the new one. If no report is written for the new PDF, the
+build ends with none beside it, and it names an earlier report it removed:
+
+```
+TeXLib: removed a stale accessibility report (its PDF was rebuilt without a new report): exam1_accessible-report.html
+```
+
+That happens when `accessible_report` is off (the line says so), when veraPDF
+is not installed, and when veraPDF ends in a tool error. Until 2026-10 the
+earlier report stayed in all three, beside a PDF it did not describe. A build
+that is cancelled after replacing a tagged PDF leaves no report for it either,
+and prints no line.
+
 veraPDF exits 0 for a conforming file and 1 for a non-conforming one, and writes
 a valid report either way. Only an exit above 1 is a tool error. Lean by default
 (~20 KB); `accessible_report_full` adds `--success`, which evidences all ~840
