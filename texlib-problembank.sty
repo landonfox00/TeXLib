@@ -26,6 +26,7 @@
 %                              \@problem@item (the \problem item command, which
 %                              {problems} swaps in for \problem in its body)
 %   Standalone import . . . .  \importproblem
+%   Answer grid . . . . . . .  \begin{sketchaxes}, \sketchwindow
 %   Hooks (overridable) . . .  \workbox, \autoexam@problem@sep,
 %                              \problems@begin@hook, \problems@end@hook
 %
@@ -530,10 +531,84 @@
 %   solution builds (so a key copy doesn't get blank pages).
 \providecommand{\workbox}[1]{\vspace{\stretch{#1}}}
 
+% {sketchaxes} — the grid a graphing problem is answered on.
+%   \begin{sketchaxes}[<scale>]{xmin}{xmax}{ymin}{ymax}
+%       <TikZ drawing the answer>
+%   \end{sketchaxes}
+%   A student copy prints the blank grid. A copy that shows solutions prints the
+%   SAME grid with the body drawn on it, so the answer takes the place of the
+%   blank and costs the key no height. The alternative -- a blank grid in the
+%   stem and a second, filled grid inside {partsolution} -- prints both in a
+%   key, and two grids are what push a one-page problem onto a second page.
+%
+%   The body is ordinary TikZ in grid units (one unit per grid line), run after
+%   the grid and axes so it draws over them. \sketchwindow is the grid's own
+%   rectangle, for clipping a curve that leaves it:
+%       \begin{scope} \clip \sketchwindow; \draw ... ; \end{scope}
+%   An empty body is a grid with no drawn answer; it prints blank in every copy.
+%   The star drops the y tick labels, for a problem where reading the scale is
+%   part of the question. The optional argument is the TikZ scale (default 0.7).
+%
+%   The body is dropped unread from a student copy rather than typeset into a
+%   discard box the way {solution} is, so nothing in it can reach the tag tree.
+%   The note sits outside \ifsolutions for the reason given in texlib-build.sty:
+%   the planner learns from the plain build that this document has a key.
+\NewDocumentEnvironment{sketchaxes}{ s O{0.7} m m m m +b }{%
+	\IfBlankF{#7}{\ifdefined\TeXLibNoteSolution \TeXLibNoteSolution \fi}%
+	\begin{center}
+		\begin{tikzpicture}[scale=#2, >=stealth]
+			\def\sketchwindow{(#3,#5) rectangle (#4,#6)}%
+			\draw[help lines, color=black!18] (#3,#5) grid (#4,#6);
+			\draw[->] (#3-0.6,0) -- (#4+0.6,0) node[right] {$x$};
+			\draw[->] (0,#5-0.6) -- (0,#6+0.6) node[above] {$y$};
+			\foreach \sketch@x in {#3,...,#4}
+				{\ifnum\sketch@x=0\else
+					\draw (\sketch@x,0.1) -- (\sketch@x,-0.1)
+						node[below, font=\tiny] {$\sketch@x$};
+				\fi}
+			\foreach \sketch@y in {#5,...,#6}
+				{\ifnum\sketch@y=0\else
+					\draw (0.1,\sketch@y) -- (-0.1,\sketch@y)
+						\IfBooleanF{#1}{node[left, font=\tiny] {$\sketch@y$}};
+				\fi}
+			% \@firstofone / \@gobble, not \ifsolutions #7\fi: a skipped branch is
+			% still scanned for conditionals, and the body is the author's.
+			\ifsolutions \expandafter\@firstofone \else \expandafter\@gobble \fi
+				{#7}%
+		\end{tikzpicture}
+	\end{center}%
+}{}
+
 % \autoexam@problem@sep — separator between consecutive problems on the same
 %   page (engine emits this for problems 2+ on each page).  Default: a plain
 %   \par\medskip; autoexam.cls overrides with a full-width rule.
 \providecommand{\autoexam@problem@sep}{\par\medskip}
+
+% \pbank@sep@marked — that separator with its nodes marked. Inside {problems}
+%   and {mcproblems} \autoexam@problem@sep is this wrapper around the class's
+%   own definition (\pbank@sep@plain; see \@texlib@psection@begin). The
+%   separator's nodes (its space, autoexam's rule) then carry \pbank@sepattr
+%   and nothing else on the page does, so the place where one problem ends and
+%   the next begins can be found on a finished page. The inline key cuts a page
+%   that cannot hold its solutions there (texlib_keyfit.lua). An attribute is
+%   not a node: the page is the same page, in every build.
+%
+%   Only in vertical mode. In horizontal mode the paragraph still open belongs
+%   to the problem above, and its lines would take the mark; the separator then
+%   runs unmarked and that boundary is simply not offered. A problem that ends
+%   in an inline solution ends in vertical mode, and those are the pages cut.
+\ifdefined\directlua
+	\newattribute\pbank@sepattr
+	\edef\pbank@sepattrnum{\the\allocationnumber}
+	\newcommand{\pbank@sep@marked}{%
+		\ifvmode
+			\setattribute\pbank@sepattr{1}%
+			\pbank@sep@plain
+			\unsetattribute\pbank@sepattr
+		\else
+			\pbank@sep@plain
+		\fi}
+\fi
 
 % \begin{problems} / \begin{mcproblems} ... (auto-numbered "Part N" sections)
 %   Drop-in replacements for {questions} that accept \problem items (the
@@ -678,6 +753,14 @@
 	\fi
 	% ---- inter-problem separator: first problem on a page gets no rule -------
 	\pbank@lua{pbank_first_on_page = true}%
+	% Mark it, for this section (\pbank@sep@marked). The \ifx keeps a second
+	% pass through here in one group from wrapping the wrapper.
+	\ifdefined\pbank@sep@marked
+		\ifx\autoexam@problem@sep\pbank@sep@marked\else
+			\let\pbank@sep@plain\autoexam@problem@sep
+			\let\autoexam@problem@sep\pbank@sep@marked
+		\fi
+	\fi
 	\let\@problems@saved@newpage\newpage
 	% ---- open the question list, carrying the question number across sections -
 	\begin{questions}%

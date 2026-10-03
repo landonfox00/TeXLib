@@ -6,6 +6,82 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Added
 
+- **`{sketchaxes}` — the grid a graphing problem is answered on, with the answer
+  as its body.** `\begin{sketchaxes}[<scale>]{xmin}{xmax}{ymin}{ymax}` …
+  `\end{sketchaxes}` prints a blank labeled grid on a student copy and the same
+  grid with its body drawn on it on every copy that shows solutions. A bank that
+  put a blank grid in the stem and a second, filled grid inside `{partsolution}`
+  printed both in a key: on a twelve-version Math 126 exam the key ran 9 pages a
+  version against the student copy's 7, and with `{sketchaxes}` it runs 7. The
+  body is TikZ in grid units; `\sketchwindow` is the grid's rectangle, for
+  `\clip`; the star drops the y tick labels. A student copy discards the body
+  unread, and `test_mode_effects.py` checks that in every mode of `autoexam` and
+  `quiz`. Defined in `texlib-problembank.sty`, so every class that draws from a
+  bank has it. On a three-problem probe the tagged student copy passes PDF/UA-2
+  with 0 failed checks, and the tagged solutions copy reports the same 10 failed
+  checks with the grids as without them: a shown `{partsolution}` already fails
+  four Table 5 rules there, and `{sketchaxes}` adds none.
+
+- **`\texlibpartsolheader` — a `{partsolution}`'s header, set apart from
+  `{solution}`'s.** It defaults to `\texlibsolheader`, so no document changes
+  until one sets it. `\renewcommand{\texlibpartsolheader}{}` removes the line:
+  the tint and the accent still mark each answer, and a page of one-line part
+  answers gets a line back per part. A sixteen-page Math 126 review whose key
+  ran eighteen pages runs sixteen with it. The headerless box keeps the header
+  box's shape (one line of height, the rest depth), which the inline key relies
+  on to hang an answer below its question.
+
+- **`\keylayout{inline}` — a document says once that its keys keep the student
+  copy's page.** Every answer-bearing copy the builder makes of that document
+  (`_solutions`, `_instructor`) is then laid out with the inline layout: the
+  answer space stays, each solution is drawn into it, and every problem prints
+  where the student copy prints it. The plain build is still the student copy,
+  pixel for pixel, cover included. The tagged twins keep the compact layout:
+  they are read through their structure, and on a probe of whole-problem
+  solutions the compact tagged key passes PDF/UA-2 with 0 failed rules where
+  the inline one fails four. The layout existed
+  only as the `solutions-inline` build mode, chosen by hand at each build and
+  never planned by the default fan-out; a preference in the source needs no
+  builder change, and the key lands under the names every tool already reads.
+  `\keylayout{compact}`, the default, is the layout keys had: the space closes
+  and the solutions flow.
+
+- **The inline key makes room for a solution taller than its blank.** The
+  overlay was unbounded: a solution taller than the answer space it was drawn
+  into printed over the next question, and nothing reported it. Whether it fits
+  cannot be known where the solution is typeset, because the blank is `\stretch`
+  glue and is sized when the page is. Each overlay now ends in a marker box
+  carrying how far below it the ink reaches, and `texlib_keyfit.lua`, called
+  from the kernel's `build/page/before` hook, checks the finished page. Where a
+  solution is short of room, the space after it is raised to what it needs and
+  the page's other stretchable spaces give that up in proportion to their
+  stretch; the page height does not change. A page on which everything fits is
+  not touched, so it stays identical to the student copy. Measured on five exams
+  (181 pages) with every solution set solid red: before, black ink inside a
+  solution block on one page of each of six versions of one exam and on two
+  pages of another; after, none on any page.
+
+  A page that cannot hold its solutions however the space is shared is split.
+  Each solution's reach becomes real depth on the box that owns it, the list is
+  cut at the column height with `\vsplit`, the part that fits is shipped, and
+  the rest is returned to the main vertical list from `build/page/after`
+  followed by a page break. The key is one page longer there, a part stays with
+  its own answer, and the log carries a warning: `Page N cannot hold its
+  solutions … the key continues on an added page`. On two quizzes whose pages
+  are 94pt and 189pt short, every line of every solution is on the paper and
+  nothing is printed over.
+
+  A page of several problems is cut between two of them. Left to `\vsplit`, the
+  cut falls at the last break that fits, and on both quizzes that was the line
+  under the second problem's stem: the stem stayed at the foot of the page and
+  its graph went to the next. Inside `{problems}` the separator between
+  problems now carries an attribute (`\pbank@sep@marked`; no node is added, so
+  the page is the same page), and the page is cut at the last separator that
+  leaves each side a page's worth. The separator is dropped there, as it is
+  before a problem that starts a page. With no such separator `\vsplit`
+  chooses, as before. `test_solution_inline_fit.py` asserts all four cases on
+  word positions from `pdftotext -bbox`.
+
 - **The viewer opens on `<base>.pdf` as soon as the base compile ends, not when
   the fan-out does.** That PDF is final at that moment — everything after it
   writes *other* files (the tagged twins, the variant copies, the per-version
@@ -100,6 +176,33 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   stretch and the unfixed library scores 100% on it; and the cover is excluded,
   because the key's red "Solutions" badge is supposed to reflow it.
 
+- **An inline `{partsolution}` moved what followed it.** The layout's contract
+  is that a key page is its student page with the answers drawn in, and for a
+  part solution it did not hold. Two causes. The overlay ended with
+  `\nointerlineskip`, which left `\prevdepth` at −1000pt, so the line after the
+  answer space got no interline glue and sat about 3pt high, once per part
+  solution. And an overlay that was the last thing in its list (a part answer
+  ending a `{cols}` column) changed the enclosing box's depth, because the
+  question line's depth was no longer the list's last depth. Both inline
+  solutions now go through one macro, `\@sol@overlay`, which carries
+  `\prevdepth` across the overlay and closes the list with an empty box of the
+  depth it had. On a twelve-version exam the key's 48 problem pages kept between
+  70.3% and 97.2% of the student page's ink in place (1px tolerance at 100 dpi);
+  they now keep 100.000%, every page. `test_solution_inline_parity.py` gained
+  the two pages that tell the cases apart: one fails on the old code at 81.6%,
+  the other on the `\prevdepth` fix alone at 86.9%.
+
+- **A tagged key raised TeX errors when a solution ended in a display.** A
+  shown solution's body is collected into a box, and the closing brace ends its
+  last paragraph without the `\par` token, so the tagging code's
+  end-of-paragraph hook never ran. After running text the next `\par` outside
+  closed the structure. After `\[ … \]` nothing did, and tagpdf stopped with
+  `there is no open structure on the stack`: twelve errors for a
+  `{partsolution}` in either layout, two for a `{solution}` in the inline
+  layout, a PDF written anyway, exit 0. Both render branches now end the body
+  with a real `\par` in an accessible build, under the guard the discard
+  branches already use. `test_solution_tagged_key.py` reads the log for it.
+
 - **A luaotfload cache-path race cost roughly one parallel build in five.** The
   lane died before LaTeX started, with a traceback and no PDF:
   `"no writeable cache path, quiting"`. luaotfload decides whether a
@@ -114,6 +217,138 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   pointed at a private `$TEXMFCACHE` fails the same check outright — so both
   hosts recognise the abort and spend the pass again. It is a startup failure,
   so the retry costs a startup and nothing else.
+
+- **A tagged key failed PDF/UA-2 at every part solution it showed.** veraPDF
+  reported four ISO 32005 Table 5 rules for each shown `{partsolution}`: `LI-P`
+  (two checks), `LI-Part`, `P-P` and `P-Part`, five failed checks, in the
+  `solutions` and `instructor` twins and in the inline layout. A Math 126 review
+  key with 63 part solutions failed 315. The student copies passed and no build
+  raised a TeX error. Nothing reported it: the accessible gate builds each
+  document's default copy, a build writes its veraPDF report for the base
+  tagged copy only, and no template here uses `{partsolution}`.
+
+  The frame around a solution (the tint and the left accent) is a `\parbox`,
+  and the kernel's tagging code for `\parbox` assumes a paragraph is open. It
+  ends the innermost structure, taking it for that paragraph's, opens a `<Div>`,
+  and afterwards opens a new paragraph structure. `{partsolution}` assembles its
+  frame in a box register with no paragraph open, which is what lets SyncTeX
+  stamp it. The structure that was ended there is the part's `<LBody>`, so the
+  `<Div>`, the paragraph after it and anything the part went on to say became
+  children of the `<LI>`. A bare `article` reproduces it with
+  `\sbox0{\parbox{1cm}{x}}\noindent\box0` inside a list item: the same four
+  rules, five checks, and none with the `\parbox` in an artifact group.
+  Upstream has it open as latex3/tagging-project issues 54 and 345.
+
+  The frame is one artifact now. `\texlib@acc@artifactbegin` and
+  `\texlib@acc@artifactend` in `texlib-solutions.sty` put it in tagpdf's
+  artifact group: the tint and the accent are marked as layout decoration, the
+  `\parbox` opens no structure, and the solution's header and body, which were
+  tagged when they were typeset, stay in the `<LBody>`. `{solution}` draws its
+  frame the same way in both layouts. Its compact layout sets the frame in a
+  live paragraph, and passed. Its inline layout boxes it, and a tagged inline
+  key of whole-problem solutions failed the same four rules. The
+  inline-key entry above met this in the Bank template and put it down to "a
+  structure level". The cause there was this `\parbox`, set into a box with no
+  paragraph open: with the compact frame boxed the way that draft boxed it, the
+  Bank template fails 27 checks on `origin/main` and none with the frame an
+  artifact.
+
+  Failed checks, before and after. The regression fixture (three part solutions
+  and three whole-problem solutions, one in the side-by-side multiple-choice
+  key): `solutions` 17 → 0, `solutions-inline` 31 → 0, `instructor` 17 → 0,
+  student copy 0 → 0, and the same exam under `quiz` 17, 29 and 17 → 0. The
+  Math 126 review key, rebuilt from a copy of the course with this change
+  applied: 315 → 0.
+
+  Nothing moves on the page. The pair is empty in a normal build: the fixture's
+  four untagged copies are the same PDFs byte for byte before and after, apart
+  from the trailer `/ID`, with `SOURCE_DATE_EPOCH` fixed. In a tagged build the
+  pair sets node attributes and adds no node: the four tagged copies differ on
+  0 pixels (`pdftoppm` at 150 dpi, compared exactly), and so do all four PDFs
+  of the 16-page review at 100 dpi.
+
+  Guarded by a new `test_solution_tagged_conformance.py`, which `accessible.yml`
+  runs ahead of the module suite. It builds one exam's tagged student copy and
+  its three tagged keys and requires, of each, no TeX error in the log, no
+  failed veraPDF check, and a label and a body in every list item. The last is
+  read off the structure tree with pypdf, so the defect is still caught where
+  veraPDF is not installed.
+
+  Not fixed here: a solution whose body ends in a display or a list fails in
+  the student copy as well. That is the missing `\par` before the box closes,
+  with its own fixes in PR #182 (a hidden solution) and PR #281 (a shown one).
+  Built with those two and this one together, every construct tried (thirteen,
+  in four tagged copies each) has no failed check.
+
+- **A tagged key read a solution's answer before its "Solution." header.** In
+  the structure tree, which is the order a screen reader follows, a shown
+  `{solution}` or `{partsolution}` had its answer first and its header after
+  it. The page drew the header above the answer. Both environments typeset the
+  body into a box before the header exists, so that the body's `\rubric` calls
+  and the SyncTeX harvest can run first, and a structure element lists its
+  children in the order they are created. veraPDF checks which element may hold
+  which and says nothing about their order, so it passed every key. A part
+  solution with no header line (`\renewcommand{\texlibpartsolheader}{}`) had
+  nothing out of order.
+
+  A shown solution is one `<Div>` now, and the header is its first child.
+  `\texlib@acc@solbegin` in `texlib-solutions.sty` opens the `<Div>` before the
+  body is boxed and `\texlib@acc@solend` closes it once header and body are
+  assembled, so the body's paragraphs are its children as they stand. The
+  header paragraph is set inside a `<NonStruct>` that carries tagpdf's
+  `firstkid` key, which puts an element at the front of its parent's children.
+  The kernel's float code puts a caption first with the same key. A part
+  solution's rubric stays after its answer and a whole-problem solution's
+  rubric overlay stays on the header line, as on the page. The `<Div>` also
+  keeps the grouping that the frame shows: the frame is an artifact (the entry
+  above), and without the `<Div>` nothing in the tree says which paragraphs are
+  one solution.
+
+  The other way to reorder is to open the body's element with `stash` and
+  attach it after the header with `\tag_struct_use_num:n`. That needs a second
+  `<Div>`, around the body, and tagpdf 1.0e warns twice for every paragraph
+  inside a stashed `<Div>` (`Parent-Child 'STASHED' --> 'Part'`, and the same
+  for `'P'`), because it cannot check them against a parent it does not know
+  yet. `firstkid` raises no warning, and has been in tagpdf since 0.99f.
+
+  Headers read after their answer, before and after, on the regression fixture
+  (three part solutions and three whole-problem solutions, one in the
+  side-by-side multiple-choice key): 6 → 0 in each of `solutions`,
+  `solutions-inline` and `instructor`, under `autoexam` and under `quiz`. No
+  copy has a failed veraPDF check, a TeX error or a tagpdf warning, before or
+  after. Fifteen solutions of other shapes (a body that ends in a display, a
+  centered table or a list, one that is only a display, one that holds a table
+  or an `align*`, the inline and the stacked multiple-choice key, a
+  whole-problem solution after part solutions): 15 → 0 in each key, no failed
+  check in a key before or after, and the same pages.
+
+  Nothing moves on the page. The four commands are empty in a normal build: the
+  fixture's four untagged copies, under `autoexam` and under `quiz`, are the
+  same PDFs byte for byte before and after, apart from the trailer `/ID`, with
+  `SOURCE_DATE_EPOCH` fixed. In a tagged build they add no node: the eight
+  tagged copies differ on 0 pixels (`pdftoppm` at 150 dpi, compared exactly),
+  and a tagged student copy is the same file apart from the `/ID` and the
+  random UUID tagpdf gives its namespace.
+
+  Two Math 126 documents, built from a copy of the course before and after: the
+  Exam 1 review (16 pages; 63 part solutions with no header line and two
+  whole-problem solutions) and Quiz 3 (three solutions). In their tagged keys
+  the headers read after their answer go 2 → 0 and 3 → 0. veraPDF reports no
+  failed check and the logs no error and no tagpdf warning, before or after,
+  and all eight PDFs match on every page at 100 dpi.
+
+  `test_solution_tagged_conformance.py` asserts the order. veraPDF cannot, so
+  the test reads the text of every marked-content sequence out of the page
+  content streams with pypdf, decoding it with each font's `/ToUnicode` map,
+  and requires the innermost `<Div>` around each answer to hold that one
+  solution and to start with "Solution.". It builds a fifth copy as well, a
+  `solutions` key with `\texlibpartsolheader` emptied, where a part solution's
+  `<Div>` starts at its answer. On the code before this change the new
+  assertion fails in all four keys.
+
+  Not changed: a paragraph that holds only a box leaves an empty `<P>`, as it
+  did. There is one after each solution, for its frame, and one inside a part
+  solution, for its body.
 
 - **The stale sweep missed two whole classes of artifact.** It walked
   `VARIANT_MACROS`, which does not contain `base`, so `<base>_accessible.pdf`

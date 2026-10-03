@@ -208,5 +208,10 @@
 \providecommand{\texlibsolrulecolor}{green!50!black}     % left accent (shown)
 \providecommand{\texlibsolblankrulecolor}{black!40}      % dashed rule (student blank)
 \providecommand{\texlibsolheader}{\textbf{Solution.}}    % bold run-in header
+% {partsolution}'s header, the same one unless a document says otherwise. A key
+% with a dozen one-line part answers on a page spends a dozen lines on the word
+% "Solution."; \renewcommand{\texlibpartsolheader}{} gives them back, and the
+% tint and accent still mark each answer.
+\providecommand{\texlibpartsolheader}{\texlibsolheader}
 
 \endinput

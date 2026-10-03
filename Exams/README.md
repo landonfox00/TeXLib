@@ -224,6 +224,52 @@ Solution body. Visible only in key/solutions builds.
 `\begin{partsolution} ... \end{partsolution}`
 Per-part solution paired with `\part`.
 
+`\texlibpartsolheader`
+The header a `{partsolution}` prints, `\texlibsolheader` ("Solution.") by
+default. `\renewcommand{\texlibpartsolheader}{}` in the preamble removes it from
+part solutions and leaves `{solution}`'s in place; use it when a page of short
+part answers runs a key onto an extra page.
+
+`\keylayout{inline}` (preamble)
+Lay this document's keys out on the student copy's page. The answer space
+stays and each solution is drawn into it, so a key page is the student page
+with the answers showing: same pagination, every problem where the student
+copy prints it. It applies to every answer-bearing copy the builder makes
+(`<base>_solutions.pdf`, the per-version `_solutions` slices, `_instructor`).
+The plain build is still the student copy.
+
+The tagged twin of a key (`<base>_solutions_accessible.pdf`) keeps the compact
+layout. It is read through its structure, where position on the page carries
+nothing, and the inline layout costs it conformance: a key of whole-problem
+solutions passes PDF/UA-2 compact and fails four Table 5 rules inline.
+
+Where a solution is taller than the blank it is drawn into, the space after it
+grows to hold it and the page's other answer spaces give that up in proportion
+to their stretch. The page height does not change, and a page on which every
+solution fits is left exactly as the student copy. The log records each page
+where room was made (`made room for N tall solution(s)`).
+
+A page whose solutions cannot fit at all, however the space is shared, is split:
+what fits stays, the rest continues on one added page, and the pages after it
+keep their contents. A part is never separated from its own answer, and a page
+of several problems is cut between two of them when each side fits a page, so
+that no problem is divided. The key is then a page longer than the student
+copy, and the build says so:
+
+```
+Package texlib-solutions Warning: Page 3 cannot hold its solutions:
+(texlib-solutions)                they need 41.5pt more room than it has;
+(texlib-solutions)                the key continues on an added page.
+```
+
+To get that key back onto the student copy's pages, give the page the room it is
+short of: a larger stretch on the `\problem` line, a smaller figure, or one
+problem fewer on that page. `TEXLIB_KEYFIT_TRACE=1` in the environment writes
+the page as the fit read it to the log, one line per item, in points.
+
+`\keylayout{compact}` is the default: the answer space closes and the solutions
+flow, which is what a review sheet with no work space wants.
+
 `\rubric{points}{description}`
 Add a rubric line. Rendered as an overlay in rubric builds.
 
@@ -304,6 +350,34 @@ Add a final scoring page (defaults to 20 questions).
 
 `\graph[opts]{x-min}{x-max}{y-min}{y-max}{tikz body}`
 Inline coordinate plane with axes and a tikz body.
+
+`\begin{sketchaxes}[scale]{x-min}{x-max}{y-min}{y-max} ... \end{sketchaxes}`
+The grid a graphing problem is answered on. The body is TikZ, in grid units,
+that draws the answer:
+
+```latex
+\ppart Graph $f$.
+    \begin{sketchaxes}[0.62]{-5}{5}{-5}{5}
+        \begin{scope}
+            \clip \sketchwindow;
+            \draw[blue, very thick, domain=-5:5] plot (\x, {(\x)^2 - 2});
+        \end{scope}
+        \fill[blue] (0,-2) circle (2.6pt);
+    \end{sketchaxes}
+    \begin{partsolution}
+        Vertex $(0, -2)$, opening upward.
+    \end{partsolution}
+```
+
+A student copy prints the blank grid. A copy that shows solutions prints the same
+grid with the body drawn on it, so the key keeps the student copy's pagination.
+`\sketchwindow` is the grid's rectangle. The optional argument is the TikZ scale
+(default `0.7`); the starred form drops the y tick labels; an empty body is a
+grid that prints blank in every copy. Defined in `texlib-problembank.sty`, so it
+works from a quiz and from lecture notes as well.
+
+Do not also draw the answer's grid inside `{partsolution}`: the key then prints
+two grids, and the second is what pushes the problem onto another page.
 
 `\workbox{height}`
 Reserved blank space for student work.
