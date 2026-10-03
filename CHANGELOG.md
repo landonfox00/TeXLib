@@ -280,6 +280,76 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   Built with those two and this one together, every construct tried (thirteen,
   in four tagged copies each) has no failed check.
 
+- **A tagged key read a solution's answer before its "Solution." header.** In
+  the structure tree, which is the order a screen reader follows, a shown
+  `{solution}` or `{partsolution}` had its answer first and its header after
+  it. The page drew the header above the answer. Both environments typeset the
+  body into a box before the header exists, so that the body's `\rubric` calls
+  and the SyncTeX harvest can run first, and a structure element lists its
+  children in the order they are created. veraPDF checks which element may hold
+  which and says nothing about their order, so it passed every key. A part
+  solution with no header line (`\renewcommand{\texlibpartsolheader}{}`) had
+  nothing out of order.
+
+  A shown solution is one `<Div>` now, and the header is its first child.
+  `\texlib@acc@solbegin` in `texlib-solutions.sty` opens the `<Div>` before the
+  body is boxed and `\texlib@acc@solend` closes it once header and body are
+  assembled, so the body's paragraphs are its children as they stand. The
+  header paragraph is set inside a `<NonStruct>` that carries tagpdf's
+  `firstkid` key, which puts an element at the front of its parent's children.
+  The kernel's float code puts a caption first with the same key. A part
+  solution's rubric stays after its answer and a whole-problem solution's
+  rubric overlay stays on the header line, as on the page. The `<Div>` also
+  keeps the grouping that the frame shows: the frame is an artifact (the entry
+  above), and without the `<Div>` nothing in the tree says which paragraphs are
+  one solution.
+
+  The other way to reorder is to open the body's element with `stash` and
+  attach it after the header with `\tag_struct_use_num:n`. That needs a second
+  `<Div>`, around the body, and tagpdf 1.0e warns twice for every paragraph
+  inside a stashed `<Div>` (`Parent-Child 'STASHED' --> 'Part'`, and the same
+  for `'P'`), because it cannot check them against a parent it does not know
+  yet. `firstkid` raises no warning, and has been in tagpdf since 0.99f.
+
+  Headers read after their answer, before and after, on the regression fixture
+  (three part solutions and three whole-problem solutions, one in the
+  side-by-side multiple-choice key): 6 → 0 in each of `solutions`,
+  `solutions-inline` and `instructor`, under `autoexam` and under `quiz`. No
+  copy has a failed veraPDF check, a TeX error or a tagpdf warning, before or
+  after. Fifteen solutions of other shapes (a body that ends in a display, a
+  centered table or a list, one that is only a display, one that holds a table
+  or an `align*`, the inline and the stacked multiple-choice key, a
+  whole-problem solution after part solutions): 15 → 0 in each key, no failed
+  check in a key before or after, and the same pages.
+
+  Nothing moves on the page. The four commands are empty in a normal build: the
+  fixture's four untagged copies, under `autoexam` and under `quiz`, are the
+  same PDFs byte for byte before and after, apart from the trailer `/ID`, with
+  `SOURCE_DATE_EPOCH` fixed. In a tagged build they add no node: the eight
+  tagged copies differ on 0 pixels (`pdftoppm` at 150 dpi, compared exactly),
+  and a tagged student copy is the same file apart from the `/ID` and the
+  random UUID tagpdf gives its namespace.
+
+  Two Math 126 documents, built from a copy of the course before and after: the
+  Exam 1 review (16 pages; 63 part solutions with no header line and two
+  whole-problem solutions) and Quiz 3 (three solutions). In their tagged keys
+  the headers read after their answer go 2 → 0 and 3 → 0. veraPDF reports no
+  failed check and the logs no error and no tagpdf warning, before or after,
+  and all eight PDFs match on every page at 100 dpi.
+
+  `test_solution_tagged_conformance.py` asserts the order. veraPDF cannot, so
+  the test reads the text of every marked-content sequence out of the page
+  content streams with pypdf, decoding it with each font's `/ToUnicode` map,
+  and requires the innermost `<Div>` around each answer to hold that one
+  solution and to start with "Solution.". It builds a fifth copy as well, a
+  `solutions` key with `\texlibpartsolheader` emptied, where a part solution's
+  `<Div>` starts at its answer. On the code before this change the new
+  assertion fails in all four keys.
+
+  Not changed: a paragraph that holds only a box leaves an empty `<P>`, as it
+  did. There is one after each solution, for its frame, and one inside a part
+  solution, for its body.
+
 - **The stale sweep missed two whole classes of artifact.** It walked
   `VARIANT_MACROS`, which does not contain `base`, so `<base>_accessible.pdf`
   outlived any build that stopped producing it; and it only ever considered the

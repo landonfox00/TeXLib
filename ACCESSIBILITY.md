@@ -47,9 +47,12 @@ navigate.
 - **Answer keys.** `smoke_test.py --accessible` builds each document's default
   copy, in which a solution is typeset into a discarded box. The same job runs
   `test_solution_tagged_conformance.py`, which builds one exam's tagged student
-  copy and its three tagged keys (`solutions`, `solutions-inline`,
-  `instructor`) and requires that none has a failed check and that every list
-  item is a label and a body.
+  copy and four tagged keys (`solutions`, `solutions-inline`, `instructor`, and
+  a `solutions` key whose part solutions have no header line) and requires that
+  none has a failed check and that every list item is a label and a body. It
+  also reads each key's structure tree for the order, which veraPDF does not
+  check: every solution is one `<Div>` that reads "Solution." and then the
+  answer.
 - **The characters themselves.** Tags and conformance say how a document is
   structured, not whether the letters in it are the right letters. `smoke.yml`
   runs `test_text_layer.py`, which sets 35 non-ASCII characters through
