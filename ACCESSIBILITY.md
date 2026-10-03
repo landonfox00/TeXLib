@@ -44,6 +44,12 @@ navigate.
 - **A missing validator fails the gate.** If veraPDF is absent the job fails
   instead of skipping, because a skipped check reports the same green as a
   passing one.
+- **Answer keys.** `smoke_test.py --accessible` builds each document's default
+  copy, in which a solution is typeset into a discarded box. The same job runs
+  `test_solution_tagged_conformance.py`, which builds one exam's tagged student
+  copy and its three tagged keys (`solutions`, `solutions-inline`,
+  `instructor`) and requires that none has a failed check and that every list
+  item is a label and a body.
 - **The characters themselves.** Tags and conformance say how a document is
   structured, not whether the letters in it are the right letters. `smoke.yml`
   runs `test_text_layer.py`, which sets 35 non-ASCII characters through
@@ -63,6 +69,39 @@ accessible build, **whether it passes or fails** — a report naming the clauses
 file broke is the one worth reading. It is the artifact to hand over when
 someone asks for proof; some graduate schools now require one filed with a
 thesis.
+
+A build that produces several tagged PDFs checks each one. A document with
+solutions also builds `<base>_solutions_accessible.pdf`, and one with rubrics
+builds `<base>_instructor_accessible.pdf`. Each is run through veraPDF and gets
+a report of its own beside it, named after its PDF
+(`<base>_solutions_accessible-report.html`). The build ends with one line per
+tagged PDF, giving the verdict and the number of failed checks:
+
+```
+TeXLib: PDF/UA-2 conformance (veraPDF; set accessible_report_full for the itemized form):
+    exam1_accessible.pdf  PASSED, 0 failed checks  -> exam1_accessible-report.html
+    exam1_solutions_accessible.pdf  FAILED, 17 failed checks  -> exam1_solutions_accessible-report.html
+```
+
+A key is checked on its own because it has structure the base copy does not
+have: the solutions. Until 2026-10 a build checked the base copy alone, and
+every `{partsolution}` in a tagged key failed five checks beside a base report
+that passed. A report is deleted when a build stops producing its PDF.
+
+A report is kept only beside the PDF it was written for. When a build writes a
+tagged PDF again, it deletes the earlier report as the new PDF lands, and the
+check then writes the new one. If no report is written for the new PDF, the
+build ends with none beside it, and it names an earlier report it removed:
+
+```
+TeXLib: removed a stale accessibility report (its PDF was rebuilt without a new report): exam1_accessible-report.html
+```
+
+That happens when `accessible_report` is off (the line says so), when veraPDF
+is not installed, and when veraPDF ends in a tool error. Until 2026-10 the
+earlier report stayed in all three, beside a PDF it did not describe. A build
+that is cancelled after replacing a tagged PDF leaves no report for it either,
+and prints no line.
 
 veraPDF exits 0 for a conforming file and 1 for a non-conforming one, and writes
 a valid report either way. Only an exit above 1 is a tool error. Lean by default
@@ -100,6 +139,14 @@ in separate formulas — or in separate cells of one matrix — are fine.
 If you need SE on a document that falls back, the workaround is editorial rather
 than technical: split the formula so no two nth-roots share it. The defect is
 upstream, not in TeXLib, and it reproduces on a bare `article`.
+
+**A failed check does not fail the build.** A tagged PDF that fails is reported
+`FAILED` with its count, in the last lines of the build and in its report. The
+build's exit status and the editor's build status are what they would have been
+without the check. The same holds for a PDF veraPDF could not read, which is
+reported `NOT CHECKED` with the reason. A script that needs conformance enforced
+has to run veraPDF and test its exit status, as `smoke_test.py --accessible`
+does in CI.
 
 **`\tagpdfsetup{math/alt/use}` is deliberately not set.** It raises the score an
 Ally- or UDOIT-style checker reports by replacing the MathML with flat alt text,

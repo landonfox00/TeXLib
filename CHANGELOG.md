@@ -32,6 +32,105 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Changed
 
+- **A build checks every tagged PDF it writes, and reports each one.** A build
+  ran veraPDF over `<base>_accessible.pdf` and no other file. The builder gave
+  its reason: a variant is the same document with different content revealed,
+  so its tag structure is the base copy's, and one run per build keeps a JVM
+  launch per variant out of the edit loop. A key has structure the base copy
+  never has, its solutions. Every shown `{partsolution}` failed five checks in
+  `<base>_solutions_accessible.pdf` while `<base>_accessible-report.html` said
+  `PASSED` (the part-solution entry under Fixed), and a Math 126 review key
+  failed 315 checks with nothing in the build output to say so.
+
+  Every tagged PDF is validated now: the base twin, each variant's twin, and
+  the accessible pair's. Each gets a report beside it, named after its PDF
+  (`<base>_solutions_accessible-report.html`), and the build summary ends with
+  one line per tagged PDF: its name, `PASSED` or `FAILED`, the number of failed
+  checks, and the report. `texlib_cli.py build` on a two-page exam with three
+  part solutions, compiled against `texlib-solutions.sty` as it stood before
+  the part-solution fix, ends with
+  `exam1_accessible.pdf  PASSED, 0 failed checks`,
+  `exam1_solutions_accessible.pdf  FAILED, 17 failed checks` and
+  `exam1_instructor_accessible.pdf  FAILED, 17 failed checks`. veraPDF's XML
+  report gives the same three totals, and with the fix all three lines read
+  `PASSED, 0 failed checks`. Every tagged PDF the build wrote has a line: one
+  veraPDF could not read says `NOT CHECKED` and the reason.
+
+  A report is written for every copy, pass or fail. The cost of a check is the
+  veraPDF launch, and the verdict needs that launch whether or not the report
+  is kept: the HTML is the launch's own output, and the failed-check count is
+  read from it. Keeping a report only for a copy that fails would save no time,
+  and "no report" would then mean either a copy that passed or a copy nothing
+  checked.
+
+  The launches run at once, `build_jobs` wide, after the last copy has landed.
+  On 12 logical cores one copy took 5.0 s (1.6 s of it validation, the rest
+  the JVM starting), and that exam's three copies took 8.0 s together and
+  15.8 s in turn. With a dozen other TeX and Java processes running, the same
+  three measurements were 6.7 s, 9.4 s and 21.2 s. A build with three tagged
+  PDFs therefore ends about 3 s later than it did, and `build_jobs: 1` checks
+  them in turn. One veraPDF launch does take several files (three in 4.8 s, as
+  XML), but its HTML for a batch is a summary table with no rule in it, and the
+  HTML is the report.
+
+  The stale sweep follows the reports: a twin's report is removed with its PDF
+  when a build stops producing it, where the base report alone was removed
+  before. The rest is as it was. `accessible_report: false` runs nothing, a
+  missing veraPDF is a soft skip said once per build, no verdict changes a
+  build's exit status, and exit 1 from veraPDF is a non-conforming file.
+
+  That switch did not work where it is documented. The Sublime build command
+  copies the build settings out of `TeXLib.sublime-settings` by name, and its
+  list held seven of the nine the builder reads. `accessible_report` and
+  `accessible_report_full` were the two missing, so setting either in the
+  editor did nothing, and the report could be switched off only with
+  `TEXLIB_A11Y_REPORT=0`. Both are passed now. `test_texlib_runner.py` reads
+  the builder's keys off its source and fails when the editor's list lacks
+  one.
+
+- **A report no longer outlives the PDF it was written for.** A build that
+  replaced a tagged PDF and wrote no report for the new copy left the earlier
+  build's report beside it. That happened three ways: `accessible_report:
+  false` (or `TEXLIB_A11Y_REPORT=0`), veraPDF not installed, and a veraPDF
+  tool error (an exit above 1, or a launch that raises). Each ended with this
+  build's `<base>_accessible.pdf` beside an earlier build's
+  `<base>_accessible-report.html`, and nothing in the build output said the
+  report was about another file. The stale sweep already deleted a report
+  whose PDF a build stopped producing. It did not cover a PDF the build wrote
+  again.
+
+  The earlier report is now deleted as its PDF is replaced, for every tagged
+  PDF a build copies out. A check that runs writes the new report as before,
+  passing or failing. A build that writes none ends with no report beside
+  that PDF and says what it removed, once per build:
+  `TeXLib: removed a stale accessibility report (its PDF was rebuilt without
+  a new report): exam1_solutions_accessible-report.html`. A report that cannot
+  be deleted is named as still there, and the report of a tagged PDF the build
+  did not write is left alone.
+
+  The deletion is at the copy and not at the check, so it holds for a build
+  that never reaches the check. A serial build cancelled after a tagged PDF
+  landed used to leave the old report beside it, and now leaves none. Nothing
+  is printed in that case.
+
+  `accessible_report: false` deletes the earlier report too. The switch means
+  "do not check", and the PDF that report described has been overwritten. The
+  line then reads `rebuilt with accessible_report off`. It is the only line
+  about reports that a build prints with the switch off, and only a build that
+  removes one prints it.
+
+  Run as real builds of the `pset` template through `texlib_cli.py build`. A
+  default build with the check on wrote three reports. The same build with
+  `TEXLIB_A11Y_REPORT=0` rebuilt the three tagged PDFs, left no report, and
+  printed one line naming the three. In `--mode accessible`, a stand-in
+  veraPDF that exits 2 and a veraPDF lookup that finds nothing each ended with
+  a new `ps3_accessible.pdf`, no report, and that line, and the next build
+  with the check on wrote the report again.
+
+  No verdict and no removal changes a build's exit status, a missing veraPDF
+  is still said once per build, and exit 1 from veraPDF still writes its
+  report.
+
 - **A document with one problem-section is no longer headed "Part I".** The
   `Part N —` prefix now appears only when there really are two or more headed
   sections — in the body heading and the running header both — so a quiz, a
@@ -114,6 +213,68 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   pointed at a private `$TEXMFCACHE` fails the same check outright — so both
   hosts recognise the abort and spend the pass again. It is a startup failure,
   so the retry costs a startup and nothing else.
+
+- **A tagged key failed PDF/UA-2 at every part solution it showed.** veraPDF
+  reported four ISO 32005 Table 5 rules for each shown `{partsolution}`: `LI-P`
+  (two checks), `LI-Part`, `P-P` and `P-Part`, five failed checks, in the
+  `solutions` and `instructor` twins and in the inline layout. A Math 126 review
+  key with 63 part solutions failed 315. The student copies passed and no build
+  raised a TeX error. Nothing reported it: the accessible gate builds each
+  document's default copy, a build writes its veraPDF report for the base
+  tagged copy only, and no template here uses `{partsolution}`.
+
+  The frame around a solution (the tint and the left accent) is a `\parbox`,
+  and the kernel's tagging code for `\parbox` assumes a paragraph is open. It
+  ends the innermost structure, taking it for that paragraph's, opens a `<Div>`,
+  and afterwards opens a new paragraph structure. `{partsolution}` assembles its
+  frame in a box register with no paragraph open, which is what lets SyncTeX
+  stamp it. The structure that was ended there is the part's `<LBody>`, so the
+  `<Div>`, the paragraph after it and anything the part went on to say became
+  children of the `<LI>`. A bare `article` reproduces it with
+  `\sbox0{\parbox{1cm}{x}}\noindent\box0` inside a list item: the same four
+  rules, five checks, and none with the `\parbox` in an artifact group.
+  Upstream has it open as latex3/tagging-project issues 54 and 345.
+
+  The frame is one artifact now. `\texlib@acc@artifactbegin` and
+  `\texlib@acc@artifactend` in `texlib-solutions.sty` put it in tagpdf's
+  artifact group: the tint and the accent are marked as layout decoration, the
+  `\parbox` opens no structure, and the solution's header and body, which were
+  tagged when they were typeset, stay in the `<LBody>`. `{solution}` draws its
+  frame the same way in both layouts. Its compact layout sets the frame in a
+  live paragraph, and passed. Its inline layout boxes it, and a tagged inline
+  key of whole-problem solutions failed the same four rules. The
+  inline-key entry above met this in the Bank template and put it down to "a
+  structure level". The cause there was this `\parbox`, set into a box with no
+  paragraph open: with the compact frame boxed the way that draft boxed it, the
+  Bank template fails 27 checks on `origin/main` and none with the frame an
+  artifact.
+
+  Failed checks, before and after. The regression fixture (three part solutions
+  and three whole-problem solutions, one in the side-by-side multiple-choice
+  key): `solutions` 17 → 0, `solutions-inline` 31 → 0, `instructor` 17 → 0,
+  student copy 0 → 0, and the same exam under `quiz` 17, 29 and 17 → 0. The
+  Math 126 review key, rebuilt from a copy of the course with this change
+  applied: 315 → 0.
+
+  Nothing moves on the page. The pair is empty in a normal build: the fixture's
+  four untagged copies are the same PDFs byte for byte before and after, apart
+  from the trailer `/ID`, with `SOURCE_DATE_EPOCH` fixed. In a tagged build the
+  pair sets node attributes and adds no node: the four tagged copies differ on
+  0 pixels (`pdftoppm` at 150 dpi, compared exactly), and so do all four PDFs
+  of the 16-page review at 100 dpi.
+
+  Guarded by a new `test_solution_tagged_conformance.py`, which `accessible.yml`
+  runs ahead of the module suite. It builds one exam's tagged student copy and
+  its three tagged keys and requires, of each, no TeX error in the log, no
+  failed veraPDF check, and a label and a body in every list item. The last is
+  read off the structure tree with pypdf, so the defect is still caught where
+  veraPDF is not installed.
+
+  Not fixed here: a solution whose body ends in a display or a list fails in
+  the student copy as well. That is the missing `\par` before the box closes,
+  with its own fixes in PR #182 (a hidden solution) and PR #281 (a shown one).
+  Built with those two and this one together, every construct tried (thirteen,
+  in four tagged copies each) has no failed check.
 
 - **The stale sweep missed two whole classes of artifact.** It walked
   `VARIANT_MACROS`, which does not contain `base`, so `<base>_accessible.pdf`

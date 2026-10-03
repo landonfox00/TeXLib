@@ -50,6 +50,46 @@
 % moved there because didactic.cls gates inline worked lead-ins into a discard box
 % the same way and hits the identical violation, but does not load this package.
 
+% ACCESSIBLE: a solution's frame is decoration around content that is ALREADY
+% tagged. The tint and the left accent are drawn in a \parbox around a box that
+% was typeset, and tagged, before the frame existed. The frame has no structure
+% to add, and the kernel's \parbox must not be left to add one. Its tagging
+% socket (parbox/before, latex-lab-testphase-minipage) assumes a paragraph is
+% open: it ends the innermost structure, taking it for that paragraph's, opens a
+% <Div>, and afterwards opens a new paragraph structure. {partsolution} always
+% assembles its frame in a box register (\sbox) between paragraphs, and
+% {solution} does in the inline layout. No paragraph is open there, so what the
+% socket ended was whatever encloses the solution. In the exam-class {parts}
+% list that is the part's <LBody>: the <Div> and the paragraph after it became
+% children of the <LI>, which veraPDF reports as ISO 32005 Table 5 LI-P (twice),
+% LI-Part, P-P and P-Part, five failed checks for every part solution a tagged
+% key shows. The inline {solution} did the same to its problem's <LBody>. It is
+% upstream behaviour (latex3/tagging-project issues 54 and 345, both open): on a
+% bare article, \sbox0{\parbox{1cm}{x}}\noindent\box0 inside a list item fails
+% the same four rules with the same five checks.
+%
+% Between this pair the material is ONE artifact. Tagging is suspended, so no
+% socket runs and the structure stack is left alone; the rules are marked as
+% layout decoration; and the tagged box set inside keeps its own marking, which
+% under LuaTeX (every tagged build) is an attribute a node carries from the
+% moment it is made. The pair may stand in a paragraph or outside one. No-ops in
+% a normal build. The names are tested at each use because a document can define
+% \TeXLibAccessibleMode with no \DocumentMetadata, and \csname would then turn
+% the missing command into \relax and typeset its argument.
+\ifdefined\TeXLibAccessibleMode
+	\newcommand\texlib@acc@artifactbegin{%
+		\ifcsname tag_mc_artifact_group_begin:n\endcsname
+			\csname tag_mc_artifact_group_begin:n\endcsname{layout}%
+		\fi}
+	\newcommand\texlib@acc@artifactend{%
+		\ifcsname tag_mc_artifact_group_end:\endcsname
+			\csname tag_mc_artifact_group_end:\endcsname
+		\fi}
+\else
+	\newcommand\texlib@acc@artifactbegin{}
+	\newcommand\texlib@acc@artifactend{}
+\fi
+
 \newbox\@partsol@box
 \newbox\@sol@box
 \newbox\@sol@vtop
@@ -384,7 +424,15 @@
 		% renders its catalogue with \solutionstrue -- lost PDF/UA-2 on the extra
 		% structure level (Table 5 StructTreeRoot-Div / P-P / P-Part). Only the
 		% inline branch boxes it, because only that branch has to raise it.
+		%
+		% ACCESSIBLE: that loss was the \parbox's tagging socket ending a
+		% structure that was not a paragraph's, which is what a \parbox set
+		% into a box does (see \texlib@acc@artifactbegin above), and the inline
+		% branch still had it. The frame is an artifact in both layouts now:
+		% the tint and the accent are decoration, and \@sol@vtop, set inside,
+		% was tagged when it was typeset.
 		\def\@sol@frame{%
+			\texlib@acc@artifactbegin
 			\hspace*{-\@totalleftmargin}%
 			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
 				\noindent
@@ -433,6 +481,7 @@
 							depth \dimexpr\dp\@sol@vtop+6pt\relax}}}%
 				\box\@sol@vtop
 			}%
+			\texlib@acc@artifactend
 		}%
 		% Same geometry contract {partsolution} already honors: under the inline
 		% layout the frame declares ZERO height and depth and is lowered one
@@ -579,7 +628,14 @@
 % its 6pt overhang.  That pairing is empirical and SyncTeX-load-bearing there;
 % it is reused here rather than re-derived, but the measure differs (\linewidth),
 % so re-run sol_probe (SYNCTEX.md) before trusting reverse search inside one.
+%
+% ACCESSIBLE: the frame is an artifact. It is always set into \@partsol@outer
+% with no paragraph open, and the \parbox's tagging socket then ended the part's
+% <LBody> and hung a <Div> and a paragraph on the <LI>; see
+% \texlib@acc@artifactbegin near the top of this file. \@partsol@wrap, set
+% inside, was tagged when it was typeset and keeps that.
 \newcommand{\@partsol@frame}{%
+	\texlib@acc@artifactbegin
 	\parbox[t]{\dimexpr\linewidth-12pt\relax}{%
 		\noindent
 		\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsoltint}{%
@@ -592,6 +648,7 @@
 				depth \dimexpr\dp\@partsol@wrap+6pt\relax}}}%
 		\box\@partsol@wrap
 	}%
+	\texlib@acc@artifactend
 }
 
 % \rubric{pts}{text} — one grading criterion, shown only when \ifrubric.  Appends

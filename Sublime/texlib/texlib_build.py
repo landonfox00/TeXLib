@@ -82,6 +82,7 @@
 # commands().
 # ============================================================================
 
+import concurrent.futures
 import csv
 import glob
 import gzip
@@ -334,6 +335,7 @@ LUAMML_SIDECARS = ("-luamml-mathml.html", "-mathml.html")
 ACCESSIBLE_REPORT_SUFFIX = _spec.VERAPDF_REPORT_SUFFIX
 find_verapdf = _spec.find_verapdf
 verapdf_report_cmd = _spec.verapdf_report_cmd
+verapdf_failed_checks = _spec.verapdf_failed_checks
 
 # A pseudo-mode: a single engine pass with no biber and no rerun loop, for fast
 # preview while writing. Cross-references / citations may be stale; a normal
@@ -496,6 +498,14 @@ class TexlibBuildCore:
         self._build_start = time.monotonic()
         self._pass_count = 0
         self._biber_count = 0
+
+        # The tagged PDFs this build has copied out and veraPDF has not read
+        # yet, and one verdict per file once it has (_check_tagged_copies).
+        # _earlier_reports names the reports an earlier build had left for
+        # those PDFs, each deleted when its PDF was replaced.
+        self._tagged_copies = []
+        self._conformance = []
+        self._earlier_reports = []
 
         # Variant fan-out state, reset per build so a single-variant build
         # after a Ctrl+B cannot inherit the previous plan and sweep away PDFs
@@ -1485,8 +1495,7 @@ class TexlibBuildCore:
 
         # The base tagged twin goes first, on its own, because its run 1 is the
         # mathml-SE probe (see ACCESSIBLE_DOCMETA) and every other tagged lane
-        # needs that verdict before it can be given a command line. It is also
-        # the twin veraPDF reports on, so it is the one worth having early.
+        # needs that verdict before it can be given a command line.
         if tagged_twins:
             yield from self._build_one_variant(
                 "base", VARIANT_MACROS.get("base", ""), engine, tex_dir,
@@ -1652,16 +1661,18 @@ class TexlibBuildCore:
         except OSError as exc:
             self.display(f"TeXLib: could not write {dest}: {exc}\n")
             return
-        # The conformance report, for the BASE tagged PDF only. The fan-out
-        # reaches here rather than through _copy_back_accessible (which finds
+        # Every tagged twin is queued for veraPDF, which _postprocess runs over
+        # the whole set once the fan-out has landed (_check_tagged_copies). The
+        # fan-out reaches here and not _copy_back_accessible, which finds
         # nothing: the variant builds write to <aux>/<variant>-a11y/, not
-        # <aux>/a11y/), so without this a plain Ctrl+B would produce tagged
-        # PDFs and no report at all. Base only, deliberately: every variant is
-        # the same document with different content revealed, so their tag
-        # structure is the same structure, and one veraPDF run per build keeps
-        # a JVM launch per variant out of the edit loop.
-        if tagged and variant == "base":
-            self._write_accessible_report(tex_dir, dest)
+        # <aux>/a11y/. Until 2026-10 only the base twin was queued, on the
+        # premise that a variant is the same document with different content
+        # revealed and so has the same tag structure. A key has structure the
+        # base copy never has, its solutions: every shown {partsolution} failed
+        # five checks in <base>_solutions_accessible.pdf while the base twin's
+        # report, the only one written, passed.
+        if tagged:
+            self._note_tagged_copy(variant, dest)
         # A versioned exam emits every copy into ONE PDF plus a .vmap. The base
         # build's map is sliced in _postprocess; a variant's map lives in that
         # variant's own output directory and was never read, so a \versions
@@ -1741,14 +1752,22 @@ class TexlibBuildCore:
             if not os.path.exists(path):
                 removed.append(name)
         removed += self._sweep_stale_version_slices(tex_dir, built)
-        # The conformance report describes the base tagged PDF specifically, so
-        # it goes when that PDF does. A report outliving the file it certifies
-        # is the same failure mode as a stale _instructor.pdf, and worse in
-        # kind: this one is EVIDENCE, and it would be filed with a thesis.
-        base_tagged = self._variant_pdf_name(self.base_name, "base", True)
-        if base_tagged.lower() not in keep:
+        # A conformance report describes one tagged PDF, so it goes when that
+        # PDF does. A report outliving the file it certifies is the same failure
+        # mode as a stale _instructor.pdf, and worse in kind: this one is
+        # EVIDENCE, and it would be filed with a thesis. Its own loop, because
+        # the one above skips a variant whose PDF is already gone, and a report
+        # left behind by a PDF deleted by hand is no less stale. This covers
+        # the PDFs a build stops producing. One it REPLACES lost its earlier
+        # report at the copy (_note_tagged_copy).
+        for variant, tagged in candidates:
+            if not tagged:
+                continue
+            pdf = self._variant_pdf_name(self.base_name, variant, True)
+            if pdf.lower() in keep:
+                continue
             report = os.path.join(
-                tex_dir, self.base_name + ACCESSIBLE_REPORT_SUFFIX)
+                tex_dir, self._variant_report_name(self.base_name, variant))
             if os.path.exists(report):
                 self._force_remove(report)
                 if not os.path.exists(report):
@@ -1884,10 +1903,49 @@ class TexlibBuildCore:
         except OSError as exc:
             self.display(f"TeXLib: could not write {dest}: {exc}\n")
             return
-        self._write_accessible_report(tex_dir, dest)
+        self._note_tagged_copy("base", dest)
 
-    def _write_accessible_report(self, tex_dir, pdf_path):
-        """Write veraPDF's conformance report beside <base>_accessible.pdf.
+    @staticmethod
+    def _variant_report_name(base_name, variant):
+        """<base>[_<variant>]_accessible-report.html: the report for the tagged
+        PDF of the same stem (see _variant_pdf_name), so each pair sorts
+        together in a file listing."""
+        stem = base_name if variant == "base" else f"{base_name}_{variant}"
+        return stem + ACCESSIBLE_REPORT_SUFFIX
+
+    def _note_tagged_copy(self, variant, pdf_path):
+        """Queue one tagged PDF, just copied out, for _check_tagged_copies, and
+        delete the report an earlier build wrote for the PDF it replaced.
+
+        That report describes a file that no longer exists. Until 2026-10 it
+        was only ever overwritten, by the next report, so it stayed beside the
+        new PDF whenever this build wrote none: accessible_report off, veraPDF
+        not found, a veraPDF error. The sweep's rule for a PDF the build stops
+        producing (_sweep_stale_variants) holds for one it replaces too.
+
+        It is deleted here, at the copy, because the check may never run: a
+        host that stops resuming commands() after this copy (a serial build
+        that is cancelled, Ctrl+C in the CLI) never reaches _postprocess.
+        Nothing is said here, since the check usually writes the next report.
+        _check_tagged_copies names the reports that were not written again.
+        """
+        if not isinstance(getattr(self, "_tagged_copies", None), list):
+            self._tagged_copies = []
+        self._tagged_copies.append((variant, pdf_path))
+        report = os.path.join(
+            os.path.dirname(pdf_path),
+            self._variant_report_name(self.base_name, variant))
+        # isfile, not exists: a folder under that name is nobody's report.
+        if not os.path.isfile(report):
+            return
+        self._force_remove(report)
+        if not isinstance(getattr(self, "_earlier_reports", None), list):
+            self._earlier_reports = []
+        self._earlier_reports.append(os.path.basename(report))
+
+    def _check_tagged_copies(self, tex_dir):
+        """Run veraPDF over every tagged PDF this build copied out, and write
+        each one's conformance report beside it.
 
         A tagged PDF's accessibility is invisible in the render, so the build
         that produces one should also produce the evidence that it conforms --
@@ -1897,28 +1955,133 @@ class TexlibBuildCore:
         `smoke_test.check_verapdf`, which parses the failed clauses out and
         DISCARDS the report; this writes it out where the author can read it.
 
-        Never fails the build. veraPDF is optional in the same way pdftotext and
-        ImageMagick are, and a missing report is not a reason to lose a PDF that
-        built cleanly.
+        Every copy gets a report, pass or fail. The cost of a check is one
+        veraPDF launch per file, and the verdict needs that launch whether or
+        not the report is kept: the HTML is the launch's own output, and the
+        failed-check count is read from it. Keeping the report only for a copy
+        that fails would save no time, and would leave "no report" meaning two
+        things: a copy that passed, and a copy nothing checked.
 
-        Exit status is load-bearing and is NOT an error condition: veraPDF exits
-        0 for a conforming file and 1 for a non-conforming one, and writes a
-        valid report either way -- a failing report is precisely when the author
-        most needs to read it. Only >1 is a tool error.
+        The launches run at once, build_jobs wide, after the last copy has
+        landed. Most of a launch is the JVM starting (5.0 s for a two-page exam
+        on 12 logical cores, 1.6 s of it validation), so that exam's three
+        copies took 8.0 s together against 15.8 s one after another. veraPDF
+        does take several files in one launch, and its XML then carries every
+        file's detail in 4.8 s, but the HTML of a batch is a summary table with
+        no rule in it, and the HTML is the report.
+
+        No verdict is displayed here. The verdicts are held for the build
+        summary (_display_conformance_summary), where the lines sit together
+        and in the order the copies were built.
+
+        A copy that ends with no report from this build has none at all: the
+        one an earlier build wrote went when its PDF was replaced
+        (_note_tagged_copy). That is said here, once, in each of the three
+        ways it happens. accessible_report off is one of them. The switch
+        means "do not check", and the report it would leave is evidence about
+        a PDF this build has overwritten.
         """
+        copies = list(getattr(self, "_tagged_copies", None) or [])
+        self._tagged_copies = []
+        self._conformance = []
+        earlier = list(getattr(self, "_earlier_reports", None) or [])
+        self._earlier_reports = []
+        if not copies:
+            return
         if not self._setting_on(
                 "accessible_report", "TEXLIB_A11Y_REPORT", True):
+            self._display_reports_removed(
+                tex_dir, earlier, "with accessible_report off")
             return
         exe = find_verapdf()
         if not exe:
             self.display(
                 "TeXLib: veraPDF not found -- no accessibility report written. "
                 "Install it or set accessible_report off to silence this.\n")
+            self._display_reports_removed(tex_dir, earlier)
             return
         itemize = self._setting_on(
             "accessible_report_full", "TEXLIB_A11Y_REPORT_FULL", False)
-        dest = os.path.join(
-            tex_dir, self.base_name + ACCESSIBLE_REPORT_SUFFIX)
+
+        def check(copy):
+            variant, pdf_path = copy
+            report_path = os.path.join(
+                tex_dir, self._variant_report_name(self.base_name, variant))
+            try:
+                return self._write_accessible_report(
+                    exe, pdf_path, report_path, itemize)
+            except Exception as exc:  # noqa: BLE001 - must not fail a build
+                return None, None, None, f"the check did not finish ({exc})"
+
+        width = 1
+        if len(copies) > 1:
+            width = min(self._configured_jobs(), len(copies))
+        if width > 1:
+            with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=width) as pool:
+                results = list(pool.map(check, copies))
+        else:
+            results = [check(copy) for copy in copies]
+        self._conformance = [
+            (os.path.basename(pdf_path),) + tuple(result)
+            for (_variant, pdf_path), result in zip(copies, results)]
+        written = {report for _pdf, _verdict, _failed, report, _problem
+                   in self._conformance if report}
+        self._display_reports_removed(
+            tex_dir, [name for name in earlier if name not in written])
+
+    def _display_reports_removed(self, tex_dir, names,
+                                 why="without a new report"):
+        """Say which of an earlier build's reports are gone with nothing in
+        their place: `names`, each deleted when its PDF was replaced
+        (_note_tagged_copy) and not written again by this build.
+
+        One line for the build, naming them in the order their PDFs were
+        copied out. A report that could not be deleted then is tried once more
+        and, if it is still there, named as that: it is in the folder beside a
+        PDF it does not describe, and the output is the only place left to say
+        so.
+
+        `why` is "without a new report" and not "and not checked" because a
+        copy can be checked and still have none: veraPDF's verdict is in the
+        summary, and the report could not be written.
+        """
+        removed, stuck = [], []
+        for name in names:
+            path = os.path.join(tex_dir, name)
+            if os.path.isfile(path):
+                self._force_remove(path)
+            (stuck if os.path.isfile(path) else removed).append(name)
+        for did, which in (("removed", removed), ("could not remove", stuck)):
+            if not which:
+                continue
+            what, whose = (
+                ("a stale accessibility report", "its PDF was")
+                if len(which) == 1 else
+                ("stale accessibility reports", "their PDFs were"))
+            self.display(
+                f"TeXLib: {did} {what} ({whose} rebuilt {why}): "
+                + ", ".join(which) + "\n")
+
+    def _write_accessible_report(self, exe, pdf_path, report_path, itemize):
+        """One veraPDF run over one tagged PDF: write its report, and return
+        (verdict, failed checks, report name, problem).
+
+        Runs on a worker thread beside the other copies' checks, so it answers
+        through its return value and never calls self.display.
+
+        Never fails the build. veraPDF is optional in the same way pdftotext and
+        ImageMagick are, and a missing report is not a reason to lose a PDF that
+        built cleanly. A copy this could not check comes back with no verdict
+        and the reason, and the summary gives that copy a line saying so.
+
+        Exit status is load-bearing and is NOT an error condition: veraPDF exits
+        0 for a conforming file and 1 for a non-conforming one, and writes a
+        valid report either way -- a failing report is precisely when the author
+        most needs to read it. Only >1 is a tool error. The verdict is the exit
+        status; the count is what the report says (verapdf_failed_checks), and
+        is None when a failing report does not say.
+        """
         try:
             proc = subprocess.run(
                 verapdf_report_cmd(exe, pdf_path, "html", itemize),
@@ -1926,25 +2089,54 @@ class TexlibBuildCore:
                 creationflags=_NO_WINDOW, timeout=300,
             )
         except (OSError, subprocess.SubprocessError) as exc:
-            self.display(f"TeXLib: veraPDF report not written ({exc}).\n")
-            return
+            return None, None, None, f"veraPDF did not run ({exc})"
         if proc.returncode > 1:
             err = (proc.stderr or b"").decode("utf-8", "replace").strip()
-            self.display(
-                f"TeXLib: veraPDF error (exit {proc.returncode}) "
-                f"-- no accessibility report. {err[:200]}\n")
-            return
+            return (None, None, None,
+                    f"veraPDF error (exit {proc.returncode}), no accessibility "
+                    f"report. {err[:200]}".rstrip())
+        report = proc.stdout or b""
+        if proc.returncode == 0:
+            verdict, failed = "PASSED", 0
+        else:
+            verdict, failed = "FAILED", verapdf_failed_checks(report)
         try:
-            with open(dest, "wb") as f:
-                f.write(proc.stdout or b"")
+            with open(report_path, "wb") as f:
+                f.write(report)
         except OSError as exc:
-            self.display(f"TeXLib: could not write {dest}: {exc}\n")
+            return (verdict, failed, None,
+                    f"could not write {report_path}: {exc}")
+        return verdict, failed, os.path.basename(report_path), ""
+
+    def _display_conformance_summary(self):
+        """One line per tagged PDF: veraPDF's verdict, the failed-check count,
+        and the report that holds the detail.
+
+        Every copy _check_tagged_copies was handed has a line, the ones veraPDF
+        could not read included: a copy left out of this list would read the
+        same as a copy that passed.
+        """
+        rows = getattr(self, "_conformance", None)
+        if not rows:
             return
-        verdict = "PASSED" if proc.returncode == 0 else "FAILED"
-        detail = "" if itemize else " (set accessible_report_full for the itemized form)"
+        lines = []
+        for pdf, verdict, failed, report, problem in rows:
+            if verdict is None:
+                lines.append(f"    {pdf}  NOT CHECKED -- {problem}")
+                continue
+            if failed is None:
+                count = "failed-check count not found in the report"
+            else:
+                count = f"{failed} failed check{'' if failed == 1 else 's'}"
+            where = f"-> {report}" if report else f"-- {problem}"
+            lines.append(f"    {pdf}  {verdict}, {count}  {where}")
+        itemized = self._setting_on(
+            "accessible_report_full", "TEXLIB_A11Y_REPORT_FULL", False)
+        hint = "" if itemized else (
+            "; set accessible_report_full for the itemized form")
         self.display(
-            f"TeXLib: PDF/UA-2 {verdict} -- accessibility report -> "
-            f"{os.path.basename(dest)}{detail}\n")
+            f"TeXLib: PDF/UA-2 conformance (veraPDF{hint}):\n"
+            + "\n".join(lines) + "\n")
 
     def _tex_dir(self):
         """The directory containing the root .tex file."""
@@ -2459,6 +2651,11 @@ class TexlibBuildCore:
         if getattr(self, "_accessible_build", False) \
                 and not getattr(self, "_variant_build", False):
             self._copy_back_accessible(tex_dir)
+
+        # Every tagged PDF is beside the source by now, the fan-out's twins and
+        # the accessible pair's one alike. veraPDF reads each and writes its
+        # report; the verdicts go out with the build summary below.
+        self._check_tagged_copies(tex_dir)
 
         # Merge the fan-out's artifacts into produced_pdfs, which was reset
         # above, then delete variant PDFs this build deliberately did not plan.
@@ -3326,6 +3523,7 @@ class TexlibBuildCore:
             f"{passes} pass(es){biber_str}{size_str}.\n"
         )
         self._display_variant_summary(tex_dir)
+        self._display_conformance_summary()
 
     def _display_variant_summary(self, tex_dir):
         """List what the fan-out produced AND what it chose not to.
