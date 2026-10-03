@@ -105,6 +105,11 @@
 \@autoexam@versionedfalse
 
 % Handle Versions
+% \theExamVersion is defined in EVERY autoexam document.  With no \versions and
+% no forced \Version it is A: that label seeds the engine (\AtBeginDocument
+% below) and is what \byversion and \vercase select, so changing it would redraw
+% every existing exam that declares no versions.  The macro therefore cannot
+% tell such a document from version A of a versioned one; \IfExamVersioned can.
 \ifdefined\Version
 	\newcommand{\theExamVersion}{\Version}
 \else
@@ -406,6 +411,19 @@
 	\edef\@vc@cur{\theExamVersion}%
 	\edef\@vc@want{#1}%
 	\ifx\@vc@cur\@vc@want #2\fi
+}
+% \IfExamVersioned{versioned}{unversioned}
+%   The first branch when the document called \versions (or \examversions), the
+%   second otherwise; expandable.  texlib-problembank.sty documents the query
+%   and supplies the second branch for the classes that have no versions.
+%   A \Version forced on a document that declares none still takes the second
+%   branch: \theExamVersion is then a label the document never declared.
+\renewcommand{\IfExamVersioned}{%
+	\if@autoexam@versioned
+		\expandafter\@firstoftwo
+	\else
+		\expandafter\@secondoftwo
+	\fi
 }
 
 % \importproblem is provided by texlib-problembank.sty.

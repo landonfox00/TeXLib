@@ -32,6 +32,10 @@ regression anywhere along the engine -> LaTeX -> PDF path is caught:
   * Stretch (vmap-test): parses the engine-emitted .vmap version markers and
     pdftotext-slices each copy's page range (the marker EMISSION in
     autoexam_run_versions was never exercised -- only the builder's slicer was).
+  * Stretch (versions-none-*): a bank problem that reports its version, drawn
+    by an exam with no \\versions and by a quiz.  \\IfExamVersioned must take
+    its unversioned branch there, and a selector keyed to version labels must
+    print its fallback.
 
 Soft-skips (exit 0) if lualatex or a poppler-flavored pdftotext (-bbox / real
 poppler banner, NOT Git-for-Windows' bundled xpdf build) is missing -- matching
@@ -486,6 +490,45 @@ def scenario_vmap_emission():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# =============================================================================
+# Stretch: \IfExamVersioned in documents that declare no versions
+# =============================================================================
+# The selector branches the bank problem printed, as version labels.
+_VQSEL_RE = re.compile(r"VQSEL(\d+)")
+
+
+def scenario_unversioned_query():
+    print("\n=== Stretch: \\IfExamVersioned with no \\versions (versions-none-*) ===")
+    # (document, what \theExamVersion reads there).  autoexam defines it as A
+    # when no \versions is declared; quiz does not define it at all.  Neither is
+    # one of the bank's labels, so only the query can route the selector to its
+    # fallback -- comparing against \theExamVersion printed nothing in the exam.
+    for tex_name, label in (("versions-none-test.tex", "A"),
+                            ("versions-none-quiz.tex", "none")):
+        tmp = tempfile.mkdtemp(prefix="texlib_engine_noversions_")
+        try:
+            pdf, _aux, log = build(tmp, tex_name, "versions-bank.tex",
+                                   "coursemeta.tex")
+            check(f"{tex_name}: PDF was produced", os.path.exists(pdf), log[-600:])
+            if not os.path.exists(pdf):
+                continue
+            text = flat(pdftext(pdf))
+            check(f"{tex_name}: the problem stem rendered", "VQSTEM" in text,
+                  text[:240])
+            check(f"{tex_name}: \\IfExamVersioned takes the unversioned branch",
+                  "VQUNVERSIONED" in text and "VQVERSIONED" not in text,
+                  text[:240])
+            check(f"{tex_name}: the selector prints its fallback branch, alone",
+                  _VQSEL_RE.findall(text) == ["1301"],
+                  f"got {_VQSEL_RE.findall(text)}")
+            check(f"{tex_name}: the query is expandable (\\setvar read it as 0)",
+                  "VQFLAG0" in text, text[:240])
+            check(f"{tex_name}: \\theExamVersion is left as it was ({label})",
+                  f"VQLABEL[{label}]" in text, text[:240])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     print("TeXLib problem-bank engine correctness tests\n")
     print(f"  build root: {_build_root()}  (override with TEXLIB_TEST_ROOT)")
@@ -503,6 +546,7 @@ def main():
     scenario_ppart_atomicity()
     scenario_importproblem()
     scenario_vmap_emission()
+    scenario_unversioned_query()
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
