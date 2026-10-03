@@ -20,10 +20,9 @@ Three things kept it out of sight:
   * The builder writes its veraPDF report for the base tagged copy only.
   * No template or fixture in this repository uses {partsolution}.
 
-So this builds one exam with tagging on: the student copy, the `solutions',
-`solutions-inline' and `instructor' variants with the macros the builder
-injects, and a `solutions' key whose part solutions have no header line. It
-asserts, for each:
+So this builds one exam four ways with tagging on (the student copy and the
+`solutions', `solutions-inline' and `instructor' variants, with the macros the
+builder injects) and asserts, for each:
 
   * no TeX error in the log. The engine exits 0 after recovering from one.
   * veraPDF, flavour ua2: no failed check.
@@ -32,24 +31,25 @@ asserts, for each:
     with no veraPDF.
   * a key carries the solutions' text and the student copy does not, so a
     build that stops showing solutions cannot pass as a key.
-  * every solution a key shows is one <Div> that reads "Solution." and then the
-    answer. See below.
-
-A solution used to read backwards. Both environments typeset the body before
-the header, and a structure element lists its children in the order they were
-created, so the tree had the answer and then "Solution." while the page drew
-them in the right order. veraPDF checks which element may contain which and
-says nothing about order, so no gate saw it. The assertion needs the text
-under each structure element, which is the text of its marked-content
-sequences. pypdf's extract_text() returns a page's text with no marked-content
-ids, so marked_text() walks each page's content stream itself and decodes the
-strings with the font's /ToUnicode map. pdfminer would do the same and is not
-a dependency of this repository.
 
 The fixture's solutions end in running text on purpose. A body that ends in a
 display or a list is a separate defect with its own fixes (the missing \par
 before the box closes: PR #182 for a hidden solution, PR #281 for a shown one),
 and it fails on the student copy too.
+
+A key is also read for the ORDER of each solution, which veraPDF does not
+check. Both solution environments typeset the body before the header, and a
+structure element lists its children in the order they were created, so the
+tree used to have the answer and then "Solution." while the page drew the
+header above the answer. Every solution a key shows is asserted to be one <Div>
+that reads "Solution." and then the answer. The `solutions' key is built once
+more with \texlibpartsolheader emptied, and there a part solution's <Div>
+starts at its answer. The assertion needs the text under each structure
+element, which is the text of its marked-content sequences. pypdf's
+extract_text() returns a page's text with no marked-content ids, so
+marked_text() walks each page's content stream itself and decodes the strings
+with the font's /ToUnicode map. pdfminer would do the same and is not a
+dependency of this repository.
 
 Soft-skips (exit 0) without lualatex, and skips the veraPDF or the pypdf
 assertions when that tool is missing, like the other real-build tests. veraPDF
@@ -79,28 +79,30 @@ try:
 except ImportError:
     PdfReader = None
 
-# The tagged copies: (name, the macro injected for it, whether it shows
-# solutions, whether a part solution has its header line). The first four are
-# what a build of this exam can produce. The student copy is the base compile,
-# which injects nothing; `solutions-inline' is the inline layout asked for
-# outright. The fifth is the `solutions' key of a document that empties
-# \texlibpartsolheader. texlib-corepkg sets that hook with \providecommand, so
-# a definition made before the class is the one that stands.
+# For the order of a solution: what \texlibsolheader prints, and the copy whose
+# part solutions have no header line.
+HEADER = "Solution."
+NO_HEADER_COPY = "solutions-noheader"
+
+# The four tagged copies a build of this exam can produce: (name, the macro the
+# builder injects for it, whether it shows solutions). The student copy is the
+# base compile, which injects nothing. `solutions-inline' is the inline layout
+# asked for outright.
 COPIES = (
-    ("student", "", False, True),
-    ("solutions", _build.VARIANT_MACROS["solutions"], True, True),
-    ("solutions-inline", _build.VARIANT_MACROS["solutions-inline"], True, True),
-    ("instructor", _build.VARIANT_MACROS["instructor"], True, True),
-    ("solutions-noheader",
-     _build.VARIANT_MACROS["solutions"] + r"\def\texlibpartsolheader{}", True, False),
+    ("student", "", False),
+    ("solutions", _build.VARIANT_MACROS["solutions"], True),
+    ("solutions-inline", _build.VARIANT_MACROS["solutions-inline"], True),
+    ("instructor", _build.VARIANT_MACROS["instructor"], True),
+    # A fifth, which no build of this exam produces: the `solutions' key of a
+    # document that empties \texlibpartsolheader. texlib-corepkg sets that
+    # hook with \providecommand, so a definition made before the class stands.
+    (NO_HEADER_COPY,
+     _build.VARIANT_MACROS["solutions"] + r"\def\texlibpartsolheader{}", True),
 )
 
 # One word per solution, and one the student copy prints as well.
-PART_WORDS = ("PARTSOLA", "PARTSOLB", "PARTSOLC")
-SOLUTION_WORDS = PART_WORDS + ("WHOLESOL", "AFTERSOL", "CHOICESOL")
+SOLUTION_WORDS = ("PARTSOLA", "PARTSOLB", "PARTSOLC", "WHOLESOL", "AFTERSOL", "CHOICESOL")
 QUESTION_WORD = "TRAILING"
-# What \texlibsolheader prints.
-HEADER = "Solution."
 
 COURSEMETA_TEX = r"""\metasetup{
 	institution     = {University of Nevada, Reno},
@@ -294,33 +296,6 @@ def _role(elem) -> str:
     return str(name).lstrip("/")
 
 
-def list_items(reader) -> list[list[str]]:
-    """-> the child structure types of every <LI>, in document order."""
-    root = _obj(reader.trailer["/Root"].get("/StructTreeRoot"))
-    if root is None:
-        raise RuntimeError("the PDF has no structure tree")
-
-    def children(node):
-        kids = _obj(node.get("/K"))
-        if kids is None:
-            return []
-        kids = kids if isinstance(kids, list) else [kids]
-        # Marked-content ids are integers; marked-content and object
-        # references are dictionaries with no /S.
-        return [k for k in map(_obj, kids)
-                if hasattr(k, "get") and k.get("/S") is not None]
-
-    items: list[list[str]] = []
-    pending = list(reversed(children(root)))
-    while pending:
-        elem = pending.pop()
-        kids = children(elem)
-        if _role(elem) == "LI":
-            items.append([_role(k) for k in kids])
-        pending.extend(reversed(kids))
-    return items
-
-
 _BFCHAR_RE = re.compile(r"beginbfchar(.*?)endbfchar", re.S)
 _BFRANGE_RE = re.compile(r"beginbfrange(.*?)endbfrange", re.S)
 _HEX_RE = re.compile(r"<([0-9A-Fa-f\s]*)>")
@@ -457,6 +432,33 @@ def solution_groups(reader) -> dict[str, str]:
     return groups
 
 
+def list_items(reader) -> list[list[str]]:
+    """-> the child structure types of every <LI>, in document order."""
+    root = _obj(reader.trailer["/Root"].get("/StructTreeRoot"))
+    if root is None:
+        raise RuntimeError("the PDF has no structure tree")
+
+    def children(node):
+        kids = _obj(node.get("/K"))
+        if kids is None:
+            return []
+        kids = kids if isinstance(kids, list) else [kids]
+        # Marked-content ids are integers; marked-content and object
+        # references are dictionaries with no /S.
+        return [k for k in map(_obj, kids)
+                if hasattr(k, "get") and k.get("/S") is not None]
+
+    items: list[list[str]] = []
+    pending = list(reversed(children(root)))
+    while pending:
+        elem = pending.pop()
+        kids = children(elem)
+        if _role(elem) == "LI":
+            items.append([_role(k) for k in kids])
+        pending.extend(reversed(kids))
+    return items
+
+
 def main() -> int:
     if LUALATEX is None:
         log("SKIP: lualatex not found")
@@ -484,7 +486,7 @@ def main() -> int:
                 fh.write(content)
         _copy_build_inputs(tmp)
 
-        for copy, macro, is_key, part_header in COPIES:
+        for copy, macro, is_key in COPIES:
             log(f"tagged {copy} copy")
             pdf, errors = build(tmp, copy.replace("-", "_"), macro)
             check(f"{copy}: no TeX errors", not errors, "; ".join(errors[:3]))
@@ -506,6 +508,20 @@ def main() -> int:
                       "; ".join(f"item {i} of {len(items)} holds {', '.join(kids) or 'nothing'}"
                                 for i, kids in bad[:4]) if bad
                       else "no list items found")
+                if is_key:
+                    # One <Div> to a solution, the header its first words. In
+                    # the copy whose part solutions have no header line, a part
+                    # solution (the PARTSOL words) starts at its answer.
+                    groups = solution_groups(reader)
+                    misread = []
+                    for word, group in groups.items():
+                        bare = copy == NO_HEADER_COPY and word.startswith("PARTSOL")
+                        alone = sum(w in group for w in SOLUTION_WORDS) == 1
+                        if not (alone and group.startswith(word if bare else HEADER)):
+                            misread.append(f"{word} is in no <Div>" if not group else
+                                           f"{word}'s <Div> reads {group[:48]!r}")
+                    check(f"{copy}: each solution is one element, header first",
+                          not misread, "; ".join(misread))
 
                 text = "\n".join(pg.extract_text() or "" for pg in reader.pages)
                 shown = [w for w in SOLUTION_WORDS if w in text]
@@ -517,21 +533,6 @@ def main() -> int:
                     check(f"{copy}: shows no solution", not shown,
                           f"shows {', '.join(shown)}")
                 check(f"{copy}: prints the questions", QUESTION_WORD in text)
-
-                if is_key:
-                    # One <Div> to a solution, the header its first words. A
-                    # part solution with no header line starts at its answer.
-                    groups = solution_groups(reader)
-                    bad = []
-                    for word in SOLUTION_WORDS:
-                        lead = HEADER if part_header or word not in PART_WORDS else word
-                        group = groups[word]
-                        alone = sum(w in group for w in SOLUTION_WORDS) == 1
-                        if not (alone and group.startswith(lead)):
-                            bad.append(f"{word} is in no <Div>" if not group else
-                                       f"{word}'s <Div> reads {group[:48]!r}")
-                    check(f"{copy}: each solution is one element, header first",
-                          not bad, "; ".join(bad))
         return report(failures)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
         log(f"FAIL: build environment failed -- {type(exc).__name__}: {exc}")
