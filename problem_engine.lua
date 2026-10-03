@@ -2166,8 +2166,8 @@ function autoexam_run_versions()
 		-- same as any other copy of the same version (e.g. student vs solutions).
 		tex.sprint("\\directlua{local _ENV=texlib;pbank_emit_partno=0}")
 		-- The class resets its own per-copy state (Part and question numbers,
-		-- the {parts} resume tracker): see \AutoExamBeginCopy in
-		-- texlib-autoexam.cls.
+		-- the {parts} resume tracker, the page number, the header and footer,
+		-- the marks): see \AutoExamBeginCopy in texlib-autoexam.cls.
 		tex.sprint("\\AutoExamBeginCopy")
 		tex.sprint("\\input{" .. body_tmp .. "}")
 		if i < #copies then
