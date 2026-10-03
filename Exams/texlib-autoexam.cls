@@ -495,20 +495,25 @@
 \newcounter{global_partno_storage}
 \newcounter{tracker_question_no}
 \setcounter{tracker_question_no}{-1}
-
-% \AutoExamBeginCopy -- run by the version loop (autoexam_run_versions in
-% problem_engine.lua) before it reads each copy's body.
+% Every step of the question counter clears the stored count.
 %   {parts} below resumes its lettering when the question number equals the one
 %   it last saw, which is how a second list in the same question ({cols},
 %   \splitpage) carries on from the first.  A question NUMBER does not identify
-%   a question across copies, because every copy numbers from 1: unless the
-%   tracker is cleared here, the first {parts} of a copy resumes the last list
-%   of the copy before it whenever the two questions share a number.  An exam
-%   whose only problem with parts was Problem 1 printed 1a, 1b on its first
-%   version and 1c, 1d on its second.
-%   Not handled: two {questions} lists in ONE copy that each restart at 1 share
-%   a tracker value in the same way.  {problems} numbers continuously, so a
-%   document built on it cannot reach that case.
+%   a question: a second {questions} list starts again at 1, and so does every
+%   copy of a versioned exam.  Before this reset, the first {parts} of a second
+%   Problem 1 resumed the first Problem 1's list and printed 1c, 1d.
+%   Only a step runs the reset.  \question reaches \refstepcounter through the
+%   list's \item, and \extracredit steps the counter itself.  \setcounter and
+%   \addtocounter clear nothing: \begin{questions} and {problems} set the
+%   number that way, and the \question that follows is what clears the count.
+\@addtoreset{global_partno_storage}{question}
+
+% \AutoExamBeginCopy -- run by the version loop (autoexam_run_versions in
+% problem_engine.lua) before it reads each copy's body.
+%   Clears the tracker and the stored count for a list that a copy opens before
+%   its first \question.  The question counter has not stepped in that copy yet
+%   and still holds the last number of the copy before, so without this such a
+%   list resumes that copy's last one.
 \newcommand{\AutoExamBeginCopy}{%
 	\setcounter{tracker_question_no}{-1}%
 	\setcounter{global_partno_storage}{0}%

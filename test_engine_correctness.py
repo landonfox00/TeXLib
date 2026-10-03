@@ -41,6 +41,10 @@ regression anywhere along the engine -> LaTeX -> PDF path is caught:
     engine-emitted .vmap.  The parts must be lettered 1a..1d on EVERY copy (the
     first {parts} restarting at a, the {cols} list after it continuing at c),
     and each copy must report its own version label.
+  * Stretch (question-lists-test): two exam.cls {questions} lists in one
+    unversioned copy.  Each list restarts at Problem 1 and each Problem 1 has
+    parts.  The second list's first {parts} must restart at 1a, and the {cols}
+    list after it in the same question must continue at 1c.
 
 Soft-skips (exit 0) if lualatex or a poppler-flavored pdftotext (-bbox / real
 poppler banner, NOT Git-for-Windows' bundled xpdf build) is missing -- matching
@@ -579,8 +583,9 @@ def scenario_versioned_copies():
 
             # The one problem with parts is Problem 1 on every copy.  Its first
             # {parts} has to restart at a, and the {cols} list after it has to
-            # carry on at c.  Without the per-copy reset the second copy reads
-            # 1e..1h, and the seventh runs \alph past z and stops lettering.
+            # carry on at c.  With neither the per-copy reset nor the reset on
+            # the question step, the second copy reads 1e..1h, and the seventh
+            # runs \alph past z and stops lettering.
             parts = _VPART_RE.findall(text)
             check(f"{tag}: the parts are lettered 1a, 1b, 1c, 1d in authored order",
                   parts == [("1", "a", "VPARTA"), ("1", "b", "VPARTB"),
@@ -598,6 +603,51 @@ def scenario_versioned_copies():
                   f"got {_VQSEL_RE.findall(text)}")
             check(f"{tag}: the query is expandable (\\setvar read it as 1)",
                   "VQFLAG1" in text, text[:240])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# =============================================================================
+# Stretch: two {questions} lists in one copy -- part labels belong to a question
+# =============================================================================
+# A question label, or a part label, followed by one of the fixture's needles.
+# The part pattern is unanchored for the same reason as _VPART_RE: {cols}.
+_QLSTEM_RE = re.compile(r"Problem\s+(\d+)\.\s+(QLSTEM[A-Z]+)")
+_QLPART_RE = re.compile(r"(\d+)([a-z])\.\s+(QLPART[A-F])")
+
+
+def scenario_restarted_question_lists():
+    print("\n=== Stretch: two {questions} lists in one copy (question-lists-test) ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_engine_qlists_")
+    try:
+        pdf, _aux, log = build(tmp, "question-lists-test.tex")
+        check("PDF was produced", os.path.exists(pdf), log[-600:])
+        if not os.path.exists(pdf):
+            return
+        text = flat(pdftext(pdf))
+
+        # What the fixture depends on: each list numbers from 1, so the copy has
+        # two Problem 1s.  Lists that numbered continuously would never reach
+        # the case below, and this check fails first.
+        stems = _QLSTEM_RE.findall(text)
+        check("each list numbers from 1: two questions are labelled Problem 1",
+              stems == [("1", "QLSTEMONE"), ("1", "QLSTEMTWO")],
+              f"got {stems}")
+
+        # {parts} keys its resume on the question NUMBER, and both questions are
+        # number 1.  Unless the stored count is cleared when the question counter
+        # steps, the second list reads 1c, 1d and its {cols} list 1e, 1f.
+        parts = _QLPART_RE.findall(text)
+        got = [q + l + ". " + n for (q, l, n) in parts]
+        check("the first list's parts are lettered 1a, 1b",
+              parts[:2] == [("1", "a", "QLPARTA"), ("1", "b", "QLPARTB")],
+              f"got {got}")
+        check("the second list's first {parts} restarts at 1a, 1b",
+              parts[2:4] == [("1", "a", "QLPARTC"), ("1", "b", "QLPARTD")],
+              f"got {got}")
+        check("the {cols} list in the same question continues at 1c, 1d",
+              parts[4:] == [("1", "c", "QLPARTE"), ("1", "d", "QLPARTF")],
+              f"got {got}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -621,6 +671,7 @@ def main():
     scenario_vmap_emission()
     scenario_unversioned_query()
     scenario_versioned_copies()
+    scenario_restarted_question_lists()
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
