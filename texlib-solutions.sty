@@ -199,33 +199,54 @@
 % label column where the rubric prints what the step earns.  The magnitude is
 % what the author writes and the minus is supplied here, so the two panels can
 % never disagree about the sign.  \item[0] means "costs nothing" (a wasted-effort
-% note rather than a penalty) and prints a muted [0 pts].  A bare \item still
-% works and falls back to the old square bullet -- documents predating the
-% deduction labels keep rendering unchanged.
+% note rather than a penalty) and prints a muted [0 pts].  A bare \item prints a
+% square bullet, so a block written before the deduction labels still renders.
+% A non-integer optional argument is not supported (the \ifnum in \@cerr@pts
+% would choke) -- the label column is for a number of points, and prose belongs
+% in the item body.
 %
-% The fallback is detected by giving the list a \relax default label and
-% comparing against it: LaTeX routes both \item and \item[x] through \makelabel,
-% so this is the only way to tell them apart from inside.  A non-integer optional
-% argument is not supported (the \ifnum below would choke) -- the label column is
-% for a number of points, and prose belongs in the item body.
+% \makelabel only typesets its argument.  It must not read it, because what it
+% is handed is not what the author wrote.  The kernel's \item hands over a bare
+% item's label as the unexpanded \@itemlabel.  The tagged list code
+% (latex-lab-testphase-block, the `item' template) hands over
+% \MakeLinkTarget[..]{} followed by a token list that holds the label, whether
+% the label was given or is the list's default.  An earlier \makelabel ran
+% \ifnum on its argument and compared it with a default label of \relax.  The
+% comparison never held, so a bare \item printed "=0 [0 pts]" in every
+% instructor copy.  In a tagged copy the \ifnum met \MakeLinkTarget, so \item[2]
+% printed "2=0 [0 pts]".  Each was three TeX errors an item, and a tagged copy
+% still passed veraPDF.
+%
+% So the number is taken at \item, where the author wrote it.  Inside the
+% panel's list \item is \@cerr@item.  It passes a deduction to the kernel's
+% \item already formatted, \item[\@cerr@pts{4}], and leaves a bare \item alone,
+% which then gets the list's default label, the bullet.  \@cerr@item acts only
+% while \@itemlabel is this list's default label.  Every list sets its own, in
+% a tagged build as well, so a list nested in an entry keeps its \item[..].
 \newlength{\@cerrlabelwd}
 \setlength{\@cerrlabelwd}{1.55cm}
-\def\@cerr@nolabel{\relax}
-\newcommand{\@cerr@makelabel}[1]{%
-	\def\@cerr@tmp{#1}%
-	\makebox[\@cerrlabelwd][l]{%
-		\ifx\@cerr@tmp\@cerr@nolabel
-			\textcolor{red!70!black}{\rule[0.15ex]{0.45em}{0.45em}}%
-		\else
-			\textbf{\ifnum#1=0
-				\textcolor{black!45}{[0\,pts]}%
-			\else
-				\textcolor{red!70!black}{%
-					[$-$#1\,\ifnum#1=1 pt\else pts\fi]}%
-			\fi}%
-		\fi
-	}%
+\newcommand{\@cerr@bullet}{%
+	\textcolor{red!70!black}{\rule[0.15ex]{0.45em}{0.45em}}}
+\def\@cerr@itemlabel{\@cerr@bullet}
+\newcommand{\@cerr@pts}[1]{%
+	\textbf{\ifnum#1=0
+		\textcolor{black!45}{[0\,pts]}%
+	\else
+		\textcolor{red!70!black}{%
+			[$-$#1\,\ifnum#1=1 pt\else pts\fi]}%
+	\fi}%
 }
+\newcommand{\@cerr@makelabel}[1]{\makebox[\@cerrlabelwd][l]{#1}}
+\newcommand{\@cerr@item}{%
+	\ifx\@itemlabel\@cerr@itemlabel
+		\expandafter\@cerr@item@own
+	\else
+		\expandafter\@cerr@item@kernel
+	\fi
+}
+\newcommand{\@cerr@item@own}{%
+	\@ifnextchar[{\@cerr@item@pts}{\@cerr@item@kernel}}
+\def\@cerr@item@pts[#1]{\@cerr@item@kernel[\@cerr@pts{#1}]}
 
 % Same shell as the rubric panel, and the same hanging shape: label column of a
 % fixed width, body indented past it.  {list} rather than {itemize} so every
@@ -238,7 +259,7 @@
 			\raggedright\small\sffamily
 			\vspace{2pt}%
 			\textbf{\textcolor{red!70!black}{Common Errors:}}\\[0.25em]%
-			\begin{list}{\relax}{%
+			\begin{list}{\@cerr@bullet}{%
 				\setlength{\topsep}{0pt}%
 				\setlength{\partopsep}{0pt}%
 				\setlength{\parsep}{0pt}%
@@ -249,6 +270,12 @@
 				\setlength{\itemindent}{0pt}%
 				\setlength{\listparindent}{0pt}%
 				\let\makelabel\@cerr@makelabel
+				% \item as it stands here, the kernel's or the tagged list
+				% code's.  It is not saved again inside another panel's
+				% entry: \item is \@cerr@item there, and saving that would
+				% make \item[..] loop.
+				\ifx\item\@cerr@item\else\let\@cerr@item@kernel\item\fi
+				\let\item\@cerr@item
 			}%
 				\@sol@cerr
 			\end{list}%

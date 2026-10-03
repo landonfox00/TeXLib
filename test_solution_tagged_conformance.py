@@ -23,13 +23,26 @@ So this builds one exam four ways with tagging on (the student copy and the
 `solutions', `solutions-inline' and `instructor' variants, with the macros the
 builder injects) and asserts, for each:
 
-  * no TeX error in the log. The engine exits 0 after recovering from one.
+  * no TeX error in the log. A nonstopmode run recovers from one and still
+    writes its PDF.
   * veraPDF, flavour ua2: no failed check.
   * every list item is a label and then a body. This is the defect itself, read
     off the structure tree with pypdf, so it is still asserted on a machine
     with no veraPDF.
   * a key carries the solutions' text and the student copy does not, so a
     build that stops showing solutions cannot pass as a key.
+
+The instructor copy also prints the {commonerrors} panels, and their labels are
+asserted as text: \item[2] reads [-2 pts], \item[1] reads [-1 pt], \item[0]
+reads [0 pts], and a bare \item, whose label is a square rule, prints nothing
+ahead of its entry. Both kinds went wrong, and veraPDF had no objection to
+either. The tagged list code hands \makelabel the label behind a link target,
+and the panel's \makelabel ran \ifnum on what it was handed: \item[2] printed
+"2=0 [0 pts]" in a tagged instructor copy, with three TeX errors. A bare \item
+printed "=0 [0 pts]" in the untagged copy as well, because the kernel hands
+\makelabel an unexpanded \@itemlabel. So the instructor copy is built a fifth
+time with tagging off, and the same labels are asserted there. The other three
+copies are asserted to print no common error.
 
 The fixture's solutions end in running text on purpose. A body that ends in a
 display or a list is a separate defect with its own fixes (the missing \par
@@ -79,6 +92,22 @@ COPIES = (
 SOLUTION_WORDS = ("PARTSOLA", "PARTSOLB", "PARTSOLC", "WHOLESOL", "AFTERSOL", "CHOICESOL")
 QUESTION_WORD = "TRAILING"
 
+# The copy that prints the rubric, and with it the common errors.
+RUBRIC_COPY = "instructor"
+
+# The common errors: (what the page prints just before the entry, the entry's
+# first word, the label between the two). Compared with the white space taken
+# out, because the label's thin space is a kern and a text extractor may or may
+# not report it as a space.
+MINUS = "\N{MINUS SIGN}"
+COMMON_ERRORS = (
+    ("CommonErrors:", "CERRPART", f"[{MINUS}1pt]"),
+    ("CommonErrors:", "CERRTWO", f"[{MINUS}2pts]"),
+    ("dropsasign", "CERRONE", f"[{MINUS}1pt]"),
+    ("losesafactor", "CERRZERO", "[0pts]"),
+    ("expandsitagain", "CERRBARE", ""),
+)
+
 COURSEMETA_TEX = r"""\metasetup{
 	institution     = {University of Nevada, Reno},
 	instructor      = {Test Instructor},
@@ -103,7 +132,9 @@ COURSEMETA_TEX = r"""\metasetup{
 # sets them in a minipage under the answer), one of two paragraphs, and one
 # followed by more of its part, which the defect also moved out of the <LBody>.
 # The whole-problem solutions cover the same frame at problem level, in the
-# side-by-side multiple-choice key as well.
+# side-by-side multiple-choice key as well. Two solutions carry {commonerrors}:
+# a whole-problem one, whose panel the solution's footer sets beside the rubric,
+# and a part solution, where the panel is set where it stands.
 BANK_TEX = r"""\begin{problem}{choice}[topic=choice]
 	Which is $2 + 2$?
 	\begin{choices}
@@ -125,6 +156,9 @@ BANK_TEX = r"""\begin{problem}{choice}[topic=choice]
 				PARTSOLA $(x - 3)(x + 3)$.
 				\rubric{1}{names the pattern}
 				\rubric{1}{factors}
+				\begin{commonerrors}
+					\item[1] CERRPART stops at $x^{2} = 9$
+				\end{commonerrors}
 			\end{partsolution}
 			\workbox{1}
 		\ppart $x^{2} - 1$
@@ -150,6 +184,12 @@ BANK_TEX = r"""\begin{problem}{choice}[topic=choice]
 		WHOLESOL $(x - 4)(x + 4)$.
 		\rubric{5}{names the pattern}
 		\rubric{5}{factors}
+		\begin{commonerrors}
+			\item[2] CERRTWO drops a sign
+			\item[1] CERRONE loses a factor
+			\item[0] CERRZERO expands it again
+			\item CERRBARE writes $(x - 4)^{2}$
+		\end{commonerrors}
 	\end{solution}
 \end{problem}
 
@@ -203,13 +243,15 @@ def _copy_build_inputs(tmp: str) -> None:
                 shutil.copy2(src, dest)
 
 
-def build(tmp: str, jobname: str, macro: str, timeout: int = 300) -> tuple[str, list[str]]:
+def build(tmp: str, jobname: str, macro: str, tagged: bool = True,
+          timeout: int = 300) -> tuple[str, list[str]]:
     """-> (pdf path, the log's error lines). No -halt-on-error: a nonstopmode
-    build recovers from a tagging error, exits 0 and reports it only in its
-    log, and that log is what is read here."""
+    build recovers from a TeX error and still writes its PDF, and the log is
+    what is read here."""
+    prefix = _spec.ACCESSIBLE_MACRO if tagged else ""
     cmd = [LUALATEX, "-interaction=nonstopmode", "-shell-escape",
            f"-jobname={jobname}",
-           f"{_spec.ACCESSIBLE_MACRO}{macro}\\input{{doc.tex}}"]
+           f"{prefix}{macro}\\input{{doc.tex}}"]
     # Two passes that RAN. On Windows luaotfload's cache probe can lose a race
     # with another engine and end the run before LaTeX starts, and a tagged PDF
     # from a single pass can fail veraPDF on its last page (tagpdf numbers the
@@ -298,7 +340,34 @@ def list_items(reader) -> list[list[str]]:
     return items
 
 
+def page_text(reader) -> str:
+    return "\n".join(pg.extract_text() or "" for pg in reader.pages)
+
+
+def mislabelled(text: str) -> list[str]:
+    """-> one line for each common error that does not carry its label."""
+    squeezed = "".join(text.split())
+    wrong = []
+    for before, word, label in COMMON_ERRORS:
+        end = squeezed.find(word)
+        start = squeezed.rfind(before, 0, end) if end >= 0 else -1
+        if start < 0:
+            wrong.append(f"{word} is not printed after {before!r}")
+            continue
+        printed = squeezed[start + len(before):end]
+        if printed != label:
+            wrong.append(f"{word} is labelled {printed!r} for {label!r}")
+    return wrong
+
+
 def main() -> int:
+    # A label's minus is U+2212, and a failure quotes the label. A Windows
+    # pipe is cp1252, which has no such character.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="backslashreplace")
+        except (AttributeError, ValueError):
+            pass
     if LUALATEX is None:
         log("SKIP: lualatex not found")
         return 0
@@ -348,7 +417,7 @@ def main() -> int:
                                 for i, kids in bad[:4]) if bad
                       else "no list items found")
 
-                text = "\n".join(pg.extract_text() or "" for pg in reader.pages)
+                text = page_text(reader)
                 shown = [w for w in SOLUTION_WORDS if w in text]
                 if is_key:
                     missing = [w for w in SOLUTION_WORDS if w not in text]
@@ -358,6 +427,26 @@ def main() -> int:
                     check(f"{copy}: shows no solution", not shown,
                           f"shows {', '.join(shown)}")
                 check(f"{copy}: prints the questions", QUESTION_WORD in text)
+                if copy == RUBRIC_COPY:
+                    wrong = mislabelled(text)
+                    check(f"{copy}: every common error carries its label",
+                          not wrong, "; ".join(wrong))
+                else:
+                    errs = [w for _, w, _ in COMMON_ERRORS if w in text]
+                    check(f"{copy}: prints no common error", not errs,
+                          f"prints {', '.join(errs)}")
+
+        # The copy a tagged label has to match, and the one a bare \item was
+        # wrong in as well.
+        copy = f"untagged {RUBRIC_COPY}"
+        log(f"{copy} copy")
+        pdf, errors = build(tmp, f"{RUBRIC_COPY}_untagged",
+                            _build.VARIANT_MACROS[RUBRIC_COPY], tagged=False)
+        check(f"{copy}: no TeX errors", not errors, "; ".join(errors[:3]))
+        if PdfReader is not None:
+            wrong = mislabelled(page_text(PdfReader(pdf)))
+            check(f"{copy}: every common error carries the same label",
+                  not wrong, "; ".join(wrong))
         return report(failures)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
         log(f"FAIL: build environment failed -- {type(exc).__name__}: {exc}")
