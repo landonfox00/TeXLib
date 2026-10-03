@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 r"""
-A tagged key conforms to PDF/UA-2, part solutions included.
+A tagged key conforms to PDF/UA-2, part solutions included, and reads each
+solution's header before its answer.
 
 Every shown {partsolution} used to cost a tagged key five failed checks, and
 nothing reported it. The frame around a solution (the tint and the left accent)
@@ -19,9 +20,10 @@ Three things kept it out of sight:
   * The builder writes its veraPDF report for the base tagged copy only.
   * No template or fixture in this repository uses {partsolution}.
 
-So this builds one exam four ways with tagging on (the student copy and the
-`solutions', `solutions-inline' and `instructor' variants, with the macros the
-builder injects) and asserts, for each:
+So this builds one exam with tagging on: the student copy, the `solutions',
+`solutions-inline' and `instructor' variants with the macros the builder
+injects, and a `solutions' key whose part solutions have no header line. It
+asserts, for each:
 
   * no TeX error in the log. The engine exits 0 after recovering from one.
   * veraPDF, flavour ua2: no failed check.
@@ -30,6 +32,19 @@ builder injects) and asserts, for each:
     with no veraPDF.
   * a key carries the solutions' text and the student copy does not, so a
     build that stops showing solutions cannot pass as a key.
+  * every solution a key shows is one <Div> that reads "Solution." and then the
+    answer. See below.
+
+A solution used to read backwards. Both environments typeset the body before
+the header, and a structure element lists its children in the order they were
+created, so the tree had the answer and then "Solution." while the page drew
+them in the right order. veraPDF checks which element may contain which and
+says nothing about order, so no gate saw it. The assertion needs the text
+under each structure element, which is the text of its marked-content
+sequences. pypdf's extract_text() returns a page's text with no marked-content
+ids, so marked_text() walks each page's content stream itself and decodes the
+strings with the font's /ToUnicode map. pdfminer would do the same and is not
+a dependency of this repository.
 
 The fixture's solutions end in running text on purpose. A body that ends in a
 display or a list is a separate defect with its own fixes (the missing \par
@@ -64,20 +79,28 @@ try:
 except ImportError:
     PdfReader = None
 
-# The four tagged copies a build of this exam can produce: (name, the macro the
-# builder injects for it, whether it shows solutions). The student copy is the
-# base compile, which injects nothing. `solutions-inline' is the inline layout
-# asked for outright.
+# The tagged copies: (name, the macro injected for it, whether it shows
+# solutions, whether a part solution has its header line). The first four are
+# what a build of this exam can produce. The student copy is the base compile,
+# which injects nothing; `solutions-inline' is the inline layout asked for
+# outright. The fifth is the `solutions' key of a document that empties
+# \texlibpartsolheader. texlib-corepkg sets that hook with \providecommand, so
+# a definition made before the class is the one that stands.
 COPIES = (
-    ("student", "", False),
-    ("solutions", _build.VARIANT_MACROS["solutions"], True),
-    ("solutions-inline", _build.VARIANT_MACROS["solutions-inline"], True),
-    ("instructor", _build.VARIANT_MACROS["instructor"], True),
+    ("student", "", False, True),
+    ("solutions", _build.VARIANT_MACROS["solutions"], True, True),
+    ("solutions-inline", _build.VARIANT_MACROS["solutions-inline"], True, True),
+    ("instructor", _build.VARIANT_MACROS["instructor"], True, True),
+    ("solutions-noheader",
+     _build.VARIANT_MACROS["solutions"] + r"\def\texlibpartsolheader{}", True, False),
 )
 
 # One word per solution, and one the student copy prints as well.
-SOLUTION_WORDS = ("PARTSOLA", "PARTSOLB", "PARTSOLC", "WHOLESOL", "AFTERSOL", "CHOICESOL")
+PART_WORDS = ("PARTSOLA", "PARTSOLB", "PARTSOLC")
+SOLUTION_WORDS = PART_WORDS + ("WHOLESOL", "AFTERSOL", "CHOICESOL")
 QUESTION_WORD = "TRAILING"
+# What \texlibsolheader prints.
+HEADER = "Solution."
 
 COURSEMETA_TEX = r"""\metasetup{
 	institution     = {University of Nevada, Reno},
@@ -298,6 +321,142 @@ def list_items(reader) -> list[list[str]]:
     return items
 
 
+_BFCHAR_RE = re.compile(r"beginbfchar(.*?)endbfchar", re.S)
+_BFRANGE_RE = re.compile(r"beginbfrange(.*?)endbfrange", re.S)
+_HEX_RE = re.compile(r"<([0-9A-Fa-f\s]*)>")
+_RANGE_RE = re.compile(
+    r"<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*(?:\[(.*?)\]|<([0-9A-Fa-f]+)>)", re.S)
+
+
+def _utf16(hexdigits: str) -> str:
+    return bytes.fromhex(hexdigits).decode("utf-16-be", "replace")
+
+
+def _tounicode(font) -> dict[int, str] | None:
+    """A font's /ToUnicode CMap as {character code: text}, or None when the
+    font has none. Both forms a CMap can take are read: single codes (bfchar)
+    and ranges (bfrange), a range giving either its first target or a list."""
+    cmap = _obj(font.get("/ToUnicode"))
+    if cmap is None:
+        return None
+    data = cmap.get_data().decode("latin-1")
+    table: dict[int, str] = {}
+    for block in _BFCHAR_RE.findall(data):
+        codes = _HEX_RE.findall(block)
+        for code, target in zip(codes[0::2], codes[1::2]):
+            table[int(code, 16)] = _utf16(target)
+    for block in _BFRANGE_RE.findall(data):
+        for low, high, targets, first in _RANGE_RE.findall(block):
+            low, high = int(low, 16), int(high, 16)
+            if first:
+                for offset in range(high - low + 1):
+                    table[low + offset] = _utf16(
+                        format(int(first, 16) + offset, f"0{len(first)}x"))
+            else:
+                for offset, target in enumerate(_HEX_RE.findall(targets)):
+                    table[low + offset] = _utf16(target)
+    return table
+
+
+def marked_text(reader) -> dict[tuple[int, int], str]:
+    """-> {(page's object number, MCID): the text shown in that marked-content
+    sequence}.
+
+    A page's content stream brackets each tagged run of text between
+    `/Tag <</MCID n>> BDC' and `EMC', and the structure tree refers to the run
+    by its page and that number. Text shown outside such a sequence, or in one
+    with no MCID (an artifact), is dropped."""
+    out: dict[tuple[int, int], list[str]] = {}
+    for page in reader.pages:
+        contents = page.get_contents()
+        if contents is None:
+            continue
+        number = page.indirect_reference.idnum
+        fonts = {}
+        resources = _obj(page.get("/Resources")) or {}
+        for name, font in (_obj(resources.get("/Font")) or {}).items():
+            font = _obj(font)
+            # A composite font (what LuaTeX embeds for OpenType) is addressed
+            # by two-byte codes, a simple font by one.
+            fonts[name] = (_tounicode(font), 2 if font.get("/Subtype") == "/Type0" else 1)
+        table, width = None, 1
+        open_mcids: list[int | None] = []
+        for operands, operator in contents.operations:
+            if operator == b"BDC":
+                props = _obj(operands[1]) if len(operands) > 1 else None
+                mcid = props.get("/MCID") if hasattr(props, "get") else None
+                open_mcids.append(None if mcid is None else int(mcid))
+            elif operator == b"BMC":
+                open_mcids.append(None)
+            elif operator == b"EMC":
+                if open_mcids:
+                    open_mcids.pop()
+            elif operator == b"Tf":
+                table, width = fonts.get(operands[0], (None, 1))
+            elif operator in (b"Tj", b"TJ", b"'", b'"'):
+                if not open_mcids or open_mcids[-1] is None:
+                    continue
+                shown = operands[-1]
+                for piece in shown if isinstance(shown, list) else [shown]:
+                    raw = getattr(piece, "original_bytes", None)
+                    if raw is None:      # a number: TJ's spacing adjustment
+                        continue
+                    if table is None:
+                        text = raw.decode("latin-1")
+                    else:
+                        text = "".join(
+                            table.get(int.from_bytes(raw[i:i + width], "big"), "?")
+                            for i in range(0, len(raw), width))
+                    out.setdefault((number, open_mcids[-1]), []).append(text)
+    return {key: "".join(pieces) for key, pieces in out.items()}
+
+
+def solution_groups(reader) -> dict[str, str]:
+    """-> for each solution word, the text of the innermost <Div> that holds
+    it, read in the order of the structure tree and with white space removed;
+    "" for a word that no <Div> holds.
+
+    The order of the tree is the order a screen reader reads in. It is not the
+    order of the page's content stream, and for a solution the two used to
+    disagree."""
+    root = _obj(reader.trailer["/Root"].get("/StructTreeRoot"))
+    if root is None:
+        raise RuntimeError("the PDF has no structure tree")
+    text = marked_text(reader)
+    divs: list[str] = []
+
+    def page_of(node, inherited):
+        ref = node.raw_get("/Pg") if "/Pg" in node else None
+        return getattr(ref, "idnum", inherited)
+
+    def read(elem, page) -> str:
+        page = page_of(elem, page)
+        kids = _obj(elem.get("/K"))
+        if kids is None:
+            return ""
+        pieces = []
+        for kid in map(_obj, kids if isinstance(kids, list) else [kids]):
+            if isinstance(kid, int):
+                pieces.append(text.get((page, int(kid)), ""))
+            elif not hasattr(kid, "get"):
+                continue
+            elif kid.get("/S") is not None:
+                pieces.append(read(kid, page))
+            elif kid.get("/Type") == "/MCR":
+                pieces.append(text.get((page_of(kid, page), int(kid["/MCID"])), ""))
+        whole = "".join("".join(pieces).split())
+        if elem.get("/S") is not None and _role(elem) == "Div":
+            divs.append(whole)
+        return whole
+
+    read(root, None)
+    groups = {}
+    for word in SOLUTION_WORDS:
+        holding = [div for div in divs if word in div]
+        groups[word] = min(holding, key=len) if holding else ""
+    return groups
+
+
 def main() -> int:
     if LUALATEX is None:
         log("SKIP: lualatex not found")
@@ -325,7 +484,7 @@ def main() -> int:
                 fh.write(content)
         _copy_build_inputs(tmp)
 
-        for copy, macro, is_key in COPIES:
+        for copy, macro, is_key, part_header in COPIES:
             log(f"tagged {copy} copy")
             pdf, errors = build(tmp, copy.replace("-", "_"), macro)
             check(f"{copy}: no TeX errors", not errors, "; ".join(errors[:3]))
@@ -358,6 +517,21 @@ def main() -> int:
                     check(f"{copy}: shows no solution", not shown,
                           f"shows {', '.join(shown)}")
                 check(f"{copy}: prints the questions", QUESTION_WORD in text)
+
+                if is_key:
+                    # One <Div> to a solution, the header its first words. A
+                    # part solution with no header line starts at its answer.
+                    groups = solution_groups(reader)
+                    bad = []
+                    for word in SOLUTION_WORDS:
+                        lead = HEADER if part_header or word not in PART_WORDS else word
+                        group = groups[word]
+                        alone = sum(w in group for w in SOLUTION_WORDS) == 1
+                        if not (alone and group.startswith(lead)):
+                            bad.append(f"{word} is in no <Div>" if not group else
+                                       f"{word}'s <Div> reads {group[:48]!r}")
+                    check(f"{copy}: each solution is one element, header first",
+                          not bad, "; ".join(bad))
         return report(failures)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
         log(f"FAIL: build environment failed -- {type(exc).__name__}: {exc}")
@@ -372,7 +546,7 @@ def report(failures: list[str]) -> int:
         for f in failures:
             log(f"FAIL: {f}")
         return 1
-    log("OK: the tagged student copy and all three tagged keys conform")
+    log("OK: the tagged student copy and all four tagged keys conform")
     return 0
 
 

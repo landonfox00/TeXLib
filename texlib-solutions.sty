@@ -90,6 +90,56 @@
 	\newcommand\texlib@acc@artifactend{}
 \fi
 
+% ACCESSIBLE: a shown solution is ONE structure element, and it reads its header
+% first. Both environments typeset the body before the header: the body is boxed
+% so that its \rubric calls and the SyncTeX harvest can run before the header
+% line exists. A structure element records its children in the order they are
+% created, so the tree read the answer and then "Solution.", while the page
+% drew the header above the answer. veraPDF checks which element may hold
+% which, and passed it.
+%
+% \texlib@acc@solbegin opens a <Div> before the body is boxed and
+% \texlib@acc@solend closes it once header and body are assembled, so the
+% body's paragraphs are its children as they stand. The header paragraph is set
+% between \texlib@acc@solheadbegin and \texlib@acc@solheadend: a <NonStruct>
+% with tagpdf's `firstkid' key, which puts an element at the FRONT of its
+% parent's children. The kernel's float code puts a caption first with the same
+% key. NonStruct is there only to carry the key (the kernel's paragraph tagging
+% takes none), and a PDF reader looks through it to the paragraph inside.
+%
+% The other way to reorder is to open the body's element with `stash' and
+% attach it after the header with \tag_struct_use_num:n. That needs a second
+% <Div>, around the body, to have something to stash, and tagpdf cannot check
+% the children of a stashed <Div> against a parent it does not know yet: it
+% warns twice for every paragraph of every answer ("Parent-Child 'STASHED' -->
+% 'Part'", and the same for 'P').
+%
+% The <Div> also keeps the grouping the frame shows on the page. The frame is
+% an artifact, so without the <Div> nothing in the tree says which paragraphs
+% are one solution. None of these commands adds a node, so a tagged key's pages
+% do not move, and all four are no-ops in a normal build. Each name is tested
+% at use for the reason given above.
+\ifdefined\TeXLibAccessibleMode
+	\newcommand\texlib@acc@solbegin{%
+		\ifcsname tag_struct_begin:n\endcsname
+			\csname tag_struct_begin:n\endcsname{tag=Div}%
+		\fi}
+	\newcommand\texlib@acc@solheadbegin{%
+		\ifcsname tag_struct_begin:n\endcsname
+			\csname tag_struct_begin:n\endcsname{tag=NonStruct,firstkid}%
+		\fi}
+	\newcommand\texlib@acc@solend{%
+		\ifcsname tag_struct_end:\endcsname
+			\csname tag_struct_end:\endcsname
+		\fi}
+	\let\texlib@acc@solheadend\texlib@acc@solend
+\else
+	\newcommand\texlib@acc@solbegin{}
+	\newcommand\texlib@acc@solheadbegin{}
+	\newcommand\texlib@acc@solend{}
+	\newcommand\texlib@acc@solheadend{}
+\fi
+
 \newbox\@partsol@box
 \newbox\@sol@box
 \newbox\@sol@vtop
@@ -451,6 +501,7 @@
 		\gdef\@sol@rubric{}%
 		\gdef\@sol@cerr{}%
 		\@in@solutiontrue
+		\texlib@acc@solbegin
 		\setbox\@sol@box\vbox\bgroup
 			\hsize\dimexpr\textwidth-12pt\relax
 	\else
@@ -515,13 +566,18 @@
 		% below where the formula assumed), leaving the last line outside the fill.
 		\setbox\@sol@vtop\vtop{%
 			\hsize\dimexpr\textwidth-12pt\relax
+			% ACCESSIBLE: the header line, overlay included, goes to the front
+			% of the solution's <Div>; see \texlib@acc@solbegin.
+			\texlib@acc@solheadbegin
 			\noindent\texlibsolheader%
 			\ifrubric
 				\ifx\@sol@rubric\@empty\else
 					\@emit@rubric@overlay{\@sol@rubric}%
 				\fi
 			\fi
-			\par\vskip2pt
+			\par
+			\texlib@acc@solheadend
+			\vskip2pt
 			\box\@sol@box
 			% The 6pt bottom pad lives INSIDE the box, not as rule overhang. The
 			% fill used to be drawn 6pt past \dp\@sol@vtop, and that overhang is
@@ -531,6 +587,7 @@
 			% the difference is whether the rule extends beyond the box it fills.
 			\vskip6pt
 		}%
+		\texlib@acc@solend
 		% Stamp every container and rule in the finished box with the harvested
 		% solution source, so a click anywhere in the green box -- padding,
 		% header, fill -- resolves there instead of dying on a tag-0 wrapper.
@@ -664,6 +721,7 @@
 		\ifsolinline\else\smallskip\fi
 		\gdef\@partsol@rubric{}%
 		\@in@partsolutiontrue
+		\texlib@acc@solbegin
 		\setbox\@partsol@box\vbox\bgroup
 			\hsize\dimexpr\linewidth-12pt\relax
 	\else
@@ -707,7 +765,12 @@
 				\noindent\lower\dimexpr\ht\@partsol@box-\ht\strutbox\relax
 					\box\@partsol@box
 			\else
+				% ACCESSIBLE: the header goes to the front of the solution's
+				% <Div>. The rubric below is set after it and stays last, which
+				% is where the page has it.
+				\texlib@acc@solheadbegin
 				\noindent\texlibpartsolheader\par
+				\texlib@acc@solheadend
 				\noindent\box\@partsol@box
 			\fi
 			\ifrubric
@@ -717,6 +780,7 @@
 				\fi
 			\fi
 		}%
+		\texlib@acc@solend
 		% Stamp the assembled FRAME, not just the wrap inside it. {solution} can
 		% stamp its inner vtop and leave its \parbox/\rlap/rules unstamped --
 		% measured residual, documented in SYNCTEX.md as cosmetic slivers -- but
