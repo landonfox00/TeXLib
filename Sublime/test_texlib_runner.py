@@ -465,5 +465,36 @@ ok &= check(("%s:1: [full build log" % engine_log)
                                     [], texlib._aux_log_path(root)),
             "report: the full-log link points at the file the engine writes")
 
+# ----------------------------------------------------------------------------
+# 8. Every build setting the brain reads reaches it from the editor. The native
+# host has no LaTeXTools builder_settings, so the build command copies the keys
+# in texlib.BUILD_SETTINGS out of TeXLib.sublime-settings, and a key that list
+# lacks does nothing in the editor. accessible_report and accessible_report_full
+# were that until 2026-10: the settings file documented an off switch for the
+# veraPDF report that only the TEXLIB_A11Y_REPORT environment variable worked.
+# The brain's keys are read off its source, so the next one it starts reading
+# is held to the same list without anyone editing this test.
+# ----------------------------------------------------------------------------
+import inspect  # noqa: E402
+
+with open(texlib_build.__file__, "r", encoding="utf-8") as fh:
+    _brain_src = fh.read()
+_brain_keys = set()
+for _tok in (re.findall(r"self\._setting_on\(\s*(\"?[A-Za-z_]+\"?)", _brain_src)
+             + re.findall(r"getter\.get\(\s*([A-Z_]+)\s*\)", _brain_src)):
+    _brain_keys.add(_tok.strip('"') if _tok.startswith('"')
+                    else getattr(texlib_build, _tok, None))
+ok &= check(len(_brain_keys) >= 9 and None not in _brain_keys,
+            "settings: the brain's builder_settings keys are found in its source")
+_unpassed = sorted(k for k in _brain_keys if k and k not in texlib.BUILD_SETTINGS)
+ok &= check(not _unpassed,
+            "settings: the editor passes every build setting the brain reads"
+            + (" (not passed: %s)" % ", ".join(_unpassed) if _unpassed else ""))
+ok &= check("accessible_report" in texlib.BUILD_SETTINGS
+            and "accessible_report_full" in texlib.BUILD_SETTINGS,
+            "settings: the veraPDF report's two switches are among them")
+ok &= check("in BUILD_SETTINGS" in inspect.getsource(texlib.TexlibBuildCommand.run),
+            "settings: the build command copies that list, and no other")
+
 print("\nALL PASS" if ok else "\nFAILURES ABOVE")
 sys.exit(0 if ok else 1)

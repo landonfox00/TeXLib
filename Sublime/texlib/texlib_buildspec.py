@@ -212,9 +212,30 @@ def accessible_macro_for(tex_path, se=True):
 # claim is missing -- which is the very defect the check exists to catch.
 VERAPDF_FLAVOUR = "ua2"
 
-# Written beside <base>_accessible.pdf, matching its `_accessible` stem so the
-# pair sorts together in a file listing.
+# Written beside each tagged PDF (<base>_accessible.pdf, and
+# <base>_<variant>_accessible.pdf for a variant's twin), matching its
+# `_accessible` stem so the pair sorts together in a file listing.
 VERAPDF_REPORT_SUFFIX = "_accessible-report.html"
+
+# The failed-check total as veraPDF's HTML report states it, in the table under
+# "Validation information":  <td><b>Failed Checks:</b></td> <td>17</td>.
+# The builder runs veraPDF once per tagged PDF, for that HTML, and the total is
+# read from the same output: the XML report carries it as an attribute, and
+# costs a second JVM launch per file. The markup is veraPDF's own stylesheet
+# (1.30.2 here and in accessible.yml). A release that words the row differently
+# makes verapdf_failed_checks return None, and a build then reports a failing
+# file without a count. PASSED or FAILED is veraPDF's exit status alone.
+_VERAPDF_FAILED_CHECKS_RE = re.compile(
+    rb"Failed Checks:\s*</b>\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>")
+
+
+def verapdf_failed_checks(report):
+    """The failed-check total one veraPDF HTML report states, or None when the
+    report has no such row. Takes the report as bytes or str."""
+    if isinstance(report, str):
+        report = report.encode("utf-8", "replace")
+    match = _VERAPDF_FAILED_CHECKS_RE.search(report or b"")
+    return int(match.group(1)) if match else None
 
 
 def _verapdf_candidates():
