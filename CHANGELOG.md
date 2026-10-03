@@ -154,6 +154,26 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   six-version exam with keys, including a `{cols}` list that has to continue at
   1c on every copy.
 
+- **Two `{questions}` lists in one exam ran their part labels together.**
+  `\begin{questions}` restarts the question number at 1, and `{parts}` decides
+  whether to resume its lettering by comparing question numbers, so the first
+  `{parts}` of the second list's Problem 1 resumed the first list's Problem 1:
+  1a, 1b in the first list and 1c, 1d in the second. An exam built on
+  `{problems}` did the same after a second `\maketitle` in one copy, because
+  `\maketitle` restarts its numbering. The stored count is now cleared on every
+  step of the question counter (`\@addtoreset{global_partno_storage}{question}`
+  in `texlib-autoexam.cls`), so a question's first `{parts}` starts at a. A
+  second list inside the same question (`{cols}`, `\splitpage`) still continues
+  the first, because nothing steps the counter between the two. The step also
+  restarts the lettering on every copy of a versioned exam, which leaves
+  `\AutoExamBeginCopy` one case: a list that a copy opens before its first
+  question. Measured on the repository's seventeen `autoexam` documents, each
+  built five ways (default, student, key, instructor and the tagged copy): all
+  85 builds are pixel-identical before and after (ImageMagick AE = 0 on 355
+  pages at 110 dpi). Test: `question-lists-test` in
+  `test_engine_correctness.py` reads 1a, 1b from each of two lists in one copy,
+  then 1c, 1d from a `{cols}` list in the second list's question.
+
 - **The stale sweep missed two whole classes of artifact.** It walked
   `VARIANT_MACROS`, which does not contain `base`, so `<base>_accessible.pdf`
   outlived any build that stopped producing it; and it only ever considered the
