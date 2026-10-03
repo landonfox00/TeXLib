@@ -24,13 +24,12 @@
 % ===========================================================================
 % \rubric{pts}{text} appends a rubric item to one of two accumulators depending
 % on which environment is active (\@sol@rubric inside {solution}, \@partsol@rubric
-% inside {partsolution}).  The accumulators hold \@rubricline tokens emitted into
-% a right-side overlay box pinned to the "Solution." line via \hfill\llap.  The
-% overlay's height/depth are left natural (a zero-declared version was tried
-% first, but its real ink still extended below the "Solution." line -- just
-% uncounted by TeX's own spacing -- so it visually collided with the solution's
-% own first line whenever that line ran long enough to reach the same right-hand
-% region; see \@emit@rubric@overlay).  The \if@in@* flags tell \rubric which one.
+% inside {partsolution}).  The accumulators hold \@rubricline tokens, and each
+% is set ONCE, in a teal box at the right, beneath the answer it grades:
+% {solution}'s by \@emit@sol@footer, beside the common errors, and
+% {partsolution}'s by \@emit@rubric@overlay.  The box was an overlay on the
+% "Solution." line until the footer replaced that placement, and the names date
+% from then.  The \if@in@* flags tell \rubric which accumulator is active.
 
 \newif\if@in@partsolution  \@in@partsolutionfalse
 \newif\if@in@solution      \@in@solutionfalse
@@ -92,7 +91,7 @@
 
 % ACCESSIBLE: a shown solution is ONE structure element, and it reads its header
 % first. Both environments typeset the body before the header: the body is boxed
-% so that its \rubric calls and the SyncTeX harvest can run before the header
+% so that the SyncTeX harvest can run on it before the header
 % line exists. A structure element records its children in the order they are
 % created, so the tree read the answer and then "Solution.", while the page
 % drew the header above the answer. veraPDF checks which element may hold
@@ -293,19 +292,13 @@
 	#2\par\smallskip
 }
 
-% \@emit@rubric@overlay{accumulator} — right-side overlay box pinned to the
-% "Solution." line via \hfill\llap (right edge at \textwidth).  Height/depth are
-% left natural (NOT zeroed) so \par charges the line for the overlay's real
-% vertical extent, pushing whatever comes next (the solution body) down far
-% enough to clear it -- a zero-height version let the overlay's ink bleed into
-% the solution's own first line whenever that line ran long. Trade-off: a short
-% solution now gets pushed down by however tall the rubric box is, even when it
-% wouldn't have collided -- accepted since this only affects instructor-facing
-% rubric builds, and the alternative (reflowing the solution's own already-
-% \box'd first lines around the overlay) needs a two-pass height measurement
-% that isn't worth it here.
-% Kept for {partsolution}, which emits it BENEATH its prose rather than beside
-% the header; the argument is the accumulator to render.
+% \@emit@rubric@overlay{accumulator} — the rubric box of a {partsolution}:
+% \rubricboxwidth wide, teal, headed "Rubric:".  The argument is the accumulator
+% to render.  The box has no placement of its own.  \end{partsolution} sets it
+% beneath the part's answer, after an \hfill, and nothing else calls it:
+% {solution}'s rubric is \@rubric@panel, in the footer below.  Until the footer,
+% this was the overlay \llap'd onto the "Solution." line of both environments;
+% the footer's comment says why that placement was wrong.
 \newcommand{\@emit@rubric@overlay}[1]{%
 	\setlength{\fboxsep}{4pt}%
 	\colorbox{teal!8}{%
@@ -455,17 +448,17 @@
 % {solution} / {partsolution}
 % ===========================================================================
 % {solution} — full-problem solution block: a green box with a bold "Solution."
-% header and any \rubric items overlaid on the right, shown when \ifsolutions;
-% the content is silently discarded otherwise.  The body is collected into
-% \@sol@box first so \rubric{}{} calls can populate \@sol@rubric before the header
-% is emitted.  The exam class defines a native \solution; \let-ing it to \relax
-% lets \newenvironment redefine it (the engine emits {solution} only when the
-% problem actually has a non-empty solution).
+% header, the worked answer and, when \ifrubric, the grading footer under it,
+% shown when \ifsolutions; the content is silently discarded otherwise.  The
+% body is collected into \@sol@box first: the footer is laid out at the end of
+% that box, the SyncTeX harvest reads the box before the header joins it, and
+% the frame is sized from it.  The exam class defines a native \solution;
+% \let-ing it to \relax lets \newenvironment redefine it (the engine emits
+% {solution} only when the problem actually has a non-empty solution).
 %
 % Rendering is plain \colorbox+\parbox, NOT tcolorbox, despite looking similar:
 % content that reaches a tcolorbox's interior via \unvbox (as this box's content
-% does -- \@sol@box above must be pre-collected so \rubric{}{} can populate the
-% overlay before the header renders) gets SyncTeX-orphaned. \unvbox splices
+% does, \@sol@box being pre-collected) gets SyncTeX-orphaned. \unvbox splices
 % nodes into the current list with no box-open record of its own; the only
 % enclosing record left is the wrapper's OWN self-tag (this .sty file, not the
 % bank), and SyncTeX's reverse search (`synctex edit`, what a PDF viewer's
@@ -556,7 +549,7 @@
 		% exactly as {partsolution} suppresses its opening \smallskip.
 		\ifsolinline\else\par\vspace{\@sol@outervsep}\fi
 		\setlength{\fboxsep}{6pt}%
-		% Collect the "Solution." header (+ any \rubric overlay) and the pre-\box'd
+		% Collect the "Solution." header and the pre-\box'd
 		% body into ONE \vtop, whose reference point is the header baseline. Then
 		% \dp\@sol@vtop is the EXACT distance from that baseline down to the body's
 		% bottom, so the green fill / left accent size to the real rendered content.
@@ -566,16 +559,14 @@
 		% below where the formula assumed), leaving the last line outside the fill.
 		\setbox\@sol@vtop\vtop{%
 			\hsize\dimexpr\textwidth-12pt\relax
-			% ACCESSIBLE: the header line, overlay included, goes to the front
-			% of the solution's <Div>; see \texlib@acc@solbegin.
+			% ACCESSIBLE: the header line goes to the front of the solution's
+			% <Div>; see \texlib@acc@solbegin.
 			\texlib@acc@solheadbegin
-			\noindent\texlibsolheader%
-			\ifrubric
-				\ifx\@sol@rubric\@empty\else
-					\@emit@rubric@overlay{\@sol@rubric}%
-				\fi
-			\fi
-			\par
+			% No rubric on this line: \@emit@sol@footer has set it, at the end of
+			% \@sol@box. A call to \@emit@rubric@overlay here prints the rubric a
+			% second time and pushes the answer down by the depth of that box. It
+			% happened: a merge restored the call that the footer had replaced.
+			\noindent\texlibsolheader\par
 			\texlib@acc@solheadend
 			\vskip2pt
 			\box\@sol@box

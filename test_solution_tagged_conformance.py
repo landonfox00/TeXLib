@@ -51,6 +51,13 @@ marked_text() walks each page's content stream itself and decodes the strings
 with the font's /ToUnicode map. pdfminer would do the same and is not a
 dependency of this repository.
 
+Every copy is read for the rubric as well. A whole-problem {solution} sets its
+rubric in the footer under the answer, and the instructor copy used to print it
+a second time, on the "Solution." line: the call the footer had replaced came
+back in a merge, and the page then had three rubric boxes for the fixture's two
+rubrics. Each rubric line is asserted to be printed once by the copy that shows
+rubrics and by no other copy.
+
 Soft-skips (exit 0) without lualatex, and skips the veraPDF or the pypdf
 assertions when that tool is missing, like the other real-build tests. veraPDF
 is found with find_verapdf(), since its installer does not put it on PATH.
@@ -83,6 +90,14 @@ except ImportError:
 # part solutions have no header line.
 HEADER = "Solution."
 NO_HEADER_COPY = "solutions-noheader"
+# What a copy that shows rubrics prints of them, and how many times: the
+# heading once for each of the two solutions that carry a rubric (a part
+# solution and a whole-problem one), and each of their lines once. Compared
+# with the white space taken out, because a label's thin space is a kern and a
+# text extractor may or may not report it as a space.
+RUBRIC_TEXT = (("Rubric:", 2),
+               ("[1pt]namesthepattern", 1), ("[1pt]factors", 1),
+               ("[5pts]namesthepattern", 1), ("[5pts]factors", 1))
 
 # The four tagged copies a build of this exam can produce: (name, the macro the
 # builder injects for it, whether it shows solutions). The student copy is the
@@ -432,6 +447,21 @@ def solution_groups(reader) -> dict[str, str]:
     return groups
 
 
+def rubric_misprints(reader, shown: bool) -> list[str]:
+    """-> one line for each piece of RUBRIC_TEXT that the pages do not print
+    the right number of times: as often as RUBRIC_TEXT says in a copy that
+    shows rubrics, and never in a copy that does not."""
+    squeezed = "".join(
+        "".join(pg.extract_text() or "" for pg in reader.pages).split())
+    wrong = []
+    for piece, times in RUBRIC_TEXT:
+        want = times if shown else 0
+        found = squeezed.count(piece)
+        if found != want:
+            wrong.append(f"{piece!r} is printed {found} times, not {want}")
+    return wrong
+
+
 def list_items(reader) -> list[list[str]]:
     """-> the child structure types of every <LI>, in document order."""
     root = _obj(reader.trailer["/Root"].get("/StructTreeRoot"))
@@ -522,6 +552,13 @@ def main() -> int:
                                            f"{word}'s <Div> reads {group[:48]!r}")
                     check(f"{copy}: each solution is one element, header first",
                           not misread, "; ".join(misread))
+                # The rubric: once where rubrics are shown, which is the copy
+                # whose macro raises \ShowRubric, and nowhere else.
+                shows_rubric = r"\ShowRubric" in macro
+                wrong = rubric_misprints(reader, shows_rubric)
+                check(f"{copy}: " + ("prints each rubric line once" if shows_rubric
+                                     else "prints no rubric"),
+                      not wrong, "; ".join(wrong))
 
                 text = "\n".join(pg.extract_text() or "" for pg in reader.pages)
                 shown = [w for w in SOLUTION_WORDS if w in text]
