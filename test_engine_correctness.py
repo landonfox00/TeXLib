@@ -32,6 +32,19 @@ regression anywhere along the engine -> LaTeX -> PDF path is caught:
   * Stretch (vmap-test): parses the engine-emitted .vmap version markers and
     pdftotext-slices each copy's page range (the marker EMISSION in
     autoexam_run_versions was never exercised -- only the builder's slicer was).
+  * Stretch (versions-none-*): a bank problem that reports its version, drawn
+    by an exam with no \\versions and by a quiz.  \\IfExamVersioned must take
+    its unversioned branch there, and a selector keyed to version labels must
+    print its fallback.
+  * Stretch (versions-test): the same problem, and one with parts, in a
+    six-version exam with student and key copies, sliced per copy through the
+    engine-emitted .vmap.  The parts must be lettered 1a..1d on EVERY copy (the
+    first {parts} restarting at a, the {cols} list after it continuing at c),
+    and each copy must report its own version label.
+  * Stretch (question-lists-test): two exam.cls {questions} lists in one
+    unversioned copy.  Each list restarts at Problem 1 and each Problem 1 has
+    parts.  The second list's first {parts} must restart at 1a, and the {cols}
+    list after it in the same question must continue at 1c.
 
 Soft-skips (exit 0) if lualatex or a poppler-flavored pdftotext (-bbox / real
 poppler banner, NOT Git-for-Windows' bundled xpdf build) is missing -- matching
@@ -486,6 +499,159 @@ def scenario_vmap_emission():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# =============================================================================
+# Stretch: \IfExamVersioned in documents that declare no versions
+# =============================================================================
+# The selector branches the bank problem printed, as version labels.
+_VQSEL_RE = re.compile(r"VQSEL(\d+)")
+
+
+def scenario_unversioned_query():
+    print("\n=== Stretch: \\IfExamVersioned with no \\versions (versions-none-*) ===")
+    # (document, what \theExamVersion reads there).  autoexam defines it as A
+    # when no \versions is declared; quiz does not define it at all.  Neither is
+    # one of the bank's labels, so only the query can route the selector to its
+    # fallback -- comparing against \theExamVersion printed nothing in the exam.
+    for tex_name, label in (("versions-none-test.tex", "A"),
+                            ("versions-none-quiz.tex", "none")):
+        tmp = tempfile.mkdtemp(prefix="texlib_engine_noversions_")
+        try:
+            pdf, _aux, log = build(tmp, tex_name, "versions-bank.tex",
+                                   "coursemeta.tex")
+            check(f"{tex_name}: PDF was produced", os.path.exists(pdf), log[-600:])
+            if not os.path.exists(pdf):
+                continue
+            text = flat(pdftext(pdf))
+            check(f"{tex_name}: the problem stem rendered", "VQSTEM" in text,
+                  text[:240])
+            check(f"{tex_name}: \\IfExamVersioned takes the unversioned branch",
+                  "VQUNVERSIONED" in text and "VQVERSIONED" not in text,
+                  text[:240])
+            check(f"{tex_name}: the selector prints its fallback branch, alone",
+                  _VQSEL_RE.findall(text) == ["1301"],
+                  f"got {_VQSEL_RE.findall(text)}")
+            check(f"{tex_name}: the query is expandable (\\setvar read it as 0)",
+                  "VQFLAG0" in text, text[:240])
+            check(f"{tex_name}: \\theExamVersion is left as it was ({label})",
+                  f"VQLABEL[{label}]" in text, text[:240])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+# =============================================================================
+# Stretch: per-copy state of a versioned exam -- part labels + the version label
+# =============================================================================
+_VERSIONS = ["1301", "1302", "1303", "1304", "1305", "1306"]
+# A part label followed by one of the fixture's needles.  Not anchored to a line
+# start: {cols} sets two parts side by side, and pdftotext may give them a line.
+_VPART_RE = re.compile(r"(\d+)([a-z])\.\s+(VPART[A-D])")
+
+
+def read_vmap(path):
+    """The engine's .vmap as [(version, 'stu'|'sol', first page)], in file order."""
+    entries = []
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            parts = line.strip().split("|")
+            if len(parts) == 3:
+                entries.append((parts[0], parts[1], int(parts[2])))
+    return entries
+
+
+def scenario_versioned_copies():
+    print("\n=== Stretch: every copy of a versioned exam (versions-test) ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_engine_versions_")
+    try:
+        pdf, aux, log = build(tmp, "versions-test.tex", "versions-bank.tex",
+                              "coursemeta.tex")
+        check("PDF was produced", os.path.exists(pdf), log[-600:])
+        vmap = os.path.join(aux, "versions-test.vmap")
+        check(".vmap file was emitted by the engine", os.path.exists(vmap))
+        if not (os.path.exists(pdf) and os.path.exists(vmap)):
+            return
+
+        entries = read_vmap(vmap)
+        want = ([(v, "stu") for v in _VERSIONS] + [(v, "sol") for v in _VERSIONS])
+        check("twelve copies: the six student copies, then the six keys",
+              [(v, c) for (v, c, _p) in entries] == want,
+              f"copies={[(v, c) for (v, c, _p) in entries]}")
+
+        for i, (ver, copy, start) in enumerate(entries):
+            end = entries[i + 1][2] - 1 if i + 1 < len(entries) else None
+            text = flat(pdftext(pdf, first=start, last=end))
+            tag = f"{ver}|{copy}"
+
+            # The one problem with parts is Problem 1 on every copy.  Its first
+            # {parts} has to restart at a, and the {cols} list after it has to
+            # carry on at c.  With neither the per-copy reset nor the reset on
+            # the question step, the second copy reads 1e..1h, and the seventh
+            # runs \alph past z and stops lettering.
+            parts = _VPART_RE.findall(text)
+            check(f"{tag}: the parts are lettered 1a, 1b, 1c, 1d in authored order",
+                  parts == [("1", "a", "VPARTA"), ("1", "b", "VPARTB"),
+                            ("1", "c", "VPARTC"), ("1", "d", "VPARTD")],
+                  f"got {[q + l + '. ' + n for (q, l, n) in parts]}")
+
+            # The copy knows it is versioned and which version it is.
+            check(f"{tag}: \\IfExamVersioned takes the versioned branch",
+                  "VQVERSIONED" in text and "VQUNVERSIONED" not in text,
+                  text[:240])
+            check(f"{tag}: \\theExamVersion is this copy's label",
+                  f"VQLABEL[{ver}]" in text, text[:240])
+            check(f"{tag}: the selector prints this version's branch and no other",
+                  _VQSEL_RE.findall(text) == [ver],
+                  f"got {_VQSEL_RE.findall(text)}")
+            check(f"{tag}: the query is expandable (\\setvar read it as 1)",
+                  "VQFLAG1" in text, text[:240])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# =============================================================================
+# Stretch: two {questions} lists in one copy -- part labels belong to a question
+# =============================================================================
+# A question label, or a part label, followed by one of the fixture's needles.
+# The part pattern is unanchored for the same reason as _VPART_RE: {cols}.
+_QLSTEM_RE = re.compile(r"Problem\s+(\d+)\.\s+(QLSTEM[A-Z]+)")
+_QLPART_RE = re.compile(r"(\d+)([a-z])\.\s+(QLPART[A-F])")
+
+
+def scenario_restarted_question_lists():
+    print("\n=== Stretch: two {questions} lists in one copy (question-lists-test) ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_engine_qlists_")
+    try:
+        pdf, _aux, log = build(tmp, "question-lists-test.tex")
+        check("PDF was produced", os.path.exists(pdf), log[-600:])
+        if not os.path.exists(pdf):
+            return
+        text = flat(pdftext(pdf))
+
+        # What the fixture depends on: each list numbers from 1, so the copy has
+        # two Problem 1s.  Lists that numbered continuously would never reach
+        # the case below, and this check fails first.
+        stems = _QLSTEM_RE.findall(text)
+        check("each list numbers from 1: two questions are labelled Problem 1",
+              stems == [("1", "QLSTEMONE"), ("1", "QLSTEMTWO")],
+              f"got {stems}")
+
+        # {parts} keys its resume on the question NUMBER, and both questions are
+        # number 1.  Unless the stored count is cleared when the question counter
+        # steps, the second list reads 1c, 1d and its {cols} list 1e, 1f.
+        parts = _QLPART_RE.findall(text)
+        got = [q + l + ". " + n for (q, l, n) in parts]
+        check("the first list's parts are lettered 1a, 1b",
+              parts[:2] == [("1", "a", "QLPARTA"), ("1", "b", "QLPARTB")],
+              f"got {got}")
+        check("the second list's first {parts} restarts at 1a, 1b",
+              parts[2:4] == [("1", "a", "QLPARTC"), ("1", "b", "QLPARTD")],
+              f"got {got}")
+        check("the {cols} list in the same question continues at 1c, 1d",
+              parts[4:] == [("1", "c", "QLPARTE"), ("1", "d", "QLPARTF")],
+              f"got {got}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     print("TeXLib problem-bank engine correctness tests\n")
     print(f"  build root: {_build_root()}  (override with TEXLIB_TEST_ROOT)")
@@ -503,6 +669,9 @@ def main():
     scenario_ppart_atomicity()
     scenario_importproblem()
     scenario_vmap_emission()
+    scenario_unversioned_query()
+    scenario_versioned_copies()
+    scenario_restarted_question_lists()
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0

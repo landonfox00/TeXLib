@@ -95,6 +95,37 @@ Declare the versions. In standalone mode (no `\Version` defined), the
 class loops over all versions in one compilation. In builder mode
 (`\def\Version{A}` passed externally), only the named version is built.
 
+`\theExamVersion`
+The version label of the copy being typeset. A document that declares no
+versions gets `A`, the label that seeds the engine and the one `\byversion`
+and `\vercase` select. `quiz.cls` does not define the macro.
+
+`\IfExamVersioned{versioned}{unversioned}`
+Takes the first branch in a document that calls `\versions` and the second in
+one that does not. Expandable. `quiz`, `didactic` and `bank` define it as well
+and always take the second branch, so a problem in a shared bank can call it
+whichever class draws it.
+
+A macro that selects content by version label has to ask before it compares.
+`\theExamVersion` alone is wrong in two places. An exam with no `\versions` (a
+final, a review sheet) reports `A`; when the bank's labels are anything else
+(section numbers, say) a selector comparing against it prints nothing, with
+exit code 0 and no warning. A quiz raises `Undefined control sequence`. Name
+the branch a document with no versions prints:
+
+```latex
+\ExplSyntaxOn
+\NewDocumentCommand{\onver}{ m m }{
+	\IfExamVersioned
+		{ \str_if_eq:eeT { #1 } { \theExamVersion } { #2 } }
+		{ \str_if_eq:nnT { #1 } { 1301 } { #2 } }
+}
+\ExplSyntaxOff
+```
+
+Under `\versions{1301, 1302}`, `\onver{1302}{...}` prints on version 1302
+only. A document with no versions prints the `1301` branch.
+
 ### Per-exam metadata via `\meta`
 
 Use `\meta{exam-number=…, exam-date=…, exam-postscript=…}` in the

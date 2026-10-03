@@ -105,6 +105,11 @@
 \@autoexam@versionedfalse
 
 % Handle Versions
+% \theExamVersion is defined in EVERY autoexam document.  With no \versions and
+% no forced \Version it is A: that label seeds the engine (\AtBeginDocument
+% below) and is what \byversion and \vercase select, so changing it would redraw
+% every existing exam that declares no versions.  The macro therefore cannot
+% tell such a document from version A of a versioned one; \IfExamVersioned can.
 \ifdefined\Version
 	\newcommand{\theExamVersion}{\Version}
 \else
@@ -407,6 +412,19 @@
 	\edef\@vc@want{#1}%
 	\ifx\@vc@cur\@vc@want #2\fi
 }
+% \IfExamVersioned{versioned}{unversioned}
+%   The first branch when the document called \versions (or \examversions), the
+%   second otherwise; expandable.  texlib-problembank.sty documents the query
+%   and supplies the second branch for the classes that have no versions.
+%   A \Version forced on a document that declares none still takes the second
+%   branch: \theExamVersion is then a label the document never declared.
+\renewcommand{\IfExamVersioned}{%
+	\if@autoexam@versioned
+		\expandafter\@firstoftwo
+	\else
+		\expandafter\@secondoftwo
+	\fi
+}
 
 % \importproblem is provided by texlib-problembank.sty.
 
@@ -477,6 +495,29 @@
 \newcounter{global_partno_storage}
 \newcounter{tracker_question_no}
 \setcounter{tracker_question_no}{-1}
+% Every step of the question counter clears the stored count.
+%   {parts} below resumes its lettering when the question number equals the one
+%   it last saw, which is how a second list in the same question ({cols},
+%   \splitpage) carries on from the first.  A question NUMBER does not identify
+%   a question: a second {questions} list starts again at 1, and so does every
+%   copy of a versioned exam.  Before this reset, the first {parts} of a second
+%   Problem 1 resumed the first Problem 1's list and printed 1c, 1d.
+%   Only a step runs the reset.  \question reaches \refstepcounter through the
+%   list's \item, and \extracredit steps the counter itself.  \setcounter and
+%   \addtocounter clear nothing: \begin{questions} and {problems} set the
+%   number that way, and the \question that follows is what clears the count.
+\@addtoreset{global_partno_storage}{question}
+
+% \AutoExamBeginCopy -- run by the version loop (autoexam_run_versions in
+% problem_engine.lua) before it reads each copy's body.
+%   Clears the tracker and the stored count for a list that a copy opens before
+%   its first \question.  The question counter has not stepped in that copy yet
+%   and still holds the last number of the copy before, so without this such a
+%   list resumes that copy's last one.
+\newcommand{\AutoExamBeginCopy}{%
+	\setcounter{tracker_question_no}{-1}%
+	\setcounter{global_partno_storage}{0}%
+}
 
 \let\oldparts\parts
 \let\endoldparts\endparts
