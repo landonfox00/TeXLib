@@ -1,0 +1,15 @@
+% versions-none-test.tex -- an exam that declares no \versions (a final, a
+% review sheet), drawing the version-reporting problem from versions-bank.tex.
+% \theExamVersion is A here, which is none of the bank's labels; the problem has
+% to print the first label's branch through \IfExamVersioned.
+\documentclass{autoexam}
+\setexamseed{126}
+\examsetup{number=3, date={Engine Test}}
+\loadbank{versions-bank.tex}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem{vquery}
+\end{problems}
+\end{document}
