@@ -115,6 +115,121 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   hosts recognise the abort and spend the pass again. It is a startup failure,
   so the retry costs a startup and nothing else.
 
+- **A tagged instructor copy printed `2=0 [0 pts]` for a common error's
+  `[-2 pts]`, and no instructor copy has printed a bare `\item`'s bullet.** In a
+  tagged copy every `{commonerrors}` entry was wrong. In an untagged one a bare
+  `\item` printed `=0 [0 pts]` where its square bullet belongs, and has since
+  the deduction labels arrived in v0.6.1. Each entry cost three TeX errors
+  (`Missing number, treated as zero`, `Missing = inserted for \ifnum`, and the
+  first again). The run recovered and wrote its PDF, and veraPDF had nothing to
+  fail, so the log and the page were the only places it showed.
+
+  The panel's `\makelabel` read its argument. It ran `\ifnum#1=0` to choose
+  between a deduction and the muted `[0 pts]`, and it compared the argument
+  with a default label of `\relax` to recognise a bare `\item`. That argument
+  is not the label the author wrote. The kernel's `\item` hands over a bare
+  item's label as the unexpanded `\@itemlabel`, which never compared equal, so
+  the bullet was unreachable and the `\ifnum` ran on `\relax`. The tagged list
+  code (latex-lab-testphase-block, the `item` template) hands over
+  `\MakeLinkTarget[..]{}` and then a token list that holds the label, and the
+  `\ifnum` met `\MakeLinkTarget`.
+
+  `\makelabel` now typesets what it is handed and reads nothing. Inside the
+  panel's list `\item` is `\@cerr@item` (`texlib-solutions.sty`), which takes
+  the number where the author wrote it and passes the kernel's `\item` the
+  deduction already formatted, `\item[\@cerr@pts{2}]`. A bare `\item` goes
+  through unchanged and gets the list's default label, which is the bullet.
+  `\@cerr@item` acts only while `\@itemlabel` is that default label. Every list
+  sets its own, so an `itemize`, an `enumerate` or a `description` nested in an
+  entry keeps its own labels, in a tagged copy and an untagged one.
+
+  TeX errors in the instructor copy, before and after: one panel with one
+  `\item[2]`, tagged 3 → 0; five panels with eight labelled entries, tagged
+  24 → 0, and the same under `quiz`; three panels with five bare entries and a
+  labelled one, tagged 18 → 0 and untagged 15 → 0. veraPDF reports no failed
+  check before or after. In each of these the panels of the tagged and the
+  untagged copy now print the same text, entry for entry. On the `autoexam`
+  pages that carry a panel, the two renders (`pdftoppm`, 200 dpi) differ only
+  on the heading lines that print a point value and on the footer line, and on
+  no row of a panel.
+
+  An untagged copy whose entries are all labelled does not change. Two
+  fixtures' four copies (student, `solutions`, `solutions-inline`,
+  `instructor`) and the `quiz` instructor copy have the same page content
+  streams byte for byte before and after, and the same renders at 200 dpi. An
+  untagged copy with a bare `\item` changes, which is the fix: the bullet,
+  where `=0 [0 pts]` was.
+
+  `test_solution_tagged_conformance.py` covers it. Its fixture now carries two
+  `{commonerrors}` blocks, one in a whole-problem solution and one in a part
+  solution, and the test reads the labels off the page: `[-2 pts]`, `[-1 pt]`,
+  `[0 pts]`, and nothing ahead of a bare entry. It reads them in the tagged
+  instructor copy and in an untagged one that it builds for the comparison, and
+  requires the other three copies to print no common error. Run on the package
+  as it was, four of its checks fail.
+
+- **A tagged key failed PDF/UA-2 at every part solution it showed.** veraPDF
+  reported four ISO 32005 Table 5 rules for each shown `{partsolution}`: `LI-P`
+  (two checks), `LI-Part`, `P-P` and `P-Part`, five failed checks, in the
+  `solutions` and `instructor` twins and in the inline layout. A Math 126 review
+  key with 63 part solutions failed 315. The student copies passed and no build
+  raised a TeX error. Nothing reported it: the accessible gate builds each
+  document's default copy, a build writes its veraPDF report for the base
+  tagged copy only, and no template here uses `{partsolution}`.
+
+  The frame around a solution (the tint and the left accent) is a `\parbox`,
+  and the kernel's tagging code for `\parbox` assumes a paragraph is open. It
+  ends the innermost structure, taking it for that paragraph's, opens a `<Div>`,
+  and afterwards opens a new paragraph structure. `{partsolution}` assembles its
+  frame in a box register with no paragraph open, which is what lets SyncTeX
+  stamp it. The structure that was ended there is the part's `<LBody>`, so the
+  `<Div>`, the paragraph after it and anything the part went on to say became
+  children of the `<LI>`. A bare `article` reproduces it with
+  `\sbox0{\parbox{1cm}{x}}\noindent\box0` inside a list item: the same four
+  rules, five checks, and none with the `\parbox` in an artifact group.
+  Upstream has it open as latex3/tagging-project issues 54 and 345.
+
+  The frame is one artifact now. `\texlib@acc@artifactbegin` and
+  `\texlib@acc@artifactend` in `texlib-solutions.sty` put it in tagpdf's
+  artifact group: the tint and the accent are marked as layout decoration, the
+  `\parbox` opens no structure, and the solution's header and body, which were
+  tagged when they were typeset, stay in the `<LBody>`. `{solution}` draws its
+  frame the same way in both layouts. Its compact layout sets the frame in a
+  live paragraph, and passed. Its inline layout boxes it, and a tagged inline
+  key of whole-problem solutions failed the same four rules. The
+  inline-key entry above met this in the Bank template and put it down to "a
+  structure level". The cause there was this `\parbox`, set into a box with no
+  paragraph open: with the compact frame boxed the way that draft boxed it, the
+  Bank template fails 27 checks on `origin/main` and none with the frame an
+  artifact.
+
+  Failed checks, before and after. The regression fixture (three part solutions
+  and three whole-problem solutions, one in the side-by-side multiple-choice
+  key): `solutions` 17 → 0, `solutions-inline` 31 → 0, `instructor` 17 → 0,
+  student copy 0 → 0, and the same exam under `quiz` 17, 29 and 17 → 0. The
+  Math 126 review key, rebuilt from a copy of the course with this change
+  applied: 315 → 0.
+
+  Nothing moves on the page. The pair is empty in a normal build: the fixture's
+  four untagged copies are the same PDFs byte for byte before and after, apart
+  from the trailer `/ID`, with `SOURCE_DATE_EPOCH` fixed. In a tagged build the
+  pair sets node attributes and adds no node: the four tagged copies differ on
+  0 pixels (`pdftoppm` at 150 dpi, compared exactly), and so do all four PDFs
+  of the 16-page review at 100 dpi.
+
+  Guarded by a new `test_solution_tagged_conformance.py`, which `accessible.yml`
+  runs ahead of the module suite. It builds one exam's tagged student copy and
+  its three tagged keys and requires, of each, no TeX error in the log, no
+  failed veraPDF check, and a label and a body in every list item. The last is
+  read off the structure tree with pypdf, so the defect is still caught where
+  veraPDF is not installed.
+
+  Not fixed here: a solution whose body ends in a display or a list fails in
+  the student copy as well. That is the missing `\par` before the box closes,
+  with its own fixes in PR #182 (a hidden solution) and PR #281 (a shown one).
+  Built with those two and this one together, every construct tried (thirteen,
+  in four tagged copies each) has no failed check.
+
 - **The stale sweep missed two whole classes of artifact.** It walked
   `VARIANT_MACROS`, which does not contain `base`, so `<base>_accessible.pdf`
   outlived any build that stopped producing it; and it only ever considered the

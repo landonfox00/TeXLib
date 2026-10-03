@@ -50,6 +50,46 @@
 % moved there because didactic.cls gates inline worked lead-ins into a discard box
 % the same way and hits the identical violation, but does not load this package.
 
+% ACCESSIBLE: a solution's frame is decoration around content that is ALREADY
+% tagged. The tint and the left accent are drawn in a \parbox around a box that
+% was typeset, and tagged, before the frame existed. The frame has no structure
+% to add, and the kernel's \parbox must not be left to add one. Its tagging
+% socket (parbox/before, latex-lab-testphase-minipage) assumes a paragraph is
+% open: it ends the innermost structure, taking it for that paragraph's, opens a
+% <Div>, and afterwards opens a new paragraph structure. {partsolution} always
+% assembles its frame in a box register (\sbox) between paragraphs, and
+% {solution} does in the inline layout. No paragraph is open there, so what the
+% socket ended was whatever encloses the solution. In the exam-class {parts}
+% list that is the part's <LBody>: the <Div> and the paragraph after it became
+% children of the <LI>, which veraPDF reports as ISO 32005 Table 5 LI-P (twice),
+% LI-Part, P-P and P-Part, five failed checks for every part solution a tagged
+% key shows. The inline {solution} did the same to its problem's <LBody>. It is
+% upstream behaviour (latex3/tagging-project issues 54 and 345, both open): on a
+% bare article, \sbox0{\parbox{1cm}{x}}\noindent\box0 inside a list item fails
+% the same four rules with the same five checks.
+%
+% Between this pair the material is ONE artifact. Tagging is suspended, so no
+% socket runs and the structure stack is left alone; the rules are marked as
+% layout decoration; and the tagged box set inside keeps its own marking, which
+% under LuaTeX (every tagged build) is an attribute a node carries from the
+% moment it is made. The pair may stand in a paragraph or outside one. No-ops in
+% a normal build. The names are tested at each use because a document can define
+% \TeXLibAccessibleMode with no \DocumentMetadata, and \csname would then turn
+% the missing command into \relax and typeset its argument.
+\ifdefined\TeXLibAccessibleMode
+	\newcommand\texlib@acc@artifactbegin{%
+		\ifcsname tag_mc_artifact_group_begin:n\endcsname
+			\csname tag_mc_artifact_group_begin:n\endcsname{layout}%
+		\fi}
+	\newcommand\texlib@acc@artifactend{%
+		\ifcsname tag_mc_artifact_group_end:\endcsname
+			\csname tag_mc_artifact_group_end:\endcsname
+		\fi}
+\else
+	\newcommand\texlib@acc@artifactbegin{}
+	\newcommand\texlib@acc@artifactend{}
+\fi
+
 \newbox\@partsol@box
 \newbox\@sol@box
 \newbox\@sol@vtop
@@ -159,33 +199,54 @@
 % label column where the rubric prints what the step earns.  The magnitude is
 % what the author writes and the minus is supplied here, so the two panels can
 % never disagree about the sign.  \item[0] means "costs nothing" (a wasted-effort
-% note rather than a penalty) and prints a muted [0 pts].  A bare \item still
-% works and falls back to the old square bullet -- documents predating the
-% deduction labels keep rendering unchanged.
+% note rather than a penalty) and prints a muted [0 pts].  A bare \item prints a
+% square bullet, so a block written before the deduction labels still renders.
+% A non-integer optional argument is not supported (the \ifnum in \@cerr@pts
+% would choke) -- the label column is for a number of points, and prose belongs
+% in the item body.
 %
-% The fallback is detected by giving the list a \relax default label and
-% comparing against it: LaTeX routes both \item and \item[x] through \makelabel,
-% so this is the only way to tell them apart from inside.  A non-integer optional
-% argument is not supported (the \ifnum below would choke) -- the label column is
-% for a number of points, and prose belongs in the item body.
+% \makelabel only typesets its argument.  It must not read it, because what it
+% is handed is not what the author wrote.  The kernel's \item hands over a bare
+% item's label as the unexpanded \@itemlabel.  The tagged list code
+% (latex-lab-testphase-block, the `item' template) hands over
+% \MakeLinkTarget[..]{} followed by a token list that holds the label, whether
+% the label was given or is the list's default.  An earlier \makelabel ran
+% \ifnum on its argument and compared it with a default label of \relax.  The
+% comparison never held, so a bare \item printed "=0 [0 pts]" in every
+% instructor copy.  In a tagged copy the \ifnum met \MakeLinkTarget, so \item[2]
+% printed "2=0 [0 pts]".  Each was three TeX errors an item, and a tagged copy
+% still passed veraPDF.
+%
+% So the number is taken at \item, where the author wrote it.  Inside the
+% panel's list \item is \@cerr@item.  It passes a deduction to the kernel's
+% \item already formatted, \item[\@cerr@pts{4}], and leaves a bare \item alone,
+% which then gets the list's default label, the bullet.  \@cerr@item acts only
+% while \@itemlabel is this list's default label.  Every list sets its own, in
+% a tagged build as well, so a list nested in an entry keeps its \item[..].
 \newlength{\@cerrlabelwd}
 \setlength{\@cerrlabelwd}{1.55cm}
-\def\@cerr@nolabel{\relax}
-\newcommand{\@cerr@makelabel}[1]{%
-	\def\@cerr@tmp{#1}%
-	\makebox[\@cerrlabelwd][l]{%
-		\ifx\@cerr@tmp\@cerr@nolabel
-			\textcolor{red!70!black}{\rule[0.15ex]{0.45em}{0.45em}}%
-		\else
-			\textbf{\ifnum#1=0
-				\textcolor{black!45}{[0\,pts]}%
-			\else
-				\textcolor{red!70!black}{%
-					[$-$#1\,\ifnum#1=1 pt\else pts\fi]}%
-			\fi}%
-		\fi
-	}%
+\newcommand{\@cerr@bullet}{%
+	\textcolor{red!70!black}{\rule[0.15ex]{0.45em}{0.45em}}}
+\def\@cerr@itemlabel{\@cerr@bullet}
+\newcommand{\@cerr@pts}[1]{%
+	\textbf{\ifnum#1=0
+		\textcolor{black!45}{[0\,pts]}%
+	\else
+		\textcolor{red!70!black}{%
+			[$-$#1\,\ifnum#1=1 pt\else pts\fi]}%
+	\fi}%
 }
+\newcommand{\@cerr@makelabel}[1]{\makebox[\@cerrlabelwd][l]{#1}}
+\newcommand{\@cerr@item}{%
+	\ifx\@itemlabel\@cerr@itemlabel
+		\expandafter\@cerr@item@own
+	\else
+		\expandafter\@cerr@item@kernel
+	\fi
+}
+\newcommand{\@cerr@item@own}{%
+	\@ifnextchar[{\@cerr@item@pts}{\@cerr@item@kernel}}
+\def\@cerr@item@pts[#1]{\@cerr@item@kernel[\@cerr@pts{#1}]}
 
 % Same shell as the rubric panel, and the same hanging shape: label column of a
 % fixed width, body indented past it.  {list} rather than {itemize} so every
@@ -198,7 +259,7 @@
 			\raggedright\small\sffamily
 			\vspace{2pt}%
 			\textbf{\textcolor{red!70!black}{Common Errors:}}\\[0.25em]%
-			\begin{list}{\relax}{%
+			\begin{list}{\@cerr@bullet}{%
 				\setlength{\topsep}{0pt}%
 				\setlength{\partopsep}{0pt}%
 				\setlength{\parsep}{0pt}%
@@ -209,6 +270,12 @@
 				\setlength{\itemindent}{0pt}%
 				\setlength{\listparindent}{0pt}%
 				\let\makelabel\@cerr@makelabel
+				% \item as it stands here, the kernel's or the tagged list
+				% code's.  It is not saved again inside another panel's
+				% entry: \item is \@cerr@item there, and saving that would
+				% make \item[..] loop.
+				\ifx\item\@cerr@item\else\let\@cerr@item@kernel\item\fi
+				\let\item\@cerr@item
 			}%
 				\@sol@cerr
 			\end{list}%
@@ -384,7 +451,15 @@
 		% renders its catalogue with \solutionstrue -- lost PDF/UA-2 on the extra
 		% structure level (Table 5 StructTreeRoot-Div / P-P / P-Part). Only the
 		% inline branch boxes it, because only that branch has to raise it.
+		%
+		% ACCESSIBLE: that loss was the \parbox's tagging socket ending a
+		% structure that was not a paragraph's, which is what a \parbox set
+		% into a box does (see \texlib@acc@artifactbegin above), and the inline
+		% branch still had it. The frame is an artifact in both layouts now:
+		% the tint and the accent are decoration, and \@sol@vtop, set inside,
+		% was tagged when it was typeset.
 		\def\@sol@frame{%
+			\texlib@acc@artifactbegin
 			\hspace*{-\@totalleftmargin}%
 			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
 				\noindent
@@ -433,6 +508,7 @@
 							depth \dimexpr\dp\@sol@vtop+6pt\relax}}}%
 				\box\@sol@vtop
 			}%
+			\texlib@acc@artifactend
 		}%
 		% Same geometry contract {partsolution} already honors: under the inline
 		% layout the frame declares ZERO height and depth and is lowered one
@@ -579,7 +655,14 @@
 % its 6pt overhang.  That pairing is empirical and SyncTeX-load-bearing there;
 % it is reused here rather than re-derived, but the measure differs (\linewidth),
 % so re-run sol_probe (SYNCTEX.md) before trusting reverse search inside one.
+%
+% ACCESSIBLE: the frame is an artifact. It is always set into \@partsol@outer
+% with no paragraph open, and the \parbox's tagging socket then ended the part's
+% <LBody> and hung a <Div> and a paragraph on the <LI>; see
+% \texlib@acc@artifactbegin near the top of this file. \@partsol@wrap, set
+% inside, was tagged when it was typeset and keeps that.
 \newcommand{\@partsol@frame}{%
+	\texlib@acc@artifactbegin
 	\parbox[t]{\dimexpr\linewidth-12pt\relax}{%
 		\noindent
 		\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsoltint}{%
@@ -592,6 +675,7 @@
 				depth \dimexpr\dp\@partsol@wrap+6pt\relax}}}%
 		\box\@partsol@wrap
 	}%
+	\texlib@acc@artifactend
 }
 
 % \rubric{pts}{text} — one grading criterion, shown only when \ifrubric.  Appends
