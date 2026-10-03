@@ -208,6 +208,15 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   check fails if any N3 check consults the machine's `TEXMFHOME`. 12 checks
   become 14.
 
+  A new `test_workflow_coverage.py` runs last in `builder-logic` and fails when
+  a tracked `test_*.py` or `test_*.lua` is not run by a workflow: an
+  interpreter, then the file's path from the repo root, on a line that is not a
+  comment. It also fails when a workflow runs a test path that is not tracked.
+  Each of these fails it: a run line deleted, a run line commented out, a file
+  named only in a job's comment block, and a new tracked file that nothing
+  names. A test that must stay out of CI goes in the file's `EXEMPT` table with
+  the reason.
+
 ## [0.9.0] — 2026-09-08
 
 ### Fixed

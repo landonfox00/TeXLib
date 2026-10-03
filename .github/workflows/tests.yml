@@ -87,6 +87,11 @@ jobs:
           python test_collate_keys.py
           python test_coursemeta_lint.py
           python test_version_diff.py
+      - name: Workflow coverage (every tracked test file is run by a workflow)
+        # No workflow globs for tests, so a test file that no workflow names
+        # never runs and nothing reports it. 16 of 44 were in that state on
+        # 2026-10-02, and one of them had failed on main for four weeks.
+        run: python test_workflow_coverage.py
 
   # TeXaM client-side pure logic (texam_web/logic.js) under Node's built-in test
   # runner -- no npm dependencies. Covers the browser-only helpers with no server
