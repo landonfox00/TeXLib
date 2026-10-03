@@ -59,6 +59,34 @@ jobs:
           python Sublime/test_texlib_texam.py
           python Sublime/test_texlib_bank.py
           python Sublime/test_texlib_domain.py
+      - name: Build-mode parity (picker, build file, palette, brain)
+        # A mode is declared in four files that nothing else ties together.
+        # `accessible` shipped in the build file alone, so Ctrl+Shift+B never
+        # listed it and a direct dispatch was rejected as an unknown mode.
+        run: python Sublime/test_texlib_modes.py
+      - name: Plugin command modules (headless, sublime stubbed)
+        # test_texlib_doctor.py's first shadow-install check reads the real
+        # TEXMFHOME, and fails on a machine with a TeXLib copy installed there.
+        # This job installs no TeX, and the runner has no ~/texmf.
+        run: |
+          set -e
+          python Sublime/test_texlib_complete.py
+          python Sublime/test_texlib_doctor.py
+          python Sublime/test_texlib_editor.py
+          python Sublime/test_texlib_gallery.py
+          python Sublime/test_texlib_locate.py
+          python Sublime/test_texlib_scaffold.py
+          python Sublime/test_texlib_texmf.py
+          python Sublime/test_texlib_tools.py
+      - name: Course tools (bank report, key collation, coursemeta lint, version diff)
+        # test_collate_keys.py merges real PDFs with pypdf and skips that check
+        # when pypdf is missing, so it depends on the install step above.
+        run: |
+          set -e
+          python test_bank_report.py
+          python test_collate_keys.py
+          python test_coursemeta_lint.py
+          python test_version_diff.py
 
   # TeXaM client-side pure logic (texam_web/logic.js) under Node's built-in test
   # runner -- no npm dependencies. Covers the browser-only helpers with no server
@@ -148,6 +176,16 @@ jobs:
   #     fixture per assessment flag and asserts each flag CHANGES output (a
   #     solution/answer/rubric never leaks into a student copy, and the answer
   #     key is not a silent no-op). Needs lualatex + poppler's pdftotext.
+  #   * test_schedule_schedmeta.lua -- the <jobname>.schedmeta sidecar, under
+  #     texlua with tex.* stubbed. Its entry ids carry no date: cancelling a
+  #     class day moves the exam and changes no content id. Rides this job for
+  #     the reason test_shuffle.lua does; its two Schedule siblings run in
+  #     smoke.yml, which is main-only.
+  #   * test_engine_emit_edges.py -- real lualatex builds read back with
+  #     pdftotext: the engine-emitted .vmap against the pages it names, then
+  #     through the builder's own slicer (pypdf); the "N of M" footer,
+  #     unresolved after one pass and resolved after two; \ppart parts
+  #     contiguous under \shuffle; an \importproblem stem.
   # All soft-skip if their tools are missing, so a toolchain hiccup degrades
   # gracefully rather than failing the job.
   #
@@ -191,6 +229,12 @@ jobs:
             python3 test_class_render.py
             # MC answer-key marks the correct choice + schedule grid content.
             python3 test_mc_schedule_render.py
+            # Schedule .schedmeta sidecar: entry ids stay put when the dates
+            # shift. texlua only, no build.
+            texlua Schedule/test_schedule_schedmeta.lua
+            # Engine-emitted .vmap against the rendered PDF and the builder's
+            # slicer, the two-pass "N of M" footer, \ppart under \shuffle.
+            python3 Sublime/test_engine_emit_edges.py
             # TeXaM real-render integration: lualatex + pdftocairo on the demo
             # bank (the composer preview pipeline). LUAINPUTS points at the repo
             # root so the class-local .lua engines resolve in the container

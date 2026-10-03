@@ -176,6 +176,32 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   old prune fails the companion check with "0 files scanned". 401 checks
   become 402.
 
+- **Fifteen more test files ran in no workflow.** No workflow globs for tests:
+  a file runs in CI only when a workflow names it. Of the 44 tracked
+  `test_*.py` and `test_*.lua` files, fifteen were named by none. Twelve were
+  added between 2026-07-10 and 2026-07-12, the newest on 2026-08-24. The
+  workflows now name all 44.
+
+  Thirteen need no TeX and run in the `builder-logic` job of `tests.yml`, in
+  three steps: `test_texlib_modes.py`; the plugin-module files
+  `test_texlib_complete.py`, `test_texlib_doctor.py`, `test_texlib_editor.py`,
+  `test_texlib_gallery.py`, `test_texlib_locate.py`, `test_texlib_scaffold.py`,
+  `test_texlib_texmf.py` and `test_texlib_tools.py`; and the course-tool files
+  `test_bank_report.py`, `test_collate_keys.py`, `test_coursemeta_lint.py` and
+  `test_version_diff.py`. `Schedule/test_schedule_schedmeta.lua` and
+  `Sublime/test_engine_emit_edges.py` run in `biber-integration`, the job with
+  `texlua`, `lualatex`, poppler and pypdf. That job runs on every push; the
+  Schedule file's two siblings stay in `smoke.yml`, which runs for `main` only.
+
+  With the entry above, `test_engine_emit_edges.py` runs its slicer sub-check in
+  that job, where pypdf is installed and a builder that does not import is a
+  failure.
+
+  One check is tied to the machine. `test_texlib_doctor.py` reads the real
+  `TEXMFHOME` for `N3: no texinputs -> no warning`, and exits 1 when a TeXLib
+  copy sits under its `tex/latex/texlib`. The `builder-logic` runner has no TeX
+  and no `~/texmf`, so the check passes there.
+
 ## [0.9.0] — 2026-09-08
 
 ### Fixed
