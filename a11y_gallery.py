@@ -13,10 +13,10 @@ strip:
     + per-page pixel diff (differing pixels highlighted in red)
 
 Point a browser at the file, Ctrl-F (or the search box) for a feature, and see
-how the two builds differ — both visually (the deliberate accessible fallbacks:
-multicol->single column, tcolorbox theorems->plain amsthm, ...) and structurally
-(the tag tree, which is where accessibility actually lives and is otherwise
-invisible in a plain render).
+how the two builds differ — both visually (the deliberate accessible fallbacks,
+e.g. the schedule's box-grid calendar in place of the tabularray one) and
+structurally (the tag tree, which is where accessibility actually lives and is
+otherwise invisible in a plain render).
 
 PIXEL DIFF METHODOLOGY. The accessible build always forces lualatex, so a
 pdflatex-native class would show uniform sub-pixel font drift that has nothing to
