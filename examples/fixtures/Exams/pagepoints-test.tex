@@ -1,0 +1,28 @@
+% pagepoints-test.tex -- two versions x (student + solutions), \shuffle'd, so
+% the same problem lands on different pages in different copies.  A solutions
+% copy heads each numbered page with the points of the items that begin on it
+% ("14 points", "1 point", nothing for a page with none); a student copy, the
+% cover and the \blankpage leaf carry no total.  test_engine_correctness.py
+% finds each page's needles and checks the header against their points.
+\documentclass{autoexam}
+\versions{A,B}
+\setexamseed{11}
+\shuffle
+\solutions
+\examsetup{number=1, date={Engine Test}, points=18}
+\loadbank{pagepoints-bank.tex}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem[8]{ppeight}
+	\problem[4,2]{ppparts}
+	\newpage
+	\problem[1]{ppone}
+	\newpage
+	\problem{ppnone}
+	\newpage
+	\problem[3]{ppthree}
+\end{problems}
+\blankpage
+\end{document}
