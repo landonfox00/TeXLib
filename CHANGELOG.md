@@ -22,6 +22,15 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   checks with the grids as without them: a shown `{partsolution}` already fails
   four Table 5 rules there, and `{sketchaxes}` adds none.
 
+  The grid lines are stroked in `\sketchgridcolor` at width `\sketchgridwidth`,
+  `black!40` and `0.3pt` by default, and a course changes either with
+  `\renewcommand`. The first draft of the environment hardcoded `black!18` at
+  TikZ's 0.2pt help-line width, and printed Math 126 exams came back with some
+  of those lines missing (reported 2026-10-07). The default is the weight that course
+  then overlaid on the grid from its preamble, and `\graph` in `autoexam`
+  already draws its dashed grid in `black!40`. No template, fixture or scenario
+  draws a `{sketchaxes}`, so no visual reference changes.
+
 - **`\texlibpartsolheader` — a `{partsolution}`'s header, set apart from
   `{solution}`'s.** It defaults to `\texlibsolheader`, so no document changes
   until one sets it. `\renewcommand{\texlibpartsolheader}{}` removes the line:
