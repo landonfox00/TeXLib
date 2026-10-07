@@ -336,6 +336,18 @@ grid with the body drawn on it, so the key keeps the student copy's pagination.
 grid that prints blank in every copy. Defined in `texlib-problembank.sty`, so it
 works from a quiz and from lecture notes as well.
 
+The grid lines are drawn in `\sketchgridcolor` (default `black!40`) at width
+`\sketchgridwidth` (default `0.3pt`). To change them for a course, redefine
+either in the preamble; inside a group the change holds for that group's grids.
+
+```latex
+\renewcommand{\sketchgridcolor}{black!55}   % any xcolor expression
+\renewcommand{\sketchgridwidth}{0.4pt}      % does not scale with [scale]
+```
+
+The axes and tick marks are 0.4pt black, so a grid darker than about `black!60`
+is hard to tell from them.
+
 Do not also draw the answer's grid inside `{partsolution}`: the key then prints
 two grids, and the second is what pushes the problem onto another page.
 
