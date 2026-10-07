@@ -32,6 +32,10 @@ regression anywhere along the engine -> LaTeX -> PDF path is caught:
   * Stretch (vmap-test): parses the engine-emitted .vmap version markers and
     pdftotext-slices each copy's page range (the marker EMISSION in
     autoexam_run_versions was never exercised -- only the builder's slicer was).
+  * Page points (pagepoints-test): a shuffled two-version exam with keys.  Each
+    key page's center header must read the points of the items found on that
+    page ("1 point" in the singular, nothing for none), and a student copy, the
+    cover and a scratch leaf must carry no total.
 
 Soft-skips (exit 0) if lualatex or a poppler-flavored pdftotext (-bbox / real
 poppler banner, NOT Git-for-Windows' bundled xpdf build) is missing -- matching
@@ -142,8 +146,10 @@ def build(tmp, tex_name, *bank_names):
     return os.path.join(aux, base + ".pdf"), aux, out
 
 
-def pdftext(pdf, first=None, last=None):
+def pdftext(pdf, first=None, last=None, layout=False):
     cmd = [PDFTOTEXT]
+    if layout:
+        cmd.append("-layout")
     if first is not None:
         cmd += ["-f", str(first)]
     if last is not None:
@@ -486,6 +492,75 @@ def scenario_vmap_emission():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# =============================================================================
+# Points on each page, in the center header of a solutions copy
+# =============================================================================
+# What each needle in pagepoints-bank.tex is worth in pagepoints-test.tex.
+PAGEPOINTS = {"PPEIGHT": 8, "PPPARTA": 4, "PPPARTB": 2, "PPONE": 1,
+              "PPTHREE": 3, "PPNONE": 0}
+# A running header as pdftotext -layout prints it: the title, the center slot,
+# then the part label or "Scratch Work".
+PAGEPOINTS_HEADER = re.compile(r"Exam 1\s+(.*?)\s*(Free Response|Scratch Work)")
+
+
+def scenario_page_points():
+    print("\n=== Points on each page in a key's header (pagepoints-test) ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_engine_pagepoints_")
+    try:
+        pdf, aux, log = build(tmp, "pagepoints-test.tex", "pagepoints-bank.tex")
+        check("PDF was produced", os.path.exists(pdf), log[-600:])
+        vmap = os.path.join(aux, "pagepoints-test.vmap")
+        if not (os.path.exists(pdf) and os.path.exists(vmap)):
+            check(".vmap file was emitted by the engine", False)
+            return
+        entries = []
+        with open(vmap, encoding="utf-8") as fh:
+            for line in fh:
+                parts = line.strip().split("|")
+                if len(parts) == 3:
+                    entries.append((parts[0], parts[1], int(parts[2])))
+        npages = pdftext(pdf).count("\f")
+
+        totals = {}          # (version, copy) -> the totals of its problem pages
+        for i, (ver, copy, start) in enumerate(entries):
+            end = entries[i + 1][2] - 1 if i + 1 < len(entries) else npages
+            seen = []
+            for page in range(start, end + 1):
+                text = pdftext(pdf, first=page, last=page, layout=True)
+                head = PAGEPOINTS_HEADER.search(text)
+                center = head.group(1).strip() if head else ""
+                where = f"{ver}|{copy} page {page - start + 1}"
+                if head is None or head.group(2) == "Scratch Work":
+                    check(f"{where} (cover or scratch leaf) has no total",
+                          "point" not in center, f"header center: {center!r}")
+                    continue
+                total = sum(pts for needle, pts in PAGEPOINTS.items()
+                            if needle in text)
+                seen.append(total)
+                if copy != "sol":
+                    check(f"{where} (student copy) has no total", center == "",
+                          f"header center: {center!r}")
+                elif total == 0:
+                    check(f"{where} has no pointed item and no total",
+                          center == "", f"header center: {center!r}")
+                else:
+                    want = f"{total} point" + ("" if total == 1 else "s")
+                    check(f"{where} is headed {want!r}", center == want,
+                          f"header center: {center!r}")
+            totals[(ver, copy)] = seen
+
+        # The fixture must keep exercising what the checks above are for.
+        a, b = totals.get(("A", "sol"), []), totals.get(("B", "sol"), [])
+        check("each key has four problem pages totalling 18 points",
+              len(a) == len(b) == 4 and sum(a) == sum(b) == 18, f"A={a} B={b}")
+        check("the shuffle puts different totals on the same page number",
+              a != b, f"A={a} B={b}")
+        check("the keys include a one-point page and a page with no points",
+              1 in a + b and 0 in a + b, f"A={a} B={b}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     print("TeXLib problem-bank engine correctness tests\n")
     print(f"  build root: {_build_root()}  (override with TEXLIB_TEST_ROOT)")
@@ -503,6 +578,7 @@ def main():
     scenario_ppart_atomicity()
     scenario_importproblem()
     scenario_vmap_emission()
+    scenario_page_points()
 
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0

@@ -297,6 +297,29 @@ exam number/date, version letter (if versioned), the instructions
 `\blankpage`
 Force a blank page between sections.
 
+Running header
+Left: the exam title. Right: the current part, or "Scratch Work" on a
+`\blankpage` leaf. Center: empty on a student copy. On a copy that shows
+solutions (the `solutions` and `instructor` builds), the center of each numbered
+exam page reads the points on that page, "14 points" or "1 point".
+
+| Page | Center header on a solutions copy |
+|---|---|
+| A numbered exam page | The total of the questions and parts that begin on it |
+| A numbered exam page where no pointed item begins | Empty |
+| The cover, a `\blankpage` leaf, a `\scorepage` | Empty |
+
+A point value counts on the page where its own question or part begins. When a
+problem's points are given by part (`\problem[4,2]{id}`, or `\part[n]` in the
+bank), each part counts on its own page. Under `\keylayout{inline}` a key has
+the student copy's pages, so the totals are those of the paper the students
+sat. A compact key reflows: a problem that breaks across two pages splits its
+part points between them, and a page that holds only the end of a solution has
+no total. Extra credit is not counted, as in the `points` check. Each version
+has its own totals, so a `\shuffle`d page carries its total to wherever it
+lands. The totals come from the `.aux` file and appear on the second pass, like
+the "k of n" footer.
+
 `\scorepage[questions]`
 Add a final scoring page (defaults to 20 questions).
 

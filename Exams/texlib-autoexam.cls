@@ -324,7 +324,15 @@
 		% the same page), by which point this environment's own group (and any
 		% plain \def make here) has already closed.
 		\gdef\@lhead{\bfseries\GetExamTitle}%
-		\gdef\@chead{}%
+		% Center: this page's points on a copy that shows solutions, nothing on
+		% a student copy (see \@autoexam@pagepoints).  Decided here, not in the
+		% slot: the header is set when the page ships, and the last page of a
+		% copy can ship after the loop has moved \ifsolutions on to the next.
+		\ifsolutions
+			\gdef\@chead{\@autoexam@pagepoints}%
+		\else
+			\gdef\@chead{}%
+		\fi
 		\gdef\@rhead{\rightmark}%
 		\global\@headruletrue%
 		% Per-copy "X of N": freeze THIS copy's id into the footer denominator.
@@ -332,7 +340,7 @@
 		\xdef\@cfoot{%
 			\noexpand\thepage\noexpand\space of\noexpand\space\noexpand\@ifundefined{r@@lastqpage@\theautoexamcopyno}{\noexpand\numpages}{\noexpand\pageref*{@lastqpage@\theautoexamcopyno}}%
 		}%
-		\gdef\run@chead{}%
+		\global\let\run@chead\@chead
 		\global\let\run@cfoot\@cfoot
 	\fi
 }
@@ -470,6 +478,69 @@
 	\immediate\write\vmapfile{#1|#2|\number\numexpr\value{autoexamabspage}+1\relax}%
 }
 \newcommand{\AutoExamVmapClose}{\immediate\closeout\vmapfile}
+
+% Points on each page -- the center header of a copy that shows solutions reads
+% "14 points", the total of the questions and parts that begin on that page.
+% A page where no pointed item begins reads nothing, as does every page that is
+% not a numbered exam page (the cover, a \blankpage leaf, a \scorepage) and
+% every page of a student copy.
+%
+% Each item counts on the page its own first line is set on: a question whose
+% parts carry the points counts part by part, so when a compact key breaks a
+% problem across two pages each page totals the parts that start on it, and a
+% page holding only the end of a solution has no total.  A \keylayout{inline}
+% key keeps the student copy's pages, so there the totals are that copy's.
+% Extra credit is left out, as it is from the declared total (\extracredit
+% prints its own points; a \bonusquestion is skipped below).
+%
+% Not exam.cls's \pointsonpage: that table is keyed on \thepage, which every
+% copy restarts at 1, so the copies of a versioned exam would add into one
+% another's pages.  The key here is autoexamabspage, which never resets, and
+% that is also what keeps a \shuffle'd version's totals its own.
+%
+% \@readpoints[N] is the one path exam.cls takes for an item that has points
+% (question, part, subpart alike).  The record is a \write whatsit, so its page
+% is read when the page ships; it rides the item's first paragraph (para/begin)
+% rather than the vertical list, where a page break could fall between the
+% record and the line it describes.  An item set in a box that is thrown away
+% (a measuring pass) records nothing.
+%
+% The totals reach the header through the .aux file, so they print from the
+% second pass on, like the "k of n" footer.
+\let\@autoexam@orig@readpoints\@readpoints
+\def\@readpoints[#1]{%
+	\ifsolutions\if@bonus\else\@autoexam@notepoints{#1}\fi\fi
+	\@autoexam@orig@readpoints[#1]%
+}
+\newcommand{\@autoexam@notepoints}[1]{%
+	\begingroup
+		\def\half{.5}%
+		\edef\reserved@a{\endgroup
+			\noexpand\AddToHookNext{para/begin}{\noexpand\@autoexam@writepoints{#1}}}%
+	\reserved@a
+}
+\newcommand{\@autoexam@writepoints}[1]{%
+	\write\@auxout{\string\@autoexam@addpagepoints{\the\c@autoexamabspage}{#1}}%
+}
+% #1 = absolute page, #2 = points.  Read back from the .aux file at
+% \begin{document}; switched off before \end{document} reads the file again.
+\newcommand{\@autoexam@addpagepoints}[2]{%
+	\edef\reserved@a{\fpeval{\ifcsname @autoexam@pts@#1\endcsname
+		\csname @autoexam@pts@#1\endcsname\else 0\fi + #2}}%
+	\expandafter\global\expandafter\let\csname @autoexam@pts@#1\endcsname\reserved@a
+}
+\AddToHook{enddocument/afterlastpage}{\let\@autoexam@addpagepoints\@gobbletwo}
+% The header is set before its page ships and autoexamabspage is stepped as it
+% ships, so the page being headed is the next one.
+\newcommand{\@autoexam@pagepoints}{%
+	\ifcsname @autoexam@pts@\number\numexpr\c@autoexamabspage+1\relax\endcsname
+		\edef\reserved@a{%
+			\csname @autoexam@pts@\number\numexpr\c@autoexamabspage+1\relax\endcsname}%
+		\ifdim\reserved@a\p@>\z@
+			\reserved@a\ \ifdim\reserved@a\p@=\p@ point\else points\fi
+		\fi
+	\fi
+}
 
 % Smart Nested Columns
 \newif\ifinparts
