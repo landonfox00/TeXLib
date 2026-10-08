@@ -126,6 +126,31 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   `exam1_review_instructor.pdf`, a different document that merely starts with
   the same characters.
 
+- **A comment that names `\begin{document}` put the preamble into every copy of
+  a versioned exam.** The version loop typesets each copy from text it reads
+  back out of the source file, from the line after `\begin{document}` to
+  `\end{document}`, and it took the first `\begin{document}` in the file whether
+  or not a `%` stood before it. A header comment above `\documentclass` that
+  mentions the marker therefore started the body: every copy input the rest of
+  the header and the whole preamble ahead of the real body, with
+  `! LaTeX Error: Can be used only in preamble.` at `\documentclass` and again
+  at the real `\begin{document}`, and the class name typeset on a page of its
+  own at the front of the copy. The search for `\end{document}` already passed
+  over a mention that follows an unescaped `%` on its line. Both searches now
+  go through one helper (`find_uncommented` in `problem_engine.lua`), so the
+  body runs from the first `\begin{document}` outside a comment to the first
+  `\end{document}` outside one. A build of a single copy with no `\shuffle`
+  printed correctly before and after: there TeX reads the body itself, and the
+  engine's reading of it feeds only the point check and the score sheet.
+
+  Measured on the new fixture `commented-begin-test.tex`, two versions of a
+  one-problem exam with four comments that name a marker: 4 errors and 4 pages
+  before, no error and 2 pages after. For each of the other 161 `.tex` files in
+  the repository the old and the new reader return the same body, so no
+  document that built correctly reads different text. `test_read_body.lua`
+  (new, runs under `texlua`) checks the reader on 15 sources, and
+  `test_engine_correctness.py` builds the fixture and reads both copies back.
+
 ## [0.9.0] — 2026-09-08
 
 ### Fixed

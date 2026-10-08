@@ -29,6 +29,12 @@ regression anywhere along the engine -> LaTeX -> PDF path is caught:
   * Stretch (import-test): \\importproblem renders a standalone file inline with
     its overrides locking the file's own \\setvar/\\setrng, and push_scope/
     pop_scope keeps the import's variables from leaking out.
+  * Stretch (commented-begin-test): comments name \\begin{document} and
+    \\end{document} before and after the real markers.  The version loop reads
+    its body out of the source (autoexam_read_body), and a mention taken for a
+    marker puts the preamble into every copy, cuts the body short or ends the
+    document after one copy, so the test counts the pages and reads each copy
+    back.
   * Stretch (vmap-test): parses the engine-emitted .vmap version markers and
     pdftotext-slices each copy's page range (the marker EMISSION in
     autoexam_run_versions was never exercised -- only the builder's slicer was).
@@ -437,6 +443,57 @@ def scenario_importproblem():
 
 
 # =============================================================================
+# Stretch: comments that name \begin{document} and \end{document}
+# =============================================================================
+def scenario_commented_markers():
+    print("\n=== Stretch: comments naming \\begin{document} and \\end{document} "
+          "(commented-begin-test) ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_engine_cbegin_")
+    try:
+        pdf, aux, log = build(tmp, "commented-begin-test.tex", "vmap-bank.tex")
+        check("PDF was produced", os.path.exists(pdf), log[-600:])
+        vmap = os.path.join(aux, "commented-begin-test.vmap")
+        check(".vmap file was emitted by the engine", os.path.exists(vmap))
+        if not (os.path.exists(pdf) and os.path.exists(vmap)):
+            return
+
+        # With the header's \begin{document} taken for the marker, the body is
+        # the rest of the file: \documentclass and the real \begin{document}
+        # then run inside every copy, and each is an error there.
+        errors = [ln for ln in log.splitlines() if ln.startswith("! ")]
+        check("the build raises no TeX error", not errors, "; ".join(errors[:4]))
+
+        entries = []
+        with open(vmap, encoding="utf-8") as fh:
+            for line in fh:
+                parts = line.strip().split("|")
+                if len(parts) == 3:
+                    entries.append((parts[0], parts[1], int(parts[2])))
+        # \versions{A,B} and one problem: a copy is one page.  A copy that
+        # inputs the preamble opens with a page holding the class name, which
+        # \documentclass leaves behind when it errors, so B starts on page 3.
+        check("copy A starts on page 1 and copy B on page 2",
+              entries == [("A", "stu", 1), ("B", "stu", 2)], f"entries={entries}")
+        text = pdftext(pdf)
+        pages = text.count("\f")    # pdftotext ends every page with a form feed
+        check("the PDF has two pages, one per copy", pages == 2, f"pages={pages}")
+        for ver, _copy, start in entries:
+            first = flat(pdftext(pdf, first=start, last=start))
+            check(f"copy {ver} opens on its problem page",
+                  "VSTEM" in first, first[:160])
+        check("the class name is not typeset ('autoexam' absent from the text)",
+              "autoexam" not in text, flat(text)[:160])
+        # The two comments that name \end{document} are caught here.  Taken for
+        # the marker, the one in the body ends the body before \begin{problems}
+        # (no copy carries the problem), and the one on the last line pulls the
+        # real \end{document} into the body (the document ends after copy A).
+        stems = text.count("VSTEM")
+        check("the problem is set once in each copy", stems == 2, f"stems={stems}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# =============================================================================
 # Stretch: engine-emitted .vmap version markers
 # =============================================================================
 def scenario_vmap_emission():
@@ -502,6 +559,7 @@ def main():
     scenario_mc_answer_key_shuffle()
     scenario_ppart_atomicity()
     scenario_importproblem()
+    scenario_commented_markers()
     scenario_vmap_emission()
 
     print(f"\n{_PASS} passed, {_FAIL} failed")

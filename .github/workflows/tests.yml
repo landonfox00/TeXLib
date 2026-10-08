@@ -133,6 +133,9 @@ jobs:
   #   * test_exam_seed.lua          -- pure-texlua unit test of set_exam_seed's
   #     per-version decorrelation (needs texlua, hence this job, not the fast
   #     Python-only one). Cheap; run first.
+  #   * test_read_body.lua          -- pure-texlua unit test of autoexam_read_body:
+  #     the version loop's body starts and ends at the first \begin{document} /
+  #     \end{document} that is not in a comment. Same job for the same reason.
   #   * test_shuffle.lua -- the permutation core (problem_shuffle.lua) under
   #     texlua alone: bijection, determinism, seed-sensitivity, extra-credit
   #     pinning. Pure logic, but texlua ships only with TeX Live, so it rides
@@ -169,6 +172,7 @@ jobs:
             pip install --break-system-packages --quiet pypdf==6.16.2 \
               || pip install --quiet pypdf==6.16.2
             texlua test_exam_seed.lua
+            texlua test_read_body.lua
             python3 Sublime/test_biber_integration.py
             python3 Sublime/test_shuffle_integration.py
             python3 Sublime/test_synctex_integration.py
