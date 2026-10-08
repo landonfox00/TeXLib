@@ -21,6 +21,35 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   skipped, since `<base>.pdf` does not survive that one. New setting:
   `open_pdf_early` (default on).
 
+- **The accessible gate builds a tagged `{cols}` and asserts its two columns.**
+  No workflow built one. `accessible.yml` builds the documents registered in
+  `examples/manifest.py`, none of which used the environment, and CI builds
+  its one user in the repository, the scenario `examples/scenarios/exam/cols`,
+  untagged. `{cols}` has wrapped its parts in `multicols` in every build since
+  v0.7.4, and the comment above it in `Exams/texlib-autoexam.cls` keeps the
+  earlier single-column guard for a toolchain whose multicol breaks under
+  tagging. Neither that breakage nor the guard coming back would have turned a
+  check red.
+
+  `examples/fixtures/Exams/cols-test.tex` is a `{cols}` around four `{parts}`,
+  registered with the `smoke` tag, so `smoke_test.py --accessible` builds it
+  tagged and veraPDF 1.30.2 validates it: 2586 checks, 0 failed. veraPDF
+  validates the structure tree and does not read where the text sits. With the
+  guard restored in a scratch copy of the class, the tagged fixture is set in
+  one column and veraPDF reports the same 2586 checks and 0 failed. So
+  `accessible.yml` also runs a new `test_cols_tagged_layout.py`, which builds
+  the fixture as a normal copy and as a tagged copy, reads the word boxes with
+  `pdftotext -bbox`, and requires parts a and b at least 72 pt to the left of
+  parts c and d in each. On TeX Live 2026 they start at 166.61 and 407.28 pt in
+  the normal copy and at 164.79 and 405.46 pt in the tagged copy. With the
+  guard restored all four start at 164.79 pt in the tagged copy and the test
+  fails. The test soft-skips without poppler's `pdftotext`, so the workflow
+  checks for it before the test runs.
+
+  The comment above `{cols}` and the header of the scenario name the fixture
+  and the test. Restoring the guard turns the test red, and the comment says
+  so: the test's expectation for the tagged copy has to change with it.
+
 - **`tagged_twins` / `TEXLIB_TAGGED_TWINS` — keep the write loop off the PDF/UA
   path.** Tagging is where a build's time actually goes. Measured on a
   twelve-version exam: an untagged pass is 6.8s, a tagged one ~20s, and the

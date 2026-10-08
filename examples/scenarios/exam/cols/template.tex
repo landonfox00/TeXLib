@@ -29,6 +29,9 @@
 % left column and 1c and 1d in the right, as the normal build does, and its
 % structure tree holds the four parts as one list in that order. No workflow
 % builds this scenario tagged; `python a11y_gallery.py exam` does, locally.
+% The tagged {cols} that CI builds is examples/fixtures/Exams/cols-test.tex:
+% accessible.yml runs veraPDF on it (`smoke_test.py --accessible`) and asserts
+% its two columns (test_cols_tagged_layout.py).
 \documentclass[
 	exam-number = {6},
 	exam-date   = {Smoke Test Date},

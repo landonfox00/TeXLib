@@ -55,6 +55,12 @@ navigate.
   Extended-A and every curly quote vanished from the page, and a fully
   conformant, fully tagged PDF/UA file carried the wrong text to the screen
   reader. Structure was never the thing that was broken.
+- **The layout of `{cols}`.** veraPDF validates the structure tree and does not
+  read where the text sits, so an exam whose columns had collapsed into one
+  would still conform. The accessible job also runs
+  `test_cols_tagged_layout.py`, which builds one exam's `{cols}` problem as a
+  normal copy and as a tagged copy and requires its parts in two columns in
+  each.
 
 ## Getting the evidence
 
