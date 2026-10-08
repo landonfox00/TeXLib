@@ -189,8 +189,14 @@
 }
 
 % ------------------------------------------------------------------------------
-% Accessible (tagged PDF/UA) theorem environments  (trivlist-free)
+% Accessible (tagged PDF/UA) theorem environments  (trivlist-free; DORMANT)
 % ------------------------------------------------------------------------------
+% No build calls the macros in this block: \__texlib_thm_declare:n reaches them
+% only when \g__texlib_thm_accessible_bool is true, and the line that sets it is
+% commented out (see "Per-environment declaration" below). A tagged build
+% declares the catalog through amsthm + tcolorbox, as a normal build does. The
+% rest of this comment describes the fallback as it worked while it was in use.
+%
 % amsthm builds every theorem on \trivlist, tagged as a list <L>; the body then
 % becomes a <P>/<Sect> directly inside <L> -- a PDF/UA structure-nesting failure
 % ("<L> shall not contain <P>"), the dominant cause of non-conformance in pset
@@ -347,16 +353,17 @@
 
 % Declares one environment from the catalog: amsthm \newtheorem (master counter
 % the first time, sharing it thereafter), its unnumbered `<name>*` twin, and the
-% tcolorbox wrap on both (unless box=none, or an accessible build). Label/style/
-% box are x-expanded into the calls so amsthm/tcolorbox receive literal values —
-% the lookup scratch tls are overwritten on the next iteration.
+% tcolorbox wrap on both (unless box=none), in a tagged build as in a normal
+% one. Label/style/box are x-expanded into the calls so amsthm/tcolorbox receive
+% literal values — the lookup scratch tls are overwritten on the next iteration.
 \cs_new_protected:Npn \__texlib_thm_declare:n #1 {
 	\prop_get:NnNTF \g__texlib_thm_label_prop {#1} \l__texlib_thm_label_tl {
 		\prop_get:NnN \g__texlib_thm_style_prop {#1} \l__texlib_thm_style_tl
 		\prop_get:NnN \g__texlib_thm_box_prop   {#1} \l__texlib_thm_box_tl
 		\bool_if:NTF \g__texlib_thm_accessible_bool {
-			% ACCESSIBLE: self-contained trivlist-free envs sharing one master
-			% counter (see the \texlib@acc@* helpers). No amsthm \newtheorem, so
+			% DORMANT FALLBACK (the flag is never set): self-contained
+			% trivlist-free envs sharing one master counter (see the
+			% \texlib@acc@* helpers). No amsthm \newtheorem, so
 			% cleveref/tcolorbox/trivlist are all sidestepped.
 			\bool_if:NT \l__texlib_thm_first_bool {
 				\tl_set:Nn \l__texlib_thm_master_tl {#1}
@@ -371,7 +378,8 @@
 			\use:x { \exp_not:N \texlib@acc@mkthmstar { \exp_not:n {#1} * }
 				{ \l__texlib_thm_label_tl } { \l__texlib_thm_style_tl } }
 		}{
-			% NORMAL: amsthm \newtheorem (shared master counter) + tcolorbox wrap.
+			% EVERY BUILD, tagged or not: amsthm \newtheorem (shared master
+			% counter) + tcolorbox wrap.
 			\exp_args:NV \theoremstyle \l__texlib_thm_style_tl
 			\bool_if:NTF \l__texlib_thm_first_bool {
 				\tl_set:Nn \l__texlib_thm_master_tl {#1}
