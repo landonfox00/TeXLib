@@ -17,8 +17,8 @@ The largest TeXLib class. Builds randomized, multi-version exams from a problem 
 	(`\ShowKey`/`\keys`) now implies for this class.
 - Smart-columns environment (`problems`) that groups problems into
 	TWO-column or FULL-width layouts based on per-problem hints.
-- Rubric overlays, common-errors lists, and a scorepage option for
-	the final.
+- Grading rubrics and common-errors lists, printed with the solutions
+	they annotate, and a scorepage option for the final.
 - A printable title page assembled from `coursemeta.tex` plus a
 	`\examsetup{number=…, date=…, ps=…}` preamble call.
 
@@ -70,8 +70,9 @@ lualatex exam5.tex
 For the answer key, redefine `\ShowKey` (or call `\keys` in source)
 and recompile. This builds the instructor **key copies only** (no blank
 student copy) — each problem interleaved with its solution, and one key
-per version in a multi-version exam. Add `\def\ShowRubric{}` to also
-overlay the grading rubrics. To build the blank student copies **and**
+per version in a multi-version exam. Add `\def\ShowRubric{}` to print
+each solution's grading rubric under its answer; that build also emits
+the blank student copies. To build the blank student copies **and**
 the keys together (the fuller production build the Sublime builder then
 slices apart), use `\def\ShowSolutions{}` instead.
 
@@ -146,8 +147,10 @@ The cover word is keyed on `\ifinstructor`, not `\ifkey`: after the 0.8.0
 rename the student-facing key is the `solutions` build, so labelling it
 "Answer Key" while the instructor copy said "Solutions" had the two backwards.
 
-`\ShowRubric` / `\rubrics` overlays the grading rubrics on top of either
-(rubrics live inside a shown solution, so they need one of the above too).
+`\ShowRubric` / `\rubrics` prints the grading rubrics and common-error lists
+with the solutions they annotate, so they show only in a copy that shows
+solutions. `\ShowRubric` raises `\ifsolutions` itself; `\rubrics` in the source
+raises `\ifrubric` alone and needs `\solutions` or `\keys` beside it.
 
 ### Problem bank workflow
 
@@ -225,10 +228,21 @@ Solution body. Visible only in key/solutions builds.
 Per-part solution paired with `\part`.
 
 `\rubric{points}{description}`
-Add a rubric line. Rendered as an overlay in rubric builds.
+Add a rubric line to the solution it is written in. It prints in a build that
+shows rubrics (see [Build flags](#build-flags-texlib-unified-cli)). A
+whole-problem `{solution}` sets its rubric in the grading footer: under the
+worked answer, inside the solution's box, on the right, with `{commonerrors}`
+on the left. A `{partsolution}` sets its rubric in a right-aligned box under
+the part's answer, and `\rubricboxwidth` is that box's width. A problem in
+`{mcproblems}` prints no rubric. The layout is `\@emit@sol@footer` and
+`\@emit@rubric@overlay` in `texlib-solutions.sty`.
 
 `\begin{commonerrors} ... \end{commonerrors}`
-List common student errors; renders only in solutions/key build.
+List common student errors. It prints only in a build that shows rubrics: an
+instructor copy has it and a `solutions` key does not. Inside a `{solution}` it
+is the left panel of the grading footer, wherever in the solution it is
+written; inside a `{partsolution}` it prints where it stands. A problem in
+`{mcproblems}` prints none.
 
 `\ppart`
 Insert a part marker compatible with the autoexam shuffler.
