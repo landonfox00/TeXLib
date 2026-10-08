@@ -3104,10 +3104,7 @@ class TexlibBuildCore:
 
         An accessible build publishes its TAGGED half. The shareable copies are
         precisely the files that go up to WebCampus, where an untagged PDF is
-        what the LMS accessibility checker flags -- and where the tagged twin
-        costs nothing visually for the only two publishable classes: syllabus and
-        schedule box no theorems, so the tcolorbox fallback that makes the tagged
-        variant plainer elsewhere never fires for them.
+        what the LMS accessibility checker flags.
 
         Gated on THIS build having produced the tagged file. A stale
         <base>_accessible.pdf left behind by an earlier accessible run must never
