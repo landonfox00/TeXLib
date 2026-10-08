@@ -271,9 +271,11 @@ Set a problem's parts in `n` columns (default 2), inside a problem body.
 The nesting order matters and the failures are quiet. Inverted — `{parts}`
 outside, `{cols}` in — the build dies with "missing `\item`". Used with bare
 `\ppart` and no inner `{parts}` at all, every item is silently dropped and
-the PDF still builds clean. In an accessible build `{cols}` drops to a single
-column (multicol cannot be tagged); the parts and their labels survive, only
-the two-up layout is lost.
+the PDF still builds clean.
+
+An accessible build keeps the columns. In the tagged PDF's structure tree the
+parts are one list in label order, so the reading order runs down the first
+column and then the next.
 
 > **Never use `{cols}` in a problem that lives in a shared bank.** `cols` is
 > defined by `autoexam.cls` **only** — `quiz.cls` does not have it. A bank

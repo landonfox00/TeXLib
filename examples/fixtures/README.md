@@ -25,6 +25,7 @@ sibling or use any module's class.
 | Module | Entry | Exercises |
 |--------|-------|-----------|
 | `Exams` | `fix-test.tex` (+ `fix-bank.tex`) | the `\problem{id}[a=1,b=2]` fix-overrides syntax |
+| `Exams` | `cols-test.tex` | `{cols}` around `{parts}`, the one tagged `{cols}` the accessible gate builds; `test_cols_tagged_layout.py` asserts that the tagged copy keeps the two columns |
 | `Metadata` | `metadata-test.tex` (+ `coursemeta.tex`) | `course-metadata.sty`'s arbitrary-key catch-all + `\Get<Key>` derivation |
 | `Notes` | `theorem-numbering.tex` | didactic's shared-counter, section-based theorem numbering (`Theorem 1.1`, `Definition 1.2`, … resetting per `\section`) |
 | `MathML` | `nth-root-mathml.tex` | two or more `\sqrt[n]{…}` in ONE formula — the shape that aborts a tagged build under `mathml-SE` |
