@@ -281,11 +281,10 @@ RENAMED_MODES = {
 
 # --- Accessible (tagged PDF/UA) mode ----------------------------------------
 # A PAIRED build: the document is typeset twice and both PDFs are kept, as
-# <base>.pdf (normal) and <base>_accessible.pdf (tagged). Pairing rather than
-# replacing is deliberate -- tagging=on costs real visual fidelity (tcolorbox
-# wraps are dropped because their inner list breaks under tagging; see
-# texlib-thmenv.sty), so the normal PDF stays the pretty one for print and
-# lecture while the tagged twin is the one a screen reader can navigate.
+# <base>.pdf (normal) and <base>_accessible.pdf (tagged). Both are kept because
+# the tagged twin is a separate run whose spacing and page breaks can differ
+# from the normal PDF's, so the normal PDF stays the one for print and lecture
+# while the tagged twin is the one a screen reader can navigate.
 #
 # The two halves use DIFFERENT engines on purpose. The normal half keeps the
 # class's natural engine (pdflatex for syllabus/notes/pset), so the primary PDF
@@ -3105,10 +3104,7 @@ class TexlibBuildCore:
 
         An accessible build publishes its TAGGED half. The shareable copies are
         precisely the files that go up to WebCampus, where an untagged PDF is
-        what the LMS accessibility checker flags -- and where the tagged twin
-        costs nothing visually for the only two publishable classes: syllabus and
-        schedule box no theorems, so the tcolorbox fallback that makes the tagged
-        variant plainer elsewhere never fires for them.
+        what the LMS accessibility checker flags.
 
         Gated on THIS build having produced the tagged file. A stale
         <base>_accessible.pdf left behind by an earlier accessible run must never
