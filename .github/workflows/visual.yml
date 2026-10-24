@@ -55,7 +55,8 @@ jobs:
       # the log), and an `update_refs` dispatch dies the same way BEFORE
       # regenerating, so its artifact is the plain checkout -- check
       # .regen-manifest before committing anything from it. Bumped to
-      # 7.1.2.30-r0 on 2026-08-30.
+      # 7.1.2.30-r0 on 2026-08-30, and to 7.1.2.34-r0 on 2026-10-24 when
+      # Alpine dropped 7.1.2.30-r0 the same way.
       # 20260701 is TeX Live 2026; the refs are regenerated in this same
       # container (update_refs dispatch), so refs and checks share a toolchain.
       - name: Visual regression in pinned TeX Live
@@ -65,7 +66,7 @@ jobs:
           # poppler-utils -> pdftoppm (PDF->PNG); imagemagick -> magick compare.
           run: |
             set -e
-            apk add --no-cache python3 poppler-utils=25.12.0-r1 imagemagick=7.1.2.30-r0
+            apk add --no-cache python3 poppler-utils=25.12.0-r1 imagemagick=7.1.2.34-r0
             # Fail loudly if the compare tool is missing: smoke_test soft-skips
             # visual checks when ImageMagick is absent, which would make this
             # gate pass vacuously.
