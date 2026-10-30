@@ -512,6 +512,12 @@
 % solution column outgrow the choices, pushing problems onto extra pages.
 \newlength{\@sol@outervsep}
 \setlength{\@sol@outervsep}{10pt}
+% How far right of the text margin a {solution} box starts; it still ends at the
+% right margin. \texlib@sol@setinset sets it at \begin{solution}. The default is
+% zero, the full-bleed box; autoexam indents a problem that has no parts to its
+% body, where a part's solution would start (texlib-autoexam.cls).
+\newdimen\texlib@sol@inset
+\providecommand{\texlib@sol@setinset}{\texlib@sol@inset\z@}
 \let\solution\relax
 \let\endsolution\relax
 \newenvironment{solution}{%
@@ -522,8 +528,9 @@
 		\gdef\@sol@cerr{}%
 		\@in@solutiontrue
 		\texlib@acc@solbegin
+		\texlib@sol@setinset
 		\setbox\@sol@box\vbox\bgroup
-			\hsize\dimexpr\textwidth-12pt\relax
+			\hsize\dimexpr\textwidth-12pt-\texlib@sol@inset\relax
 	\else
 		\gdef\@sol@cerr{}%
 		% ACCESSIBLE: close the stem's paragraph before opening the discard box.
@@ -585,7 +592,7 @@
 		% in the narrow side-by-side MC-key column (the body sat a full extra line
 		% below where the formula assumed), leaving the last line outside the fill.
 		\setbox\@sol@vtop\vtop{%
-			\hsize\dimexpr\textwidth-12pt\relax
+			\hsize\dimexpr\textwidth-12pt-\texlib@sol@inset\relax
 			% ACCESSIBLE: the header line goes to the front of the solution's
 			% <Div>; see \texlib@acc@solbegin.
 			\texlib@acc@solheadbegin
@@ -635,8 +642,8 @@
 		% was tagged when it was typeset.
 		\def\@sol@frame{%
 			\texlib@acc@artifactbegin
-			\hspace*{-\@totalleftmargin}%
-			\parbox[t]{\dimexpr\textwidth-12pt\relax}{%
+			\hspace*{\dimexpr\texlib@sol@inset-\@totalleftmargin\relax}%
+			\parbox[t]{\dimexpr\textwidth-12pt-\texlib@sol@inset\relax}{%
 				\noindent
 					% Green fill + left accent \smash\rlap'd BEHIND the content on this
 					% one line (the \box\@sol@vtop below shares this baseline = the
@@ -663,7 +670,7 @@
 					% (recreatable from SYNCTEX.md) rather than reasoning.
 					\smash{\rlap{\hspace{-6pt}\textcolor{\texlibsoltint}{%
 						\rule[-\dp\@sol@vtop]%
-							{\dimexpr\textwidth\relax}%
+							{\dimexpr\textwidth-\texlib@sol@inset\relax}%
 							{\dimexpr\ht\@sol@vtop+\dp\@sol@vtop\relax}}}}%
 					% Left accent, top/bottom flush with the green fill (the same 6pt
 					% pad), reading as a full-height left border like pset/didactic's

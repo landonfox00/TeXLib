@@ -316,6 +316,13 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   printed the red `\todo` placeholder meant for the exam whose date nobody
   remembered. The cover line is emitted conditionally too, so an absent date
   leaves no blank strut behind.
+- **An exam problem with no parts lines its solution up with the parts'.** In
+  an autoexam key, a part's solution starts at the part's text, but a problem
+  with no parts had its `{solution}` pulled back to the text margin, about 42pt
+  further left. It now starts where a part's solution would and still ends at
+  the right margin. Quiz and bank keep the full-width box. `\splitpage` gave its
+  parts a margin 1pt wider than every other `{parts}`, so it now keeps
+  exam.cls's; on a student copy only a `\splitpage` problem moves, 1pt left.
 
 ### Fixed
 
