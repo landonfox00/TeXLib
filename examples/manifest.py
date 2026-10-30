@@ -69,14 +69,16 @@ class Example:
     expect    substrings that must appear in the rendered PDF text
     absent    substrings that must NOT appear (the negative mirror of expect)
     artifact  glob patterns for sidecars that must exist and be non-empty
+    tagged    {standard structure type: count} the ACCESSIBLE build's structure
+              tree must carry exactly, e.g. {"L": 11, "LI": 27}
     note      why this example exists at all -- the thing a list of paths loses
     """
 
     __slots__ = ("module", "template", "kind", "tags", "expect", "absent",
-                 "artifact", "note")
+                 "artifact", "tagged", "note")
 
     def __init__(self, module, template, kind, tags,
-                 expect=(), absent=(), artifact=(), note=""):
+                 expect=(), absent=(), artifact=(), tagged=None, note=""):
         self.module = module
         self.template = template
         self.kind = kind
@@ -84,6 +86,7 @@ class Example:
         self.expect = tuple(expect)
         self.absent = tuple(absent)
         self.artifact = tuple(artifact)
+        self.tagged = dict(tagged or {})
         self.note = note
 
 
@@ -182,6 +185,19 @@ EXAMPLES = [
                  "counters would renumber Definition to 1.1, a flat scheme "
                  "would drop the '.1', and a missing reset would make the "
                  "section-2 boxes 1.4/1.5."),
+    Example("examples/fixtures/Notes", "tasks-tagging.tex", "fixture", _FIXTURE,
+            expect=["GRIDMARK", "DISPLAYMARK", "COLUMNMARK", "RUNINMARK",
+                    "PARTSMARK", "RICHMARK", "LABELMARK", "GATEDMARK"],
+            tagged={"L": 11, "LI": 27, "LBody": 27},
+            note="Nine {tasks} grids. The tasks package is not tagging-aware: "
+                 "a tagged row was paragraphs nested in a paragraph, and the "
+                 "accessible build failed ISO 32005 Table 5 (P-P and P-Part), "
+                 "50 checks on this document. "
+                 "texlib-tasks.sty retags a grid as a list. veraPDF asserts "
+                 "the nesting; tagged= asserts that each of the 23 tasks is a "
+                 "list item, which a legal tree of loose paragraphs would not "
+                 "be. The other two lists and four items are the fixture's "
+                 "own {parts} and {itemize}."),
     Example("examples/fixtures/MathML", "nth-root-mathml.tex", "fixture", _FIXTURE,
             expect=["RADPRODUCTMARK", "RADQUOTIENTMARK", "RADCANCELMARK",
                     "RADEXPONENTMARK"],
@@ -287,6 +303,11 @@ def expect_absent():
 def expect_artifact_nonempty():
     """{(module, template): [glob]} -- sidecars that must exist and be non-empty."""
     return {(e.module, e.template): list(e.artifact) for e in EXAMPLES if e.artifact}
+
+
+def expect_tagged():
+    """{(module, template): {structure type: count}} for the accessible build."""
+    return {(e.module, e.template): dict(e.tagged) for e in EXAMPLES if e.tagged}
 
 
 def visual_modules():
