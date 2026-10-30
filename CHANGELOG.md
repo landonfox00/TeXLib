@@ -85,6 +85,26 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   chooses, as before. `test_solution_inline_fit.py` asserts all four cases on
   word positions from `pdftotext -bbox`.
 
+- **An inline key solution taller than its answer space is reported by name.**
+  Where the fit pass made room, the key's page stopped matching the student
+  copy's and the log said only `made room for N tall solution(s)`; on a Math
+  126 review a part answer longer than its `\workbox` moved the parts after it
+  and pushed a page over, and nothing in the build said so. It is now a
+  `Package texlib-solutions Warning` that names the page (and the version, in a
+  document of several), each solution that ran over by the label the student
+  copy prints (`15b`), how many points it ran over, how far that moved what
+  follows it, and what to change: more stretch on the `\problem` line, a bigger
+  `\workbox`, or a shorter solution. The warning for a page that cannot hold its
+  solutions names them too. The label rides on a second attribute of each
+  overlay's marker box, an index into a table in `texlib_keyfit.lua` filled
+  when the solution is typeset. The build reads both warnings back out of each
+  key compile's final log (`keyfit_notices` in `texlib_buildspec.py`) and ends
+  the summary with one line per page, a page found in several keys printed once
+  with every PDF named. The CLI repeats the block on stderr, under `--quiet`
+  too; Sublime shows it in the build panel and the status bar, the one warning
+  a successful build opens the panel for. A key whose solutions all fit prints
+  nothing extra.
+
 - **The viewer opens on `<base>.pdf` as soon as the base compile ends, not when
   the fan-out does.** That PDF is final at that moment — everything after it
   writes *other* files (the tagged twins, the variant copies, the per-version

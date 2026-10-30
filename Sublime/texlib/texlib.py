@@ -113,13 +113,24 @@ def _aux_log_path(tex_root):
     return os.path.join(tempfile.gettempdir(), "texlib-aux", key, base + ".log")
 
 
-def _build_report(base, errors, warnings, log_path):
+def _build_report(base, errors, warnings, log_path, keyfit=()):
     """The condensed failure report: a header with counts, the clickable file:line
     errors, warnings (capped), and a clickable full-log link. Error and log lines
-    are unprefixed `path:line: msg` so result_file_regex makes them jump."""
+    are unprefixed `path:line: msg` so result_file_regex makes them jump.
+
+    `keyfit` is the core's keyfit_summary: inline-key pages whose solutions did
+    not fit. They get their own block above the warnings. As warnings they were
+    one first line among dozens, cut at MAX_WARNINGS, with the solutions named
+    only on the continuation lines WARNING_RE does not keep."""
     out = ["", "==== TeXLib: %s -- %d error(s), %d warning(s) ===="
            % (base, len(errors), len(warnings)), ""]
     out.extend(errors)
+    if keyfit:
+        if errors:
+            out.append("")
+        out.append("TeXLib: inline key solutions taller than their answer space:")
+        out.extend("    " + row for row in keyfit)
+        out.append("  " + texlib_build.KEYFIT_ADVICE)
     shown = warnings[:MAX_WARNINGS]
     if shown:
         out.append("")
@@ -833,6 +844,8 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
 
         def on_finish(state, error_lines, warning_lines):
             # Runs in the worker; marshal all UI changes to the main thread.
+            keyfit = list(getattr(host, "keyfit_summary", None) or [])
+
             def apply():
                 if state == "cancelled":
                     view.set_status("texlib_build", "TeXLib: build cancelled.")
@@ -845,7 +858,20 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                         # was otherwise empty; in 'always' this appends after the
                         # streamed raw log.
                         _echo(panel, _build_report(
-                            base, error_lines, warning_lines, log_path))
+                            base, error_lines, warning_lines, log_path, keyfit))
+                        _show_panel(window, root)
+                elif keyfit:
+                    # An inline key whose solutions did not fit is the one
+                    # warning a successful build shows the panel for: the PDF
+                    # looks finished, and only this says that its pages no
+                    # longer match the student copy's.
+                    view.set_status(
+                        "texlib_build",
+                        "TeXLib: built %s — key solutions too tall on %d "
+                        "page(s)" % (base, len(keyfit)))
+                    if show_mode != "never":
+                        _echo(panel, _build_report(
+                            base, [], warning_lines, log_path, keyfit))
                         _show_panel(window, root)
                 else:  # ok
                     nwarn = len(warning_lines)
@@ -867,7 +893,7 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                             _hide_panel(window, root)
                 sublime.set_timeout(
                     lambda: view.erase_status("texlib_build"),
-                    8000 if state == "error" else 4000)
+                    8000 if state == "error" or keyfit else 4000)
             sublime.set_timeout(apply, 0)
 
         cancel = threading.Event()

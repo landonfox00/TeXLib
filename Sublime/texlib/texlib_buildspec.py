@@ -268,3 +268,93 @@ def verapdf_report_cmd(exe, pdf_path, fmt="html", itemize=False):
         cmd.append("--success")
     cmd.append(pdf_path)
     return cmd
+
+
+# --- Inline-key fit -----------------------------------------------------------
+# texlib_keyfit.lua warns when a solution in an inline key is taller than the
+# answer space it is drawn into: either the page made room, and the key no
+# longer matches the student copy, or the page could not, and the key has a page
+# more. Either way the warning is one of many in a long log, and its detail is
+# on the continuation lines, which a host's warning list does not keep. So the
+# build reads the warnings back out of each lane's final log and gives them a
+# block of their own in the summary. The patterns are the Lua's wording.
+
+KEYFIT_HEAD_RE = re.compile(
+    r"^Package texlib-solutions Warning: Page (\d+)(?: \(version (.+?)\))?"
+    r"(?:: (?:a solution is|\d+ solutions are) too tall\.|"
+    r" (cannot hold its solutions):)$")
+KEYFIT_CONT = "(texlib-solutions)"
+KEYFIT_SOLUTION_RE = re.compile(r"^(.+?): (\d+)pt too tall(?:; (.+))?$")
+KEYFIT_NEED_RE = re.compile(r"^they need ([\d.]+)pt more room")
+# The engine's max_print_line: a longer line goes on in the next one.
+LOG_WIDTH = 79
+
+
+def _unwrapped_log_lines(log_text):
+    lines = (log_text or "").splitlines()
+    out, i = [], 0
+    while i < len(lines):
+        line = lines[i]
+        while (len(line) == LOG_WIDTH and i + 1 < len(lines)
+               and not lines[i + 1].startswith((KEYFIT_CONT, "Package "))):
+            i += 1
+            line += lines[i]
+        out.append(line)
+        i += 1
+    return out
+
+
+def keyfit_notices(log_text):
+    """One dict per key page whose solutions did not all fit, in log order.
+
+    Keys: `page` (as the footer prints it), `version` (None in a document of
+    one), `added` (True when the page could not hold its solutions and the key
+    continues on an added page), `short` (how many points that page lacked,
+    as the log prints it, else None) and `solutions`: one (label, over,
+    effect) per solution that ran over, with the label the student copy
+    prints ("15b", or "a solution"), whole points, and what that did to the
+    items after it ("what follows moved 12pt"; empty on an added page).
+    """
+    notices = []
+    lines = _unwrapped_log_lines(log_text)
+    i = 0
+    while i < len(lines):
+        head = KEYFIT_HEAD_RE.match(lines[i])
+        i += 1
+        if not head:
+            continue
+        notice = {"page": int(head.group(1)), "version": head.group(2),
+                  "added": bool(head.group(3)), "short": None,
+                  "solutions": []}
+        while i < len(lines) and lines[i].startswith(KEYFIT_CONT):
+            body = lines[i][len(KEYFIT_CONT):].strip()
+            i += 1
+            m = KEYFIT_NEED_RE.match(body)
+            if m:
+                notice["short"] = m.group(1)
+                continue
+            m = KEYFIT_SOLUTION_RE.match(body)
+            if m:
+                notice["solutions"].append(
+                    (m.group(1), int(m.group(2)), m.group(3) or ""))
+        notices.append(notice)
+    return notices
+
+
+def keyfit_notice_text(notice):
+    """A notice as one line of the build summary, without the PDF's name."""
+    where = f"page {notice['page']}"
+    if notice["version"]:
+        where = f"version {notice['version']}, {where}"
+    if notice["added"]:
+        short = f" ({notice['short']}pt short)" if notice["short"] else ""
+        tall = ", ".join(f"{label} ({over}pt)"
+                         for label, over, _e in notice["solutions"])
+        return (f"{where} cannot hold its solutions{short}; the key continues"
+                f" on an added page. Too tall: {tall}")
+    parts = []
+    for label, over, effect in notice["solutions"]:
+        name = f"problem {label}" if label[:1].isdigit() else label
+        parts.append(f"{name} is {over}pt too tall"
+                     + (f" ({effect})" if effect else ""))
+    return f"{where}: " + "; ".join(parts)

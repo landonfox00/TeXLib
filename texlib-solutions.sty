@@ -94,13 +94,31 @@
 % off the finished page and makes room where a solution came out taller than
 % its blank; see that file. Under an engine without attributes the marker is
 % a plain box and the overlay is unbounded, as it always was.
+%
+% A second attribute names the solution, so that a warning about it can say
+% which one it is: an index into texlib_keyfit's list of labels, each the
+% label the student copy prints (\@sol@label, "15b" for a part), with the
+% version when the document has several.
 \ifdefined\directlua
 	\newattribute\@sol@reach
 	\edef\@sol@reachattr{\the\allocationnumber}
-	\newcommand{\@sol@marker}[2]{\hbox attr\@sol@reachattr=\number\dimexpr#1\relax{#2}}
+	\newattribute\@sol@which
+	\edef\@sol@whichattr{\the\allocationnumber}
+	\newcommand{\@sol@marker}[2]{\hbox
+		attr\@sol@reachattr=\number\dimexpr#1\relax
+		attr\@sol@whichattr=\directlua{tex.sprint(texlib_keyfit.name(
+			"\luaescapestring{\@sol@label}", "\luaescapestring{\@sol@version}"))}%
+		{#2}}
 \else
 	\newcommand{\@sol@marker}[2]{\hbox{#2}}
 \fi
+\newcommand{\@sol@label}{}
+\newcommand{\@sol@qlabel}{\ifdefined\c@question\thequestion\fi}
+\newcommand{\@sol@plabel}{\@sol@qlabel\ifdefined\c@partno\thepartno\fi}
+\newcommand{\@sol@version}{%
+	\ifcsname @autoexam@versions\endcsname
+		\ifx\@autoexam@versions\@empty\else\theExamVersion\fi
+	\fi}
 \newcommand{\@sol@overlay}[2]{%
 	\begingroup
 		\parskip\z@skip
@@ -162,7 +180,8 @@
 	\AddToHook{build/page/before}{%
 		\@sol@spillstate\z@
 		\directlua{texlib_keyfit.fit(\number\@outputbox, \@sol@reachattr,
-			\ifdefined\pbank@sepattrnum \pbank@sepattrnum \else -1 \fi)}%
+			\ifdefined\pbank@sepattrnum \pbank@sepattrnum \else -1 \fi,
+			\@sol@whichattr)}%
 		\ifnum\@sol@spillstate>\z@
 			\begingroup
 				\vbadness\@M \vfuzz\maxdimen
@@ -573,6 +592,7 @@
 		\ifsolinline
 			\@sol@reachdim\dimexpr\baselineskip+\dp\@sol@vtop+6\p@\relax
 			\sbox\@sol@outer{\raisebox{-\baselineskip}[\z@][\z@]{\@sol@frame}}%
+			\let\@sol@label\@sol@qlabel
 			\@sol@overlay\@sol@outer\@sol@reachdim
 		\else
 			\noindent\@sol@frame
@@ -702,6 +722,7 @@
 			% got no interline glue and sat about 3pt high, once per part
 			% solution, so a page of four part answers lost 12pt before its next
 			% problem.
+			\let\@sol@label\@sol@plabel
 			\@sol@overlay\@partsol@outer\@sol@reachdim
 		\else
 			\par\noindent\box\@partsol@outer\par\smallskip

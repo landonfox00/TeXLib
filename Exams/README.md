@@ -246,8 +246,29 @@ solutions passes PDF/UA-2 compact and fails four Table 5 rules inline.
 Where a solution is taller than the blank it is drawn into, the space after it
 grows to hold it and the page's other answer spaces give that up in proportion
 to their stretch. The page height does not change, and a page on which every
-solution fits is left exactly as the student copy. The log records each page
-where room was made (`made room for N tall solution(s)`).
+solution fits is left exactly as the student copy. Where room was made, the key
+page no longer matches the student page, and the build warns, naming each
+solution by the label the student copy prints:
+
+```
+Package texlib-solutions Warning: Page 2 (version B): a solution is too tall.
+(texlib-solutions)                15b: 23pt too tall; what follows moved 23pt
+(texlib-solutions)                The key no longer matches the student copy.
+(texlib-solutions)                Fix: more stretch (\problem[pts][stretch]),
+(texlib-solutions)                a bigger \workbox, or a shorter solution.
+```
+
+The version appears only in a document of several. The build summary repeats
+every such page, from every key the build wrote, in a block of its own:
+
+```
+TeXLib: inline key solutions taller than their answer space:
+    exam_solutions.pdf  version B, page 2: problem 15b is 23pt too tall (what follows moved 23pt)
+```
+
+The CLI prints the block again at the end of its output, under `--quiet` too,
+and Sublime shows it in the build panel and the status bar. A build whose key
+solutions all fit prints nothing extra.
 
 A page whose solutions cannot fit at all, however the space is shared, is split:
 what fits stays, the rest continues on one added page, and the pages after it
@@ -260,7 +281,10 @@ copy, and the build says so:
 Package texlib-solutions Warning: Page 3 cannot hold its solutions:
 (texlib-solutions)                they need 41.5pt more room than it has;
 (texlib-solutions)                the key continues on an added page.
+(texlib-solutions)                5a: 30pt too tall
 ```
+
+It has a line in the summary block above as well.
 
 To get that key back onto the student copy's pages, give the page the room it is
 short of: a larger stretch on the `\problem` line, a smaller figure, or one
