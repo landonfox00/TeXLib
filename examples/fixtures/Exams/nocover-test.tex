@@ -1,0 +1,47 @@
+% nocover-test.tex -- two versions x (student + key) = four copies of an exam
+% with no cover page, for the per-copy assertions in test_engine_correctness.py.
+%
+% With no \maketitle, the version loop (\AutoExamBeginCopy) is the only thing
+% that restarts a copy's problem-section state. Each piece of that state has
+% something here to show it:
+%   - Two sections. The Part counter has to restart for every copy to read
+%     Part I, Part II, and the first section of a copy is what restarts the
+%     page number and takes the copy's own "X of N" denominator.
+%   - Three problems across the two sections. The question number carried from
+%     section to section has to restart for every copy to read Problem 1 to
+%     Problem 3.
+%   - A line of text before the first section, and {mcproblems} LAST. A section
+%     that follows an {mcproblems} skips its \clearpage, so unless that flag is
+%     cleared the next copy's first section starts on the page the text is on.
+\documentclass{autoexam}
+\versions{A,B}
+\setexamseed{7}
+\solutions
+\examsetup{number=1, date={Engine Test}}
+
+\begin{problem}{ncone}[topic=fr]
+	NCSTEMONE first free-response stem.
+\end{problem}
+
+\begin{problem}{nctwo}[topic=fr]
+	NCSTEMTWO second free-response stem.
+\end{problem}
+
+\begin{problem}{ncmc}[topic=mc]
+	NCSTEMMC multiple-choice stem.
+	\begin{choices}
+		\cchoice NCRIGHT
+		\choice NCWRONG
+	\end{choices}
+\end{problem}
+
+\begin{document}
+NCFRONT text before the first section.
+\begin{problems}
+	\problem{ncone}
+	\problem{nctwo}
+\end{problems}
+\begin{mcproblems}
+	\problem{ncmc}
+\end{mcproblems}
+\end{document}

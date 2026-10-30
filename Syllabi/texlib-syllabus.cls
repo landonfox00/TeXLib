@@ -157,8 +157,16 @@
 		{ \tl_use:c { g__meta_short-title_tl } }
 }
 
+% \IfSyllSet{<name>}{<true>}{<false>} -- kept for documents written before these
+% fields moved into coursemeta. It used to test g__syll_<name>_tl, a store
+% nothing defines any more, so it answered <true> for every field. It now asks
+% \IfMetaSet, mapping the old underscored names (class_time) to the coursemeta
+% keys (class-time).
+\str_new:N \l__syll_key_str
 \NewDocumentCommand{\IfSyllSet}{ m +m +m } {
-	\tl_if_empty:cTF { g__syll_#1_tl } { #3 } { #2 }
+	\str_set:Nn \l__syll_key_str {#1}
+	\str_replace_all:Nnn \l__syll_key_str { _ } { - }
+	\exp_args:NV \IfMetaSet \l__syll_key_str {#2} {#3}
 }
 
 \ExplSyntaxOff

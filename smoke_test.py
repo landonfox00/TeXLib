@@ -230,6 +230,11 @@ EXPECT_ABSENT = _manifest.expect_absent()
 # bug. Patterns are globbed inside the build's temp dir.
 EXPECT_ARTIFACT_NONEMPTY = _manifest.expect_artifact_nonempty()
 
+# Structure-element counts, by standard type, that a document's ACCESSIBLE build
+# must carry exactly -- {"L": 11, "LI": 27}. Read only by check_tagged_structure,
+# which says why veraPDF passing is not the same assertion.
+EXPECT_TAGGED = _manifest.expect_tagged()
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -485,6 +490,105 @@ def check_verapdf(pdf_path: str) -> tuple[list[str], bool]:
     detail = f" -- failed clause(s): {', '.join(clauses[:6])}" if clauses else ""
     more = f" (+{len(clauses) - 6} more)" if len(clauses) > 6 else ""
     return [f"PDF/UA-2 non-compliant{detail}{more}"], False
+
+
+def _pdf_obj(x):
+    """Dereference a pypdf indirect object; anything else passes through."""
+    return x.get_object() if hasattr(x, "get_object") else x
+
+
+def _struct_role(elem) -> str:
+    """
+    The standard structure type a structure element resolves to.
+
+    The LaTeX tagging code writes tag names of its own ("item", "itembody",
+    "text-unit") in a namespace of its own, and that namespace's /RoleMapNS maps
+    each one to a standard type. An element with no namespace, or whose
+    namespace has no entry for its name, is standard already.
+
+    The document-level /RoleMap is deliberately not consulted. It is the PDF 1.7
+    fallback, and it maps PDF 2.0 types DOWN (Artifact to Private, Title to P),
+    which would miscount exactly the types a PDF/UA-2 file is built from.
+    """
+    name, ns = elem.get("/S"), elem.get("/NS")
+    for _ in range(8):  # a role map can chain; eight hops is past any real one
+        ns = _pdf_obj(ns)
+        if ns is None:
+            break
+        target = _pdf_obj((_pdf_obj(ns.get("/RoleMapNS")) or {}).get(name))
+        if target is None:
+            break
+        if isinstance(target, list):
+            name, ns = target[0], target[1]
+        else:
+            name, ns = target, None
+    return str(name).lstrip("/")
+
+
+def check_tagged_structure(module: str, template: str,
+                           pdf_path: str) -> tuple[list[str], bool]:
+    """
+    Count the structure elements of an accessible build against the document's
+    `tagged=` declaration in examples/manifest.py. Returns (problems, skipped);
+    skipped when pypdf is unavailable. A document that declares nothing is not
+    checked.
+
+    veraPDF answers whether the tree is legal. It cannot answer whether the
+    tree says what the page says: six tasks tagged as six loose paragraphs are
+    legal, and are not a list. This counts, by standard type, and the counts
+    must match exactly.
+
+    One shape is checked beyond the counts, because a count cannot see order:
+    every list item must hold a label and then a body. The tasks package sets a
+    task's text before its label, and a tree built in that order reads every
+    item backwards.
+    """
+    expected = EXPECT_TAGGED.get((module, template))
+    if not expected:
+        return [], False
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return [], True  # soft skip: pypdf not installed
+    try:
+        root = _pdf_obj(PdfReader(pdf_path).trailer["/Root"].get("/StructTreeRoot"))
+        if root is None:
+            return ["tagged structure: the PDF has no structure tree"], False
+
+        def children(node):
+            kids = _pdf_obj(node.get("/K"))
+            if kids is None:
+                return []
+            kids = kids if isinstance(kids, list) else [kids]
+            out = []
+            for kid in kids:
+                kid = _pdf_obj(kid)
+                # Marked-content ids are integers, and marked-content and
+                # object references are dictionaries with no /S.
+                if hasattr(kid, "get") and kid.get("/S") is not None:
+                    out.append(kid)
+            return out
+
+        counts: dict[str, int] = {}
+        backwards = 0
+        pending = children(root)
+        while pending:
+            elem = pending.pop()
+            role = _struct_role(elem)
+            counts[role] = counts.get(role, 0) + 1
+            kids = children(elem)
+            if role == "LI" and [_struct_role(k) for k in kids] != ["Lbl", "LBody"]:
+                backwards += 1
+            pending.extend(kids)
+    except Exception as exc:  # noqa: BLE001 - never crash the suite on a reader quirk
+        return [f"tagged structure check failed to read PDF: {exc}"], False
+
+    problems = [f"{role} x{counts.get(role, 0)} (expected {want})"
+                for role, want in sorted(expected.items())
+                if counts.get(role, 0) != want]
+    if backwards:
+        problems.append(f"{backwards} list item(s) not a label then a body")
+    return (["tagged structure: " + "; ".join(problems)] if problems else []), False
 
 
 def check_visual(module: str, tmp: str, pdf_path: str, update: bool) -> tuple[list[str], bool]:
@@ -835,6 +939,9 @@ def build_one(
                 vp, vera_skipped = check_verapdf(pdf)
                 problems += vp
                 skipped = skipped or vera_skipped
+                tp, tagged_skipped = check_tagged_structure(module, template, pdf)
+                problems += tp
+                skipped = skipped or tagged_skipped
             if content:
                 cp, text_skipped = check_content(module, template, tmp, pdf)
                 problems += cp

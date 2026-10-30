@@ -1,0 +1,29 @@
+% versions-bank.tex -- one problem that reports which version it was typeset
+% for, drawn by a versioned exam (versions-test.tex), an exam with no \versions
+% (versions-none-test.tex) and a quiz (versions-none-quiz.tex).
+%
+% \onver{label}{content} is the course-side selector \IfExamVersioned exists
+% for: it prints content on the copy whose version is label, and a document with
+% no versions prints the first label's branch. The comparison with
+% \theExamVersion sits inside the versioned branch because that macro is A in an
+% exam with no \versions and undefined in a quiz, so a selector that compares
+% without asking prints nothing in the first and raises "Undefined control
+% sequence" in the second.
+\ExplSyntaxOn
+\NewDocumentCommand{\onver}{ m m }{
+	\IfExamVersioned
+		{ \str_if_eq:eeT { #1 } { \theExamVersion } { #2 } }
+		{ \str_if_eq:nnT { #1 } { 1301 } { #2 } }
+}
+\ExplSyntaxOff
+
+% VQFLAG reads the query through \setvar, whose argument is expanded inside
+% \directlua: it prints 1 or 0 only while \IfExamVersioned stays expandable.
+% VQLABEL prints \theExamVersion as the class left it.
+\begin{problem}{vquery}[topic=fr]
+	\setvar{vqflag}{\IfExamVersioned{1}{0}}
+	VQSTEM \IfExamVersioned{VQVERSIONED}{VQUNVERSIONED}
+	\onver{1301}{VQSEL1301}\onver{1302}{VQSEL1302}\onver{1303}{VQSEL1303}\onver{1304}{VQSEL1304}\onver{1305}{VQSEL1305}\onver{1306}{VQSEL1306}
+	VQFLAG\get{vqflag}
+	VQLABEL[\ifdefined\theExamVersion\theExamVersion\else none\fi]
+\end{problem}

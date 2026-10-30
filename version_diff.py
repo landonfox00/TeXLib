@@ -21,6 +21,11 @@ import shutil
 import subprocess
 import sys
 
+# The poppler lookup is declared once, in Sublime/texlib/texlib_buildspec.py.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "Sublime", "texlib"))
+from texlib_buildspec import find_poppler  # noqa: E402
+
 VERSIONS_RE = re.compile(r"\\versions\{([^}]*)\}")
 
 
@@ -85,7 +90,7 @@ def build_version(tex_path, version, engine):
     tex_dir = os.path.dirname(os.path.abspath(tex_path)) or "."
     name = os.path.basename(tex_path)
     base = os.path.splitext(name)[0]
-    pt = _poppler_pdftotext()
+    pt = find_poppler()
     if not pt:
         return None, "no poppler pdftotext"
     outdir = tempfile.mkdtemp(prefix="vdiff_%s_" % version)
@@ -110,21 +115,6 @@ def build_version(tex_path, version, engine):
         return normalize(txt), ""
     finally:
         shutil.rmtree(outdir, ignore_errors=True)
-
-
-def _poppler_pdftotext():
-    for cand in (shutil.which("pdftotext"),
-                 r"C:\texlive\2025\bin\windows\pdftotext.exe"):
-        if not cand:
-            continue
-        try:
-            p = subprocess.run([cand, "-v"], capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        if "poppler" in ((p.stdout or "") + (p.stderr or "")).lower():
-            return cand
-    return None
 
 
 def main(argv=None):

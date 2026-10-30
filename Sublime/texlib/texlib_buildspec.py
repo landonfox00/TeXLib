@@ -26,9 +26,11 @@ this directory to `sys.path`). Sublime does not auto-load `.py` from a package
 subfolder, so adding a module here is import-only and cannot become a plugin.
 """
 
+import glob
 import os
 import re
 import shutil
+import subprocess
 
 # Document classes that MUST be compiled with lualatex.
 #
@@ -94,9 +96,20 @@ LUALATEX_CLASSES = {
 # path now instead of waiting on upstream. A builder runs the SE prefix first,
 # tests its log with luamml_se_aborted(), and re-runs with the AF-only prefix
 # when that fires. Drop the fallback once a fixed luamml ships.
+#
+# viewer/pane/mathml=false (latex-lab-math) keeps the MathML files out of the
+# Catalog's EmbeddedFiles name tree, which is the list a viewer shows as the
+# document's attachments. Each file stays in the /AF of its Formula structure
+# element, and that is where Firefox and Foxit read it. At the default the tree
+# lists one mathml-N.xml per distinct formula -- 4,035 of them in a 241-page
+# document built with the thesis class -- and SumatraPDF appends every entry to
+# its bookmarks pane, after the outline. A document with no attachment of its
+# own then carries LaTeX's PDF/A-4f placeholder, pdf-A4f.txt, as the tree's one
+# entry, as a document without mathematics already did.
 ACCESSIBLE_DOCMETA = (
     r"\DocumentMetadata{lang=en,tagging=on,"
-    r"tagging-setup={math/setup={mathml-AF,mathml-SE},table/header-rows=1},"
+    r"tagging-setup={math/setup={mathml-AF,mathml-SE},table/header-rows=1,"
+    r"viewer/pane/mathml=false},"
     r"pdfstandard={ua-2,a-4f}}"
 )
 
@@ -127,6 +140,49 @@ def luamml_se_aborted(log_text):
 
 def _FLATTEN(s):
     return re.sub(r"\s+", "", s)
+
+
+# What the LaTeX kernel prints when a pass ends with its last-page guess wrong.
+#
+# A pass takes the page count from the \@abspage@last its predecessor wrote to
+# the .aux and runs the shipout/lastpage hook on that page. tagpdf reads the
+# same count at \begin{document}, from its own @tag@LastPage record, and numbers
+# the parent tree from it: pages hold the keys below the count, annotations the
+# keys from the count up. A pass that ships a different number of pages goes
+# wrong in one of two ways.
+#
+#   * More pages than recorded. A surplus page and an annotation share a
+#     parent-tree key, and veraPDF fails that page's content under ISO
+#     14289-2:2024 clause 8.2.2. Measured on a 6-page document built from a
+#     5-page record: /Nums held key 5 twice (page 6's marked content and the
+#     first link), 54 failed checks, all on page 6. The kernel reports "Hook
+#     'shipout/lastpage' executed on wrong page (5 not 6)".
+#   * Fewer pages than recorded. The hook's page is never shipped, so the
+#     kernel appends a page that reads "Temporary page!" to carry the hook's
+#     material and reports "Temporary extra page added at the end". Measured on
+#     the same document from a 9-page record: 7 pages.
+#
+# The .aux such a pass leaves holds the right count, so one more pass corrects
+# either. A pass that outgrows its record prints stale numbers as well: the
+# 6-page PDF above had "6 of 5" in its last footer and every contents entry one
+# page low.
+LASTPAGE_WRONG_PAGE = "Hook 'shipout/lastpage' executed on wrong page"
+LASTPAGE_EXTRA_PAGE = "Temporary extra page added at the end"
+
+
+def lastpage_unsettled(log_text):
+    """True when a pass ended with the kernel's last-page guess wrong.
+
+    The PDF that pass wrote is then wrong in one of the two ways described at
+    LASTPAGE_WRONG_PAGE, and the pass has to be run again.
+
+    Compared with the whitespace removed from both sides, as luamml_se_aborted
+    does. Neither message is long enough for the engine to wrap it at 79
+    columns today, and the comparison does not depend on that staying true.
+    """
+    flat = _FLATTEN(log_text or "")
+    return (_FLATTEN(LASTPAGE_WRONG_PAGE) in flat
+            or _FLATTEN(LASTPAGE_EXTRA_PAGE) in flat)
 
 
 # luaotfload's verdict when it cannot claim a cache directory. See
@@ -212,9 +268,30 @@ def accessible_macro_for(tex_path, se=True):
 # claim is missing -- which is the very defect the check exists to catch.
 VERAPDF_FLAVOUR = "ua2"
 
-# Written beside <base>_accessible.pdf, matching its `_accessible` stem so the
-# pair sorts together in a file listing.
+# Written beside each tagged PDF (<base>_accessible.pdf, and
+# <base>_<variant>_accessible.pdf for a variant's twin), matching its
+# `_accessible` stem so the pair sorts together in a file listing.
 VERAPDF_REPORT_SUFFIX = "_accessible-report.html"
+
+# The failed-check total as veraPDF's HTML report states it, in the table under
+# "Validation information":  <td><b>Failed Checks:</b></td> <td>17</td>.
+# The builder runs veraPDF once per tagged PDF, for that HTML, and the total is
+# read from the same output: the XML report carries it as an attribute, and
+# costs a second JVM launch per file. The markup is veraPDF's own stylesheet
+# (1.30.2 here and in accessible.yml). A release that words the row differently
+# makes verapdf_failed_checks return None, and a build then reports a failing
+# file without a count. PASSED or FAILED is veraPDF's exit status alone.
+_VERAPDF_FAILED_CHECKS_RE = re.compile(
+    rb"Failed Checks:\s*</b>\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>")
+
+
+def verapdf_failed_checks(report):
+    """The failed-check total one veraPDF HTML report states, or None when the
+    report has no such row. Takes the report as bytes or str."""
+    if isinstance(report, str):
+        report = report.encode("utf-8", "replace")
+    match = _VERAPDF_FAILED_CHECKS_RE.search(report or b"")
+    return int(match.group(1)) if match else None
 
 
 def _verapdf_candidates():
@@ -268,3 +345,78 @@ def verapdf_report_cmd(exe, pdf_path, fmt="html", itemize=False):
         cmd.append("--success")
     cmd.append(pdf_path)
     return cmd
+
+
+# --- poppler lookup ---------------------------------------------------------
+#
+# The content suites read a built PDF back with poppler's pdftotext, and a
+# suite that cannot find one soft-skips with exit 0. So when the lookup misses
+# an installed poppler, the suite reports green having verified no content.
+# The lookup was a private copy in five repo-root suites and version_diff.py,
+# each ending in a TeX Live path pinned to 2025, and all six went blind
+# together when TeX Live 2026 replaced it. Declared here, once, for every one
+# of them and for Sublime/_testkit.py.
+
+_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
+
+
+def _texlive_bin_globs():
+    """Glob patterns for the bin directory of a default TeX Live install.
+
+    The year is a wildcard. A pinned year works until the next TeX Live and
+    then points at nothing.
+    """
+    if os.name == "nt":
+        return [r"C:\texlive\*\bin\windows"]
+    return []
+
+
+def _poppler_candidates(tool):
+    """Places a poppler `tool` may live, in the order they should win.
+
+    PATH first. Then the directory of the TeX engine on PATH, because TeX Live
+    for Windows ships poppler's tools beside lualatex and that follows the
+    install wherever it is and whatever its year. Then the default TeX Live
+    roots, newest year first, for a shell that has no engine on PATH either.
+    """
+    exe = tool + (".exe" if os.name == "nt" else "")
+    found = shutil.which(tool)
+    if found:
+        yield found
+    for engine in ("lualatex", "pdflatex"):
+        beside = shutil.which(engine)
+        if beside:
+            yield os.path.join(os.path.dirname(beside), exe)
+    for pattern in _texlive_bin_globs():
+        for bindir in sorted(glob.glob(pattern), reverse=True):
+            yield os.path.join(bindir, exe)
+
+
+def _is_poppler(exe):
+    """True when `exe -v` prints a poppler banner."""
+    try:
+        proc = subprocess.run([exe, "-v"], capture_output=True, text=True,
+                              encoding="utf-8", errors="replace",
+                              creationflags=_NO_WINDOW, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return "poppler" in ((proc.stdout or "") + (proc.stderr or "")).lower()
+
+
+def find_poppler(tool="pdftotext"):
+    """Absolute path to a poppler-flavored `tool` (pdftotext/pdftoppm), or None.
+
+    Git for Windows ships an xpdf-flavored pdftotext that shadows poppler's on
+    PATH in Git Bash and silently lacks -bbox (it prints usage instead of
+    erroring), so being first on PATH proves nothing. Each candidate is asked
+    for its -v banner and the first one that says poppler wins.
+    """
+    seen = set()
+    for cand in _poppler_candidates(tool):
+        key = os.path.normcase(os.path.abspath(cand))
+        if key in seen or not os.path.isfile(cand):
+            continue
+        seen.add(key)
+        if _is_poppler(cand):
+            return cand
+    return None
