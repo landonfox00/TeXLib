@@ -60,6 +60,28 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Fixed
 
+- **Six switches and fields that a document set and the page ignored.** Found
+  by an audit of `main`, each reproduced with a one-page document and now
+  checked by `test_class_render.py`:
+  - The exam cover printed "Math" before the course number whatever
+    `course-subject` said, so a STAT 152 exam read "Math 152" on the cover and
+    "STAT 152" in its footer. The cover now uses `\GetCourse`, as the footer
+    does.
+  - A problem set with no `pset-due` printed a bare "Due:" line. The test
+    compared the getter's name with `\\` and was never true.
+  - `\drafts` in the preamble, and didactic's `draft=true` option, drew no
+    watermark. Only the command-line `\ShowDraft` did, because `\ifdraft` was
+    read once when `texlib-build` loaded, before either could set it.
+  - `\rubrics` in an exam's source gave a key cover reading "Solutions", not
+    "Solutions and Rubrics". `\if@autoexam@rubric` was a `\let` copy of
+    `\ifrubric` taken at class load. The class now reads `\ifrubric`, and the
+    alias is re-taken at `\begin{document}` for code that still uses it.
+  - `\IfSyllSet` answered "set" for every field. It tested a `g__syll_…`
+    store the move to coursemeta removed; it now asks `\IfMetaSet`.
+  - `texlib-tikzexternal` stopped at load under LuaLaTeX on
+    `\pdfshellescape`, a pdfTeX primitive. It now reads `\pdf@shellescape`
+    from `pdftexcmds`, which every engine defines.
+
 - **The inline key was only half inline: a full-problem `{solution}` still
   displaced the page.** `\ShowKeyInline` exists so a key page *is* its student
   page with the answers drawn into the blanks — same pagination, same problem

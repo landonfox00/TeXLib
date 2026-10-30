@@ -89,6 +89,39 @@ PSET_DOC = r"""\documentclass{pset}
 \end{document}
 """
 
+# Six defects found by the 2026-10-30 audit, each a one-page document. The
+# course-subject class option overrides coursemeta's "Math", so the cover must
+# read STAT; \rubrics is the source-level twin of \ShowRubric.
+EXAM_COVER = r"""\documentclass[course-subject=STAT, exam-number=1]{autoexam}
+\rubrics
+\begin{document}\maketitle\end{document}
+"""
+PSET_NO_DUE = r"""\documentclass{pset}
+\begin{document}\maketitle PSETNODUE\end{document}
+"""
+PSET_DUE = r"""\documentclass[pset-due={Oct 31}]{pset}
+\begin{document}\maketitle PSETDUE\end{document}
+"""
+SYLL_IFSET = r"""\documentclass[class-time={MWF 9}]{syllabus}
+\begin{document}
+SET=[\IfSyllSet{class_time}{yes}{no}][\IfSyllSet{office_hours}{yes}{no}]
+\end{document}
+"""
+DRAFT_SOURCE = r"""\documentclass{didactic}
+\drafts
+\begin{document}Body text.\end{document}
+"""
+PLAIN_NOTES = r"""\documentclass{didactic}
+\begin{document}Body text.\end{document}
+"""
+TIKZEXT_LUA = r"""\documentclass{article}
+\usepackage{texlib-tikzexternal}
+\begin{document}TIKZEXTLOADS\end{document}
+"""
+
+LUALATEX = shutil.which("lualatex")
+PDFTOPPM = shutil.which("pdftoppm")
+
 _PASS = 0
 _FAIL = 0
 
@@ -105,9 +138,21 @@ def check(label, cond, detail=""):
             print("        " + detail)
 
 
-def build(doc, module_cls, macro=""):
-    """Build `doc` (a didactic/pset document string) after staging the shared
-    payload + the given class. Returns normalized -layout text, or (None, err)."""
+def _ink(pdf):
+    """Inked pixels on page 1 at 20 dpi. The draft watermark is rotated 45
+    degrees, and pdftotext cannot be relied on to extract rotated text. It is
+    also only 12% grey, so anything short of white counts as ink."""
+    out = subprocess.run([PDFTOPPM, "-r", "20", "-gray", "-f", "1", "-l", "1",
+                          pdf], capture_output=True).stdout
+    # Binary PGM: "P5", width, height, maxval, then one byte per pixel.
+    fields = out.split(maxsplit=4)
+    return sum(1 for b in fields[4] if b < 250) if len(fields) == 5 else -1
+
+
+def build(doc, module_cls, macro="", engine=None, ink=False):
+    """Build `doc` (a document string) after staging the shared payload + the
+    given class. Returns normalized -layout text, or (None, err). With
+    ink=True the text is replaced by the dark-pixel count of page 1."""
     tmp = tempfile.mkdtemp(prefix="texlib_clsrender_")
     try:
         with open(os.path.join(tmp, "doc.tex"), "w", encoding="utf-8") as fh:
@@ -127,16 +172,20 @@ def build(doc, module_cls, macro=""):
         # exercised here.
         module_dir = os.path.join(TEXLIB_ROOT,
                                   os.path.dirname(module_cls.replace("/", os.sep)))
+        # Its .tex files too: pset and autoexam \input a default instructions
+        # file (pset-instructions.tex, autoexam-instructions.tex) from there.
         for entry in os.listdir(module_dir):
             src = os.path.join(module_dir, entry)
-            if os.path.isfile(src) and entry.lower().endswith((".sty", ".lua", ".cls")):
-                shutil.copy2(src, os.path.join(tmp, entry))
+            dst = os.path.join(tmp, entry)
+            if (os.path.isfile(src) and not os.path.exists(dst)
+                    and entry.lower().endswith((".sty", ".lua", ".cls", ".tex"))):
+                shutil.copy2(src, dst)
 
         arg = f"{macro}\\input{{doc.tex}}" if macro else "doc.tex"
         rc = 0
         for _ in range(2):
             proc = subprocess.run(
-                [PDFLATEX, "-interaction=nonstopmode", "-halt-on-error",
+                [engine or PDFLATEX, "-interaction=nonstopmode", "-halt-on-error",
                  "-jobname=doc", arg],
                 cwd=tmp, capture_output=True, text=True, encoding="utf-8",
                 errors="replace", timeout=120)
@@ -144,6 +193,8 @@ def build(doc, module_cls, macro=""):
         pdf = os.path.join(tmp, "doc.pdf")
         if rc != 0 or not os.path.exists(pdf):
             return None, "\n".join((proc.stdout or "").splitlines()[-8:])
+        if ink:
+            return _ink(pdf), ""
         text = subprocess.run([PDFTOTEXT, "-layout", pdf, "-"], capture_output=True,
                               text=True, encoding="utf-8", errors="replace").stdout
         return re.sub(r"\s+", " ", text), ""
@@ -215,6 +266,44 @@ def main():
     text, err = build(figdoc, "Notes/didactic.cls")
     check("didactic \\fig with alt-text (caption / explicit / filename) compiles",
           text is not None, err)
+
+    # --- metadata and build switches the 2026-10-30 audit found unwired -----
+    print("\n=== pset due line, \\IfSyllSet, source-level \\drafts ===")
+    text, err = build(PSET_NO_DUE, "Problem Sets/pset.cls")
+    check("pset with no due date prints no 'Due:' line",
+          text is not None and "PSETNODUE" in text and "Due:" not in text,
+          err or (text or "")[:200])
+    text, err = build(PSET_DUE, "Problem Sets/pset.cls")
+    check("pset with pset-due prints 'Due: Oct 31'",
+          text is not None and "Due: Oct 31" in text, err or (text or "")[:200])
+    text, err = build(SYLL_IFSET, "Syllabi/syllabus.cls")
+    check("\\IfSyllSet answers from coursemeta (set: yes, unset: no)",
+          text is not None and "SET=[yes][no]" in text, err or (text or "")[:200])
+    if PDFTOPPM:
+        plain, err1 = build(PLAIN_NOTES, "Notes/didactic.cls", ink=True)
+        drafted, err2 = build(DRAFT_SOURCE, "Notes/didactic.cls", ink=True)
+        ok = plain is not None and drafted is not None and drafted > 2 * plain > 0
+        check("\\drafts in the preamble draws the DRAFT watermark", ok,
+              err1 or err2 or f"dark pixels: plain {plain}, \\drafts {drafted}")
+    else:
+        print("  SKIP  \\drafts watermark: needs poppler pdftoppm")
+
+    if LUALATEX:
+        print("\n=== autoexam cover, tikzexternal under LuaLaTeX ===")
+        text, err = build(EXAM_COVER, "Exams/autoexam.cls",
+                          macro=r"\def\ShowKey{}", engine=LUALATEX)
+        if text is None:
+            check("autoexam cover doc builds", False, err)
+        else:
+            check("exam cover names the course subject (STAT 181, not Math 181)",
+                  "STAT 181" in text and "Math 181" not in text, text[:200])
+            check("source-level \\rubrics reaches the key cover",
+                  "Solutions and Rubrics" in text, text[:200])
+        text, err = build(TIKZEXT_LUA, "texlib-tikzexternal.sty", engine=LUALATEX)
+        check("texlib-tikzexternal loads under LuaLaTeX",
+              text is not None and "TIKZEXTLOADS" in text, err)
+    else:
+        print("  SKIP  autoexam / tikzexternal checks: need lualatex")
 
     return 1 if _FAIL else 0
 
