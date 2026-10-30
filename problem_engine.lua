@@ -1766,38 +1766,61 @@ end
 -- ============================================================
 -- MULTI-VERSION BODY READER
 -- ============================================================
+
+-- The \begin{document} pattern takes the rest of its line, so the body starts
+-- on the line below it.
+local BEGIN_DOCUMENT = "\\begin%s*{document}[^\n]*\n?"
+local END_DOCUMENT   = "\\end%s*{document}"
+
+-- First match of `pattern` at or after `init` that is not commented out: no
+-- unescaped % precedes it on its line.  Returns the match's start and end, or
+-- nil when every match is in a comment.  The test looks one character behind
+-- each % on the line, so it is wrong in two ways: the % of \\% reads as escaped
+-- (a mention after it counts as live), and a % in \verb or under another
+-- catcode reads as a comment sign (a marker after it counts as commented out).
+-- When the second leaves no match at all, autoexam_read_body falls back to the
+-- scan it had before.
+local function find_uncommented(text, pattern, init)
+	local pos = init or 1
+	while true do
+		local s, e = text:find(pattern, pos)
+		if not s then return nil end
+		local line_start = text:sub(1, s):match("()[^\n]*$") or 1
+		local prefix = text:sub(line_start, s - 1)
+		if not (prefix:find("^%%") or prefix:find("[^\\]%%")) then
+			return s, e
+		end
+		pos = e + 1
+	end
+end
+
 function autoexam_read_body()
 	local filename = tex.jobname .. ".tex"
 	local f = io.open(filename, "r")
 	if not f then return nil end
 	local content = f:read("*all")
 	f:close()
-	local _, begin_end = content:find("\\begin%s*{document}[^\n]*\n?")
-	if not begin_end then return nil end
-	-- Find the REAL \end{document}: the first occurrence that is NOT inside a TeX
-	-- comment. A raw (non-commented) \end{document} in a problem body would
-	-- itself end the document, so the first non-comment occurrence is always the
-	-- true end. This is robust against a stray \end{document} sitting in a
-	-- trailing comment, which the old "last occurrence" scan mis-sliced (pulling
-	-- the real \end{document} into the returned body).
-	local end_start, pos = nil, begin_end + 1
-	while true do
-		local s, e = content:find("\\end%s*{document}", pos)
-		if not s then break end
-		local line_start = content:sub(1, s):match("()[^\n]*$") or 1
-		local prefix = content:sub(line_start, s - 1)
-		-- Commented out if an unescaped % precedes it on the same line.
-		if not (prefix:find("^%%") or prefix:find("[^\\]%%")) then
-			end_start = s
-			break
-		end
-		pos = e + 1
+	-- The body opens at the first \begin{document} that is not in a comment. A
+	-- comment above it that names the marker (a file header saying where the
+	-- body starts) was once taken for it, and the version loop then input the
+	-- preamble as part of every copy.
+	local _, begin_end = find_uncommented(content, BEGIN_DOCUMENT)
+	if not begin_end then
+		-- Defensive fallback: original first-occurrence scan.
+		_, begin_end = content:find(BEGIN_DOCUMENT)
 	end
+	if not begin_end then return nil end
+	-- The body closes at the first \end{document} that is not in a comment. A
+	-- live \end{document} in a problem body would itself end the document, so
+	-- the first live one is the true end. The older last-occurrence scan took a
+	-- mention in a trailing comment for it and pulled the real \end{document}
+	-- into the body.
+	local end_start = find_uncommented(content, END_DOCUMENT, begin_end + 1)
 	if not end_start then
 		-- Defensive fallback: original last-occurrence heuristic.
-		pos = begin_end + 1
+		local pos = begin_end + 1
 		while true do
-			local s = content:find("\\end%s*{document}", pos)
+			local s = content:find(END_DOCUMENT, pos)
 			if s then end_start = s; pos = s + 1 else break end
 		end
 	end
