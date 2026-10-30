@@ -1,0 +1,25 @@
+% cols-test.tex -- {cols} around {parts}: four parts set in two columns.
+% smoke_test.py --accessible builds it tagged and validates it with veraPDF,
+% and test_cols_tagged_layout.py asserts that the tagged copy keeps the two
+% columns, which veraPDF does not check. The problem is defined here and not
+% in a bank fragment: {cols} is defined by the autoexam class alone.
+\documentclass{autoexam}
+\examsetup{number=1, date={Engine Test}}
+
+\begin{problem}{cols-derivatives}
+	COLSSTEMMARK state the derivative of each function.
+	\begin{cols}
+		\begin{parts}
+			\part[2] COLSPARTAMARK $x^2$
+			\part[2] COLSPARTBMARK $\sin x$
+			\part[2] COLSPARTCMARK $e^x$
+			\part[2] COLSPARTDMARK $\ln x$
+		\end{parts}
+	\end{cols}
+\end{problem}
+
+\begin{document}
+\begin{problems}
+	\problem[8]{cols-derivatives}
+\end{problems}
+\end{document}

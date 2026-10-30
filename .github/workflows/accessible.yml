@@ -125,3 +125,15 @@ jobs:
               || { echo "pypdf not importable; PDF/UA checks would soft-skip"; exit 1; }
 
             python3 smoke_test.py --accessible
+
+            # The layout of a tagged {cols}. The suite above builds
+            # examples/fixtures/Exams/cols-test.tex tagged, and veraPDF
+            # validates its structure tree, which says nothing about where the
+            # text sits: the same exam set in one column passes. This builds
+            # the fixture as a normal copy and as a tagged copy and requires
+            # two columns in each. It soft-skips without poppler's pdftotext,
+            # and its tagged/untagged assertions without pdfinfo, so both are
+            # checked for first.
+            command -v pdftotext >/dev/null 2>&1 && command -v pdfinfo >/dev/null 2>&1 \
+              || { echo "pdftotext or pdfinfo missing; the {cols} layout test would soft-skip"; exit 1; }
+            python3 test_cols_tagged_layout.py

@@ -165,6 +165,17 @@ EXAMPLES = [
                  "\\begin{problem}[meta] header rendered its stem, MLHEADERLEAK "
                  "proves the header continuation lines were skipped rather "
                  "than leaked into it."),
+    Example("examples/fixtures/Exams", "cols-test.tex", "fixture", _FIXTURE,
+            expect=["COLSSTEMMARK", "COLSPARTAMARK", "COLSPARTBMARK",
+                    "COLSPARTCMARK", "COLSPARTDMARK"],
+            note="{cols} around {parts}. No other document in the smoke corpus "
+                 "uses the environment, so this is the tagged {cols} the "
+                 "accessible gate builds and veraPDF validates. The four part "
+                 "tokens prove the parts rendered: {cols} with bare \\ppart "
+                 "and no inner {parts} drops every item and still builds "
+                 "clean. veraPDF does not read layout, and a tagged copy set "
+                 "in one column passes it; test_cols_tagged_layout.py builds "
+                 "this document again and asserts the two columns."),
     Example("examples/fixtures/Perf", "picture-density.tex", "fixture", _BENCH,
             note="Benchmark workload, not a test: twelve ordinary lecture-notes "
                  "tikzpictures, so benchmark.py can measure per-picture cost. "
