@@ -43,8 +43,11 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   only as the `solutions-inline` build mode, chosen by hand at each build and
   never planned by the default fan-out; a preference in the source needs no
   builder change, and the key lands under the names every tool already reads.
-  `\keylayout{compact}`, the default, is the layout keys had: the space closes
-  and the solutions flow.
+  autoexam and quiz make it the default, so a key always keeps its student
+  copy's page; a document that wants the layout keys had says
+  `\keylayout{compact}`, and the space closes and the solutions flow. A review
+  whose key left its `\workbox` blanks out moved every part after the first
+  answer up the page, out of line with the student copy.
 
 - **The inline key makes room for a solution taller than its blank.** The
   overlay was unbounded: a solution taller than the answer space it was drawn

@@ -267,8 +267,10 @@ short of: a larger stretch on the `\problem` line, a smaller figure, or one
 problem fewer on that page. `TEXLIB_KEYFIT_TRACE=1` in the environment writes
 the page as the fit read it to the log, one line per item, in points.
 
-`\keylayout{compact}` is the default: the answer space closes and the solutions
-flow, which is what a review sheet with no work space wants.
+In autoexam and quiz, `inline` is the default, so a key always keeps its student
+copy's page unless a solution does not fit. `\keylayout{compact}` in the preamble
+asks for the other layout: the answer space closes and the solutions flow, which
+suits a sheet with no work space.
 
 `\rubric{points}{description}`
 Add a rubric line. Rendered as an overlay in rubric builds.
