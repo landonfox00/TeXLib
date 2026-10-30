@@ -415,6 +415,41 @@ def main() -> int:
                 failures.append(
                     f"p{i}: \\keylayout{{inline}} with \\ShowKey is not the "
                     f"inline key ({pct:.2f}% preserved, {added} px added)")
+
+        # autoexam's default: a document that names no layout gets the inline
+        # key from the ordinary \ShowKey, and \keylayout{compact} still turns
+        # it off. Without the default, a review's \workbox blanks closed in its
+        # key and every later part moved up the page.
+        default_key = rasterize(build(tmp, "defkey", r"\def\ShowKey{}"), "e", tmp)
+        if len(default_key) != len(a):
+            failures.append(
+                f"no \\keylayout: page counts differ (student {len(a)}, "
+                f"key {len(default_key)}) -- the default is not inline")
+            return report(failures)
+        for i, (pa, pe) in enumerate(zip(a, default_key), 1):
+            if i < FIRST_PROBLEM_PAGE:
+                continue
+            total, moved, added = compare(os.path.join(tmp, pa),
+                                          os.path.join(tmp, pe))
+            pct = 100.0 * (total - moved) / total if total else 100.0
+            log(f"  p{i}: no \\keylayout + \\ShowKey  preserved "
+                f"{pct:6.2f}%  added by key {added:6d}")
+            if pct < MIN_PRESERVED or added == 0:
+                failures.append(
+                    f"p{i}: with no \\keylayout, \\ShowKey is not the inline "
+                    f"key ({pct:.2f}% preserved, {added} px added)")
+        with open(os.path.join(tmp, "doc_compact.tex"), "w", encoding="utf-8") as fh:
+            fh.write(EXAM_TEX.replace(r"\loadbank{bank.tex}",
+                                      "\\keylayout{compact}\n\\loadbank{bank.tex}"))
+        compact_key = rasterize(build(tmp, "compactkey", r"\def\ShowKey{}",
+                                      doc="doc_compact.tex"), "f", tmp)
+        moved_any = any(compare(os.path.join(tmp, pa), os.path.join(tmp, pf))[1]
+                        for i, (pa, pf) in enumerate(zip(a, compact_key), 1)
+                        if i >= FIRST_PROBLEM_PAGE)
+        if len(compact_key) == len(a) and not moved_any:
+            failures.append(
+                "\\keylayout{compact} gave the inline key: the opt-out does "
+                "not override the class default")
         return report(failures)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
         log(f"SKIP: build environment failed -- {type(exc).__name__}: {exc}")
