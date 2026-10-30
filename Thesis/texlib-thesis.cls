@@ -9,7 +9,8 @@
 % ACCESSIBLE BY DESIGN. Tagging is intrinsic here, not an opt-in mode: the
 % document MUST begin with
 %     \DocumentMetadata{ lang=en, tagging=on,
-%         tagging-setup={ math/setup={mathml-AF}, table/header-rows=1 },
+%         tagging-setup={ math/setup={mathml-AF}, table/header-rows=1,
+%             viewer/pane/mathml=false },
 %         pdfstandard={ua-2,a-4f} }
 %     \documentclass{texlib-thesis}
 % (\DocumentMetadata can only enable tagging BEFORE \documentclass.) The class
@@ -21,6 +22,10 @@
 % with AF alone, and it cannot retry for a document that brings its own
 % \DocumentMetadata. Two \sqrt[n]{...} in one formula under mathml-SE aborts the
 % run with no PDF, so the choice is left to the author.
+%
+% viewer/pane/mathml=false keeps the MathML files, one per formula, out of the
+% EmbeddedFiles name tree that viewers list as attachments; each stays in the
+% /AF of its Formula structure element. ACCESSIBILITY.md has the numbers.
 %
 % WHAT IS AND IS NOT INSTITUTION-SPECIFIC
 %
