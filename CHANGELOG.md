@@ -18,6 +18,22 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   travel. MC option shuffling is on either way, and `\shuffle` with no argument
   is unchanged. Written for a twelve-version exam whose two graph-bearing
   problems each own a page.
+- **A key's center header reads the points on each page.** On a copy that
+  shows solutions (`solutions`, `instructor`), every numbered exam page of an
+  `autoexam` document is headed "14 points" or "1 point": the total of the
+  questions and parts that begin on that page. A page where no pointed item
+  begins has an empty center, and so do the cover, `\blankpage` leaves and
+  every page of a student copy. A value counts where its own question or part
+  begins, so a compact key that breaks a problem across two pages splits its
+  part points between them; a `\keylayout{inline}` key has the student copy's
+  pages and therefore that paper's totals. Extra credit is not counted. The
+  totals are recorded per copy against `autoexamabspage`, which never resets.
+  `exam.cls`'s own `\pointsonpage` is keyed on `\thepage`, which every copy
+  restarts at 1, so it would add the copies of a versioned exam together.
+  Checked on a twelve-version `\shuffle[pages]` exam (50 points on four pages,
+  14 + 14 + 10 + 12): all 48 key pages carry the total of the problems printed
+  on them, and no word on any student page moved. New fixture
+  `pagepoints-test.tex`, asserted by `test_engine_correctness.py`.
 
 - **The viewer opens on `<base>.pdf` as soon as the base compile ends, not when
   the fan-out does.** That PDF is final at that moment — everything after it
