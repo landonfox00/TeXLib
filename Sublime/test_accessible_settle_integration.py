@@ -238,12 +238,17 @@ def check_pdf(label, pdf, display, pdftotext):
 
     # The builder runs veraPDF itself when it is installed and prints the
     # verdict; that line is the claim a user sees, so it is the one asserted.
+    # The summary has one line per tagged PDF ("<pdf>  PASSED, N failed
+    # checks  -> <report>"), so every such line must say PASSED.
+    verdicts = [ln.strip() for ln in display.splitlines()
+                if "_accessible.pdf" in ln
+                and any(v in ln for v in ("PASSED", "FAILED", "NOT CHECKED"))]
     if "PDF/UA-2" not in display:
         _c.skip(f"{label}: veraPDF verdict (veraPDF absent)")
     else:
         check(f"{label}: veraPDF passes the tagged PDF",
-              "PDF/UA-2 PASSED" in display,
-              [ln for ln in display.splitlines() if "PDF/UA-2" in ln])
+              bool(verdicts) and all(" PASSED," in v for v in verdicts),
+              verdicts)
 
 
 def main():
