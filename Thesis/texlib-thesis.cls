@@ -57,6 +57,9 @@
 % still produce a conformant document, not an error -- the wrapper thesis.cls
 % passes profile=unr.
 \newcommand{\thesis@profile}{generic}
+% Every other key=value option is a \thesisset key (section 12), held here and
+% applied once the profile has declared its own keys.
+\newcommand{\thesis@classkeys}{}
 \DeclareOption*{%
 	\@expandtwoargs\in@{=}{\CurrentOption}%
 	\ifin@
@@ -70,7 +73,7 @@
 	\ifx\@tempa\@tempb
 		\renewcommand{\thesis@profile}{#2}%
 	\else
-		\PassOptionsToClass{#1=#2}{report}%
+		\g@addto@macro\thesis@classkeys{#1=#2,}%
 	\fi
 }
 \ProcessOptions\relax
@@ -213,6 +216,18 @@
 \RequirePackage{booktabs}
 \RequirePackage[title]{appendix}
 \RequirePackage[hidelinks, linktoc=page, pdfusetitle]{hyperref}
+% pdfusetitle hands \title to the XMP writer, which reads pdftitle as a comma
+% list: "Operads, Higher Categories, and ..." became three dc:title entries with
+% duplicate x-default languages, and a viewer showing the title showed only
+% "... Operads". A title is one phrase, so pass it braced. Only when the author
+% has not set pdftitle: under \DocumentMetadata the key records itself as the
+% hyperref/pdftitle document property (\@pdftitle stays empty either way).
+\AtBeginDocument{%
+	\edef\thesis@tmp@pdftitle{\GetDocumentProperties{hyperref/pdftitle}}%
+	\ifx\thesis@tmp@pdftitle\@empty
+		\hypersetup{pdftitle={{\@title}}}%
+	\fi
+}
 % cleveref direct, NOT texlib-crossref: that package exists because
 % cleveref's amsthm patch leaves a block-level list open under tagging and
 % kills the first definition-style environment. This class never uses
@@ -278,6 +293,15 @@
 		\renewcommand{\thesis@degree}{Master of Science}%
 	\fi
 }
+% \graddean{Name, Degree}: the dean who signs off for the graduate school, for a
+% profile whose approval page names one (UNR's ends with the Dean of the Graduate
+% School). Empty by default; a profile that prints it warns when it is unset.
+\newcommand{\thesis@dean}{}
+\newcommand{\graddean}[1]{\renewcommand{\thesis@dean}{#1}}
+% \copyrightyear{YYYY}: the year in the copyright notice. Unset, it is the
+% four-digit year in \graddate, else the year of the build.
+\newcommand{\thesis@copyrightyear}{}
+\newcommand{\copyrightyear}[1]{\renewcommand{\thesis@copyrightyear}{#1}}
 % Committee: \committeemember{Name, Degree}{Role}; \committee stores the list.
 \newcommand{\thesis@committee}{}
 \newcommand{\committeemember}[2]{%
@@ -331,10 +355,28 @@
 % ---------------------------------------------------------------------------
 % 6. Copyright page  (optional)
 % ---------------------------------------------------------------------------
+% A notice needs the symbol, the owner's name and the year of first publication
+% (17 U.S.C. 401(b), and UNR's filing guidelines name the same three). The page
+% used to print the name alone.
+\ExplSyntaxOn
+% A 2e name: \makecopyrightpage below is defined outside \ExplSyntaxOn.
+\cs_new_protected:Npn \thesis@copyright@year
+	{
+		\tl_if_empty:NTF \thesis@copyrightyear
+			{
+				\regex_extract_once:nVNTF { \d{4} } \thesis@date \l_tmpa_seq
+					{ \seq_item:Nn \l_tmpa_seq { 1 } }
+					{ \int_use:N \c_sys_year_int }
+			}
+			{ \thesis@copyrightyear }
+	}
+\cs_generate_variant:Nn \regex_extract_once:nnNTF { nV }
+\ExplSyntaxOff
 \newcommand{\makecopyrightpage}{%
 	\clearpage\thispagestyle{empty}%
 	\vspace*{\fill}
-	{\centering\large Copyright by \@author\par All Rights Reserved.\par}%
+	{\centering\large \textcopyright{} Copyright by \@author{} \thesis@copyright@year\par
+		All Rights Reserved\par}%
 	\vspace*{\fill}\clearpage
 }
 
@@ -371,7 +413,9 @@
 		\MakeUppercase{\bfseries\@author}\par
 		\vfill
 		entitled\par
-		\begin{minipage}{0.7\textwidth}
+		% [t]: a centered minipage straddles the line before it, so a title of
+		% two or more lines printed on top of "entitled".
+		\begin{minipage}[t]{0.7\textwidth}
 			\centering\bfseries
 			\hyphenpenalty=10000 \exhyphenpenalty=10000 \emergencystretch=2em
 			\@title\par
@@ -427,11 +471,13 @@
 		{\bfseries .}\hskip.5em\relax #3\ignorespaces
 	}{\par\addvspace\medskipamount}%
 }
-% plain style: italic body (theorem family)
-\thesis@mkthm{theorem}{Theorem}{\itshape}
-\thesis@mkthm{lemma}{Lemma}{\itshape}
-\thesis@mkthm{corollary}{Corollary}{\itshape}
-\thesis@mkthm{proposition}{Proposition}{\itshape}
+% plain style: italic body (theorem family), unless theorem-font=upright
+% (section 12) -- for a school that reads "no italic typefaces" literally.
+\newcommand{\thesis@thmfont}{\itshape}
+\thesis@mkthm{theorem}{Theorem}{\thesis@thmfont}
+\thesis@mkthm{lemma}{Lemma}{\thesis@thmfont}
+\thesis@mkthm{corollary}{Corollary}{\thesis@thmfont}
+\thesis@mkthm{proposition}{Proposition}{\thesis@thmfont}
 % definition style: upright body
 \thesis@mkthm{definition}{Definition}{}
 \thesis@mkthm{example}{Example}{}
@@ -590,7 +636,39 @@
 }
 
 % ---------------------------------------------------------------------------
-% 12. Institution profile
+% 12. Reading choices  (\thesisset)
+% ---------------------------------------------------------------------------
+% A graduate school's own pages do not always agree with each other: UNR's prose
+% asks for the author's name in capitals and its sample page does not; one
+% section says to type the committee page and another to merge its PDF. Where
+% the sources disagree, the profile defaults to one reading and declares a key
+% for the other, so the author picks the reading their reviewer holds them to
+% instead of editing the class.
+%
+%     \documentclass[profile=unr, committee-roles=inline]{texlib-thesis}
+%     \thesisset{committee-roles=inline}            % same, in the preamble
+%
+% Keys live in the l3keys family `thesis'. The class declares the ones that are
+% not institution-specific; a profile declares its own with
+%     \keys_define:nn { thesis } { ... }
+% inside \ExplSyntaxOn. A key the loaded profile does not declare is an error,
+% which is right: that profile has no such choice to make.
+\ExplSyntaxOn
+\keys_define:nn { thesis }
+	{
+		theorem-font .choices:nn = { italic, upright }
+			{
+				\str_if_eq:VnTF \l_keys_choice_tl { italic }
+					{ \cs_set:Npn \thesis@thmfont { \itshape } }
+					{ \cs_set:Npn \thesis@thmfont { \upshape } }
+			} ,
+		theorem-font .initial:n = italic ,
+	}
+\NewDocumentCommand \thesisset { m } { \keys_set:nn { thesis } {#1} }
+\ExplSyntaxOff
+
+% ---------------------------------------------------------------------------
+% 13. Institution profile
 % ---------------------------------------------------------------------------
 % Loaded LAST, on purpose: a profile redefines the two page macros and may call
 % \thesissetgeometry / \thesissetspacing / \thesisinstitution, all of which must
@@ -615,5 +693,7 @@
 			institution-neutral pages -- check the name, or add the file}%
 	}%
 \fi
+% Class-option keys, now that the profile's keys exist.
+\expandafter\thesisset\expandafter{\thesis@classkeys}
 
 \endinput

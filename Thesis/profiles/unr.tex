@@ -77,14 +77,91 @@
 }
 
 % --- Committee approval page --------------------------------------------------
-% A double blue frame, the Graduate School heading, the author in bold caps, the
-% title, the degree, and each committee member with a signature rule. The hidden
-% tagged "Committee Approval Page" H1 gives a screen reader a heading; the frame
-% is decorative and drawn with tikz overlay so it contributes no structure.
-\renewcommand{\thesisapprovalpage}{%
+% Sources, read 2026-10-30:
+%   FG  https://www.unr.edu/grad/current-students/filing-guidelines
+%       section 4 (instructions for the page) and section 5 (Committee approval
+%       page; Format and sequence of pages)
+%   S   the sample committee pages linked from FG section 6 (thesis and
+%       doctoral, both dated August 2023)
+% FG section 6 also links Word templates for 3-6 member committees, with and
+% without a co-advisor; they sit behind a Box login and were NOT read.
+%
+% What every reading agrees on: the Graduate School heading, "We recommend that
+% the thesis/dissertation" / "prepared under our supervision by", "entitled" in
+% lowercase, the title in bold with no hyphenation, "be accepted in partial
+% fulfillment of the" / "requirements for the degree of", the degree without the
+% program, one entry per member with the Graduate School Representative last,
+% then the Dean of the Graduate School ("The last entry is reserved for the Dean
+% of the Graduate School", FG 4), then the month and year. No page number and
+% "NO SIGNATURES" (FG 3, 5) -- so no signature rules either, which this page used
+% to draw.
+%
+% Where FG and S disagree, the default follows FG's prose and a key selects the
+% other reading (see \thesisset in the class):
+%
+%   committee-page   = typeset | pdf     FG 4 says to type the words as they
+%       appear on the template; FG 5 says to use the PDF template and "Combine
+%       the PDF into your manuscript". `pdf' places committee-pdf=<file> (the
+%       filled-in template, exported to PDF) as a full page, as an image with
+%       alt text: its own text and tags do not survive, which is why `typeset'
+%       is the default.
+%   committee-roles  = below | inline    FG 4 puts each member's role "under
+%       each one", and S sets it on its own italic line; FG 4's advisor example
+%       is one line, "Sonia A. Skakich, Ph.D., Advisor".
+%   committee-author = upper | as-written   FG 4: "ALL CAPITAL LETTERS and
+%       BOLD-FACED"; S prints the name in bold, mixed case.
+%   committee-degree = upper | as-written   FG 4: "all CAPITAL LETTERS and
+%       Bold-Faced"; S prints "Doctor of Philosophy" in bold, mixed case.
+%
+% A double blue frame as in S. The hidden tagged "Committee Approval Page" H1
+% gives a screen reader a heading; the frame is decorative and drawn with a tikz
+% overlay so it contributes no structure.
+\newif\ifthesis@unr@pdfpage
+\newif\ifthesis@unr@rolesbelow   \thesis@unr@rolesbelowtrue
+\newif\ifthesis@unr@authorupper  \thesis@unr@authoruppertrue
+\newif\ifthesis@unr@degreeupper  \thesis@unr@degreeuppertrue
+\newcommand{\thesis@unr@pdf}{}
+\ExplSyntaxOn
+\keys_define:nn { thesis }
+	{
+		committee-page .choices:nn = { typeset, pdf }
+			{ \use:c { thesis@unr@pdfpage \int_compare:nNnTF \l_keys_choice_int = 2 { true } { false } } } ,
+		committee-pdf .tl_set:N = \thesis@unr@pdf ,
+		committee-roles .choices:nn = { below, inline }
+			{ \use:c { thesis@unr@rolesbelow \int_compare:nNnTF \l_keys_choice_int = 1 { true } { false } } } ,
+		committee-author .choices:nn = { upper, as-written }
+			{ \use:c { thesis@unr@authorupper \int_compare:nNnTF \l_keys_choice_int = 1 { true } { false } } } ,
+		committee-degree .choices:nn = { upper, as-written }
+			{ \use:c { thesis@unr@degreeupper \int_compare:nNnTF \l_keys_choice_int = 1 { true } { false } } } ,
+	}
+\ExplSyntaxOff
+
+\newcommand{\thesis@unr@upper}[2]{% #1 = the if-name's test, #2 = text
+	#1{\MakeUppercase{#2}}\else{#2}\fi}
+
+% One entry: name and degree, then the role -- on its own italic line (S) or
+% after a comma (FG 4's advisor example). Used for the Dean too.
+\newcommand{\thesis@unr@memberline}[2]{%
+	\par\vskip 0.45\baselineskip
+	\ifthesis@unr@rolesbelow
+		#1\par
+		\ifx\relax#2\relax\else{\itshape #2}\par\fi
+	\else
+		#1\ifx\relax#2\relax\else, #2\fi\par
+	\fi
+}
+
+\newsavebox{\thesis@unr@box}
+\newcommand{\thesis@unr@typeset}{%
 	\clearpage\thispagestyle{empty}%
 	\loadgeometry{nopagenumber}\singlespacing
-	\begin{tikzpicture}[remember picture, overlay]
+	% Built in a box first, so a page that is too full -- a long title and a
+	% six-member committee with a co-advisor -- is reported here instead of
+	% spilling its last lines onto a numbered page of their own. The box is used
+	% exactly once, which is what keeps its tagged content in the structure tree.
+	% The frame is inside it so that the box is the page's only item.
+	\setbox\thesis@unr@box=\vbox{\hsize=\textwidth
+	\noindent\begin{tikzpicture}[remember picture, overlay]
 		\draw[draw={rgb,255:red,0;green,0;blue,128}, line width=0.75pt]
 			([xshift=1.5pt,yshift=-1.5pt]current page text area.north west)
 			rectangle
@@ -93,22 +170,24 @@
 			([xshift=3pt,yshift=-3pt]current page text area.north west)
 			rectangle
 			([xshift=-3pt,yshift=3pt]current page text area.south east);
-	\end{tikzpicture}%
+	\end{tikzpicture}\par
 	\begin{center}
 		\thesis@tagtitle{H1}{{\color{white}\tiny Committee Approval Page}}\par
 		\vspace{-1em}
 		\includegraphics[width=0.68in, alt={University of Nevada, Reno logo}]{UNRlogoN}\par
-		\begingroup\termesfont
+		\termesfont
 		\vspace{1mm}
 		{\fontsize{12}{18}\selectfont\textcolor[RGB]{0,0,128}{THE GRADUATE SCHOOL}}\par
 		\vfill
 		{\fontsize{12}{12}\selectfont We recommend that the \thesis@docnoun\\
 			prepared under our supervision by}\par
 		\vfill
-		\MakeUppercase{\bfseries\@author}\par
+		{\bfseries\thesis@unr@upper\ifthesis@unr@authorupper{\@author}}\par
 		\vfill
 		{\fontsize{12}{12}\selectfont entitled}\par
-		\begin{minipage}{0.7\textwidth}
+		% [t]: a centered minipage straddles the line before it, so a title of
+		% two or more lines printed on top of "entitled".
+		\begin{minipage}[t]{0.7\textwidth}
 			\centering\bfseries
 			\hyphenpenalty=10000 \exhyphenpenalty=10000 \emergencystretch=2em
 			\@title\par
@@ -117,14 +196,77 @@
 		{\fontsize{12}{12}\selectfont be accepted in partial fulfillment of the\\
 			requirements for the degree of}\par
 		\vfill
-		{\bfseries\MakeUppercase{\thesis@degree}}\par
+		{\bfseries\thesis@unr@upper\ifthesis@unr@degreeupper{\thesis@degree}}\par
+		\vfill
+		\let\thesis@memberline\thesis@unr@memberline
 		\thesis@committee
+		\ifx\thesis@dean\@empty
+			\ClassWarningNoLine{texlib-thesis}{The UNR committee approval page ends with^^J%
+				the Dean of the Graduate School, and no \string\graddean\space is set.^^J%
+				Add \string\graddean{Name, Ph.D.} with the name on the Graduate^^J%
+				School's current template}%
+		\else
+			\thesis@memberline{\thesis@dean, Dean}{Graduate School}%
+		\fi
 		\vfill
 		\thesis@date\par
-		\endgroup
-	\end{center}%
+	\end{center}}%
+	\@tempdima=\dimexpr\ht\thesis@unr@box+\dp\thesis@unr@box\relax
+	\ifdim\@tempdima>\textheight
+		\@tempdima=\dimexpr\@tempdima-\textheight\relax
+		\ClassWarningNoLine{texlib-thesis}{The committee approval page is %
+			\the\@tempdima\space too tall for^^J%
+			one page and runs into the bottom margin. Break the title into^^J%
+			fewer lines, or set committee-roles=inline}%
+	\fi
+	\vbox to \textheight{\unvbox\thesis@unr@box}%
 	\loadgeometry{normal}\doublespacing\clearpage
 }
+
+% committee-page=pdf: the filled-in Graduate School template, as a full page.
+\newcommand{\thesis@unr@pdfpage}{%
+	\clearpage
+	\newgeometry{margin=0pt, nohead, nofoot}%
+	\thispagestyle{empty}%
+	\begingroup
+		% Alt text from the same metadata the typeset page uses, as plain text.
+		\def\thesis@memberline##1##2{##1, ##2; }%
+		\def\\{ }\let\newline\\%
+		\protected@edef\thesis@unr@alt{Committee approval page. The Graduate School. We
+			recommend that the \thesis@docnoun\space prepared under our supervision
+			by \@author\space entitled \@title\space be accepted in partial
+			fulfillment of the requirements for the degree of \thesis@degree.
+			\thesis@committee
+			\ifx\thesis@dean\@empty\else\thesis@dean, Dean, Graduate School. \fi
+			\thesis@date}%
+		% Exactly one text height tall: a paragraph line of the same height did
+		% not fit, and left a blank page before a numbered one.
+		\vbox to \textheight{\vss
+			\hbox to \textwidth{\hss\includegraphics[width=\paperwidth,
+				height=\paperheight, keepaspectratio,
+				alt=\thesis@unr@alt]{\thesis@unr@pdf}\hss}%
+			\vss}%
+	\endgroup
+	\clearpage\loadgeometry{normal}%
+}
+
+\renewcommand{\thesisapprovalpage}{%
+	\ifthesis@unr@pdfpage
+		\ifx\thesis@unr@pdf\@empty
+			\ClassWarningNoLine{texlib-thesis}{committee-page=pdf needs
+				committee-pdf=<file>.^^J%
+				Typesetting the committee approval page instead}%
+			\thesis@unr@typeset
+		\else
+			\thesis@unr@pdfpage
+		\fi
+	\else
+		\thesis@unr@typeset
+	\fi
+}
+
+% "Table of Contents" is the page's name in FG section 5's sequence.
+\renewcommand{\contentsname}{Table of Contents}
 
 % Historic names, kept so documents written against the pre-split class still
 % build. \makeUNRtitlepage in particular appears in both shipped templates and

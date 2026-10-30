@@ -51,6 +51,31 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   On a twelve-version exam that was 13 near-duplicate PDFs. `full` builds it
   regardless, and the omission is reported like every other.
 
+- **The UNR thesis front pages follow the Graduate School's filing guidelines
+  (read 2026-10-30).** The committee approval page printed any title of two or
+  more lines on top of the word "entitled" (its `minipage` was centered on the
+  line above; the generic page had the same fault). It also drew a signature
+  rule under every member, where UNR says "NO SIGNATURES", and had no entry for
+  the Dean of the Graduate School, which UNR reserves the last line for. It now
+  sets each role on an italic line under the name, as UNR's 2023 sample pages
+  do, and ends with `\graddean{...}`, warning when that is unset. With six
+  members and a three-line title the old page had no room left: adding the
+  Dean pushed the date onto a new page printed "3". The page is now built in a
+  box and measured, so a page that is too full warns and stays one page; seven
+  members, the Dean and a three-line title fit. The copyright notice gains the
+  © symbol and the year (from `\graddate`, or `\copyrightyear{...}`), and the
+  contents page is headed "Table of Contents". A comma in `\title` split the
+  PDF's `dc:title` into fragments with duplicate `x-default` entries, so
+  viewers showed "... Operads" for a title that continued; the title is now
+  passed braced unless the author set `pdftitle`. Where UNR's instructions and
+  its sample pages disagree, the profile follows the instructions and a key
+  selects the other reading: `committee-roles`, `committee-author`,
+  `committee-degree`, and `committee-page=pdf` with `committee-pdf=<file>` to
+  merge the Graduate School's template. The keys go in `\thesisset{...}` or as
+  class options, through the `thesis` wrapper too; `theorem-font=upright` sets
+  theorem statements upright. All builds pass veraPDF PDF/UA-2 and PDF/A-4f
+  except `committee-page=pdf` given a file that does not embed its fonts.
+
 - **An `exam-date` the author wrote is authoritative even when empty.** A review
   sheet or a take-home has no date, and `exam-date = {}` is how a document says
   so. That used to be indistinguishable from never setting the key, so the cover
