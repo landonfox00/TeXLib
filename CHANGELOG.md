@@ -34,6 +34,39 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   14 + 14 + 10 + 12): all 48 key pages carry the total of the problems printed
   on them, and no word on any student page moved. New fixture
   `pagepoints-test.tex`, asserted by `test_engine_correctness.py`.
+- **`{sketchaxes}` — the grid a graphing problem is answered on, with the answer
+  as its body.** `\begin{sketchaxes}[<scale>]{xmin}{xmax}{ymin}{ymax}` …
+  `\end{sketchaxes}` prints a blank labeled grid on a student copy and the same
+  grid with its body drawn on it on every copy that shows solutions. A bank that
+  put a blank grid in the stem and a second, filled grid inside `{partsolution}`
+  printed both in a key: on a twelve-version Math 126 exam the key ran 9 pages a
+  version against the student copy's 7, and with `{sketchaxes}` it runs 7. The
+  body is TikZ in grid units; `\sketchwindow` is the grid's rectangle, for
+  `\clip`; the star drops the y tick labels. A student copy discards the body
+  unread, and `test_mode_effects.py` checks that in every mode of `autoexam` and
+  `quiz`. Defined in `texlib-problembank.sty`, so every class that draws from a
+  bank has it. On a three-problem probe the tagged student copy passes PDF/UA-2
+  with 0 failed checks, and the tagged solutions copy reports the same 10 failed
+  checks with the grids as without them: a shown `{partsolution}` already fails
+  four Table 5 rules there, and `{sketchaxes}` adds none.
+
+  The grid lines are stroked in `\sketchgridcolor` at width `\sketchgridwidth`,
+  `black!40` and `0.3pt` by default, and a course changes either with
+  `\renewcommand`. The first draft of the environment hardcoded `black!18` at
+  TikZ's 0.2pt help-line width, and printed Math 126 exams came back with some
+  of those lines missing (reported 2026-10-07). The default is the weight that course
+  then overlaid on the grid from its preamble, and `\graph` in `autoexam`
+  already draws its dashed grid in `black!40`. No template, fixture or scenario
+  draws a `{sketchaxes}`, so no visual reference changes.
+
+- **`\texlibpartsolheader` — a `{partsolution}`'s header, set apart from
+  `{solution}`'s.** It defaults to `\texlibsolheader`, so no document changes
+  until one sets it. `\renewcommand{\texlibpartsolheader}{}` removes the line:
+  the tint and the accent still mark each answer, and a page of one-line part
+  answers gets a line back per part. A sixteen-page Math 126 review whose key
+  ran eighteen pages runs sixteen with it. The headerless box keeps the header
+  box's shape (one line of height, the rest depth), which the inline key relies
+  on to hang an answer below its question.
 
 - **The viewer opens on `<base>.pdf` as soon as the base compile ends, not when
   the fan-out does.** That PDF is final at that moment — everything after it

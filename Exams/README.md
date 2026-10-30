@@ -258,6 +258,12 @@ Solution body. Visible only in key/solutions builds.
 `\begin{partsolution} ... \end{partsolution}`
 Per-part solution paired with `\part`.
 
+`\texlibpartsolheader`
+The header a `{partsolution}` prints, `\texlibsolheader` ("Solution.") by
+default. `\renewcommand{\texlibpartsolheader}{}` in the preamble removes it from
+part solutions and leaves `{solution}`'s in place; use it when a page of short
+part answers runs a key onto an extra page.
+
 `\rubric{points}{description}`
 Add a rubric line to the solution it is written in. It prints in a build that
 shows rubrics (see [Build flags](#build-flags-texlib-unified-cli)). A
@@ -374,6 +380,46 @@ Add a final scoring page (defaults to 20 questions).
 
 `\graph[opts]{x-min}{x-max}{y-min}{y-max}{tikz body}`
 Inline coordinate plane with axes and a tikz body.
+
+`\begin{sketchaxes}[scale]{x-min}{x-max}{y-min}{y-max} ... \end{sketchaxes}`
+The grid a graphing problem is answered on. The body is TikZ, in grid units,
+that draws the answer:
+
+```latex
+\ppart Graph $f$.
+    \begin{sketchaxes}[0.62]{-5}{5}{-5}{5}
+        \begin{scope}
+            \clip \sketchwindow;
+            \draw[blue, very thick, domain=-5:5] plot (\x, {(\x)^2 - 2});
+        \end{scope}
+        \fill[blue] (0,-2) circle (2.6pt);
+    \end{sketchaxes}
+    \begin{partsolution}
+        Vertex $(0, -2)$, opening upward.
+    \end{partsolution}
+```
+
+A student copy prints the blank grid. A copy that shows solutions prints the same
+grid with the body drawn on it, so the key keeps the student copy's pagination.
+`\sketchwindow` is the grid's rectangle. The optional argument is the TikZ scale
+(default `0.7`); the starred form drops the y tick labels; an empty body is a
+grid that prints blank in every copy. Defined in `texlib-problembank.sty`, so it
+works from a quiz and from lecture notes as well.
+
+The grid lines are drawn in `\sketchgridcolor` (default `black!40`) at width
+`\sketchgridwidth` (default `0.3pt`). To change them for a course, redefine
+either in the preamble; inside a group the change holds for that group's grids.
+
+```latex
+\renewcommand{\sketchgridcolor}{black!55}   % any xcolor expression
+\renewcommand{\sketchgridwidth}{0.4pt}      % does not scale with [scale]
+```
+
+The axes and tick marks are 0.4pt black, so a grid darker than about `black!60`
+is hard to tell from them.
+
+Do not also draw the answer's grid inside `{partsolution}`: the key then prints
+two grids, and the second is what pushes the problem onto another page.
 
 `\workbox{height}`
 Reserved blank space for student work.
