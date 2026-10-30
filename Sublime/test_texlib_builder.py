@@ -2570,6 +2570,123 @@ def main():
           _bs.VERAPDF_REPORT_SUFFIX)
 
     # ====================================================================== #
+    # Inline-key fit. texlib_keyfit.lua warns when a solution is taller than
+    # its answer space; the build reads those warnings back out of each lane's
+    # final log and gives them a block of the summary. The log text below is
+    # the Lua's wording, continuation lines and all: the detail the summary
+    # needs is on the lines a host's warning list never kept.
+    # ====================================================================== #
+    print("\n-- inline-key fit summary --")
+    P = "(texlib-solutions)                "
+    KEYFIT_LOG = "\n".join([
+        "[1] (./bank.tex)",
+        "Package texlib-solutions Warning: Page 2 (version B): 2 solutions are too tall.",
+        P + "15b: 23pt too tall; what follows moved 23pt",
+        P + "16: 4pt too tall; nothing after it moved",
+        P + "The key no longer matches the student copy.",
+        P + "Fix: more stretch (\\problem[pts][stretch]),",
+        P + "a bigger \\workbox, or a shorter solution.",
+        "",
+        "LaTeX Warning: Reference `x' undefined on input line 5.",
+        "[2] [3]",
+        "Package texlib-solutions Warning: Page 4 cannot hold its solutions:",
+        P + "they need 40.5pt more room than it has;",
+        P + "the key continues on an added page.",
+        P + "7a: 30pt too tall",
+        "",
+        "[4]",
+    ])
+    notices = _bs.keyfit_notices(KEYFIT_LOG)
+    check("keyfit: one notice per warning, the unrelated warning ignored",
+          len(notices) == 2, notices)
+    if len(notices) == 2:
+        made, added = notices
+        check("keyfit: a page that made room -- page, version, each solution",
+              made["page"] == 2 and made["version"] == "B"
+              and not made["added"]
+              and made["solutions"] == [
+                  ("15b", 23, "what follows moved 23pt"),
+                  ("16", 4, "nothing after it moved")], made)
+        check("keyfit: a page that could not -- how short, and its solutions",
+              added["page"] == 4 and added["version"] is None
+              and added["added"] and added["short"] == "40.5"
+              and added["solutions"] == [("7a", 30, "")], added)
+        check("keyfit: the summary line names the problem and the move",
+              _bs.keyfit_notice_text(made)
+              == "version B, page 2: problem 15b is 23pt too tall (what "
+                 "follows moved 23pt); problem 16 is 4pt too tall (nothing "
+                 "after it moved)", _bs.keyfit_notice_text(made))
+        check("keyfit: the summary line says the key has a page more",
+              _bs.keyfit_notice_text(added)
+              == "page 4 cannot hold its solutions (40.5pt short); the key "
+                 "continues on an added page. Too tall: 7a (30pt)",
+              _bs.keyfit_notice_text(added))
+    check("keyfit: a clean log has nothing to say",
+          _bs.keyfit_notices("[1] [2]\nLaTeX Warning: x\n") == [])
+    # The engine wraps a log line at 79 columns. A label long enough to push a
+    # solution line past that must still be read whole.
+    long_line = P + "Problem12-extra-long-label: 9pt too tall; what follows moved 9pt"
+    wrapped = (long_line[:79] + "\n" + long_line[79:])
+    n = _bs.keyfit_notices(
+        "Package texlib-solutions Warning: Page 1: a solution is too tall.\n"
+        + wrapped + "\n")
+    check("keyfit: a solution line the engine wrapped is read whole",
+          n and n[0]["solutions"] == [
+              ("Problem12-extra-long-label", 9, "what follows moved 9pt")], n)
+
+    def _keyfit_variant(variant, tagged, log):
+        d = tempfile.mkdtemp(prefix="texlib_kf_")
+        out = os.path.join(d, "out"); os.makedirs(out)
+        with open(os.path.join(out, "doc.pdf"), "wb") as fh:
+            fh.write(b"%PDF-1.7")
+        with open(os.path.join(out, "doc.log"), "w", encoding="utf-8") as fh:
+            fh.write(log)
+        b = TexlibBuilder(); b.tex_dir = d; b.base_name = "doc"
+        b._variant_pdfs = []; b._keyfit = []
+        b._write_accessible_report = lambda td, p: None
+        b._copy_back_variant(d, variant, tagged, out)
+        return b
+
+    b = _keyfit_variant("solutions", False, KEYFIT_LOG)
+    check("keyfit: a key lane's log is read when its PDF is copied out",
+          [pdf for pdf, _n in b._keyfit] == ["doc_solutions.pdf"] * 2,
+          b._keyfit)
+    check("keyfit: a tagged twin's is not -- it is the same key again",
+          _keyfit_variant("solutions", True, KEYFIT_LOG)._keyfit == [])
+
+    b._keyfit += [("doc_instructor.pdf", n) for n in notices]
+    b._displayed = ""
+    b._display_keyfit_summary()
+    check("keyfit: one summary row per page, naming every PDF it is in",
+          len(b.keyfit_summary) == 2 and b.keyfit_summary[0].startswith(
+              "doc_solutions.pdf, doc_instructor.pdf  version B, page 2: "),
+          b.keyfit_summary)
+    check("keyfit: the block has a header and says how to fix it",
+          b._displayed.startswith(
+              "TeXLib: inline key solutions taller than their answer space:\n"
+              "    doc_solutions.pdf, doc_instructor.pdf  ")
+          and "\\workbox" in b._displayed
+          and "\\problem[pts][stretch]" in b._displayed, b._displayed)
+    clean = _keyfit_variant("solutions", False, "[1] [2]\n")
+    clean._displayed = ""
+    clean._display_keyfit_summary()
+    check("keyfit: a key whose solutions fit prints nothing extra",
+          clean._displayed == "" and clean.keyfit_summary == [],
+          clean._displayed)
+
+    # A build of one key (no fan-out) reads the base compile's own log, at the
+    # end of _postprocess, after the rest of the summary.
+    _cmds, disp, _tmp = drive_builder(
+        "\\documentclass{autoexam}\\begin{document}x\\end{document}",
+        options=["--texlib-mode=solutions"], engine="lualatex",
+        steps=[{"write": {"doc.log": KEYFIT_LOG, "doc.pdf": "%PDF"}}])
+    tail = disp[disp.find("TeXLib: build finished"):]
+    check("keyfit: a single key build ends its summary with the block",
+          "TeXLib: inline key solutions taller than their answer space:\n"
+          "    doc.pdf  version B, page 2: problem 15b" in tail
+          and _LAST_BUILDER[0].keyfit_summary, disp[-600:])
+
+    # ====================================================================== #
     # (y) Preamble deferral + the precompiled-preamble cache.
     #
     # Loading is always correct and deferring is the optimisation, so nearly

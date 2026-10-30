@@ -160,6 +160,13 @@ def _format_cache_enabled():
 GRADEBOOK_CLASSES = {"report-card"}
 GRADEBOOK_SHEETS = ("Report View", "Report Cards")
 
+# Closes the keyfit block of the build summary (_display_keyfit_summary); the
+# hosts repeat it where they repeat the block.
+KEYFIT_ADVICE = (
+    "Where a page made room, the key no longer matches the student copy. "
+    "Fix: more stretch on the problem (\\problem[pts][stretch]), a bigger "
+    "\\workbox, or a shorter solution.")
+
 # --- Variants ----------------------------------------------------------------
 # A VARIANT is one rendering of the document: the same source, a different
 # audience. Each is its own compile -- the flags change what is typeset
@@ -504,6 +511,11 @@ class TexlibBuildCore:
         self._variant_pdfs = []
         self._variants_built = None
         self._variants_skipped = []
+
+        # Inline-key pages whose solutions did not fit (_note_keyfit), and the
+        # summary rows made of them, which a host may repeat where it is seen.
+        self._keyfit = []
+        self.keyfit_summary = []
 
         # Convergence state (see _record_state_baseline / _needs_another_run):
         # the aux fingerprint the current pass started from, and every
@@ -1670,6 +1682,10 @@ class TexlibBuildCore:
         # beside the source.
         if not tagged:
             self._slice_variant_versions(variant, out_dir, tex_dir, dest)
+            # A tagged twin's key is the same key, and would only repeat it.
+            self._note_keyfit(
+                os.path.basename(dest),
+                os.path.join(out_dir, self.base_name + ".log"))
 
     # Which suffix a variant's answer-bearing per-version slices carry. The
     # `solutions' variant keeps the historic "_solutions" because those copies
@@ -2482,6 +2498,15 @@ class TexlibBuildCore:
         self._slice_synctex_for_copies(tex_dir)
 
         self._display_build_summary(tex_dir, base_path)
+
+        # The base PDF is a key when the mode asked for one, and its notices
+        # go before the variants'.
+        later, self._keyfit = getattr(self, "_keyfit", []), []
+        self._note_keyfit(self.base_name + ".pdf",
+                          os.path.join(build_dir or tex_dir,
+                                       self.base_name + ".log"))
+        self._keyfit += later
+        self._display_keyfit_summary()
     def _finalize_synctex(self, tex_dir):
         """Reduce inverse-search artifacts to a single uncompressed <base>.synctex.
 
@@ -3352,6 +3377,44 @@ class TexlibBuildCore:
             self.display("TeXLib: variants produced:\n" + "\n".join(lines) + "\n")
         for name, reason in getattr(self, "_variants_skipped", []):
             self.display(f"TeXLib: variant {name!r} not built -- {reason}.\n")
+
+    def _note_keyfit(self, pdf_name, log_path):
+        """Record the inline-key pages whose solutions did not fit, from the
+        final log of the compile that wrote `pdf_name`. The final log only: an
+        earlier pass's warnings are about a page that pass laid out."""
+        try:
+            with open(log_path, encoding="utf-8", errors="replace") as fh:
+                notices = _spec.keyfit_notices(fh.read())
+        except OSError:
+            return
+        if not hasattr(self, "_keyfit"):
+            self._keyfit = []
+        self._keyfit.extend((pdf_name, n) for n in notices)
+
+    def _display_keyfit_summary(self):
+        """One line per key page whose solutions did not all fit their answer
+        space, naming each solution, and what to do about it.
+
+        A page that made room no longer matches the student copy, and one that
+        could not make it has pushed the key onto a page more. Both are what
+        the inline layout exists to prevent, and both used to pass with no more
+        than a line in the log, so they get a block of their own here. The same
+        page in several PDFs (the solutions and instructor keys) is one line.
+        A key with nothing to report prints nothing.
+        """
+        rows = {}
+        for pdf, notice in getattr(self, "_keyfit", []):
+            pdfs = rows.setdefault(_spec.keyfit_notice_text(notice), [])
+            if pdf not in pdfs:
+                pdfs.append(pdf)
+        self.keyfit_summary = [
+            f"{', '.join(pdfs)}  {text}" for text, pdfs in rows.items()]
+        if not self.keyfit_summary:
+            return
+        self.display(
+            "TeXLib: inline key solutions taller than their answer space:\n"
+            + "".join(f"    {row}\n" for row in self.keyfit_summary)
+            + "  " + KEYFIT_ADVICE + "\n")
 
     @staticmethod
     def _human_size(n):
