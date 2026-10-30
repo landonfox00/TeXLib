@@ -100,8 +100,12 @@
 % \AtBeginDocument instead, by which point every TeXLib class has loaded both --
 % and guarded, so a document that somehow has neither degrades to a warning
 % rather than an undefined-control-sequence.
-\ifdraft
-	\AtBeginDocument{%
+%
+% \ifdraft is read inside the hook, not around it: the source-level \drafts and
+% didactic's draft=true option both run after this package has loaded, and a
+% test here would see only the command-line \ShowDraft.
+\AtBeginDocument{%
+	\ifdraft
 		\@ifundefined{rotatebox}{%
 			\PackageWarning{texlib-build}{%
 				Draft build requested but graphicx/xcolor are not loaded;
@@ -115,8 +119,8 @@
 								\fontsize{5cm}{5cm}\selectfont\bfseries DRAFT}}}}%
 			}%
 		}%
-	}
-\fi
+	\fi
+}
 
 % Build-variant planning sidecar -----------------------------------------------
 % The builder plans a multi-variant build (student / solutions / instructor,

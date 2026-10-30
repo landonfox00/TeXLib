@@ -140,6 +140,10 @@
 
 \NewExpandableDocumentCommand{\GetPsetNumber}{}{ \tl_use:N \g__pset_number_tl }
 \NewExpandableDocumentCommand{\GetPsetDue}{}{ \tl_use:N \g__pset_due_tl }
+% \pset@ifdue{<set>}{<unset>} -- the title block's due-date test. It reads the
+% store, not \GetPsetDue: an \ifx on the getter's name compares two control
+% sequences, never their contents, and was always false.
+\cs_new:Npn \pset@ifdue #1 #2 { \tl_if_empty:NTF \g__pset_due_tl {#2} {#1} }
 \NewExpandableDocumentCommand{\GetPsetTitle}{}{
 	\tl_if_empty:NTF \g__pset_title_tl
 		{ Problem~Set~\GetPsetNumber }
@@ -199,9 +203,7 @@
 		\else
 			\ifkey \textit{Solutions} \\[0.4em] \fi
 		\fi
-		\ifx\\\GetPsetDue\\\else
-			\textbf{Due:}\ \GetPsetDue \\[0.4em]
-		\fi
+		\pset@ifdue{\textbf{Due:}\ \GetPsetDue \\[0.4em]}{}%
 		\ifstudent
 			{\small Name:\ \underline{\hspace{6cm}}}
 		\fi
