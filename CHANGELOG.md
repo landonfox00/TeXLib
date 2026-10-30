@@ -18,6 +18,7 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   travel. MC option shuffling is on either way, and `\shuffle` with no argument
   is unchanged. Written for a twelve-version exam whose two graph-bearing
   problems each own a page.
+
 - **A key's center header reads the points on each page.** On a copy that
   shows solutions (`solutions`, `instructor`), every numbered exam page of an
   `autoexam` document is headed "14 points" or "1 point": the total of the
@@ -34,6 +35,7 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   14 + 14 + 10 + 12): all 48 key pages carry the total of the problems printed
   on them, and no word on any student page moved. New fixture
   `pagepoints-test.tex`, asserted by `test_engine_correctness.py`.
+
 - **`{sketchaxes}` — the grid a graphing problem is answered on, with the answer
   as its body.** `\begin{sketchaxes}[<scale>]{xmin}{xmax}{ymin}{ymax}` …
   `\end{sketchaxes}` prints a blank labeled grid on a student copy and the same
@@ -316,6 +318,7 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   printed the red `\todo` placeholder meant for the exam whose date nobody
   remembered. The cover line is emitted conditionally too, so an absent date
   leaves no blank strut behind.
+
 - **An exam problem with no parts lines its solution up with the parts'.** In
   an autoexam key, a part's solution starts at the part's text, but a problem
   with no parts had its `{solution}` pulled back to the text margin, about 42pt
@@ -347,6 +350,7 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   - `texlib-tikzexternal` stopped at load under LuaLaTeX on
     `\pdfshellescape`, a pdfTeX primitive. It now reads `\pdf@shellescape`
     from `pdftexcmds`, which every engine defines.
+
 - **A tagged PDF listed every formula's MathML file as an attachment.** Under
   `mathml-AF` LaTeX writes one MathML file per distinct formula into the `/AF`
   entry of its Formula structure element, and by default (`viewer/pane/mathml`,
@@ -364,6 +368,7 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   `pdf-A4f.txt`, as the tree's one entry, as a document without mathematics
   already did. `test_texlib_builder.py` asserts the key in both prefixes and
   both templates.
+
 - **A failed build stamped itself as current, so the NEXT build did nothing.**
   The freshness stamp is written only after a clean pass, and "clean" was
   decided by scanning the log for a line starting with `!`. Every TeXLib pass
@@ -402,6 +407,7 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   All three are covered by a new suite, `Sublime/test_texlib_viewer.py`, whose
   fake engine writes a `.log` holding what it printed — two of the three are
   invisible to a harness whose engine leaves none behind.
+
 - **A `{tasks}` grid failed PDF/UA-2 in an accessible build.** The `tasks`
   package (1.4a, 2022) is not tagging-aware. It sets each task, and each label,
   as a paragraph in a box of its own and puts a row's boxes on one line. The
@@ -460,6 +466,7 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   The package installs nothing, and says so in the log, when the `tasks`
   functions it wraps or the tagging interfaces it calls are missing. It was
   written against `tasks` 1.4a and LaTeX 2026-06-01.
+
 - **A tagged build never settled for a document that trips the luamml
   mathml-SE abort and gains a page from its table of contents.** Every build
   kept a tagged PDF that failed PDF/UA-2 on its last page (ISO 14289-2:2024
@@ -590,6 +597,7 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   `\newpage`, anything) with `--mode accessible`: it reproduces in seconds
   instead of minutes, and the failure count moves as you strip the suspect line
   by line.
+
 - **An inline `{partsolution}` moved what followed it.** The layout's contract
   is that a key page is its student page with the answers drawn in, and for a
   part solution it did not hold. Two causes. The overlay ended with
@@ -781,6 +789,7 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   pages at 110 dpi). Test: `question-lists-test` in
   `test_engine_correctness.py` reads 1a, 1b from each of two lists in one copy,
   then 1c, 1d from a `{cols}` list in the second list's question.
+
 - **A tagged instructor copy printed `2=0 [0 pts]` for a common error's
   `[-2 pts]`, and no instructor copy has printed a bare `\item`'s bullet.** In a
   tagged copy every `{commonerrors}` entry was wrong. In an untagged one a bare
@@ -1134,6 +1143,7 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   `test_texlib_builder.py` gains eight checks on the candidate order, one of
   which fails if any `.py` file in the repo names a TeX Live year in a `bin`
   path.
+
 - **A comment that names `\begin{document}` put the preamble into every copy of
   a versioned exam.** The version loop typesets each copy from text it reads
   back out of the source file, from the line after `\begin{document}` to
