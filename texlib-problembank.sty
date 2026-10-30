@@ -18,6 +18,7 @@
 %   Variable management . . .  \setvar, \setrng, \calcvar, \get
 %   Randomisation . . . . . .  \picklist, \picklistr, \pickrange, \pickranger
 %   Retrieval . . . . . . . .  \getlist, \geti, \foreachpick
+%   Version query . . . . . .  \IfExamVersioned (autoexam replaces the default)
 %   Bank: define problems . .  \begin{problem} environment
 %   Bank: retrieve problems .  \getproblem (= \useproblem, \reqproblem)
 %   Bank: browse all . . . . . \printbankcatalog
@@ -167,6 +168,29 @@
 	\pbank@lua{eval_cond('#1')}%
 	\if@pbank@cond #2\else #3\fi
 }
+
+% \IfExamVersioned{versioned}{unversioned}  — branch on whether the document
+%   declares versions.
+%   The first branch is taken in an autoexam document that calls \versions,
+%   where \theExamVersion is the label of the copy being typeset.  The second is
+%   taken everywhere else: an autoexam document with no \versions, and every
+%   quiz, lecture-notes and bank-catalogue document.  Expandable, so it may sit
+%   inside \setvar or an \edef.
+%
+%   \theExamVersion cannot answer this.  autoexam defines it as A when no
+%   \versions is declared and the other classes do not define it, so a bank
+%   macro that compares its argument with \theExamVersion prints nothing in an
+%   exam with no versions (A is none of the bank's labels) and raises
+%   `Undefined control sequence' in a quiz.  A selector keyed to a document's
+%   own labels asks first, and names the branch a document with no versions
+%   prints:
+%     \IfExamVersioned
+%       {<compare the label with \theExamVersion>}
+%       {<the fallback>}
+%
+%   This definition is the answer for the classes with no versions.  autoexam
+%   replaces it with one that reads its \versions declaration.
+\providecommand{\IfExamVersioned}[2]{#2}
 
 % \picklist{name}{n}{a, b, c, ...}  — pick n items WITHOUT replacement
 % NOTE: list items must not contain commas themselves.

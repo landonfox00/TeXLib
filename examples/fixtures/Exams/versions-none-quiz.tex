@@ -1,0 +1,16 @@
+% versions-none-quiz.tex -- a quiz drawing the version-reporting problem from
+% versions-bank.tex. It is a quiz among the exam fixtures because the bank is
+% the thing under test: one fragment, drawn by both classes. quiz.cls has no
+% versions and does not define \theExamVersion, so the problem builds here only
+% while texlib-problembank.sty supplies \IfExamVersioned's unversioned default.
+\documentclass{quiz}
+\meta{ quiz-number = 3 }
+\setexamseed{126}
+\loadbank{versions-bank.tex}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem{vquery}
+\end{problems}
+\end{document}
