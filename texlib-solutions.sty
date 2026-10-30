@@ -99,19 +99,75 @@
 % which one it is: an index into texlib_keyfit's list of labels, each the
 % label the student copy prints (\@sol@label, "15b" for a part), with the
 % version when the document has several.
+%
+% A third attribute is the answer's FLOOR: the room the student copy keeps for
+% it, so that the key's blank is already as tall as its answer. It is the
+% reach, measured the same way in both copies (see \@sol@ghost below); only an
+% instructor's copy draws more than that, a rubric, and its floor leaves the
+% rubric out so that it keeps the student copy's page. A marker in a student
+% copy carries a floor and nothing else: it has no ink to fit.
 \ifdefined\directlua
 	\newattribute\@sol@reach
 	\edef\@sol@reachattr{\the\allocationnumber}
 	\newattribute\@sol@which
 	\edef\@sol@whichattr{\the\allocationnumber}
+	\newattribute\@sol@floor
+	\edef\@sol@floorattr{\the\allocationnumber}
 	\newcommand{\@sol@marker}[2]{\hbox
-		attr\@sol@reachattr=\number\dimexpr#1\relax
-		attr\@sol@whichattr=\directlua{tex.sprint(texlib_keyfit.name(
-			"\luaescapestring{\@sol@label}", "\luaescapestring{\@sol@version}"))}%
+		\if@sol@ghost\else
+			attr\@sol@reachattr=\number\dimexpr#1\relax
+			attr\@sol@whichattr=\directlua{tex.sprint(texlib_keyfit.name(
+				"\luaescapestring{\@sol@label}", "\luaescapestring{\@sol@version}"))}%
+		\fi
+		\if@sol@floors
+			attr\@sol@floorattr=\number\@sol@floordim
+		\fi
 		{#2}}
 \else
 	\newcommand{\@sol@marker}[2]{\hbox{#2}}
 \fi
+\newdimen\@sol@floordim
+% The parts of a solution that only an instructor's copy draws, measured so
+% that its floor can leave them out (\@sol@floordim is the reach less them).
+\newdimen\@sol@bodytotal
+\newcommand{\@sol@measurebody}{%
+	\par
+	\global\@sol@bodytotal=\directlua{texlib_keyfit.list_total()}sp\relax}
+
+% \if@sol@ghost -- a student copy typesetting a hidden solution the way the
+% inline key draws it, to leave the same marker with the same floor. Its ink
+% is dropped. Only where the key is inline: a compact key draws no answer in
+% the blank, so its student copy has nothing to make room for. Never in a
+% tagged build, whose key is compact whatever the document asks; and never in
+% a multiple-choice frame, where the key sets the solution beside the choices
+% rather than in a blank.
+%
+% The two environments read \if@sol@inline, which is \ifsolinline or a ghost,
+% and never raise \ifsolinline itself: quiz.cls prints its "Solutions" mark
+% off that flag, and an output routine run from inside the environment would
+% put it on the student's paper.
+\newif\if@sol@ghost
+\newif\if@sol@inmc
+\newif\if@sol@shown
+\newif\if@sol@inline
+% \if@sol@floors -- the student copy of this document keeps a floor for this
+% answer, so the key's marker carries it too. Not for a key drawn inline from
+% a document whose keys are compact (the builder's `solutions-inline' mode):
+% its student copy made no room, and the key has to make its own and say so.
+\newif\if@sol@floors
+\newcommand{\@sol@decide}{%
+	\@sol@ghostfalse \@sol@floorsfalse
+	\ifsolinline \@sol@inlinetrue \else \@sol@inlinefalse \fi
+	\ifdefined\directlua \ifdefined\TeXLibAccessibleMode \else
+	\ifTeXLib@keyinline \ifTeXLibAccessible \else \if@sol@inmc \else
+		\@sol@floorstrue
+	\fi \fi \fi \fi \fi
+	\ifsolutions
+		\@sol@showntrue
+	\else
+		\@sol@shownfalse
+		\if@sol@floors \@sol@ghosttrue \@sol@showntrue \@sol@inlinetrue \fi
+	\fi}
 \newcommand{\@sol@label}{}
 \newcommand{\@sol@qlabel}{\ifdefined\c@question\thequestion\fi}
 \newcommand{\@sol@plabel}{\@sol@qlabel\ifdefined\c@partno\thepartno\fi}
@@ -181,7 +237,7 @@
 		\@sol@spillstate\z@
 		\directlua{texlib_keyfit.fit(\number\@outputbox, \@sol@reachattr,
 			\ifdefined\pbank@sepattrnum \pbank@sepattrnum \else -1 \fi,
-			\@sol@whichattr)}%
+			\@sol@whichattr, \@sol@floorattr)}%
 		\ifnum\@sol@spillstate>\z@
 			\begingroup
 				\vbadness\@M \vfuzz\maxdimen
@@ -425,7 +481,8 @@
 \let\endsolution\relax
 \newenvironment{solution}{%
 	\TeXLibNoteSolution
-	\ifsolutions
+	\@sol@decide
+	\if@sol@shown
 		\par
 		\gdef\@sol@rubric{}%
 		\gdef\@sol@cerr{}%
@@ -452,7 +509,7 @@
 		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }{%
-	\ifsolutions
+	\if@sol@shown
 			% ACCESSIBLE: end the body's last paragraph with a real \par before
 			% the box closes. A closing brace ends a paragraph too, but without
 			% the \par token, so the tagging code's end-of-paragraph hook never
@@ -468,21 +525,39 @@
 			% {commonerrors} capture have run by now, and emitting here (rather
 			% than after \box\@sol@box below) is what puts the panels INSIDE the
 			% green fill, whose height is measured from this box.
-			\ifrubric \@emit@sol@footer \fi
+			%
+			% The student copy draws no footer, so the floor leaves it out: the
+			% body is measured before the footer is added to it. The footer's
+			% first act is a \par, so ending the paragraph here first changes
+			% nothing.
+			\global\@sol@bodytotal\z@
+			\ifrubric
+				\if@sol@inline \ifdefined\directlua
+					\ifx\@sol@cerr\@empty \ifx\@sol@rubric\@empty \else
+						\@sol@measurebody \fi
+					\else
+						\@sol@measurebody
+					\fi
+				\fi \fi
+				\@emit@sol@footer
+			\fi
 		\egroup
 		\@in@solutionfalse
+		\ifdim\@sol@bodytotal>\z@
+			\global\@sol@bodytotal\dimexpr\ht\@sol@box+\dp\@sol@box-\@sol@bodytotal\relax
+		\fi
 		% Harvest the inverse-search target from the BODY-ONLY box, before the
 		% vtop below mixes in the "Solution." header (whose glyphs carry this
 		% .sty's tag and would poison the target). See texlib_synctex.lua and
 		% SYNCTEX.md: content glyphs are attributed correctly, the boxes built
 		% around them are not, and the viewer resolves clicks by container.
-		\ifdefined\directlua
+		\ifdefined\directlua \if@sol@ghost\else
 			\directlua{texlib_synctex_read_target(\number\@sol@box)}%
-		\fi
+		\fi \fi
 		% The outer 10pt separations are real vertical space, so the inline
 		% layout suppresses them for the same reason it zeroes the box below --
 		% exactly as {partsolution} suppresses its opening \smallskip.
-		\ifsolinline\else\par\vspace{\@sol@outervsep}\fi
+		\if@sol@inline\else\par\vspace{\@sol@outervsep}\fi
 		\setlength{\fboxsep}{6pt}%
 		% Collect the "Solution." header (+ any \rubric overlay) and the pre-\box'd
 		% body into ONE \vtop, whose reference point is the header baseline. Then
@@ -513,9 +588,9 @@
 		% Stamp every container and rule in the finished box with the harvested
 		% solution source, so a click anywhere in the green box -- padding,
 		% header, fill -- resolves there instead of dying on a tag-0 wrapper.
-		\ifdefined\directlua
+		\ifdefined\directlua \if@sol@ghost\else
 			\directlua{texlib_synctex_stamp_box(\number\@sol@vtop)}%
-		\fi
+		\fi \fi
 		% Full-bleed to the true text margins.  {solution} renders inside the
 		% exam-class {questions} list body, whose left indent (\@totalleftmargin)
 		% \noindent does NOT remove; without this the full-\textwidth box is shifted
@@ -587,11 +662,21 @@
 		% page geometrically identical to its student copy. Without this branch
 		% {solution} always displaced, so any problem answered by a full-problem
 		% {solution} (rather than per-part ones) re-paginated the key.
-		% Caveat, inherited from {partsolution}: nothing bounds the overlay, so a
-		% solution taller than its answer space overprints what follows.
-		\ifsolinline
+		% Nothing here bounds the overlay. The room for it is made on the
+		% finished page, in the student copy as well as the key: see
+		% texlib_keyfit.lua.
+		%
+		% A student copy (\if@sol@ghost) builds all of this to measure it, and
+		% sets the overlay with nothing in it: the same marker, the same floor,
+		% no ink.
+		\if@sol@inline
 			\@sol@reachdim\dimexpr\baselineskip+\dp\@sol@vtop+6\p@\relax
-			\sbox\@sol@outer{\raisebox{-\baselineskip}[\z@][\z@]{\@sol@frame}}%
+			\@sol@floordim\dimexpr\@sol@reachdim-\@sol@bodytotal\relax
+			\if@sol@ghost
+				\setbox\@sol@outer\hbox{}%
+			\else
+				\sbox\@sol@outer{\raisebox{-\baselineskip}[\z@][\z@]{\@sol@frame}}%
+			\fi
 			\let\@sol@label\@sol@qlabel
 			\@sol@overlay\@sol@outer\@sol@reachdim
 		\else
@@ -621,18 +706,19 @@
 % page geometrically identical to its student copy.  \raisebox, not \smash:
 % \smash also zeroes the size but leaves the ink on the CURRENT baseline, which
 % is the part's own text line, so every solution printed over its question.
-% Caveat: nothing bounds the overlay, so a solution taller than its answer space
-% silently overprints the next part.
+% Nothing bounds the overlay here; the student copy keeps each blank at least
+% as tall as its answer (texlib_keyfit.lua, floors()).
 \newsavebox{\@partsol@wrap}
 % The assembled frame, held so SyncTeX can stamp it (see \end{partsolution}).
 \newsavebox{\@partsol@outer}
 \newenvironment{partsolution}{%
 	\TeXLibNotePartSolution
-	\ifsolutions
+	\@sol@decide
+	\if@sol@shown
 		\par
 		% The opening \smallskip is real vertical space, so it is suppressed in
 		% the inline layout for the same reason the box declares no size.
-		\ifsolinline\else\smallskip\fi
+		\if@sol@inline\else\smallskip\fi
 		\gdef\@partsol@rubric{}%
 		\@in@partsolutiontrue
 		\setbox\@partsol@box\vbox\bgroup
@@ -645,7 +731,7 @@
 		\texlib@acc@tagsuspend\setbox\z@\vbox\bgroup
 	\fi
 }{%
-	\ifsolutions
+	\if@sol@shown
 		% ACCESSIBLE: a real \par before the box closes, for the reason given at
 		% {solution}'s. Here it bites in BOTH layouts: a part solution that ends
 		% in a display raised twelve tagpdf errors in a tagged key.
@@ -662,25 +748,34 @@
 		% right file, line 8 instead of 7, in both the key and key-inline
 		% layouts; the left padding band, answered by a stamped container, was
 		% already correct). See SYNCTEX.md; re-measure, do not reason.
-		\ifdefined\directlua
+		\ifdefined\directlua \if@sol@ghost\else
 			\directlua{texlib_synctex_read_target(\number\@partsol@box)}%
-		\fi
+		\fi \fi
+		% An answer of one line is set on the header's line ("Solution. $x = 3$")
+		% rather than under it, when the two fit across the part: stacked, a
+		% one-line answer is two lines tall, and that second line is what ran
+		% every short answer 4-9pt past its blank. Inline keys only, so the
+		% compact key keeps the stacked header it has always had.
+		\@partsol@runinfalse
+		\if@sol@inline \ifdefined\directlua
+			\if\relax\detokenize\expandafter{\texlibpartsolheader}\relax\else
+				\setbox\@tempboxa\hbox{\texlibpartsolheader\ }%
+				\ifnum\directlua{tex.sprint(texlib_keyfit.runin(
+						\number\@partsol@box, \number\@tempboxa))}=\@ne
+					\@partsol@runintrue
+				\fi
+			\fi
+		\fi \fi
+		% The floor leaves out what only an instructor's copy draws, the
+		% rubric: the same stack without it, measured from a copy of the body.
+		\@sol@floordim\z@
+		\if@sol@inline \ifrubric \ifx\@partsol@rubric\@empty\else
+			\setbox\@tempboxa\vtop{\@partsol@stack\copy}%
+			\@sol@floordim\dimexpr\baselineskip+\dp\@tempboxa+6\p@\relax
+		\fi \fi \fi
 		% Header, body and any rubric share one vtop so a single fill backs them.
 		\setbox\@partsol@wrap\vtop{%
-			\hsize\dimexpr\linewidth-12pt\relax
-			\if\relax\detokenize\expandafter{\texlibpartsolheader}\relax
-				% No header line. The body is lowered until its first line sits
-				% where the header's would have, so the wrap keeps the shape the
-				% frame and the inline overlay below both assume: one line of
-				% height, everything else depth. Set on the line as it stands,
-				% the body would be all height, and \ifsolinline would then draw
-				% the answer upward over its own question.
-				\noindent\lower\dimexpr\ht\@partsol@box-\ht\strutbox\relax
-					\box\@partsol@box
-			\else
-				\noindent\texlibpartsolheader\par
-				\noindent\box\@partsol@box
-			\fi
+			\@partsol@stack\box
 			\ifrubric
 				\ifx\@partsol@rubric\@empty\else
 					\par\vspace{6pt}\noindent
@@ -707,16 +802,22 @@
 		% unchanged, both layouts).
 		% Read before the frame consumes the wrap.
 		\@sol@reachdim\dimexpr\baselineskip+\dp\@partsol@wrap+6\p@\relax
-		\sbox\@partsol@outer{%
-			\ifsolinline
-				\raisebox{-\baselineskip}[\z@][\z@]{\@partsol@frame}%
-			\else
-				\@partsol@frame
-			\fi}%
-		\ifdefined\directlua
-			\directlua{texlib_synctex_stamp_box(\number\@partsol@outer)}%
+		\ifdim\@sol@floordim=\z@ \@sol@floordim\@sol@reachdim \fi
+		% A student copy measures and stops here: its overlay is empty.
+		\if@sol@ghost
+			\setbox\@partsol@outer\hbox{}%
+		\else
+			\sbox\@partsol@outer{%
+				\if@sol@inline
+					\raisebox{-\baselineskip}[\z@][\z@]{\@partsol@frame}%
+				\else
+					\@partsol@frame
+				\fi}%
+			\ifdefined\directlua
+				\directlua{texlib_synctex_stamp_box(\number\@partsol@outer)}%
+			\fi
 		\fi
-		\ifsolinline
+		\if@sol@inline
 			% A trailing \nointerlineskip stood here in place of \@sol@overlay,
 			% and it left \prevdepth at -1000pt: the line after the answer space
 			% got no interline glue and sat about 3pt high, once per part
@@ -731,6 +832,28 @@
 		\egroup\texlib@acc@tagresume
 	\fi
 }
+
+% \@partsol@stack{\box or \copy} -- the header and the body of a part answer,
+% for the vtop that {partsolution} frames.
+\newif\if@partsol@runin
+\newcommand{\@partsol@stack}[1]{%
+	\hsize\dimexpr\linewidth-12pt\relax
+	\if@partsol@runin
+		% The header is already on the answer's line (texlib_keyfit.runin).
+		\noindent#1\@partsol@box
+	\else\if\relax\detokenize\expandafter{\texlibpartsolheader}\relax
+		% No header line. The body is lowered until its first line sits
+		% where the header's would have, so the wrap keeps the shape the
+		% frame and the inline overlay below both assume: one line of
+		% height, everything else depth. Set on the line as it stands,
+		% the body would be all height, and \ifsolinline would then draw
+		% the answer upward over its own question.
+		\noindent\lower\dimexpr\ht\@partsol@box-\ht\strutbox\relax
+			#1\@partsol@box
+	\else
+		\noindent\texlibpartsolheader\par
+		\noindent#1\@partsol@box
+	\fi\fi}
 
 % \@partsol@frame — draws \@partsol@wrap with the {solution} tint and accent.
 % Geometry mirrors {solution}'s: fill flush to the box it backs, accent keeping
@@ -905,6 +1028,7 @@
 \newcommand{\TeXLibMCKeyStacked}{\@mc@keystackedtrue}
 \renewcommand{\@mcframe@begin}[1]{%
 	\def\@mc@letter{#1}%
+	\global\@sol@inmctrue
 	\par
 	\ifsolutions \if@mc@inline\else \if@mc@keystacked\else
 		\noindent\begin{minipage}[t]{\@mc@choicew}%
@@ -1005,6 +1129,7 @@
 		\noindent\hfill\textbf{Answer:}~\@mc@answerbox
 	\fi \fi
 	\par
+	\global\@sol@inmcfalse
 }
 
 \endinput

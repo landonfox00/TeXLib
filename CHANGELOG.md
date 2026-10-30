@@ -105,6 +105,55 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   a successful build opens the panel for. A key whose solutions all fit prints
   nothing extra.
 
+- **A student copy reserves the room its key's answers need.** In a document
+  whose keys are inline (autoexam's and quiz's default), the student copy now
+  typesets each hidden `{solution}` and `{partsolution}` the way the key draws
+  it, measures it, and leaves the same zero-size marker the key leaves, with
+  the answer's height on it as a floor. When a page is finished, in both
+  copies, `texlib_keyfit.lua` (`floors()`) checks those floors. A page whose
+  blanks already hold their answers is left as TeX set it. On any other page,
+  each short blank (the `\workbox` after the answer, or the `\problem` stretch
+  after a whole-problem solution) gets its answer's height, and the other
+  blanks share what is left in proportion to their stretch. Both copies do the
+  same arithmetic on the same list, so the key is the student page with the
+  answers drawn in, and fit() finds nothing to move. On 2026-10-30 the five
+  Math 126 review keys took hours of hand-tuned `\workbox` weights, `\problem`
+  stretches and page breaks to match their student pages. Built from the same
+  sources on the branch this one stacks on, they still had 22 key pages off
+  their student pages and 31 solutions reported too tall. With this change,
+  no solution is reported, every page count holds, and every word of each
+  student page prints at the same place in its key. The exceptions are
+  `{sketchaxes}` tick labels on three graph pages, which the key's grid places
+  apart from the student's. The student copies keep their page counts, and the
+  text moves on 10 of their 65 pages.
+  Shapes that ran over on those reviews are handled. A blank set *before* its
+  solution (a body that ends in `\workbox`, whose `{solution}` the engine emits
+  after it) has the answer moved up to the top of that blank, in both copies;
+  the moved nodes have no size, so only the ink moves. An answer in a `{cols}`
+  column or a `\splitpage` minipage, whose closing `\vspace` the column drops,
+  gets its room after the columns. A whole-problem solution gets its room from
+  the `\problem` stretch. A page that cannot hold its floors keeps TeX's layout
+  in the student copy, and its key splits with the existing warning. An
+  instructor's key draws a rubric its student copy leaves out: the floor omits
+  the rubric, and where the rubric does not fit, the key makes room and warns
+  against the student page, naming only that solution. Unchanged: compact keys
+  and their student copies, multiple-choice keys, tagged twins (no floors; a
+  tagged key is compact), and a key drawn inline with the `solutions-inline`
+  mode from a `compact` document, which still makes its own room and warns.
+
+- **A one-line part answer goes on its header's line.** In an inline key,
+  `{partsolution}` sets a body of one line of text after `\texlibpartsolheader`
+  ("Solution. $x = 3$") when the two fit across the part
+  (`texlib_keyfit.runin`). A longer answer keeps the stacked header. A stacked
+  one-line answer is two lines tall, and that second line ran every short
+  answer on the Math 126 reviews 4–9pt past its blank. Compact keys keep the
+  stacked header. `test_solution_inline_parity.py` builds a second exam whose
+  answers are taller than their weighted blanks, in each of those shapes, and
+  requires its key to equal the student page pixel for pixel, with no warning
+  and with its one-line answers run in. `test_solution_inline_fit.py` runs its
+  room-making cases on a `compact` document built with the `solutions-inline`
+  mode, and checks that the inline default needs none.
+
 - **The viewer opens on `<base>.pdf` as soon as the base compile ends, not when
   the fan-out does.** That PDF is final at that moment — everything after it
   writes *other* files (the tagged twins, the variant copies, the per-version
