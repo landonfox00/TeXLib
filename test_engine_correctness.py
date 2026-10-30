@@ -32,6 +32,21 @@ regression anywhere along the engine -> LaTeX -> PDF path is caught:
   * Stretch (vmap-test): parses the engine-emitted .vmap version markers and
     pdftotext-slices each copy's page range (the marker EMISSION in
     autoexam_run_versions was never exercised -- only the builder's slicer was).
+  * Stretch (nocover-test): a two-version exam with keys and NO cover page,
+    sliced per copy through the .vmap.  Every copy must number its problems
+    from 1, its Parts from I and its problem pages from "1 of N", and must
+    start its first section on a fresh page.  Nothing but the version loop
+    restarts those in a document with no \\maketitle.  The page of text before
+    the first section must read on every copy as it does on the first: no
+    header, numbered 1.
+  * Stretch (nocover-front-test): two versions with no cover page, two pages
+    of text before an unheaded section, a header set in the preamble and a
+    trailing \\blankpage.  Every page of a copy must read as it does on the
+    first copy.  The second page of text reads what the first does not: the
+    running header, the running footer and the marks.
+  * Stretch (twocover-test): a document with no \\versions and two cover pages.
+    The version loop does not typeset it, so the second \\maketitle has to
+    restart the same state.
   * Stretch (versions-none-*): a bank problem that reports its version, drawn
     by an exam with no \\versions and by a quiz.  \\IfExamVersioned must take
     its unversioned branch there, and a selector keyed to version labels must
@@ -434,6 +449,10 @@ def scenario_importproblem():
 # =============================================================================
 # Stretch: engine-emitted .vmap version markers
 # =============================================================================
+# The number in a "Problem <n>." heading, wherever it falls on the line.
+_PROBNO_RE = re.compile(r"Problem\s+(\d+)\.")
+
+
 def scenario_vmap_emission():
     print("\n=== Stretch: .vmap version-marker emission (vmap-test) ===")
     tmp = tempfile.mkdtemp(prefix="texlib_engine_vmap_")
@@ -471,12 +490,231 @@ def scenario_vmap_emission():
             sliced = flat(pdftext(pdf, first=start, last=end))
             check(f"{ver}|{copy} slice (page {start}) contains the problem stem",
                   "VSTEM" in sliced, sliced[:160])
+            # The fixture has no cover page.  Its copies read Problem 1 to
+            # Problem 4 while only \maketitle restarted the question number.
+            check(f"{ver}|{copy} slice numbers its one problem 1",
+                  _PROBNO_RE.findall(sliced) == ["1"],
+                  f"problem numbers={_PROBNO_RE.findall(sliced)}")
+            # Every copy opens on its section, so the section's mark is the
+            # first mark on the copy's first page and the right header reads
+            # it: the label prints twice, in the header and as the heading.  A
+            # reset that SETS an empty mark when a copy starts (\markboth{}{},
+            # as \maketitle does) puts it on this page ahead of the section's,
+            # and the header of every copy loses the label.
+            check(f"{ver}|{copy} slice is headed by its section label",
+                  sliced.count("Free Response") == 2,
+                  f"'Free Response' x{sliced.count('Free Response')}: {sliced[:160]}")
             if copy == "sol":
                 check(f"{ver}|{copy} slice shows the solution needle",
                       "VSOLUTION" in sliced, sliced[:160])
             else:
                 check(f"{ver}|{copy} student slice hides the solution needle",
                       "VSOLUTION" not in sliced, sliced[:160])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# =============================================================================
+# Stretch: what a copy numbers -- with no cover page, and with two
+# =============================================================================
+# A "Part <roman>" section heading (set in the body and repeated in the running
+# header), and the "<page> of <count>" centre footer of a problem page.
+_PARTNO_RE = re.compile(r"Part\s+([IVXLC]+)\b")
+_FOOTER_RE = re.compile(r"\b(\d+)\s+of\s+(\d+)\b")
+
+
+def page_texts(pdf):
+    """Each page's text, flattened, in page order.  pdftotext ends every page
+    with a form feed, so the split leaves one empty entry after the last."""
+    pages = pdftext(pdf).split("\f")
+    if pages and not pages[-1].strip():
+        pages.pop()
+    return [flat(p) for p in pages]
+
+
+def scenario_nocover_copies():
+    print("\n=== Stretch: every copy of a versioned exam with no cover page (nocover-test) ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_engine_nocover_")
+    try:
+        pdf, aux, log = build(tmp, "nocover-test.tex", "coursemeta.tex")
+        check("PDF was produced", os.path.exists(pdf), log[-600:])
+        vmap = os.path.join(aux, "nocover-test.vmap")
+        check(".vmap file was emitted by the engine", os.path.exists(vmap))
+        if not (os.path.exists(pdf) and os.path.exists(vmap)):
+            return
+
+        entries = read_vmap(vmap)
+        check("four copies: the two student copies, then the two keys",
+              [(v, c) for (v, c, _p) in entries]
+              == [("A", "stu"), ("B", "stu"), ("A", "sol"), ("B", "sol")],
+              f"copies={[(v, c) for (v, c, _p) in entries]}")
+        pages = page_texts(pdf)
+        first_front = None
+
+        for i, (ver, copy, start) in enumerate(entries):
+            end = entries[i + 1][2] - 1 if i + 1 < len(entries) else len(pages)
+            own = pages[start - 1:end]
+            tag = f"{ver}|{copy}"
+
+            # The question number carried from section to section restarts with
+            # the copy.  Without that the second copy reads Problem 4 to 6.
+            nums = _PROBNO_RE.findall(" ".join(own))
+            check(f"{tag}: the problems are numbered 1, 2, 3",
+                  nums == ["1", "2", "3"], f"got {nums}")
+
+            # The copy before this one ended in {mcproblems}, and a section after
+            # an {mcproblems} skips its \clearpage.  Unless that flag restarts
+            # too, the first section is set on the page that carries the text.
+            front = next((p for p in own if "NCFRONT" in p), "")
+            check(f"{tag}: the first section starts on a fresh page",
+                  bool(front) and not _PROBNO_RE.search(front), front[:200])
+
+            # The text is page 1 of its copy: the first-page header, which is
+            # empty, and the class's own footer.  That footer counts with
+            # exam.cls's \numpages, the page number the last copy ends on, 2
+            # here.  While \maketitle alone put the page number and the header
+            # and footer back, every copy after the first set this page under
+            # the previous copy's running header and numbered on from its last
+            # page: "Exam 1" and "Part II" above the text, "3 of 2" below it.
+            if first_front is None:
+                first_front = front
+            check(f"{tag}: the page of text has no header and is numbered 1 of 2",
+                  bool(front) and "Exam 1" not in front
+                  and not _PARTNO_RE.search(front)
+                  and _FOOTER_RE.findall(front) == [("1", "2")], front[:200])
+            check(f"{tag}: the page of text reads as it does on the first copy",
+                  bool(front) and front == first_front,
+                  f"got {front[:200]!r}, first copy {first_front[:200]!r}")
+
+            # The Part counter restarts with the copy, and a copy's first
+            # section is what restarts the page number and takes the copy's own
+            # "X of N" count.  Each section is read on the page its stem is on.
+            for stem, kind, part, foot in (
+                    ("NCSTEMONE", "free-response", "I", ("1", "2")),
+                    ("NCSTEMMC", "multiple-choice", "II", ("2", "2"))):
+                page = next((p for p in own if stem in p), "")
+                got = sorted(set(_PARTNO_RE.findall(page)))
+                check(f"{tag}: the {kind} section is headed Part {part}",
+                      got == [part], f"got Part {got}")
+                feet = _FOOTER_RE.findall(page)
+                check(f"{tag}: the {kind} page is numbered {foot[0]} of {foot[1]}",
+                      feet == [foot], f"got {feet}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def scenario_nocover_front_pages():
+    print("\n=== Stretch: two pages of text before the first section, no cover page "
+          "(nocover-front-test) ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_engine_ncfront_")
+    try:
+        pdf, aux, log = build(tmp, "nocover-front-test.tex", "coursemeta.tex")
+        check("PDF was produced", os.path.exists(pdf), log[-600:])
+        vmap = os.path.join(aux, "nocover-front-test.vmap")
+        check(".vmap file was emitted by the engine", os.path.exists(vmap))
+        if not (os.path.exists(pdf) and os.path.exists(vmap)):
+            return
+
+        entries = read_vmap(vmap)
+        check("two copies, one per version",
+              [(v, c) for (v, c, _p) in entries] == [("A", "stu"), ("B", "stu")],
+              f"copies={[(v, c) for (v, c, _p) in entries]}")
+        pages = page_texts(pdf)
+        first_own = None
+
+        for i, (ver, copy, start) in enumerate(entries):
+            end = entries[i + 1][2] - 1 if i + 1 < len(entries) else len(pages)
+            own = pages[start - 1:end]
+            tag = f"{ver}|{copy}"
+            check(f"{tag}: four pages: two of text, the problem, a scratch leaf",
+                  len(own) == 4, f"{len(own)} page(s)")
+            if len(own) != 4:
+                continue
+            one, two, prob, leaf = own
+            if first_own is None:
+                first_own = own
+
+            # Page 1 of the copy reads the first-page slots.  The preamble set
+            # the centre one, and the first section of every copy empties it:
+            # only a copy that starts from what the document had when
+            # \begin{document} ended prints it again.
+            check(f"{tag}: the first page of text is headed by the preamble's "
+                  "first-page header alone",
+                  "NFPAGEONE" in one and "NFHEADFIRST" in one
+                  and "NFHEADRUN" not in one and "Exam 1" not in one
+                  and "Scratch Work" not in one, one[:200])
+            # Page 2 reads the running slots and \rightmark.  The copy before
+            # this one ended on a \blankpage, which empties the running centre
+            # footer and marks its leaf "Scratch Work"; its first section had
+            # already emptied the running centre header.
+            check(f"{tag}: the second is headed by the exam title and the "
+                  "preamble's running header, with no part label",
+                  "NFPAGETWO" in two and "Exam 1" in two and "NFHEADRUN" in two
+                  and "NFHEADFIRST" not in two and "Scratch Work" not in two,
+                  two[:200])
+            # The count is exam.cls's \numpages, the page number the last copy
+            # ends on: 2, its scratch leaf.
+            feet = [_FOOTER_RE.findall(p) for p in (one, two)]
+            check(f"{tag}: the two pages of text are numbered 1 of 2 and 2 of 2",
+                  feet == [[("1", "2")], [("2", "2")]], f"got {feet}")
+
+            # The section is unheaded and sets no mark, so its page is headed
+            # by the mark in force: none on the first copy, and the previous
+            # copy's "Scratch Work" on a later one unless the marks are cleared.
+            check(f"{tag}: the problem page is not headed by the previous "
+                  "copy's mark",
+                  "NFSTEM" in prob and "Scratch Work" not in prob, prob[:200])
+            check(f"{tag}: the problem page is numbered 1 of 1",
+                  _FOOTER_RE.findall(prob) == [("1", "1")],
+                  f"got {_FOOTER_RE.findall(prob)}")
+
+            # \blankpage reads the running slots it sets and its own mark.  The
+            # leaf ships before the next copy's state is restored.
+            check(f"{tag}: the scratch leaf is labelled and carries no page number",
+                  "Scratch Work" in leaf and not _FOOTER_RE.search(leaf),
+                  leaf[:200])
+
+            check(f"{tag}: every page reads as it does on the first copy",
+                  own == first_own,
+                  f"got {[p[:80] for p in own]}, "
+                  f"first copy {[p[:80] for p in first_own]}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def scenario_two_covers():
+    print("\n=== Stretch: a second cover page restarts the numbering (twocover-test) ===")
+    tmp = tempfile.mkdtemp(prefix="texlib_engine_twocover_")
+    try:
+        pdf, _aux, log = build(tmp, "twocover-test.tex", "coursemeta.tex")
+        check("PDF was produced", os.path.exists(pdf), log[-600:])
+        if not os.path.exists(pdf):
+            return
+        pages = page_texts(pdf)
+
+        # First exam: cover, Part I, Part II (multiple choice).  Second exam:
+        # cover, one section.  The version loop never runs here, so each row
+        # below is \maketitle's doing: it passes with the resets shared between
+        # \maketitle and \AutoExamBeginCopy and fails with them moved out of
+        # \maketitle.
+        check("five pages: a cover and two sections, then a cover and one section",
+              len(pages) == 5, f"{len(pages)} page(s)")
+        if len(pages) != 5:
+            return
+        # An empty list is a cover page.  The fourth is the one at risk: the
+        # section before it was an {mcproblems}, so the section after it skips
+        # its \clearpage, and starts on the cover, unless the cover resets that.
+        nums = [_PROBNO_RE.findall(p) for p in pages]
+        check("problems read 1, 2 in the first exam and 1 in the second, "
+              "none on a cover",
+              nums == [[], ["1"], ["2"], [], ["1"]], f"got {nums}")
+        parts = [sorted(set(_PARTNO_RE.findall(p))) for p in pages]
+        check("sections read Part I, Part II and then Part I again",
+              parts == [[], ["I"], ["II"], [], ["I"]], f"got {parts}")
+        feet = [_FOOTER_RE.findall(p) for p in pages]
+        check("section pages read 1 of 2, 2 of 2 and then 1 of 1",
+              feet == [[], [("1", "2")], [("2", "2")], [], [("1", "1")]],
+              f"got {feet}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -651,6 +889,9 @@ def main():
     scenario_ppart_atomicity()
     scenario_importproblem()
     scenario_vmap_emission()
+    scenario_nocover_copies()
+    scenario_nocover_front_pages()
+    scenario_two_covers()
     scenario_unversioned_query()
     scenario_versioned_copies()
     scenario_restarted_question_lists()
