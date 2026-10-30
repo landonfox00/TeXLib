@@ -157,11 +157,19 @@ def read_stamp(pdf_path):
         return None
 
 
-def write_stamp(pdf_path, build_key):
+def write_stamp(pdf_path, build_key, produced=()):
     """Record what this PDF was built from. Call ONLY after a clean build.
 
     Returns True if a stamp was written. A missing .fls or PDF is not an error:
     it just means the next build cannot be skipped, which is the safe default.
+
+    `produced` is the build's own list of output PDF names, in the order it made
+    them. It is carried purely so a SKIPPED build can answer the same question
+    the build that wrote it could: `preferred_pdf` resolves "solutions" and
+    "student" by searching that list, so without it a no-op rebuild resolves to
+    the combined PDF and pulls the viewer off the slice it was showing. It takes
+    no part in the freshness decision, and an older stamp that lacks it simply
+    restores nothing.
     """
     fls = fls_path_for(pdf_path)
     identity = _pdf_identity(pdf_path)
@@ -177,6 +185,7 @@ def write_stamp(pdf_path, build_key):
         "stat": stat_fingerprint(paths),
         "content": content_fingerprint(paths),
         "pdf": identity,
+        "produced": [str(name) for name in (produced or ())],
     }
     try:
         with io.open(stamp_path_for(pdf_path), "w", encoding="utf-8") as fh:
