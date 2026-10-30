@@ -178,6 +178,8 @@ A **variant** is one rendering of the document: the same source, a different aud
 | `solutions-inline` | The same answers drawn *into* the student's blank, so the page geometry matches. Needs `{partsolution}` | `\def\ShowKeyInline{}` |
 | `instructor` | Answers **plus** the rubric and common-error notes | `\def\ShowSolutions{}\def\ShowRubric{}\def\InstructorMode{}` |
 
+`solutions-inline` is a layout, and a document can ask for it once in its preamble with `\keylayout{inline}`. Its `solutions` and `instructor` copies then keep the student copy's page, with each answer drawn into the blank, and the plain build is unchanged. See [`Exams/README.md`](Exams/README.md).
+
 `Ctrl+B` (mode `default`) builds the base PDF, then every variant the document actually supports, each with a tagged PDF/UA twin — `<base>_solutions.pdf`, `<base>_solutions_accessible.pdf`, and so on. Which variants those are is decided per document, not guessed: each class declares what it distinguishes (`\TeXLibDeclareVariants`) and each build writes a `<base>.buildmeta` sidecar recording whether the document actually contains solutions, rubrics or common-error blocks. A lecture note with no solutions in it builds one PDF and its tagged twin, and says why it built nothing else.
 
 Other modes: `base` (the plain build alone, fully settled), `full` (every variant, skipping the content check), `quick` (one pass, references may be stale), `accessible` (normal + tagged pair), `draft` (adds a `DRAFT` watermark), and each variant name as a single-shot build.

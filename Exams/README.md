@@ -264,6 +264,46 @@ default. `\renewcommand{\texlibpartsolheader}{}` in the preamble removes it from
 part solutions and leaves `{solution}`'s in place; use it when a page of short
 part answers runs a key onto an extra page.
 
+`\keylayout{inline}` (preamble)
+Lay this document's keys out on the student copy's page. The answer space
+stays and each solution is drawn into it, so a key page is the student page
+with the answers showing: same pagination, every problem where the student
+copy prints it. It applies to every answer-bearing copy the builder makes
+(`<base>_solutions.pdf`, the per-version `_solutions` slices, `_instructor`).
+The plain build is still the student copy.
+
+The tagged twin of a key (`<base>_solutions_accessible.pdf`) keeps the compact
+layout. It is read through its structure, where position on the page carries
+nothing, and the inline layout costs it conformance: a key of whole-problem
+solutions passes PDF/UA-2 compact and fails four Table 5 rules inline.
+
+Where a solution is taller than the blank it is drawn into, the space after it
+grows to hold it and the page's other answer spaces give that up in proportion
+to their stretch. The page height does not change, and a page on which every
+solution fits is left exactly as the student copy. The log records each page
+where room was made (`made room for N tall solution(s)`).
+
+A page whose solutions cannot fit at all, however the space is shared, is split:
+what fits stays, the rest continues on one added page, and the pages after it
+keep their contents. A part is never separated from its own answer, and a page
+of several problems is cut between two of them when each side fits a page, so
+that no problem is divided. The key is then a page longer than the student
+copy, and the build says so:
+
+```
+Package texlib-solutions Warning: Page 3 cannot hold its solutions:
+(texlib-solutions)                they need 41.5pt more room than it has;
+(texlib-solutions)                the key continues on an added page.
+```
+
+To get that key back onto the student copy's pages, give the page the room it is
+short of: a larger stretch on the `\problem` line, a smaller figure, or one
+problem fewer on that page. `TEXLIB_KEYFIT_TRACE=1` in the environment writes
+the page as the fit read it to the log, one line per item, in points.
+
+`\keylayout{compact}` is the default: the answer space closes and the solutions
+flow, which is what a review sheet with no work space wants.
+
 `\rubric{points}{description}`
 Add a rubric line to the solution it is written in. It prints in a build that
 shows rubrics (see [Build flags](#build-flags-texlib-unified-cli)). A

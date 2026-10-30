@@ -129,9 +129,11 @@ jobs:
             # box with tagging suspended, so a defect that only a SHOWN solution
             # has cannot reach it: every part solution in a tagged key failed
             # five checks while this gate was green. This builds one exam's
-            # tagged student copy and its three tagged keys. It soft-skips
-            # veraPDF and pypdf like the suite does, and the two guards above
-            # cover it. First because it is the shorter of the two.
+            # tagged student copy and four tagged keys, and reads each key's
+            # structure tree for what veraPDF does not check: that a solution
+            # reads its header before its answer. It soft-skips veraPDF and
+            # pypdf like the suite does, and the two guards above cover it.
+            # First because it is the shorter of the two.
             python3 test_solution_tagged_conformance.py
 
             python3 smoke_test.py --accessible
