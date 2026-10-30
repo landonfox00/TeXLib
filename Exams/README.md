@@ -243,12 +243,32 @@ layout. It is read through its structure, where position on the page carries
 nothing, and the inline layout costs it conformance: a key of whole-problem
 solutions passes PDF/UA-2 compact and fails four Table 5 rules inline.
 
-Where a solution is taller than the blank it is drawn into, the space after it
-grows to hold it and the page's other answer spaces give that up in proportion
-to their stretch. The page height does not change, and a page on which every
-solution fits is left exactly as the student copy. Where room was made, the key
-page no longer matches the student page, and the build warns, naming each
-solution by the label the student copy prints:
+The student copy reserves the room each answer needs. A hidden solution is
+measured as the inline key will draw it, and its blank (the `\workbox` after
+it, or the `\problem` stretch after a whole-problem solution) is at least that
+tall. Where the stretch already gives every blank enough, the page is the one
+it always was; where it does not, the short blanks get their answer's height
+and the others share what is left in proportion to their stretch. A blank set
+before its solution (`\workbox{2}` and then `{solution}`, the order a problem
+whose body ends in a blank reaches the key) counts as that solution's blank,
+and the key draws the answer into it. So stretch weights need no tuning
+against the key: the key is the student page with the answers showing.
+
+A part answer of one line goes on its header's line ("**Solution.** x = 3"),
+in an inline key and in the room its student copy keeps for it. A longer one
+keeps the header on a line of its own.
+
+The room is the student copy's only where the keys are inline (`\keylayout`
+below) and the copy is not tagged. A multiple-choice key, which sets its
+answer beside the choices, takes none. An instructor's key also draws the
+rubric, which its student copy leaves out; where that rubric does not fit,
+the space after it grows to hold it and the page's other answer spaces give
+that up in proportion to their stretch. The same happens to a key drawn
+inline (the `solutions-inline` build mode) from a document whose keys are
+`compact`, since its student copy made no room. The page height does not
+change. Where room was made, the key page no longer matches the student page,
+and the build warns, naming each solution by the label the student copy
+prints:
 
 ```
 Package texlib-solutions Warning: Page 2 (version B): a solution is too tall.
@@ -270,7 +290,8 @@ The CLI prints the block again at the end of its output, under `--quiet` too,
 and Sublime shows it in the build panel and the status bar. A build whose key
 solutions all fit prints nothing extra.
 
-A page whose solutions cannot fit at all, however the space is shared, is split:
+A page whose answers cannot fit at all, however the space is shared, keeps the
+student copy's own layout, and its key is split:
 what fits stays, the rest continues on one added page, and the pages after it
 keep their contents. A part is never separated from its own answer, and a page
 of several problems is cut between two of them when each side fits a page, so
@@ -292,7 +313,7 @@ problem fewer on that page. `TEXLIB_KEYFIT_TRACE=1` in the environment writes
 the page as the fit read it to the log, one line per item, in points.
 
 In autoexam and quiz, `inline` is the default, so a key always keeps its student
-copy's page unless a solution does not fit. `\keylayout{compact}` in the preamble
+copy's page unless a page cannot hold its answers. `\keylayout{compact}` in the preamble
 asks for the other layout: the answer space closes and the solutions flow, which
 suits a sheet with no work space.
 
