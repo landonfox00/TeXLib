@@ -20,8 +20,10 @@ python texlib_cli.py build notes.tex --mode accessible
 or `Ctrl+Shift+B` → "Accessible" in Sublime, or `python smoke_test.py
 --accessible` across every shipped template at once.
 
-Both PDFs are kept because tagging costs visual fidelity: `tcolorbox` theorem
-wraps are dropped, since their inner list breaks under tagging. The normal PDF
+Both PDFs are kept because the tagged twin is typeset in a separate
+run and can differ from the normal PDF in spacing and page breaks.
+That run always uses lualatex, while lecture notes, problem sets and
+syllabi are otherwise built with pdflatex. The normal PDF
 is the one to print and project; the tagged twin is the one a screen reader can
 navigate.
 
