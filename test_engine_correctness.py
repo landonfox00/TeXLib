@@ -81,30 +81,12 @@ def _texinputs_env(tex_dir):
     return env
 
 
-def _find_poppler_pdftotext():
-    """A poppler-flavored pdftotext.  On some Windows dev setups Git for Windows
-    ships its own xpdfreader pdftotext earlier on PATH; that build renders
-    differently and lacks -bbox, so probe candidates and pick the first whose
-    version banner mentions poppler (same guard as test_synctex_integration.py)."""
-    candidates = []
-    which = shutil.which("pdftotext")
-    if which:
-        candidates.append(which)
-    candidates.append(r"C:\texlive\2025\bin\windows\pdftotext.exe")
-    for cand in candidates:
-        try:
-            proc = subprocess.run([cand, "-v"], capture_output=True, text=True,
-                                   encoding="utf-8", errors="replace", timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        banner = (proc.stdout or "") + (proc.stderr or "")
-        if "poppler" in banner.lower():
-            return cand
-    return None
-
+# The poppler lookup is declared once, in Sublime/texlib/texlib_buildspec.py.
+sys.path.insert(0, os.path.join(TEXLIB_ROOT, "Sublime", "texlib"))
+from texlib_buildspec import find_poppler  # noqa: E402
 
 LUALATEX = shutil.which("lualatex")
-PDFTOTEXT = _find_poppler_pdftotext()
+PDFTOTEXT = find_poppler()
 
 _PASS = 0
 _FAIL = 0

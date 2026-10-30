@@ -3,10 +3,8 @@
 result helpers, and toolchain probes copy-pasted across test_*.py. Dev-only --
 deploy.ps1 excludes it. Because Python puts a script's own directory on sys.path,
 `import _testkit` resolves from any Sublime/test_*.py with no extra path setup."""
-import glob
 import os
-import shutil
-import subprocess
+import re
 import sys
 import types
 
@@ -40,6 +38,30 @@ def report(ok):
     sys.exit(0 if ok else 1)
 
 
+# A document argument carries a deferral prefix whenever the preamble scanner
+# found something this document never uses -- which, for the synthetic one-line
+# documents the suites build, is everything. That prefix is not a MODE macro,
+# and the assertions about mode macros compare against the argument with any
+# prefix stripped.
+_DEFER_PREFIX_RE = re.compile(r"^(?:\\def\\TeXLibNo[A-Za-z]+\{\})+")
+
+
+def without_defer(arg):
+    r"""`arg` minus its \def\TeXLibNo... prefix, unwrapped from \input{...}.
+
+    "doc.tex" -> "doc.tex"
+    "\def\TeXLibNoBib{}\input{doc.tex}" -> "doc.tex"
+    "\def\ShowKey{}\input{doc.tex}" -> "\def\ShowKey{}\input{doc.tex}"  (a mode
+    macro survives, which is exactly what these assertions must still catch.)
+    """
+    arg = str(arg)
+    stripped = _DEFER_PREFIX_RE.sub("", arg)
+    if stripped == arg:
+        return arg                      # nothing was stripped; leave it alone
+    match = re.fullmatch(r"\\input\{(.*)\}", stripped)
+    return match.group(1) if match else stripped
+
+
 def touch(root, rel, body=""):
     """Create root/<rel> (slash-separated) with parent dirs and optional
     contents; return the absolute path."""
@@ -52,31 +74,13 @@ def touch(root, rel, body=""):
 
 def find_poppler(tool="pdftotext"):
     """Absolute path to a poppler-flavored `tool` (pdftotext/pdftoppm), or None.
-    Git for Windows ships an xpdf-flavored pdftotext that shadows poppler's on
-    PATH and silently lacks -bbox (prints usage instead of erroring), so probe
-    the -v banner and take the first candidate whose banner says poppler.
-
-    The TeX Live fallback is GLOBBED by year, newest first, not pinned to one.
-    It was hardcoded to 2025, which survived only because that was the year on
-    PATH; installing 2026 alongside it (and eventually removing 2025) would have
-    left the fallback pointing at nothing, and a missing poppler does not fail
-    the suites -- it soft-skips them. A green run that silently verified no
-    content is the same failure the veraPDF lookup already had."""
-    candidates = []
-    which = shutil.which(tool)
-    if which:
-        candidates.append(which)
-    candidates.extend(sorted(
-        glob.glob(rf"C:\texlive\*\bin\windows\{tool}.exe"), reverse=True))
-    for cand in candidates:
-        try:
-            proc = subprocess.run([cand, "-v"], capture_output=True, text=True,
-                                  encoding="utf-8", errors="replace", timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        if "poppler" in ((proc.stdout or "") + (proc.stderr or "")).lower():
-            return cand
-    return None
+    The lookup is texlib_buildspec.find_poppler, shared with the repo-root
+    suites and version_diff.py; this is the Sublime suites' route to it."""
+    tdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "texlib")
+    if tdir not in sys.path:
+        sys.path.insert(0, tdir)
+    import texlib_buildspec
+    return texlib_buildspec.find_poppler(tool)
 
 
 class _StubPdfBuilder:

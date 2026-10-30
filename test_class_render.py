@@ -31,22 +31,11 @@ TEXLIB_ROOT = os.path.dirname(os.path.abspath(__file__))
 PDFLATEX = shutil.which("pdflatex")
 
 
-def _poppler_pdftotext():
-    for cand in (shutil.which("pdftotext"),
-                 r"C:\texlive\2025\bin\windows\pdftotext.exe"):
-        if not cand:
-            continue
-        try:
-            p = subprocess.run([cand, "-v"], capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        if "poppler" in ((p.stdout or "") + (p.stderr or "")).lower():
-            return cand
-    return None
+# The poppler lookup is declared once, in Sublime/texlib/texlib_buildspec.py.
+sys.path.insert(0, os.path.join(TEXLIB_ROOT, "Sublime", "texlib"))
+from texlib_buildspec import find_poppler  # noqa: E402
 
-
-PDFTOTEXT = _poppler_pdftotext()
+PDFTOTEXT = find_poppler()
 
 COURSEMETA = (r"\metasetup{institution={Test U}, instructor={T}, season=Fall,"
               r" year=2026, course-subject=Math, course-number=181,"
