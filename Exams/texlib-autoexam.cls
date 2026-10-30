@@ -83,7 +83,13 @@
 % Backward-compat aliases for autoexam's internal naming. Existing logic
 % (and downstream documents) using \if@autoexam@rubric / \@autoexam@rubrictrue
 % continues to work; new code should use \ifrubric / \rubrics.
+%
+% \let copies \ifrubric's meaning at the moment it runs, so this one is a
+% snapshot: a \rubrics in the preamble flips \ifrubric and leaves the alias at
+% \iffalse. The class itself therefore reads \ifrubric, and the alias is
+% re-taken at \begin{document} so downstream code sees the preamble's setting.
 \let\if@autoexam@rubric\ifrubric
+\AtBeginDocument{\let\if@autoexam@rubric\ifrubric}
 \let\@autoexam@rubrictrue\rubrictrue
 \let\@autoexam@rubricfalse\rubricfalse
 
@@ -222,7 +228,7 @@
 	\ifinstructor
 		Instructor Version%
 	\else
-		Solutions\if@autoexam@rubric\space and Rubrics\fi
+		Solutions\ifrubric\space and Rubrics\fi
 	\fi}
 
 % texlib-problembank.sty loads problem_engine.lua and defines the shared
@@ -909,7 +915,7 @@
 	% ---- title block ---------------------------------------------------------
 	\begin{center}
 		\huge Exam \GetExamNumber \\
-		\LARGE Math \theCourseNumber\ \theCourseTitle \\
+		\LARGE \GetCourse \\
 		\vspace{0.1em}
 		% Term + section, relocated here from the running header (which now
 		% carries the part label).  Emitted only when non-empty: \GetTermSection
@@ -934,7 +940,7 @@
 			\if@autoexam@dateline \\ \fi
 			\large\textcolor{red}{\textbf{\@autoexam@solword}}%
 		\else
-			\if@autoexam@rubric
+			\ifrubric
 				\if@autoexam@dateline \\ \fi
 				\large\textcolor{red}{\textbf{Rubrics}}%
 			\fi
