@@ -35,6 +35,7 @@ anything the class loaded. It owns the parts a graduate school dictates:
 | The filing figures | `\thesissetgeometry{left=1in, ...}`, `\thesissetspacing{double\|onehalf\|single}` |
 | A deeper chapter opening | `\thesissetchapteropening{2in}` — the **total** top margin on chapter/major-section first pages |
 | Accessibility rules | `\thesisrequiretagging`, `\thesisrequiredocumentlanguage`, `\thesisrequirepdfstandard{...}`, `\thesisaccessibilityrequirement{label}{text}` |
+| Where its own sources disagree | a key in the l3keys family `thesis`, declared with `\keys_define:nn { thesis } {...}` — see [below](#choosing-a-reading) |
 
 Everything else — the tagged-PDF stack, the trivlist-free theorem
 environments, `\ThesisMathIntent`, the front-matter machinery, the
@@ -51,10 +52,43 @@ published is as wrong as an invented margin.
 
 **Writing one.** Copy [`profiles/unr.tex`](profiles/unr.tex), which is
 commented as the reference, and replace the two page bodies. The committee list
-(`\committeemember`) and its per-member signature rule are provided by the
-class, so a minimal profile is a name plus two layouts. Profiles for other
+(`\committeemember`), its per-member line (a signature rule by default, which a
+profile replaces through `\thesis@memberline` where the school takes no
+signatures, as UNR's does) and `\graddean` are provided by the class, so a
+minimal profile is a name plus two layouts. Profiles for other
 institutions are welcome — see the caveat in
 [Status](#status) about checking current wording before filing.
+
+### Choosing a reading
+
+A graduate school's instructions and its sample pages do not always agree, and
+neither does every section of one instructions page. Where they disagree, a
+profile follows one reading by default and declares a key for the other, so the
+author picks the reading their reviewer holds them to without editing the class:
+
+```latex
+\documentclass[profile=unr, committee-roles=inline]{texlib-thesis}
+\thesisset{committee-author=as-written}      % or in the preamble
+```
+
+Any `key=value` class option other than `profile=` is such a key; it also passes
+through the `thesis` wrapper. A key the loaded profile does not declare is an
+error rather than a silent no-op. One key belongs to the class itself:
+
+| Key | Values | Why |
+|---|---|---|
+| `theorem-font` | `italic` (default), `upright` | Theorem, lemma, corollary and proposition statements are italic by mathematical convention; UNR, for one, accepts italic typefaces only "where absolutely necessary". It covers the class's own environments; one declared with `\newtheorem` follows amsthm's `\theoremstyle` (`definition` is upright). |
+
+The UNR profile declares four, each defaulting to the Graduate School's
+[filing guidelines](https://www.unr.edu/grad/current-students/filing-guidelines)
+(FG) over its 2023 sample committee pages (S), both read on 2026-10-30:
+
+| Key | Values | The disagreement |
+|---|---|---|
+| `committee-page` | `typeset` (default), `pdf` | FG §4 says to type the words as they appear on the template; FG §5 says to use the PDF template and combine it into the manuscript. `pdf` places `committee-pdf=<file>` (the filled-in template, exported to PDF) as a full page. It becomes an image with alt text, so its own text and tags are lost, and it must embed its fonts or the thesis fails PDF/UA-2 and PDF/A-4f. |
+| `committee-roles` | `below` (default), `inline` | FG §4 puts each member's role "under each one" and S sets it on its own italic line; FG §4's advisor example is one line, "Sonia A. Skakich, Ph.D., Advisor". |
+| `committee-author` | `upper` (default), `as-written` | FG §4 asks for the name in all capitals and bold; S prints it bold in mixed case. |
+| `committee-degree` | `upper` (default), `as-written` | Same disagreement for the degree name. |
 
 Asking for a profile that does not exist warns and falls back to the neutral
 pages rather than failing the build; asking for `generic` explicitly is the
@@ -118,7 +152,10 @@ Checked against the [Graduate School filing guidelines](https://www.unr.edu/grad
 | Body restarts at Arabic `1`, bottom-center, no running header | conforms |
 | Table of Contents, **List of Tables**, List of Figures, in that order | conforms |
 | Fonts embedded, 10-12pt | conforms (12pt; all faces embedded) |
-| Committee page wording and layout | **needs the Graduate School's answer -- see below** |
+| Copyright notice: ©, full name, year | conforms (year from `\graddate`, or `\copyrightyear{...}`) |
+| Committee page: no signatures, Dean of the Graduate School last | conforms (`\graddean{...}`; warns when unset) |
+| Committee page fits 3-6 members, co-advisor and Dean on one page | conforms (six members and a three-line title checked; warns if a page is too full) |
+| Committee page wording and layout | typeset to match the template; **typeset vs. merged PDF needs the Graduate School's answer -- see below** |
 
 `twoside` no longer widens the inner margin. UNR requires 1.0in on all four
 sides with no binding exception, and the manuscript is filed electronically
@@ -182,6 +219,7 @@ the note in the Not-yet-done section below.
 \committeemember{Pat D. Advisor, Ph.D.}{Advisor}
 \committeemember{...}{Committee Member}
 \committeemember{...}{Graduate School Representative}
+\graddean{...}                  % last entry on the committee page
 \addbibresource{thesis-refs.bib}
 
 \begin{document}
@@ -210,9 +248,9 @@ single ambiguous symbol (for example, `\sin^{-1}`).
   internally inconsistent: section 4 says to use the handout template and *"type
   the words as they appear"*, while the committee-page section says to use their
   **PDF** template and *"combine the PDF into your manuscript"*. This class
-  typesets its own, which matches section 4 and Hurtado's template but not a
-  literal reading of the merge instruction. Ask before filing; the class can do
-  either.
+  typesets its own by default, which matches section 4 and Hurtado's template;
+  `committee-page=pdf` merges the filled-in template instead (see
+  [Choosing a reading](#choosing-a-reading)). Ask which one the reviewer wants.
 - **The accessibility report's required format is unresolved.** Hurtado's
   2026-08-25 department email states that accessibility reports must now be
   submitted with thesis documents, but his guidelines doc does not yet define
