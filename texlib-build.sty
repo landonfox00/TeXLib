@@ -142,8 +142,12 @@
 % \AtBeginDocument instead, by which point every TeXLib class has loaded both --
 % and guarded, so a document that somehow has neither degrades to a warning
 % rather than an undefined-control-sequence.
-\ifdraft
-	\AtBeginDocument{%
+%
+% \ifdraft is read inside the hook, not around it: the source-level \drafts and
+% didactic's draft=true option both run after this package has loaded, and a
+% test here would see only the command-line \ShowDraft.
+\AtBeginDocument{%
+	\ifdraft
 		\@ifundefined{rotatebox}{%
 			\PackageWarning{texlib-build}{%
 				Draft build requested but graphicx/xcolor are not loaded;
@@ -157,8 +161,8 @@
 								\fontsize{5cm}{5cm}\selectfont\bfseries DRAFT}}}}%
 			}%
 		}%
-	}
-\fi
+	\fi
+}
 
 % Build-variant planning sidecar -----------------------------------------------
 % The builder plans a multi-variant build (student / solutions / instructor,
@@ -255,6 +259,21 @@
 \else
 	\newcommand\texlib@acc@tagsuspend{}
 	\newcommand\texlib@acc@tagresume{}
+\fi
+
+% Tagged list structure for `tasks' --------------------------------------------
+% The tasks package is not tagging-aware: a tagged {tasks} list is paragraphs
+% nested in paragraphs, which PDF/UA-2 rejects. texlib-tasks.sty retags it as a
+% list and has the detail. It is loaded from here because this is the one
+% package every class loads, and the classes do not agree on when tasks arrives:
+% didactic, pset and report-card load it through basic-utilities BEFORE this
+% file, and in every other class it arrives only if a document asks for it. So
+% both orders are handled. A build in which tasks never loads never reads the
+% file.
+\ifdefined\TeXLibAccessibleMode
+	\@ifpackageloaded{tasks}%
+		{\RequirePackage{texlib-tasks}}%
+		{\AddToHook{package/tasks/after}{\RequirePackage{texlib-tasks}}}
 \fi
 
 \endinput

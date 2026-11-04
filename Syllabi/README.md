@@ -230,8 +230,10 @@ Contributions of institution profiles are welcome.
 
 `\IfMetaSet{key}{true}{false}` — from `course-metadata`. Useful in
 custom title blocks.
-`\IfSyllSet{name}{true}{false}` — class-local; `name` is the
-underscored variable name (`class_time`, `office_hours`, …).
+`\IfSyllSet{name}{true}{false}` — the older spelling of `\IfMetaSet`,
+kept for existing documents; it takes the underscored names
+(`class_time`, `office_hours`, …) and asks `\IfMetaSet` about the matching
+coursemeta key (`class-time`, `office-hours`).
 
 ### Page layout
 

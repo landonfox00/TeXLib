@@ -25,9 +25,12 @@ sibling or use any module's class.
 | Module | Entry | Exercises |
 |--------|-------|-----------|
 | `Exams` | `fix-test.tex` (+ `fix-bank.tex`) | the `\problem{id}[a=1,b=2]` fix-overrides syntax |
+| `Exams` | `cols-test.tex` | `{cols}` around `{parts}`, the one tagged `{cols}` the accessible gate builds; `test_cols_tagged_layout.py` asserts that the tagged copy keeps the two columns |
 | `Metadata` | `metadata-test.tex` (+ `coursemeta.tex`) | `course-metadata.sty`'s arbitrary-key catch-all + `\Get<Key>` derivation |
 | `Notes` | `theorem-numbering.tex` | didactic's shared-counter, section-based theorem numbering (`Theorem 1.1`, `Definition 1.2`, … resetting per `\section`) |
+| `Notes` | `tasks-tagging.tex` | nine `{tasks}` grids in the accessible build: veraPDF for the nesting, `tagged=` counts for the list structure (one item per task, label before body) |
 | `MathML` | `nth-root-mathml.tex` | two or more `\sqrt[n]{…}` in ONE formula — the shape that aborts a tagged build under `mathml-SE` |
+| `MathML` | `nth-root-toc.tex` | the same abort in a document whose table of contents adds a page (5 pages on a pass with no `.toc`, 6 after), which a tagged build needs a third pass to settle |
 
 ## Adding a fixture
 
@@ -37,8 +40,14 @@ it needs), then add an entry to `EXAMPLES` in `examples/manifest.py` — with
 (`smoke_test.py` derives its module list and `EXPECT_TEXT` from the manifest).
 Run `python smoke_test.py examples/fixtures/<Module>` to check it.
 
+A fixture about the tagged PDF can also declare `tagged=`, the exact number of
+structure elements of each standard type its accessible build must carry, for
+example `tagged={"L": 11, "LI": 27}`. veraPDF checks that a structure tree is
+legal; `tagged=` checks that it is the tree the page calls for. It is read only
+by `python smoke_test.py --accessible`.
+
 A directory may hold **several** fixtures: expectations are keyed by
-`(module, template)`, so each one keeps its own `expect`/`absent`/`artifact`
+`(module, template)`, so each one keeps its own `expect`/`absent`/`artifact`/`tagged`
 list. Put a fixture in the directory of the module it builds on, and reach for a
 new `<Module>` directory only when it genuinely builds on a different class —
 not to dodge a name collision. (Until 2026-08-31 those lists were keyed by

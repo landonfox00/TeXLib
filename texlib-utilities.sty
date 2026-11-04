@@ -30,6 +30,8 @@
 
 % tasks: grid layout for exercise parts, \begin{tasks}(N) \task ... \end{tasks}
 % Defaults: bold lowercase letter + period, e.g. "a."
+% tasks is not tagging-aware. In an accessible build texlib-build.sty also loads
+% texlib-tasks.sty, which tags the grid as a list; nothing here changes.
 \TeXLibDefer{Tasks}{%
 	\RequirePackage{tasks}%
 	\settasks{

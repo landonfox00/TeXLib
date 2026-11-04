@@ -6,6 +6,9 @@ commands() coroutine with a fake engine (scripted self.out) to prove the build
 decisions survived the port -- mode injection, the lua-class force, the rerun
 loop, quick mode, and the -file-line-error flag (PLUGIN-DESIGN Risk #1).
 
+Cases 8, 10 and 11 (the A -> B -> A oscillation stop, the filter for biblatex's
+own rerun flags, the TEXLIB_STATE_RERUN=0 opt-out) are tested nowhere else.
+
 Run:  python Sublime/test_texlib_build.py
 """
 import os
@@ -14,6 +17,12 @@ import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "texlib"))
 import texlib_build  # noqa: E402
+from _testkit import without_defer  # noqa: E402
+
+# Off, as in test_texlib_builder.py: with it on, quick mode (case 4) runs
+# `pdftex -ini` through texlib_format_cache.ensure() on any machine with TeX on
+# PATH, so the case took a different path locally than in CI.
+os.environ["TEXLIB_NO_FORMAT_CACHE"] = "1"
 
 
 def make_host(tmp, docclass, engine, mode, display):
@@ -82,13 +91,14 @@ ok &= check(len(cmds) == 1, "autoexam/base: single pass (no rerun signal)")
 ok &= check(cmds and cmds[0][0] == "lualatex", "autoexam: engine forced to lualatex")
 ok &= check(cmds and "-file-line-error" in cmds[0], "autoexam: -file-line-error present")
 ok &= check("requires lualatex" in disp, "autoexam: force message displayed")
-ok &= check(cmds and cmds[0][-1] == "doc.tex", "autoexam/base: bare \\input arg")
+ok &= check(cmds and without_defer(cmds[0][-1]) == "doc.tex",
+            "autoexam/base: no mode macro before \\input")
 
 # 2. pset, key mode -> pdflatex kept, macro injected.
 cmds, msgs, disp = run_case("pset-key",
                             docclass="pset", engine="pdflatex", mode="key")
 ok &= check(cmds and cmds[0][0] == "pdflatex", "pset: engine stays pdflatex")
-ok &= check(cmds and cmds[0][-1] == r"\def\ShowKey{}\input{doc.tex}",
+ok &= check(cmds and without_defer(cmds[0][-1]) == r"\def\ShowKey{}\input{doc.tex}",
             "pset/key: \\ShowKey macro injected before \\input")
 ok &= check(cmds and "-file-line-error" in cmds[0], "pset: -file-line-error present")
 

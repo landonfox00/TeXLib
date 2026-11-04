@@ -1,0 +1,42 @@
+% nocover-front-test.tex -- two versions of an exam with no cover page whose
+% text before the first section fills two pages, for the per-copy assertions in
+% test_engine_correctness.py.
+%
+% nocover-test.tex sets one line before its first section.  That line is page 1
+% of its copy, and page 1 reads the first-page header and footer.  This
+% document adds what a second page reads, and what one copy leaves for the
+% next:
+%   - \chead in the preamble.  The first section of a copy empties both centre
+%     headers (\problems@begin@hook), so they print again only on a copy that
+%     starts from what the document had when its preamble ended.  A copy that
+%     started from the class's own header would print neither.
+%   - A second page of text.  It reads the running header, the running footer
+%     and \rightmark.
+%   - An unheaded section.  It sets no mark, so its page is headed by whatever
+%     mark is in force.
+%   - \blankpage LAST.  It empties the running centre footer and marks its leaf
+%     "Scratch Work".  Unless both are put back, the next copy's text prints
+%     with no page number, and its text and its problem under "Scratch Work".
+%
+% These comments never spell out the command that opens the document body.
+% The version loop takes the body from the first place that command appears in
+% the file, a comment included, and reads the rest of the preamble as body.
+\documentclass{autoexam}
+\versions{A,B}
+\setexamseed{7}
+\examsetup{number=1, date={Engine Test}}
+\chead[NFHEADFIRST]{NFHEADRUN}
+
+\begin{problem}{nfone}[topic=fr]
+	NFSTEM free-response stem.
+\end{problem}
+
+\begin{document}
+NFPAGEONE first page of text.
+\newpage
+NFPAGETWO second page of text.
+\begin{problems}*
+	\problem{nfone}
+\end{problems}
+\blankpage
+\end{document}
