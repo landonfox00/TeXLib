@@ -1,0 +1,250 @@
+% profiles/alcorn-state-university.tex — Alcorn State University
+% ============================================================================
+% source: https://www.alcorn.edu/wp-content/uploads/2023/06/7th_Edition_Thesis_and_Projects_Manual.pdf
+%         ("Thesis and Non-Thesis Manual (APA 7th Edition Formatting and Style
+%         Guide)", Office of Graduate Studies, "REVISED June, 2022", 67 pp;
+%         PDF created 2022-09-22)
+% source: https://www.alcorn.edu/academics/graduate-studies/thesis-and-research-project/
+%         (Graduate Studies, "Summary of Steps for Electronic Submission of
+%         Thesis and Research Project"; page modified 2026-09-04, links the
+%         manual above as "Thesis/Project Manual")
+% accessed: 2026-09-17
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, title page, approval (signature)
+% page, and the accessibility finding.
+% NOT set: chapter openings (no deeper margin is required), typeface, page-number
+% position. See the notes at each.
+%
+% The manual is the governing document: "This is the official approved manual by
+% the Graduate Division", and the submission page tells students to check the
+% document "is formatted properly according to the Thesis/Project/Capstone
+% Manual". The separate "Division of Graduate Studies CAPSTONE PROJECT MANUAL
+% Revised Spring 2019" (wp-content/uploads/2022/06/ASU_Capstone_Project_Manual.pdf)
+% governs capstone projects, not theses, and was not used.
+%
+% AGE: revised June 2022. It is the edition the live submission page links, and
+% no newer one was found, but it is four years old -- confirm with Graduate
+% Studies (graduatestudies@alcorn.edu) before a real filing.
+%
+% NOT ENCODABLE, recorded so nobody hunts for them:
+%   * Page numbers: "All page numbers using Arabic numerals should be 1 inch
+%     from the top right edges of the page"; title and approval pages "counted,
+%     but not numbered"; preliminary pages in lower-case Roman numerals, which
+%     Appendices D-E show centred at the bottom. The class numbers in the footer.
+%   * Typeface: "The standard font for student papers is Times New Roman size
+%     12"; the quick-reference table instead lists the APA 7 choices (Calibri 11,
+%     Arial 11, Lucida Sans Unicode 10, Georgia 11) beside "The University
+%     prefers 12 pt. Times New Roman", while the Appendix T checklist says
+%     "Style: Times New Roman". Preference vs requirement is unclear, so no font
+%     is set here.
+%   * Ragged right, no hyphenation, 0.5in paragraph indent, APA 7 headings, TOC
+%     "Single space within each section; double space between sections".
+%   * Paper and binding (20 lb, 25% cotton; black hardbound, gold lettering) and
+%     the bound-copy Cover Page (Appendix A, 2in top margin) -- the cover is a
+%     binding item, not a page of the PDF.
+%
+% AMBIGUITIES left for the reviewer, quoted:
+%   1. The "Thesis Plan" table lists "Approval Page (Signatures of Committee
+%      members)" as "Optional", but the approval-page section, both binding
+%      specifications and the Appendix T checklist all require "Four (4) original
+%      signature pages". This profile keeps the page.
+%   2. Appendix T: "Title is centered vertically and horizontally on page".
+%      The Appendix B specimen instead starts the title at the 1in top margin and
+%      fixes the gaps in line counts. The manual says "your document should be
+%      formatted according to Alcorn's example included in the Appendices", so
+%      the specimen governs here.
+%   3. Block quotations: "double spaced throughout, even in block quotes and
+%      references" versus, a few lines later, "Direct quotations greater than 4
+%      lines, single space and offset by 4 spaces." Not encoded either way.
+
+\thesisinstitution{Alcorn State University}
+
+% "Ensure every page in your document is US Letter size 8.5" x 11" with margins
+% of at least 1" on all sides except the left margin which is 1.5"." Repeated
+% for every preliminary page ("Margins: 1" top: 1" right: 1" bottom and 1.5"
+% left") and in Appendix T ("Right margin, top and bottom margins 1" except on
+% cover page (2" top margin)"; "Left margin 1.5"").
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "The thesis and non-thesis should be double spaced throughout, even in block
+% quotes and references." / "Never use single-spacing or one-and-a-half spacing
+% except in tables or figures." (But see ambiguity 3, and the single-spaced TOC.)
+\thesissetspacing{double}
+
+% No \thesissetchapteropening: "The title of the chapter or section is typed in
+% capital letters and is centered at the top of the page." The only 2in top
+% margin in the manual is on the bound Cover Page.
+
+% --- Accessibility -----------------------------------------------------------
+\thesisaccessibilityrequirement{Not published}
+	{Alcorn State University's thesis manual and its thesis submission page
+	 state no accessibility requirement for a filed thesis (no mention of
+	 accessibility, tagged PDF, alternative text or a PDF standard; the only PDF
+	 rule is to "submit your thesis/thesis research project electronically in
+	 pdf format"). The university's Web Accessibility Policy governs web
+	 content and is not a thesis filing rule.}
+
+% --- Extra fields this profile's pages need ------------------------------------
+% The class has no slot for these, and Alcorn's specimens print them:
+%   \thesisschool      "SCHOOL OF AGRICULTURE AND APPLIED SCIENCES" (title page)
+%                      and the Dean's line on the approval page
+%   \thesisdepartment  "DEPARTMENT OF BIOLOGICAL SCIENCES" (approval page)
+%   \thesisdefensedate approval-page date: "the date is the date of thesis or
+%                      non-thesis defense" (the title page uses \graddate, "the
+%                      date of graduation")
+%   \thesisdean        the Dean's typed name under the Dean's signature rule
+%   \thesispriordegrees the title page's "Paper author and previous degrees
+%                      earned (B.S., M.S.)" -- "JANE DOE, B.S." on the specimen
+% Set them in the preamble with \renewcommand. Keep degrees OUT of \author: the
+% approval page wants "the student's legal name" with "No recognition or
+% designation of terminal degree", and \author also becomes the PDF's author.
+% \ifx against \@empty never matches a \providecommand'd (\long) macro, so an
+% unset field is detected by expansion instead. Use: \thesis@alcorn@ifempty\X
+% <if empty>\else <if set>\fi.
+\newcommand{\thesis@alcorn@ifempty}[1]{\expandafter\ifx\expandafter\relax#1\relax}
+\providecommand{\thesispriordegrees}{}
+\providecommand{\thesisschool}{}
+\providecommand{\thesisdepartment}{}
+\providecommand{\thesisdefensedate}{}
+\providecommand{\thesisdean}{}
+\AtBeginDocument{%
+	\thesis@alcorn@ifempty\thesisschool
+		\ClassWarningNoLine{texlib-thesis}{Alcorn State University's title and
+			approval pages^^Jname the academic school: set
+			\string\renewcommand{\string\thesisschool}{School of ...}}%
+	\fi
+	\thesis@alcorn@ifempty\thesisdepartment
+		\ClassWarningNoLine{texlib-thesis}{Alcorn State University's approval
+			page names the^^Jdepartment: set
+			\string\renewcommand{\string\thesisdepartment}{Department of ...}}%
+	\fi
+	\thesis@alcorn@ifempty\thesisdefensedate
+		\ClassWarningNoLine{texlib-thesis}{Alcorn State University's approval
+			page is dated with^^Jthe defense date: set
+			\string\renewcommand{\string\thesisdefensedate}{...}}%
+	\fi
+}
+
+% --- Title page --------------------------------------------------------------
+% From the Appendix B specimen and its annotations:
+%   title "upper and lower case letters, double spaced";
+%   "Description 7 single line spaces from last line of title; ALL CAPS,
+%    double-spaced";
+%   "6 single line spaces or 3 double-spaces from thesis description of
+%    requirements & degree name; Name, name of school degree resides - ALL CAPS";
+%   "City and state 18 single spaces or 9 double-spaces from name of school; ALL
+%    CAPS; double-spaced from date of graduation".
+% "Is not numbered", "the date is the date of graduation", title not bold.
+%
+% The last gap is \vfill rather than a literal 18 lines: 18 lines plus the
+% blocks above overrun a 9in text block at 12pt, and on the specimen the
+% city/date block sits on the bottom margin, which is where \vfill puts it.
+% The 7- and 6-line gaps are literal: \thesis@alcorn@gap{n} leaves n blank
+% single-spaced lines, i.e. puts the next baseline n+1 single lines below the
+% previous one, however the blocks either side are spaced.
+\newcommand{\thesis@alcorn@gap}[1]{%
+	\par\nointerlineskip\vspace*{#1\baselineskip}%
+}
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\centering
+		\singlespacing
+		\begingroup\doublespacing
+			\thesis@tagtitle{Title}{\@title}\par
+		\endgroup
+		\thesis@alcorn@gap{7}%
+		\begingroup\doublespacing
+			A \MakeUppercase{\thesis@DocNoun}\\
+			SUBMITTED IN PARTIAL FULFILLMENT OF THE REQUIREMENTS\\
+			FOR THE DEGREE OF \MakeUppercase{\thesis@degree}\\
+			IN \MakeUppercase{\thesis@program}\par
+		\endgroup
+		\thesis@alcorn@gap{6}%
+		\begingroup\doublespacing
+			\MakeUppercase{\@author}%
+			\thesis@alcorn@ifempty\thesispriordegrees\else, \MakeUppercase{\thesispriordegrees}\fi\par
+			\thesis@alcorn@ifempty\thesisschool\else\MakeUppercase{\thesisschool}\par\fi
+		\endgroup
+		\vfill
+		\begingroup\doublespacing
+			LORMAN, MISSISSIPPI\\
+			\MakeUppercase{\thesis@date}\par
+		\endgroup
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Approval page (Signature Page) --------------------------------------------
+% Signed, in wet ink, outside the PDF: "Original signatures of all Thesis or
+% Non-Thesis Research Project Committee members", "Signatures in black ink only",
+% "Four (4) original signature pages must be submitted to Office of Graduate
+% Studies for the Provost's signature", and the submission page: "submit original
+% signature pages on required 20# cotton paper to the Graduate Office". The page
+% in the PDF carries the blank rules they sign.
+%
+% From the Appendix C specimen: left-aligned, single-spaced, "No page number on
+% Signature page", "Thesis or Non-Thesis title single-spaced in body of
+% descriptive paragraph", "The name of each thesis or non-thesis committee member
+% must be typed under each signature line." Top to bottom: university and
+% department in capitals; the defense date; "To the Graduate Studies
+% Administrator:"; the Chair's paragraph; a right-hand rule for the Chair
+% ("Thesis Advisory Committee Chair"); "We have read this thesis and recommend it
+% for acceptance:" with a left-hand rule per member ("Committee Member");
+% "Accepted:" with right-hand rules for the school's Dean and for the "Associate
+% Provost for Research, Innovation and Graduate Education", the latter untyped.
+%
+% The Chair is \gradadvisor. \committeemember entries are the other members;
+% their role argument is printed if given, else "Committee Member" as in the
+% specimen.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\thesis@tagtitle{H1}{{\color{white}\tiny Approval Page}}\par
+	\begingroup
+	\raggedright\setlength{\parindent}{0pt}%
+	\MakeUppercase{\thesis@institution}\par
+	\thesis@alcorn@ifempty\thesisdepartment\else\MakeUppercase{\thesisdepartment}\par\fi
+	\vspace{\baselineskip}%
+	\thesisdefensedate\par
+	\vspace{\baselineskip}%
+	To the Graduate Studies Administrator:\par
+	\vspace{\baselineskip}%
+	I am submitting herewith a \thesis@docnoun{} written by \@author{} entitled
+	``\@title.'' I have examined the final copy of this \thesis@docnoun{} for form
+	and content and recommend that it be accepted in partial fulfillment of the
+	requirements for the degree of \thesis@degree{} in \thesis@program.\par
+	% Right-hand signature block, as in the specimen.
+	% Gaps are tight on purpose: the page grows by three lines per committee
+	% member and must stay on one page inside the 1in bottom margin. Measured: a
+	% Chair plus three members fits at these values; at 1.6 the Provost's line
+	% spilled onto a second page.
+	\newcommand{\thesis@alcorn@right}[2]{%
+		\vspace{1.4\baselineskip}%
+		\hspace*{\fill}\parbox[t]{3in}{\raggedright
+			\rule{3in}{0.4pt}\\
+			\sbox0{##1}\ifdim\wd0=0pt \else ##1\\\fi
+			##2}\par
+	}%
+	\thesis@alcorn@right{\thesis@advisor}{\thesis@DocNoun{} Advisory Committee Chair}%
+	\vspace{\baselineskip}%
+	We have read this \thesis@docnoun{} and\\
+	recommend it for acceptance:\par
+	\renewcommand{\thesis@memberline}[2]{%
+		\vspace{1.4\baselineskip}%
+		\parbox[t]{3in}{\raggedright
+			\rule{3in}{0.4pt}\\
+			##1\\
+			\ifx\relax##2\relax Committee Member\else ##2\fi}\par
+	}%
+	\thesis@committee
+	\vspace{0.5\baselineskip}%
+	\hspace*{\fill}\parbox[t]{3in}{\raggedright Accepted:}\par
+	\thesis@alcorn@right{\thesisdean}{Dean%
+		\thesis@alcorn@ifempty\thesisschool\else, \thesisschool\fi}%
+	\thesis@alcorn@right{}{Associate Provost for Research,\\
+		Innovation and Graduate Education}%
+	\endgroup
+	\loadgeometry{normal}\doublespacing\clearpage
+}
