@@ -1,5 +1,10 @@
 # Front matter, in order, then the body and the theorem family.
 THESISTITLEMARK
+# The copyright notice carries the symbol and the year (taken from \graddate),
+# and the committee page ends with the Dean of the Graduate School.
+© Copyright by Ada N. Student 2027
+Dana R. Dean, Ph.D., Dean
+Table of Contents
 THESISABSTRACTMARK
 THESISACKMARK
 THESISCHAPTERMARK
