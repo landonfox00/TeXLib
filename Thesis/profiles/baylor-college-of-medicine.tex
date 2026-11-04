@@ -1,0 +1,266 @@
+% profiles/baylor-college-of-medicine.tex — Baylor College of Medicine
+% ============================================================================
+% source: https://www.bcm.edu/sites/default/files/2020-01/PhD%20Dissertation%20Instructions.pdf
+%         ("Instructions for Formatting and Submitting the Ph.D. Dissertation",
+%          The Graduate School of Biomedical Sciences, Baylor College of
+%          Medicine; asset path dated 2020-01 and the file's own ModDate is
+%          2020-01-09. Its pages 6--8 are the prescribed title, signature and
+%          program-format specimens.)
+% source: https://www.bcm.edu/education/graduate-school-of-biomedical-sciences/current-students/forms
+%         (GSBS "Graduate Student Forms" — the page that now serves those
+%          instructions, and which points them at an internal site; see below)
+% accessed: 2026-09-09
+% checked:  texlib-thesis-profile-round
+%
+% NOT BAYLOR UNIVERSITY. Baylor College of Medicine (bcm.edu, Houston) and
+% Baylor University (baylor.edu, Waco) are separate institutions with separate
+% graduate schools and separate, different thesis rules. A search for "Baylor
+% dissertation guidelines" returns Baylor University's first. Nothing in this
+% file comes from baylor.edu.
+%
+% VERIFIED and set here: geometry, the chapter-opening margin, spacing, the
+% title page, and the signature page.
+% NOT set:
+%   * every checkable accessibility declaration — GSBS publishes none.
+%
+% ============================================================================
+% CURRENCY: THE CURRENT INSTRUCTIONS ARE BEHIND A LOGIN.
+% ============================================================================
+% The GSBS forms page links "Ph.D. Dissertation Instructions" and "M.S. Thesis
+% Instructions" to intouch.bcm.edu, an internal SharePoint site that redirects
+% an anonymous request straight to login.microsoftonline.com. The document this
+% profile rests on is the copy GSBS still serves publicly from bcm.edu, and it
+% is dated JANUARY 2020.
+%
+% So every figure here is verified against a Baylor College of Medicine URL, and
+% none of it is verified as current. Two visible signs of age in that copy: its
+% title-page specimen dates itself "June 17, 1999", and its signature-page
+% specimen prints a named Dean, which is exactly the kind of value that rots
+% (this profile does not reproduce the name — see \bcmdean below).
+%
+% TO FINISH THIS PROFILE properly, someone with BCM credentials should open the
+% intouch copy and diff it against these figures. Until then, treat this as
+% accurate-as-of-2020 rather than accurate-as-of-today, and note that GSBS
+% requires prior approval for any deviation anyway: "Any deviations from these
+% instructions must receive prior approval from the Dean of the Graduate School
+% of Biomedical Sciences."
+%
+% THE TITLE PAGE IS PRESCRIBED ON PAIN OF NOT GRADUATING. Verbatim: "You may use
+% the template below in preparing your dissertation, however the format of the
+% title page must be followed exactly. Deviation in format will not be accepted
+% and will prevent you from graduating." That is the strongest wording any
+% institution in this directory attaches to a page layout, and it is the reason
+% the page below reproduces the specimen line for line rather than tidying it.
+%
+% THE CLASS DOES NOT SATISFY THE TYPEFACE RULE. "Font face should be Times New
+% Roman (12 point) or Arial (11 point)" — a closed list of two, as at Arizona
+% State and Purdue. texlib-thesis sets Latin Modern at 12pt. There is no profile
+% field for a typeface; the filer must add, in the preamble:
+%
+%     \setmainfont{Times New Roman}      % 12pt, per the instructions
+%
+% "10-point minimum for tables and figures" is separately stated and the class
+% does not go below that.
+%
+% PAGINATION, which no profile field can express: "Page numbers at the bottom of
+% the page are centered and numbered continuously throughout." One continuous
+% sequence, no roman front matter — so a document filed here should not call
+% \frontmatter.
+%
+% ONE MORE PRINT-ERA RULE worth knowing before anyone reads the margins as a
+% binding allowance: the dissertation is "printed single sided", four bound
+% copies are submitted (five for MD/PhD), and 1.25in is stated flatly for all
+% four sides with no separate inner margin. Do not widen the left margin for
+% binding; GSBS did not ask for it.
+
+\thesisinstitution{Baylor College of Medicine}
+
+% "Margins should be 1.25 inches on all four sides." Stated twice — in the
+% printing-format list and again in the Margins section of the template — and
+% repeated for figures and tables ("Margins must be at least 1.25 inches on all
+% sides"). This is the second non-square-defaults institution in this directory
+% and the first at 1.25in on every side.
+\thesissetgeometry{left=1.25in, right=1.25in, top=1.25in, bottom=1.25in}
+
+% "On the first page of every major division of the dissertation (e.g. for new
+% chapters), leave a 2 inch margin from the top of the page on all major section
+% headings", restated in the Margins section as "2 inch margin from the top of
+% the page on all major section headings (e.g. new chapters)".
+%
+% \thesissetchapteropening takes the TOTAL top margin the requirements name, and
+% 2in is the figure GSBS prints. The class subtracts the geometry's own 1.25in.
+\thesissetchapteropening{2in}
+
+% "The document must be double spaced." Not a choice.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% The instructions were read end to end. They contain none of accessible,
+% accessibility, alt text, tagged, WCAG, PDF/UA, PDF/A, screen reader or Title
+% II, and state no document-language or heading-structure rule. That is
+% unsurprising for a 2020 print-oriented document that still costs out hardcover
+% binding at $12.75 a copy — and it is exactly the kind of thing the intouch
+% copy may since have changed. Recorded as an absence in the source that was
+% READ, not as a claim about what GSBS requires today.
+\thesisaccessibilityrequirement{Not published (in the readable edition)}
+	{The publicly served January 2020 Ph.D. Dissertation Instructions state no
+	 accessibility requirement of any kind. They were read in full on the access
+	 date. The current instructions are behind a BCM login and were not read, so
+	 this records an absence in the 2020 edition rather than a claim about
+	 GSBS's requirements today.}
+
+% --- Profile-local metadata ----------------------------------------------------
+% The signature page carries three approval blocks, and the second and third
+% name people and units the class knows nothing about.
+%
+% The specimen prints an actual Dean's name. A person's name in a template rots,
+% and reproducing a 2020 one would be worse than printing none — so \bcmdean is
+% empty by default and the rule prints with no name beneath it.
+\newcommand{\bcm@dean}{}
+\newcommand{\bcmdean}[1]{\renewcommand{\bcm@dean}{#1}}
+\newcommand{\bcm@dirgradstudies}{}
+\newcommand{\bcmdirectorofgraduatestudies}[1]{%
+	\renewcommand{\bcm@dirgradstudies}{#1}}
+% "Use this format for All Graduate Programs (except CSTP): APPROVED BY THE
+% Department/Program Name GRADUATE PROGRAM", and the examples beneath it are
+% listed WITH the article — "THE CANCER & CELL BIOLOGY GRADUATE PROGRAM", "THE
+% GENETIC & GENOMICS GRADUATE PROGRAM". Read together, the sentence is "APPROVED
+% BY" + "THE <program> GRADUATE PROGRAM", and the specimen simply breaks the
+% line after "THE". So the second line carries the program and the words
+% GRADUATE PROGRAM, and NOT another "THE" — writing one produces "APPROVED BY
+% THE / THE CANCER & CELL BIOLOGY GRADUATE PROGRAM", which is what a first pass
+% at this file did.
+%
+% \bcmprogramapproval overrides the whole second line, which is what a CSTP
+% student needs (the instructions send that one program to its own format).
+\newcommand{\bcm@programline}{}
+\newcommand{\bcmprogramapproval}[1]{\renewcommand{\bcm@programline}{#1}}
+\newcommand{\bcm@theprogramline}{%
+	\ifx\bcm@programline\@empty
+		\MakeUppercase{\thesis@program} GRADUATE PROGRAM%
+	\else
+		\bcm@programline
+	\fi
+}
+
+% --- Title page ----------------------------------------------------------------
+% Reproduced line for line from the specimen (page 6 of the instructions), which
+% must be "followed exactly":
+%
+%     TITLE ALL CAPITAL LETTERS          <- bold in the specimen
+%
+%     A Dissertation Submitted to the Faculty of
+%
+%     The Graduate School of Biomedical Sciences
+%     Baylor College of Medicine
+%
+%     In Partial Fulfillment of the
+%     Requirements for the Degree
+%     of
+%     Doctor of Philosophy
+%
+%     by
+%
+%     YOUR NAME                          <- larger than the body in the specimen
+%
+%     Houston, Texas
+%     June 17, 1999
+%
+% THE DATE IS NOT THE DEFENCE DATE, and GSBS says so twice: "the date on your
+% title page must reflect the month, date, and year of your graduation
+% appointment (i.e., the date you turn in your final corrected dissertation to
+% the GSBS). Your graduation date is not your defense date." So \graddate takes
+% a full date -- \graddate{June 17, 2027} -- not a month and year.
+%
+% The author's name is set in capitals, as the specimen prints it. The title is
+% the only bold on the page.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\centering\singlespacing
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{{\bfseries\MakeUppercase{\@title}}}\par
+		\vspace{3\baselineskip}
+		A \thesis@DocNoun\ Submitted to the Faculty of\par
+		\vspace{2\baselineskip}
+		The Graduate School of Biomedical Sciences\\
+		Baylor College of Medicine\par
+		\vspace{3\baselineskip}
+		In Partial Fulfillment of the\\
+		Requirements for the Degree\\
+		of\\
+		\thesis@degree\par
+		\vspace{3\baselineskip}
+		by\par
+		\vspace{2\baselineskip}
+		{\large\MakeUppercase{\@author}}\par
+		\vspace{4\baselineskip}
+		Houston, Texas\\
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Signature page ------------------------------------------------------------
+% Section 6 of the instructions puts the "Signature Page" second, immediately
+% after the title page. The specimen (page 7) has THREE approval blocks, each
+% with a bold centred heading:
+%
+%     APPROVED BY THE DISSERTATION COMMITTEE
+%         [rule] major advisor's name, credentials, Chair
+%         [rule] committee member's name, credentials
+%         ... one per member ...
+%
+%     APPROVED BY THE
+%     <program line>
+%         [rule] program director's name, credentials
+%                Director of Graduate Studies
+%
+%     APPROVED BY THE
+%     DEAN OF THE GRADUATE SCHOOL OF BIOMEDICAL SCIENCES
+%         [rule] <dean's name>
+%         [rule] Date
+%
+% Credentials belong to the NAME, not to the class's role argument, and the
+% specimen is explicit about their form: "credentials (example: John P. Smith,
+% Ph.D. no parenthesis)". Pass \committeemember{John P. Smith, Ph.D.}{Chair} for
+% the advisor and leave the second argument empty for everyone else.
+%
+% SIGNATURES ARE REAL AND ARE COLLECTED BEFORE THE DEFENCE: GSBS asks for "a
+% copy of the dissertation/thesis Signature Page" two weeks beforehand. So the
+% rules below are meant to be signed, not left blank as at UC Davis or Indiana.
+%
+% \thesis@memberline is replaced because the class's default puts the name below
+% a 3in rule with no credentials convention and no room for the Chair label the
+% specimen places after the credentials.
+\newcommand{\bcm@ruleline}[1]{%
+	\vspace{1.6\baselineskip}
+	\rule{4.2in}{0.4pt}\par
+	#1\par
+}
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\begin{center}
+		\thesis@tagtitle{H1}{{\color{white}\tiny Signature Page}}\par
+		{\bfseries APPROVED BY THE \MakeUppercase{\thesis@DocNoun} COMMITTEE}\par
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			\bcm@ruleline{##1\ifx\relax##2\relax\else\ ##2\fi}%
+		}%
+		\thesis@committee
+		\endgroup
+		\vspace{3\baselineskip}
+		{\bfseries APPROVED BY THE\\ \bcm@theprogramline}\par
+		\bcm@ruleline{%
+			\bcm@dirgradstudies\ifx\bcm@dirgradstudies\@empty\else\\\fi
+			Director of Graduate Studies}%
+		\vspace{3\baselineskip}
+		{\bfseries APPROVED BY THE\\
+		 DEAN OF THE GRADUATE SCHOOL OF BIOMEDICAL SCIENCES}\par
+		\bcm@ruleline{\bcm@dean}%
+		\bcm@ruleline{Date}%
+	\end{center}%
+	\loadgeometry{normal}\doublespacing\clearpage
+}
