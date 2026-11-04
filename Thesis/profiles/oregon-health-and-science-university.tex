@@ -1,0 +1,150 @@
+% profiles/oregon-health-and-science-university.tex
+% ============================================================================
+% source: https://www.ohsu.edu/sites/default/files/2019-03/Preparation%20of%20Dissertation%20and%20Thesis.pdf
+%         (School of Medicine — Graduate Studies, "Instructions for Preparing
+%          the Graduate Thesis", footed "Revised 9/2010" on every page)
+% source: https://www.ohsu.edu/school-of-medicine/graduate-studies/forms-policies-and-resources
+%         (Graduate Studies, "Forms, Policies, and Resources" — the live page
+%          that links the above as "this formatting guide", and that redefines
+%          the approval page; see below)
+% accessed: 2026-09-11
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the absence of
+% an approval page in the document.
+%
+% TWO THINGS A LATER PASS MUST NOT UNDO.
+%
+% 1. THE FORMATTING GUIDE IS OLD, AND IT IS STILL THE CURRENT ONE. Every page is
+%    footed "Revised 9/2010" and its sample title page is dated May 2005, but
+%    the live Forms page links exactly this PDF and OHSU publishes no other
+%    formatting document. Its modal is unusually soft -- "We often receive
+%    questions about thesis and dissertation formatting guidelines. We recommend
+%    that you follow disciplinary conventions whenever possible. But for most
+%    cases, this formatting guide MAY BE HELPFUL." The figures below are set
+%    because they are the only figures OHSU publishes, not because OHSU commands
+%    them; a filer should confirm with their program, which the guide itself
+%    says may impose more: "The student should consult the advisor/mentor or the
+%    Program Director for information about any additional requirements."
+%
+% 2. THE APPROVAL PAGE HAS MOVED OUT OF THE DOCUMENT SINCE 2010. The old guide
+%    says "The second page of the document should be the CERTIFICATE OF APPROVAL
+%    page", and prints a sample with signature lines. The live Forms page now
+%    lists "Dissertation/Thesis Certificate of Approval" as a SMARTSHEET FORM
+%    (app.smartsheet.com/b/form/...) and says of it: "This replaces the
+%    'signature page' of your thesis, with which your Oral Exam Committee
+%    approves of the final revisions of your dissertation. The approved form is
+%    due before the last day of the term of intended graduation." A Smartsheet
+%    submission cannot be bound into a PDF, and "replaces" is the operative
+%    word. \thesisnoapprovalpage below follows the live page, not the 2010
+%    sample -- flagged here because the sample is still printed in the guide and
+%    a later reader will find it.
+
+% The ampersand is part of the IPEDS name and must be escaped — a bare & here is
+% a "Misplaced alignment tab character" the moment the class typesets the name.
+\thesisinstitution{Oregon Health \& Science University}
+
+% --- Filing figures ----------------------------------------------------------
+% "The left-hand margin should be at least 1.5 inches wide, the top and
+% right-hand margins 1.0 inch and the bottom margin not less than 1.0 inch."
+%
+% Note the asymmetry in how these are stated: left and bottom are MINIMA ("at
+% least", "not less than"), top and right are exact. The minima are taken as the
+% setting, which is in spec either way. The left margin is unconditional -- it is
+% a binding allowance stated without a binding condition -- so `twoside' must
+% not alternate it.
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "All typing or printing should be double-spaced except footnotes. Footnotes
+% should be single-spaced with a double space between footnotes." Tables are the
+% one other exception: "Tables may be single or double-spaced but must conform to
+% the margin requirements".
+\thesissetspacing{double}
+
+% No \thesissetchapteropening. OHSU does prescribe a deeper opening for ONE page
+% only -- "The heading of the Table of Contents should be typed in capital
+% letters not less than 2 inches from the top of the page" -- and this hook
+% applies to every chapter and major-section opening, which would overshoot. A
+% document can get the ToC right locally; encoding it here would silently move
+% every chapter opening on the strength of a rule about one page.
+
+% --- Accessibility -----------------------------------------------------------
+% NOT PUBLISHED by Graduate Studies. Searched the whole formatting guide for
+% accessib / alt text / WCAG / tagged / screen reader / PDF/A / Title II: zero
+% occurrences -- unsurprising for a 2010 document -- and the live Forms,
+% Policies and Resources page carries none either.
+%
+% ONE STONE LEFT UNTURNED, recorded so the next pass does not repeat the
+% attempt: OHSU deposits go to the Library at digitalcollections.ohsu.edu, whose
+% submission-information page answered every fetch with a bot-protection
+% interstitial (HTTP 202, empty body) on the access date. If OHSU publishes a
+% deposit accessibility rule anywhere, that page is where it would be -- and it
+% would be the Library's rule rather than Graduate Studies'.
+\thesisaccessibilityrequirement{Not published}
+	{OHSU School of Medicine Graduate Studies publishes no accessibility
+	 requirement for a filed thesis or dissertation. Its formatting guide
+	 predates the question entirely (revised 2010), and its current Forms,
+	 Policies and Resources page states none.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduces the guide's "[Sample Title Page]". Its bracketed annotations are
+% instructions, not content: "A THESIS/DISSERTATION [Select appropriate label]"
+% and "Doctor of Philosophy/Master of Science/Master of Public Health [Select
+% only one]" -- so the class's \thesis@DocNoun and \thesis@degree make both
+% selections.
+%
+% The department line names the DEPARTMENT and then the institution in three
+% lines: "Presented to the Department of Physiology & Pharmacology / and the
+% Oregon Health & Science University / School of Medicine". \thesis@program
+% supplies the department name; the profile supplies the rest, and the school
+% line is exposed for the units of OHSU that are not the School of Medicine --
+% the guide is a School of Medicine document and says so in its own header.
+%
+% NOTE FOR THE DOCUMENT: the specimen's line reads "Presented to the Department
+% of Physiology & Pharmacology", so \gradprogram must carry the WHOLE phrase
+% ("Department of Mathematics"), not the bare subject — the profile supplies
+% only the word "the" before it. Any ampersand in that name needs escaping, as
+% the institution name above did.
+%
+% The specimen sets the title in capitals and the rest in ordinary case, with
+% the date as month and year.
+\providecommand{\thesisschoolline}{School of Medicine}
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{3\baselineskip}
+		By\\
+		\@author\par
+		\vspace{3\baselineskip}
+		A \MakeUppercase{\thesis@DocNoun}\par
+		\vspace{3\baselineskip}
+		Presented to the \thesis@program\\
+		and the Oregon Health \& Science University\\
+		\thesisschoolline\\
+		in partial fulfillment of\\
+		the requirements for the degree of\par
+		\vspace{2\baselineskip}
+		\thesis@degree\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% None in the filed document. See point 2 of the header: the Certificate of
+% Approval is now a Smartsheet form that "replaces the 'signature page' of your
+% thesis". Signatures are still collected -- the Oral Exam Committee approves
+% the final revisions through that form, due before the last day of the term of
+% intended graduation -- but not on a page inside the manuscript.
+%
+% A filer whose program still wants the 2010 bound Certificate of Approval page
+% must build it themselves; this profile deliberately does not emit one, because
+% the class's neutral page would otherwise print a committee page OHSU's current
+% process has replaced.
+\thesisnoapprovalpage
