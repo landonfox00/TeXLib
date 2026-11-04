@@ -30,6 +30,11 @@
 % common aux packages, and the unified problem/part labels). Shared with quiz.
 \RequirePackage{texlib-assessment}
 
+% A key keeps its student copy's page unless the document says
+% \keylayout{compact}. Only the preference is set here; texlib-build resolves it
+% at \begin{document}, after the document's own \keylayout.
+\TeXLib@keyinlinetrue
+
 % PDF document title (PDF/UA clause 8.11.1) -- see course-metadata.sty.
 \TeXLibDeclareDocTitle{\GetCourse\space\GetTerm\space Exam}
 
