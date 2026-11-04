@@ -82,6 +82,20 @@ MODES = [
 ]
 MODE_TOKENS = {m[0] for m in MODES}
 
+# The build settings the brain reads from builder_settings, by name. The native
+# host has no LaTeXTools builder_settings, so the build command copies each of
+# these out of TeXLib.sublime-settings. A setting the brain reads and this list
+# lacks does nothing in the editor, whatever the settings file says about it:
+# accessible_report and accessible_report_full were missing until 2026-10, and
+# the report could be switched off only with TEXLIB_A11Y_REPORT=0.
+# test_texlib_runner.py holds this list against every key texlib_build.py reads.
+BUILD_SETTINGS = (
+    "publish_shareable_copies", "copy_published_path_to_clipboard",
+    "detect_reruns_by_state", "preview_version", "tagged_twins",
+    "default_variants", "build_jobs",
+    "accessible_report", "accessible_report_full",
+)
+
 # file:line:col: message -- matches -file-line-error output (PLUGIN-DESIGN Risk
 # #1), identical to the current TeXLib.sublime-build windows file_regex.
 RESULT_FILE_REGEX = r"^((?:.:)?[^:\n\r]*):([0-9]+):?([0-9]+)?:? (.*)$"
@@ -770,9 +784,7 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         # without them the native host read only the TEXLIB_* env vars, so a
         # setting the file presents as working did nothing in the editor.
         toggles = {}
-        for _k in ("publish_shareable_copies", "copy_published_path_to_clipboard",
-                   "detect_reruns_by_state", "preview_version", "tagged_twins",
-                   "default_variants", "build_jobs"):
+        for _k in BUILD_SETTINGS:
             _v = settings.get(_k)
             if _v is not None:
                 toggles[_k] = _v

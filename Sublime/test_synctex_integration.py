@@ -191,6 +191,27 @@ def find_word(pdf_path, needle, occurrence=1):
     return None
 
 
+def find_word_left(pdf_path, needle, occurrence=1):
+    """Like find_word, but (page, left_x, center_y): the word's left edge."""
+    out = subprocess.run(
+        [PDFTOTEXT, "-bbox", pdf_path, "-"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    ).stdout
+    page = 0
+    found = 0
+    for line in out.splitlines():
+        if PAGE_RE.search(line):
+            page += 1
+            continue
+        wm = WORD_RE.search(line)
+        if wm and needle in wm.group(5):
+            found += 1
+            if found == occurrence:
+                x0, y0, x1, y1 = (float(wm.group(i)) for i in range(1, 5))
+                return page, x0, (y0 + y1) / 2
+    return None
+
+
 # --- synctex edit wrapper ------------------------------------------------------
 def synctex_edit(pdf_path, page, x, y):
     proc = subprocess.run(
@@ -352,16 +373,23 @@ def scenario_bank_solutions_mode():
             # glyph, where only the stamped containers can answer -- must
             # resolve to the solution source. Before container stamping the
             # whole strip left of the text was dead (tag-0 wrappers); measured:
-            # x >= 72 (the text margin / box edge) resolves, and this pins it.
+            # x >= the box edge resolves, and this pins it 2pt inside the edge.
+            # The edge is read from the "Solution." header, because it is not
+            # the text margin: an autoexam problem with no parts indents its
+            # box to where a part's solution would start.
             # Residual, documented in SYNCTEX.md: the 6pt visual bleed LEFT of
             # the box edge, the "Solution." header line and the pad bands still
             # answer tag-0 emission-side wrappers (\parbox/\rlap built after
             # the stamp runs) -- cosmetic slivers, deliberately not gated.
-            rp = synctex_edit(pdf, pos[0], 74.0, pos[2])
-            check("click in the box's left padding resolves to bank.tex",
-                  basename_matches(rp["input"], "bank.tex"), rp["raw"][:300])
-            check(f"...at the solution's source line ({BANK_SOLUTION_LINE})",
-                  rp["line"] == BANK_SOLUTION_LINE, f"got line {rp['line']!r}")
+            head = find_word_left(pdf, "Solution.")
+            check("found the solution header in the PDF",
+                  head is not None and head[0] == pos[0], repr(head))
+            if head and head[0] == pos[0]:
+                rp = synctex_edit(pdf, pos[0], head[1] + 2.0, pos[2])
+                check("click in the box's left padding resolves to bank.tex",
+                      basename_matches(rp["input"], "bank.tex"), rp["raw"][:300])
+                check(f"...at the solution's source line ({BANK_SOLUTION_LINE})",
+                      rp["line"] == BANK_SOLUTION_LINE, f"got line {rp['line']!r}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
