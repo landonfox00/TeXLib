@@ -1,0 +1,235 @@
+% profiles/auburn-university.tex — Auburn University
+% ============================================================================
+% source: https://graduate.auburn.edu/current-students/academic-resources/etd.php
+%         ("Electronic Thesis and Dissertation Guide", the page's own banner
+%          reads "Update: Summer 2026" and describes a June 2026 Word template
+%          and a July 2026 LaTeX template — current)
+% source: https://graduate.auburn.edu/_assets/pdf/etd_files/etd-checklist.pdf
+%         ("Electronic Thesis & Dissertation (ETD) Checklist / Accessibility &
+%          Formatting Checklist for MS Word Documents", the checklist the guide
+%          page announces as "covering all formatting and accessibility
+%          requirements")
+% accessed: 2026-09-14
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, title page, the absence of an
+% approval page, and the accessibility requirements — including two of the three
+% checkable declarations.
+% NOT set: \thesissetchapteropening. Auburn's only stated top-margin exception
+% goes the other way — the title page takes 2in, which the title page itself
+% applies, and every other major heading takes the body's 1in: "Any pages with a
+% major heading (e.g., most preliminary pages) should have a 1″ top margin."
+% \thesisrequirepdfstandard is also not set; see the accessibility note.
+%
+% TWO THINGS THIS CLASS CANNOT SUPPLY, both required preliminary pages, recorded
+% here so an Auburn author knows to write them:
+%
+%   * "Digital Accessibility Disclosure Statement (required)". Centred heading
+%     1in from the top, two blank lines, then the statement at the left margin
+%     with the first line indented. "The disclosure will include the various
+%     accessibilty tools which have been used to esnure the thesis or
+%     dissertation is compliant with federal regulations." (Both typos are
+%     Auburn's, quoted as found.)
+%   * "Artificial Intelligence (AI) Use Disclosure Statement (required)", same
+%     layout. "AI use disclosure will be included as part of the official
+%     thesis/dissertation format requirements."
+%
+% \thesisaccessibilityreport is NOT a substitute for the first of those: the
+% report prints what Auburn ASKS FOR, and the disclosure statement has to say
+% what the author DID.
+%
+% PAGINATION, which is unusual enough to state: Auburn numbers the preliminary
+% pages in ARABIC, not roman. "All pages are numbered except for the title page.
+% Preliminary, body and reference pages: Use Arabic numbers (1, 2, 3, 4, etc.)."
+% The title page is page 1 and prints no folio, so the abstract is page "2" and
+% the count runs unbroken into the body. An Auburn document therefore does NOT
+% call \frontmatter/\mainmatter, which would restart the count.
+
+\thesisinstitution{Auburn University}
+
+% "Set margins of at least one inch on all sides (top, left, right, and bottom)
+% unless otherwise specified on the samples and templates provided on the
+% Graduate School's website."
+%
+% The 1.5in left margin is a recommendation for a printed and bound copy only —
+% "Binding Note: If you plan to print and bind your document, a left margin of
+% 1.5″ is recommended" — and the filed document is the electronic one, so the
+% margins here are the electronic figures. Add a binding offset at print time.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "For conventional documents, double spacing, single spacing or 1.5 spacing is
+% acceptable." Auburn offers all three and names no default, so this takes the
+% class default; `onehalf' and `single' are equally in spec. Auburn does pin the
+% exceptions: "Single spacing is recommended for the following: bibliographical
+% entries (with double-spacing between entries), long quotations, long endnotes
+% or footnotes, long captions, and long headings."
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Auburn is at the far end of the range this class was built to record. It
+% requires a Digital Accessibility Disclosure Statement as a preliminary page,
+% ships an accessibility checklist it calls a list of requirements, and tells
+% students to run a PDF/UA checker and fix what it reports.
+%
+% THE MODAL VERBS ARE MIXED, and a reviewer should know it before trusting the
+% two declarations below. The guide page uses "should" and "we encourage" for
+% alt text and for reading the Libraries' guide. The CHECKLIST is flat
+% imperative throughout, and the guide page introduces it as "a checklist
+% covering all formatting and accessibility requirements"; it also says the
+% LaTeX template was updated "to meet formatting and accessibility
+% requirements". Two checklist items are checkable properties of the filed file
+% and are stated without hedging, so they are declared:
+%
+%   \thesisrequiredocumentlanguage — "Set the document language to English."
+%   \thesisrequiretagging          — "Check your PDF file for digital
+%       accessibility using Adobe Acrobat or PAC, as noted on our website.
+%       Errors must be fixed in the original MS Word document and then saved
+%       again as a PDF". PAC is a PDF/UA checker and reports an untagged PDF as
+%       an error, so "errors must be fixed" cannot be satisfied by an untagged
+%       file. Paired with "Export to PDF using 'File > Save As Adobe PDF' to
+%       preserve accessibility. Do not 'Print to PDF'", which is the Word
+%       instruction for keeping the tag tree.
+%
+% \thesisrequirepdfstandard is NOT set: Auburn names a TOOL (PAC, Acrobat) and
+% never a standard. Writing "PDF/UA" here would be this profile's inference, not
+% Auburn's requirement.
+\thesisrequiredocumentlanguage
+\thesisrequiretagging
+\thesisaccessibilityrequirement{Disclosure statement (required page)}
+	{A "Digital Accessibility Disclosure Statement" is a required preliminary
+	 page. "Students are responsible for understanding and following AU and
+	 federal guidelines regarding digital accessibility compliance. The
+	 disclosure will include the various accessibilty tools which have been used
+	 to esnure the thesis or dissertation is compliant with federal
+	 regulations." (Auburn's spelling.)}
+\thesisaccessibilityrequirement{Checked before submission}
+	{"Check your PDF file for digital accessibility using Adobe Acrobat or PAC,
+	 as noted on our website. Errors must be fixed in the original MS Word
+	 document and then saved again as a PDF; warnings should be addressed; tips
+	 are optional but recommended."}
+\thesisaccessibilityrequirement{Headings}
+	{"Please denote headings as a Heading 1, 2, 3 or 4 within the style and
+	 formatting of the document for digital accessibility compliance."
+	 "Headings must be applied structurally, and in hierarchy that is logical
+	 and not skipped (e.g., h1 → h2 → h3, never h1 → h3)."}
+\thesisaccessibilityrequirement{Alt text}
+	{"To meet federal digital accessibility requirements, all electronic theses
+	 or dissertations should include alternative text and/or descriptive
+	 captions for each table, illustration and figure in the document. Tables
+	 should have proper headings in rows and columns." "Alternative text should
+	 be meaningful and concise — describes what the image conveys, not just what
+	 it looks like."}
+\thesisaccessibilityrequirement{No text as image}
+	{"Text is not formatted as an image (e.g., screenshots of typed text,
+	 scanned pages, etc.)." "Mathematical equations use MathType, Word's
+	 built-in equation editor, or LaTeX — not images." "Special characters (Greek
+	 letters, symbols) should be inserted as Unicode characters, not character
+	 images."}
+\thesisaccessibilityrequirement{Colour and contrast}
+	{"Color is not used to convey meaning, but rather the underline of a
+	 hyperlink conveys the meaning that it is linked text." "Color contrast
+	 between images/graphics and adjacent background colors meets a 3:1 minimum
+	 ratio."}
+\thesisaccessibilityrequirement{Tables}
+	{"Tables are used only for data and not for layout/visual purposes." "Table
+	 header rows are designated as headers." "Tables do not contain split or
+	 merged cells."}
+\thesisaccessibilityrequirement{Links}
+	{"Hyperlinks are written and linked as descriptive text — not 'click here'
+	 or typed out URLs." They "must be underlined, and clearly distinguishable
+	 to meet color contrast requirements."}
+\thesisaccessibilityrequirement{Font}
+	{Recommended, not required, and recorded because it cuts against this
+	 class's default: "Standard sans serif fonts are recommended for compliance
+	 with federal digital accessibility requirements. Examples of a sans serif
+	 embedded, PostScript Type 1 font include Helvetica, Franklin Gothic and
+	 Avant Garde." Also required: "Embedded fonts, such as Postscript Type 1,
+	 are required", which a lualatex build satisfies.}
+
+% --- Title page --------------------------------------------------------------
+% Auburn's title page carries the committee, so it is the longest of the three
+% hooks and the most exactly prescribed. Every element below is one of the
+% guide's numbered items, in its order, with its stated blank-line count:
+%
+%   Title       — "In boldface type, centered, 2″ from the top of the page,
+%                  followed by one blank line"
+%   By-line     — "The word 'by', centered, followed by one blank line"
+%   Author      — "Your full name, centered, followed by four blank lines"
+%   Statement   — "The following statement, centered as illustrated. No blank
+%                  space separates this statement from the name of your degree,
+%                  which follows." The four lines are reproduced verbatim.
+%   Degree      — "The name of your degree, centered … followed by one blank
+%                  line"
+%   Location    — "The location of the university (e.g., 'Auburn, Alabama'),
+%                  centered"
+%   Date        — "Your graduation date, in \"Month day, year\" format (e.g.,
+%                  May 14, 2025), centered, followed by four blank lines"
+%   Keywords    — optional, omitted here
+%   Copyright   — optional, omitted here (\makecopyrightpage exists separately);
+%                  Auburn's wording is "Copyright <year> by <full name>"
+%   Approvals   — "The words 'Approved by', centered, followed by one blank
+%                  line", then the chair and each member, centred, one per line
+%
+% The title stays in mixed case: "Avoid using all capitals unless it is for an
+% acronym, previously spelled out."
+%
+% THE 2in TOP MARGIN is produced as 1in of geometry plus 1in of leading space,
+% because \loadgeometry{nopagenumber} carries the profile's own top=1in. If the
+% geometry above is ever changed, change the \vspace with it.
+%
+% The committee lines are plain text, not signature rules — see the approval-page
+% note below — so \thesis@memberline is replaced for this page. Auburn's own
+% example of a member line is "Margaret Waters, Chair, Professor of Kinesiology",
+% i.e. name, then role, then academic title; pass the academic title as part of
+% the role argument to \committeemember.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{1in}%
+		\thesis@tagtitle{Title}{{\bfseries\@title}}\par
+		\vspace{\baselineskip}
+		by\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{4\baselineskip}
+		A \thesis@docnoun{} submitted to the Graduate Faculty of\\
+		Auburn University\\
+		in partial fulfillment of the\\
+		requirements for the Degree of\\
+		\thesis@degree\par
+		\vspace{\baselineskip}
+		Auburn, Alabama\par
+		\thesis@date\par
+		\vspace{4\baselineskip}
+		Approved by\par
+		\vspace{\baselineskip}
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par
+		}%
+		\thesis@committee
+		\endgroup
+		\vfill
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page ---------------------------------------------------
+% Auburn has none inside the document, and says so three ways:
+%
+%   * the preliminary pages are an enumerated, closed list with no approval page
+%     in it — "the title page, abstract, acknowledgments (optional), disclosure
+%     statements, table of contents, list of tables (required, if applicable),
+%     list of figures or illustrations (required, if applicable), and list of
+%     abbreviations or symbols (optional)";
+%   * approval is collected on a separate form — "the committee attests to the
+%     acceptability of the ETD by signing the 'Electronic Thesis/Dissertation
+%     Final Approval Form,' which the student then submits to the Graduate
+%     School";
+%   * and the filed file must contain no signatures at all — "Replace any
+%     signatures — digital or physical — in the electronic document with typed
+%     names."
+%
+% The committee is instead named on the title page above, under "Approved by".
+\thesisnoapprovalpage
