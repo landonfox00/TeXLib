@@ -1,0 +1,244 @@
+% profiles/florida-state-university.tex — Florida State University
+% ============================================================================
+% source: https://gradschool.fsu.edu/academics-research/thesis-treatise-and-dissertation/formatting-guidelines
+%         (The Graduate School, "Formatting Guidelines")
+% source: https://gradschool.fsu.edu/sites/g/files/upcbnu761/files/media/Files/Manuscript%20Clearance/2024%20Guidelines%20%26%20Requirements.pdf
+%         ("Guidelines and Requirements for Electronic Theses, Treatises, and
+%         Dissertations (ETDs)", Edition: 2024, revised August 2024)
+% source: https://gradschool.fsu.edu/sites/g/files/upcbnu761/files/media/Files/Manuscript%20Clearance/PhD-TitleAndCommitteePageFormat-Annotated_May2016.pdf
+%         (the annotated Title and Committee page specimen for the Ph.D.;
+%         siblings exist for Master's, D.M. and D.Ed. at the same path)
+% accessed: 2026-09-13
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, title page, committee (approval)
+% page, and the absence of any published accessibility rule.
+% NOT set: chapter-opening margin (FSU states none — main section headings sit
+% AT the 1in top margin, not below a deeper one) and the typeface (see below).
+%
+% FSU's guide is unusually emphatic that it governs: "specifications in this
+% guide take precedence over all other style guidelines as well as earlier
+% versions and discipline-specific formatting requirements". The specimen is
+% dated May 2016 but is the file the current Formatting Guidelines page links,
+% and nothing in the 2024 guide contradicts it — the guide defers to it by
+% name: "Exact formatting of the Title and Committee Pages is incorporated and
+% illustrated in annotated examples on in The Graduate School's website under
+% Formatting Guidelines" (FSU's grammar, quoted as printed).
+
+\thesisinstitution{Florida State University}
+
+% "Page Margins - Exactly 1 inch on left, right, top, and bottom. No content
+% may extend into any margin."
+%
+% Note "Exactly", which is stronger than the usual floor: at FSU a wider margin
+% is as wrong as a narrower one, so a filer must not add a binding allowance.
+% "All text and figures must start at the top edge of the 1-inch margin
+% (including entries in the Reference section)" is the companion rule, and it
+% is why \thesissetchapteropening is deliberately NOT used here — FSU wants
+% main section headings AT 1in, not below a deeper opening margin.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% A CHOICE, and the profile takes one side of it. FSU: "Text in the Abstract,
+% body of the manuscript, and Biographical Sketch (if in paragraph form) must
+% be all double-spaced OR all 1.5-spaced." Both are in spec. This profile takes
+% double because it is the class default and the more common filing; switch the
+% line below to \thesissetspacing{onehalf} for the other, which is equally
+% compliant. The rule is all-or-nothing either way — FSU's "all ... OR all"
+% forbids mixing.
+%
+% Two narrower rules live on the pages themselves rather than here: the five
+% degree lines on the title page are single-spaced, and "Each entry on the
+% Committee Page must be 1.5-spaced."
+\thesissetspacing{double}
+
+% --- Typeface: NOT set, and this is the one place a filer should look ---------
+% FSU names faces: "The entire manuscript should be in either Times New Roman
+% or Arial font", at 12 pt. throughout aside from the 14 pt. boldface main
+% section headings.
+%
+% This is left unset rather than guessed at, for two reasons. The verb is
+% "should", not the "must" FSU uses for the margin and the spacing; and the
+% class's default is Latin Modern, which is neither of the two named faces. A
+% filer who wants to match the named face exactly can add
+% \setmainfont{TeX Gyre Termes} (a metric-compatible Times) to the document
+% preamble. Encoding that here would be the profile deciding, on a "should",
+% that a Times clone counts as Times New Roman — which is a judgement for the
+% Manuscript Clearance office, not for this file.
+
+% --- Accessibility -----------------------------------------------------------
+% Recorded as an absence, and the absence was looked for. The 2024 Guidelines
+% and Requirements PDF was read in full and the Formatting Guidelines page with
+% it; neither contains "accessible", "accessibility", "alt text", "WCAG",
+% "tagged", "screen reader" or "PDF/A" anywhere.
+%
+% FSU does have one rule that sounds adjacent and is not: "Personal Information
+% and Signatures - Redact, delete, or obscure student and staff personal
+% contact information, and any signatures. If the student email address is an
+% active link, deactivate it." That is a privacy rule about appended letters and
+% forms, not an accessibility one, so it is not recorded through the
+% accessibility field — but it is worth a filer's attention, and it is the
+% reason the committee page below carries no signature rules.
+\thesisaccessibilityrequirement{Not published}
+	{The FSU Graduate School publishes no accessibility requirement for a filed
+	 thesis, treatise or dissertation. Checked against the 2024 Guidelines and
+	 Requirements (revised August 2024) and the Formatting Guidelines page on
+	 2026-09-13.}
+
+% --- Profile-local fields -----------------------------------------------------
+% FSU's two pages need three things the class's metadata model has no slot for.
+% Each defaults to something loud rather than to something plausible, because a
+% plausible default on a filed page is a wrong page that looks right.
+%
+% The college line, which sits under the university name on the title page.
+% The placeholder deliberately names no macro: it is printed through
+% \MakeUppercase, which would mangle a \string'd control sequence into
+% \FSUCOLLEGE and send a filer looking for a command that does not exist.
+% The setter is \fsucollege, immediately below.
+\newcommand{\thesis@fsu@college}{[SET THE COLLEGE NAME -- see this profile]}
+\newcommand{\fsucollege}[1]{\renewcommand{\thesis@fsu@college}{#1}}
+% The defense date, as it appears in the committee page's opening sentence
+% ("... defended this dissertation on June 3, 2016.").
+\newcommand{\thesis@fsu@defensedate}{[SET THE DEFENSE DATE WITH \string\fsudefensedate]}
+\newcommand{\fsudefensedate}[1]{\renewcommand{\thesis@fsu@defensedate}{#1}}
+% The year of defense, which is its own line on the title page. Defaults to the
+% current year: a visibly wrong year is easier to catch than a missing line.
+\newcommand{\thesis@fsu@year}{\the\year}
+\newcommand{\fsudefenseyear}[1]{\renewcommand{\thesis@fsu@year}{#1}}
+% The copyright notice is marked "Optional" on the specimen, so it is off by
+% default and \fsucopyright turns it on.
+\newif\ifthesis@fsu@copyright
+\thesis@fsu@copyrightfalse
+\newcommand{\fsucopyright}{\thesis@fsu@copyrighttrue}
+
+% --- Title page --------------------------------------------------------------
+% The specimen's layout, with its annotations as the spec:
+%   "Single blank line" between the university and college lines, between the
+%     college line and the title, and between the title and "By";
+%   "If title is more than one line, then there must be a single blank line
+%     between each line of text";
+%   "Name as it appears in university records";
+%   "These 5 single-spaced lines must be formatted exactly as shown"
+%     — A <Dissertation> submitted to the / <Department> / in partial
+%       fulfillment of the / requirements for the degree of / <Degree>;
+%   "Year of defense";
+%   "Optional  (c) 2016 Janis Q. Public";
+%   "The Title Page is page i, but it is not numbered."
+%
+% The title and the author are set in capitals as the specimen shows them.
+% \thesis@program supplies the department line, so set \gradprogram to the
+% department as FSU writes it ("Department of English"), not to a field.
+%
+% The blank-line-between-title-lines rule cannot be applied mechanically to a
+% title this class receives as a single string, so a filer with a long title
+% must break it themselves with \\ and will get FSU's blank line from the
+% \setstretch below.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing
+		{\centering
+			FLORIDA STATE UNIVERSITY\par
+			\vspace{\baselineskip}
+			\MakeUppercase{\thesis@fsu@college}\par
+			\vfill
+			% Double leading gives FSU's "single blank line between each line
+			% of text" for a title the filer has broken with \\.
+			\thesis@tagtitle{Title}{%
+				\begingroup\setstretch{2}%
+				\MakeUppercase{\@title}\par
+				\endgroup
+			}%
+			\vfill
+			By\par
+			\vspace{\baselineskip}
+			\MakeUppercase{\@author}\par
+			\vfill
+			% The five lines, single-spaced, exactly as shown.
+			A \thesis@DocNoun{} submitted to the\\
+			\thesis@program\\
+			in partial fulfillment of the\\
+			requirements for the degree of\\
+			\thesis@degree\par
+			\vfill
+			\thesis@fsu@year\par
+			\ifthesis@fsu@copyright
+				\vfill
+				\textcopyright{}~\thesis@fsu@year{} \@author\par
+			\fi
+			\vspace*{\fill}
+		\par}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee page -----------------------------------------------------------
+% FSU calls this the Committee Page, and it is this class's approval page: it
+% records who approved the manuscript. Two things distinguish it from most:
+%
+%   * IT IS NUMBERED. "The Committee page is the first numbered page. Numbers in
+%     the front matter are all lower case Roman numerals." (The title page is i
+%     and unnumbered, so this is ii.) The class's neutral approval page sets
+%     \thispagestyle{empty}; that would be wrong here, so this one does not.
+%     The surrounding document still owns the numbering STYLE — set
+%     \pagenumbering{roman} in the front matter as usual.
+%   * IT CARRIES NO SIGNATURE RULES. FSU collects approval through Manuscript
+%     Clearance and the Graduate Student Tracking database, and the page ends
+%     with the Graduate School's own certification sentence instead. FSU also
+%     requires signatures to be removed from the filed PDF generally: "Redact,
+%     delete, or obscure ... any signatures."
+%
+% Each entry is a name over a role, and FSU is specific about both:
+%   "The names and roles of all members must exactly concur with the names and
+%    roles listed in the Graduate Student Tracking database as well as the forms
+%    you submit."
+%   "For the committee members, do NOT include their title (Dr., PhD, etc.)."
+%   "For co-chairs, both are listed as Professor Co-Directing Dissertation."
+%   "The University Rep is always listed immediately after the chair (or
+%    co-chairs)."
+% That last one is an ORDERING rule this file cannot enforce: the order is
+% whatever order \committeemember is called in, so a filer must put the
+% University Representative first among the \committeemember calls, since the
+% chair is emitted from \gradadvisor ahead of them.
+%
+% "These entries are lined up vertically in the center of the page. Use tabs or
+% indents to line them up. Do NOT use the space bar." — hence a left-aligned
+% block centred horizontally, rather than centred lines.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage
+	\loadgeometry{normal}%
+	% "Each entry on the Committee Page must be 1.5-spaced."
+	\begingroup\setstretch{1.5}%
+	\noindent
+	\@author{} defended this \thesis@docnoun{} on
+	\thesis@fsu@defensedate.\par
+	The members of the supervisory committee were:\par
+	\vspace{2\baselineskip}
+	{\centering
+		\begin{minipage}{0.6\textwidth}
+			\raggedright
+			% Name over role, no rule, no trailing title. The chair comes from
+			% \gradadvisor with FSU's prescribed wording; everyone else from
+			% \committeemember, whose second argument is the role.
+			% The role is guarded the way the class's own \thesis@memberline
+			% guards it: a member declared with an empty second argument would
+			% otherwise print a blank line where FSU expects a role. FSU
+			% requires one on every entry ("Committee Member" for a
+			% non-supervisory member), so an omission should close up rather
+			% than leave a gap that looks deliberate.
+			\renewcommand{\thesis@memberline}[2]{%
+				\vspace{\baselineskip}##1\par
+				\ifx\relax##2\relax\else##2\par\fi
+			}%
+			\thesis@advisor\par
+			Professor Directing \thesis@DocNoun\par
+			\thesis@committee
+		\end{minipage}\par
+	}
+	\vspace{3\baselineskip}
+	\noindent
+	The Graduate School has verified and approved the above-named committee
+	members, and certifies that the \thesis@docnoun{} has been approved in
+	accordance with university requirements.\par
+	\endgroup
+	\clearpage
+}
