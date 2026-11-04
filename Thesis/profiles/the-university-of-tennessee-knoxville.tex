@@ -1,0 +1,207 @@
+% profiles/the-university-of-tennessee-knoxville.tex — The University of Tennessee, Knoxville
+% ============================================================================
+% source: https://gradschool.utk.edu/documents/2023/07/preparation-guide-for-theses-and-dissertations.pdf/
+%         ("Guide to the Preparation of Theses and Dissertations", Thesis and
+%          Dissertation Services; its cover carries the academic year "2026 /
+%          2027", so this is the current edition despite the 2023 path)
+% source: https://gradschool.utk.edu/academics/graduation/theses-and-dissertations/preparing-your-work/
+%         ("Preparing Your Work" — the live Graduate School page, which links the
+%          guide above and calls it exhaustive)
+% accessed: 2026-09-14
+% checked:  texlib-thesis-profile-round
+%
+% NOTE THE URL. The PDF lives under /documents/2023/07/ but is NOT the 2023
+% edition — the Graduate School republishes in place, and the cover of the file
+% served on the access date reads 2026/2027. Do not "correct" this citation to a
+% newer-looking path; there isn't one.
+%
+% VERIFIED and set here: geometry, spacing, title page, the absence of an
+% approval page, and the accessibility requirements including
+% \thesisrequiretagging.
+% NOT set: \thesissetchapteropening — UTK says "Text must begin at the top of
+% the page" and states no deeper opening margin.
+% Also NOT set: \thesisrequiredocumentlanguage and \thesisrequirepdfstandard;
+% see the accessibility note.
+%
+% ONE REQUIREMENT THIS CLASS CANNOT MEET FOR THE AUTHOR, recorded here because
+% a document that builds cleanly is still not filable without it: UTK requires a
+% SCORE, not just a conformant file. "Electronic theses and dissertations must
+% be at least 70% compliant as determined by the YuJa Panorama accessibility
+% report. A copy of the report showing you've met the minimum compliance
+% threshold must be submitted to thesis@utk.edu before the document can be
+% accepted." A tagged PDF/UA build is the means, not the evidence; the evidence
+% is a YuJa Panorama report the author has to generate and email.
+%
+% TITLE LENGTH: "thesis and dissertation titles are limited to 160 characters.
+% This includes spaces." A limitation of the student information system, not of
+% the page, so it is not enforced here — but a longer \title will be rejected.
+
+\thesisinstitution{The University of Tennessee, Knoxville}
+
+% "The inside margin must be one inch on all sides of the page. These margins
+% define the minimum and maximum white space to be maintained on all sides of
+% the page and apply to page number placement. All material in the document,
+% including text, tables, and figures must fit within the margins."
+%
+% Note "minimum AND MAXIMUM" — UTK is one of the few schools to fix the margin
+% rather than floor it, so a wider margin is as wrong as a narrower one. And the
+% rule explicitly covers the folio, which is why the class's `normal' layout
+% (includefoot, so the page number sits inside the band) is the right one here
+% rather than an exception.
+%
+% "All material … must fit within the margins. If that is not possible for a
+% certain table or figure, it must be uploaded separately as an attachment" —
+% i.e. there is no oversize exception to take.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Students may use single, 1.5, or double-spacing for their text but must be
+% consistent in the application. Please note that you cannot exceed
+% double-spacing." A three-way choice with a ceiling rather than a floor. This
+% profile takes double, the class default and the top of UTK's permitted range;
+% \thesissetspacing{onehalf} and {single} are equally in spec.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% UTK is unambiguous and is one of the few schools to name both a standard and a
+% numeric threshold, so \thesisrequiretagging is set on a flat "must":
+%
+%   "PDF tags: To ensure a PDF can be read and navigated by assistive
+%    technology, use tags for headings, lists, links, tables, paragraphs, and
+%    other document components."
+%
+% \thesisrequiredocumentlanguage is NOT set. UTK requires language tagging only
+% for foreign-language passages ("Add language tagging for any foreign language
+% text"), never the document language as such. Declaring it would warn about
+% something UTK has not asked for.
+%
+% \thesisrequirepdfstandard is NOT set either: WCAG is a web-content standard,
+% not a PDF standard, and UTK names no PDF/A or PDF/UA level. Writing one here
+% would be this profile's inference.
+\thesisrequiretagging
+\thesisaccessibilityrequirement{Standard}
+	{"The University of Tennessee, Knoxville, follows federal guidelines and
+	 WCAG standards to make all digital content, materials, and technology
+	 accessible." The guide grounds this in "Title II of the Americans with
+	 Disabilities Act (ADA): This rule requires all university content and
+	 technology — including websites, documents, videos, learning systems,
+	 mobile applications and other digital tools — to meet federal accessibility
+	 standards as specified by the W3C's Web Content Accessibility Guidelines
+	 (WCAG)." No compliance date is named.}
+\thesisaccessibilityrequirement{Score, and proof of it}
+	{"Electronic theses and dissertations must be at least 70\% compliant as
+	 determined by the YuJa Panorama accessibility report. A copy of the report
+	 showing you've met the minimum compliance threshold must be submitted to
+	 thesis@utk.edu before the document can be accepted." This is a separate
+	 deliverable: building a tagged PDF does not produce it.}
+\thesisaccessibilityrequirement{PDF tags}
+	{"PDF tags: To ensure a PDF can be read and navigated by assistive
+	 technology, use tags for headings, lists, links, tables, paragraphs, and
+	 other document components." "Tables: Must have table headers for columns
+	 and rows." "Order: Ensure tags and headings are ordered in a logical
+	 sequence."}
+\thesisaccessibilityrequirement{Headings}
+	{"Mark any heading text with actual heading styles." "Don't indicate the
+	 importance with font size/color. Use headings in descending order to mark
+	 heading text that labels sections and subsections of text."}
+\thesisaccessibilityrequirement{Alt text}
+	{"Alternative text ('Alt-Text'): All visual elements (e.g. figures, images,
+	 etc.) must be described so that the meaning of the image is conveyed."
+	 UTK adopts the Section508.gov guidance: alt text "should communicate the
+	 same information as the visual content", "should refer to relevant content
+	 provided by the image, rather than simply describing how the image looks",
+	 and "should not … repeat information that is already provided in the text".
+	 A non-informative image is to be marked decorative instead. "Do not put
+	 hyperlinks inside your alt text!"}
+\thesisaccessibilityrequirement{Foreign-language passages}
+	{"Add language tagging for any foreign language text." UTK asks this of
+	 passages, not of the document as a whole.}
+\thesisaccessibilityrequirement{Colour and contrast}
+	{"Colors: It is best practice to use black font, but if colored text is
+	 necessary, ensure it has a minimum contrast ratio of 4.5:1 against the
+	 background. Avoid using color as the sole means of conveying information."}
+\thesisaccessibilityrequirement{The exemplars are not a model for this}
+	{The guide links previously accepted theses as formatting exemplars and warns
+	 in the same breath: "At this time, the exemplars do not reflect
+	 accessibility compliance." Copying an exemplar's structure will not satisfy
+	 the 70\% threshold.}
+
+% --- Title page --------------------------------------------------------------
+% "The title page should follow the specific layout and wording shown in Figure
+% A-1. The font size of the text on the title page must be consistent. Spaces
+% between the lines of text must be consistent."
+%
+% Figure A-1 is an annotated specimen, and the annotations are the specification.
+% Reading it (guide p. 52), the page is, centred, top to bottom:
+%
+%   This is the Title of My Thesis/Dissertation
+%   A Dissertation Presented for the
+%   Doctor of Philosophy
+%   Degree
+%   The University of Tennessee, Knoxville
+%   Name
+%   December 2019
+%
+% with the degree name and the word "Degree" on separate lines — that is the
+% wording, not a typesetting accident. Its annotations, quoted:
+%
+%   * "Title case (where the first letter of every major word is capitalized) is
+%     recommended, but all caps and sentence case are permissible if they are
+%     more common in your field." So the title is NOT uppercased here, and it is
+%     not emboldened either — the specimen sets the whole page in one weight,
+%     and "The font size of the text on the title page must be consistent".
+%   * "If you are a doctoral student, you should use the word 'Dissertation'; if
+%     you are a master's student, you should use the word 'Thesis'." — which is
+%     \thesis@DocNoun, driven by \doctype.
+%   * "This line should be the title of your degree … Do not include your major
+%     or department." So \graddegree takes "Doctor of Philosophy", never
+%     "Doctor of Philosophy in Mathematics".
+%   * "This must be the month and year of graduation, regardless of when you
+%     defend or submit your final document. The only permissible months are May
+%     (spring), August (summer), and December (fall). Do not include a date or a
+%     comma after the month." So \graddate is "December 2027", not
+%     "December 14, 2027".
+%
+% "Spaces between the lines of text must be consistent" is why the gaps below
+% are all multiples of one \baselineskip rather than \vfill.
+%
+% Page i, with the folio suppressed: "Although the title page is counted as page
+% i, the page number itself should be suppressed. The page following the title
+% page should be the first one with a visible page number (which should be ii)."
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{6\baselineskip}
+		A \thesis@DocNoun{} Presented for the\par
+		\vspace{2\baselineskip}
+		\thesis@degree\par
+		\vspace{2\baselineskip}
+		Degree\par
+		\vspace{2\baselineskip}
+		The University of Tennessee, Knoxville\par
+		\vspace{8\baselineskip}
+		\@author\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page ---------------------------------------------------
+% UTK has none inside the document. The preliminary pages are stated twice as a
+% closed set and an approval page is in neither:
+%
+%   * in prose — "The three preliminary pages that are required for all theses
+%     and dissertations are the title page, abstract, and table of contents.
+%     Lists of tables, figures, and attachments are required in some cases. All
+%     other pages are optional.";
+%   * and in Table A-2, "Required Page Sequence — Preliminary Pages", which
+%     enumerates title page, copyright page, dedication, acknowledgements,
+%     preface, abstract, table of contents and the lists, and nothing else.
+%
+% Approval is handled through the review and Vireo submission process the guide
+% describes in Section 5, not by a signed leaf bound into the document.
+\thesisnoapprovalpage
