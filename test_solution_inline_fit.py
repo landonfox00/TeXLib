@@ -8,6 +8,15 @@ guards that). Nothing bounded the overlay: a solution taller than the blank it
 was drawn into printed over the next question. texlib_keyfit.lua now checks
 each finished page.
 
+A document whose keys are inline (autoexam's default) has its student copy
+make that room first: each blank is at least as tall as its answer, in both
+copies, so the key has nothing left to fit. The pages below are built twice.
+As `\keylayout{compact}` with the `solutions-inline` mode, the student copy
+makes no room and the key does it alone -- the five behaviours below. As the
+default, SHORT and WORKBOX keep the student copy's page exactly, with no
+warning, while NOROOM and BETWEEN still cannot hold their solutions and split
+as before.
+
 Five pages, five behaviours:
 
   * FITS    -- the solution is shorter than its blank. The page must come out
@@ -215,7 +224,7 @@ BANK_TEX = r"""\begin{problem}{fits}[topic=fits]
 
 # The second optional argument of \problem is the stretch of the answer space
 # after it. 0.02 against 4 leaves `short` a blank a few points tall.
-EXAM_TEX = r"""\documentclass[exam-number=1, points=50]{autoexam}
+INLINE_TEX = r"""\documentclass[exam-number=1, points=50]{autoexam}
 \loadbank{bank.tex}
 \begin{document}
 \maketitle
@@ -244,6 +253,10 @@ EXAM_TEX = r"""\documentclass[exam-number=1, points=50]{autoexam}
 \end{document}
 """
 
+# The same exam with a student copy that makes no room for its answers.
+EXAM_TEX = INLINE_TEX.replace(r"\loadbank{bank.tex}",
+                              "\\keylayout{compact}\n\\loadbank{bank.tex}")
+
 WORD_RE = re.compile(
     r'<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)</word>')
 
@@ -266,8 +279,9 @@ def _copy_build_inputs(tmp: str) -> None:
                 shutil.copy2(src, dest)
 
 
-def build(tmp: str, jobname: str, macro: str, timeout: int = 300) -> str:
-    arg = f"{macro}\\input{{doc.tex}}" if macro else "doc.tex"
+def build(tmp: str, jobname: str, macro: str, timeout: int = 300,
+          doc: str = "doc.tex") -> str:
+    arg = f"{macro}\\input{{{doc}}}" if macro else doc
     cmd = [LUALATEX, "-interaction=nonstopmode", "-halt-on-error",
            "-shell-escape", f"-jobname={jobname}", arg]
     proc = None
@@ -317,7 +331,8 @@ def main() -> int:
 
     try:
         for name, content in (("coursemeta.tex", COURSEMETA_TEX),
-                              ("bank.tex", BANK_TEX), ("doc.tex", EXAM_TEX)):
+                              ("bank.tex", BANK_TEX), ("doc.tex", EXAM_TEX),
+                              ("inline.tex", INLINE_TEX)):
             with open(os.path.join(tmp, name), "w", encoding="utf-8") as fh:
                 fh.write(content)
         _copy_build_inputs(tmp)
@@ -479,7 +494,46 @@ def main() -> int:
                                "their answer space:\n") and row in block,
               block)
         check("summary: one line per page the warnings name",
-              len(core.keyfit_summary) == 4, core.keyfit_summary)
+              len(core.keyfit_summary) == 4, str(core.keyfit_summary))
+
+        # The same exam with inline keys, autoexam's default: the student copy
+        # sizes SHORT's and WORKBOX's blanks to their answers, so the key draws
+        # into them where they stand.
+        i_student = words(build(tmp, "istudent", "", doc="inline.tex"))
+        i_key = words(build(tmp, "ikey", r"\def\ShowKey{}", doc="inline.tex"))
+        with open(os.path.join(tmp, "ikey.log"), encoding="utf-8",
+                  errors="replace") as fh:
+            ikeylog = fh.read()
+        check("INLINE: the key is the student copy plus the two split pages",
+              len(i_student) == 6 and len(i_key) == 8,
+              f"student {len(i_student)} page(s), key {len(i_key)}")
+        if len(i_student) != 6 or len(i_key) != 8:
+            return report(failures)
+        for name, page, kpage, answer, after in (
+                ("SHORT", 2, 2, "TALLEND", "SHORTAFTERSTEM"),
+                ("WORKBOX", 5, 7, last, "WBB")):
+            s_pg, k_pg = i_student[page], i_key[kpage]
+            if not all(t in k_pg for t in (answer, after)) or after not in s_pg:
+                check(f"INLINE {name}: the answer and what follows are on the page",
+                      False)
+                continue
+            moved = abs(k_pg[after][0] - s_pg[after][0])
+            check(f"INLINE {name}: what follows the answer keeps the student "
+                  f"copy's place", moved < 0.05, f"moved {moved:.2f}pt")
+            check(f"INLINE {name}: the answer ends above what follows it",
+                  k_pg[answer][1] < k_pg[after][0],
+                  f"answer ends at y={k_pg[answer][1]:.1f}, {after} starts at "
+                  f"y={k_pg[after][0]:.1f}")
+            roomier = s_pg[after][0] - student[page][after][0]
+            check(f"INLINE {name}: the room is made in the student copy",
+                  roomier > 20, f"{after} is {roomier:.1f}pt lower than in the "
+                  "student copy of the compact document")
+        check("INLINE: no warning that a solution is too tall",
+              "too tall." not in ikeylog
+              and not re.search(r"^\(texlib-solutions\) +(3|8a): ", ikeylog, re.M))
+        check("INLINE: NOROOM and BETWEEN still cannot hold their solutions",
+              ikeylog.count("cannot hold its solutions") == 2,
+              f"{ikeylog.count('cannot hold its solutions')} warning(s), not 2")
         return report(failures)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
         log(f"FAIL: build environment failed -- {type(exc).__name__}: {exc}")

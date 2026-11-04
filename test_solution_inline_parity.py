@@ -43,9 +43,16 @@ Deliberate fixture details, both load-bearing:
 The cover is excluded on purpose: a key has to be identifiable as a key, and
 the class prints a red "Solutions" badge under the date that reflows page 1.
 
+A second exam has answers taller than their weighted blanks (TALL_BANK_TEX).
+The student copy sizes each blank to its answer, so there the key must be the
+student page to the pixel, not merely within the tolerance, with no keyfit
+warning in its log. Its one-line part answers are set on the header's line.
+
 Dependencies are poppler's pdftoppm and lualatex, nothing else -- the raster is
-read as PGM with the standard library so CI needs no image package. Soft-skips
-(exit 0) when a tool is missing, matching test_mode_effects.py.
+read as PGM with the standard library so CI needs no image package. The
+run-in header is read off the key's text with pdftotext, and that one check
+is skipped when it is missing. Soft-skips (exit 0) when a tool is missing,
+matching test_mode_effects.py.
 
 Run:  python test_solution_inline_parity.py   (exit 0 ok/skipped, 1 on drift)
 """
@@ -53,6 +60,7 @@ Run:  python test_solution_inline_parity.py   (exit 0 ok/skipped, 1 on drift)
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -61,6 +69,7 @@ import tempfile
 TEXLIB_ROOT = os.path.dirname(os.path.abspath(__file__))
 LUALATEX = shutil.which("lualatex")
 PDFTOPPM = shutil.which("pdftoppm")
+PDFTOTEXT = shutil.which("pdftotext")
 
 DPI = 150
 DARK = 128          # luminance at or below this counts as ink
@@ -199,6 +208,146 @@ BANK_TEX = r"""\begin{problem}{whole}[topic=whole]
 		$[0, \infty)$.
 	\end{solution}
 \end{problem}
+"""
+
+# Answers taller than the blanks their weights give them, in each of the shapes
+# that ran over on a real review: a blank BEFORE its whole-problem solution (the
+# order the engine emits a body that ends in \workbox), a blank so generous the
+# answer is short but drawn after it, parts with a tall answer in a thin blank,
+# {cols} and \splitpage columns whose closing \vspace is dropped at the column's
+# end, and a whole-problem solution whose only room is the \problem stretch.
+# The student copy sizes each blank to its answer, so the key is the student
+# page with the answers drawn in -- to the pixel, with no warning in its log.
+# `oneline' has answers of one line, which go on the header's line.
+TALL_BANK_TEX = r"""
+\begin{problem}{wbefore}[topic=wbefore]
+	Factor $x^{2} - 5x + 6$ and solve $x^{2} - 5x + 6 = 0$.
+	\workbox{1}
+	\begin{solution}
+		\begin{align*}
+			x^{2} - 5x + 6 &= (x - 2)(x - 3) \\
+			(x - 2)(x - 3) &= 0 \\
+			x - 2 = 0 \quad &\text{or} \quad x - 3 = 0 \\
+			x &= 2 \text{ or } x = 3
+		\end{align*}
+	\end{solution}
+\end{problem}
+
+\begin{problem}{roomy}[topic=roomy]
+	State the vertex of $y = (x - 1)^{2}$.
+	\workbox{8}
+	\begin{solution}
+		$(1, 0)$.
+	\end{solution}
+\end{problem}
+
+\begin{problem}{tallparts}[topic=tallparts]
+	Solve each equation.
+	\begin{parts}
+		\ppart $x^{2} = 9$
+			\begin{partsolution}
+				\begin{align*} x^{2} &= 9 \\ x &= \pm\sqrt{9} \\ x &= \pm 3 \end{align*}
+			\end{partsolution}
+			\workbox{0.2}
+		\ppart $2x + 1 = 7$
+			\begin{partsolution}
+				$x = 3$.
+			\end{partsolution}
+			\workbox{4}
+		\ppart $x^{3} = 8$
+			\begin{partsolution}
+				\begin{align*} x^{3} &= 8 \\ x &= \sqrt[3]{8} \\ x &= 2 \end{align*}
+			\end{partsolution}
+			\workbox{0.2}
+	\end{parts}
+\end{problem}
+
+\begin{problem}{split}[topic=split]
+	Give each domain in interval notation.
+	\splitpage{%
+		\ppart $f(x) = \sqrt{x - 2}$
+			\begin{partsolution}
+				\begin{align*} x - 2 &\ge 0 \\ x &\ge 2 \\ &[2, \infty) \end{align*}
+			\end{partsolution}
+			\vspace{1\baselineskip}
+	}{%
+		\ppart $g(x) = \dfrac{1}{x - 5}$
+			\begin{partsolution}
+				\begin{align*} x - 5 &\ne 0 \\ x &\ne 5 \\ &(-\infty, 5) \cup (5, \infty) \end{align*}
+			\end{partsolution}
+			\vspace{1\baselineskip}
+	}
+\end{problem}
+
+\begin{problem}{colstall}[topic=colstall]
+	Answer each for the graph of $g$.
+	\begin{cols}
+		\raggedright
+		\begin{parts}
+			\ppart On what intervals is $g$ increasing?
+				\begin{partsolution}
+					\begin{align*} g'(x) &> 0 \\ &\text{on } (0, 1) \\ &\text{and } (3, 4) \end{align*}
+				\end{partsolution}
+				\vspace{1\baselineskip}
+			\ppart On what intervals is $g$ decreasing?
+				\begin{partsolution}
+					\begin{align*} g'(x) &< 0 \\ &\text{on } (1, 3) \\ &\text{only} \end{align*}
+				\end{partsolution}
+				\vspace{1\baselineskip}
+		\end{parts}
+	\end{cols}
+\end{problem}
+
+\begin{problem}{wholetail}[topic=wholetail]
+	Find the oblique asymptote of $f(x) = \dfrac{2x^{2} + x - 3}{x - 2}$.
+	\begin{solution}
+		\begin{align*}
+			2x^{2} + x - 3 &= (x - 2)(2x + 5) + 7 \\
+			f(x) &= 2x + 5 + \frac{7}{x - 2} \\
+			&\text{so } y = 2x + 5
+		\end{align*}
+	\end{solution}
+\end{problem}
+
+\begin{problem}{oneline}[topic=oneline]
+	Evaluate.
+	\begin{parts}
+		\ppart $2 + 2$
+			\begin{partsolution}
+				RUNIN $4$.
+			\end{partsolution}
+			\workbox{1}
+		\ppart $3 \cdot 3$
+			\begin{partsolution}
+				RUNIN $9$.
+			\end{partsolution}
+			\workbox{1}
+		\ppart $10 - 4$
+			\begin{partsolution}
+				RUNIN $6$.
+			\end{partsolution}
+			\workbox{1}
+	\end{parts}
+\end{problem}
+"""
+
+TALL_TEX = r"""\documentclass[exam-number=1, points=20]{autoexam}
+\loadbank{bank.tex}
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem[10][0]{topic=wbefore}
+	\problem[10][0]{topic=roomy}
+	\problem[10][0.1]{topic=tallparts}
+
+	\newpage
+
+	\problem[5,5][0.1]{topic=split}
+	\problem[5,5][0.1]{topic=colstall}
+	\problem[10][0.2]{topic=wholetail}
+	\problem[2,2,2][3]{topic=oneline}
+\end{problems}
+\end{document}
 """
 
 EXAM_TEX = r"""\documentclass[exam-number=1, points=20]{autoexam}
@@ -340,8 +489,9 @@ def main() -> int:
     failures: list[str] = []
     try:
         for name, content in (("coursemeta.tex", COURSEMETA_TEX),
-                              ("bank.tex", BANK_TEX),
-                              ("doc.tex", EXAM_TEX)):
+                              ("bank.tex", BANK_TEX + TALL_BANK_TEX),
+                              ("doc.tex", EXAM_TEX),
+                              ("tall.tex", TALL_TEX)):
             with open(os.path.join(tmp, name), "w", encoding="utf-8") as fh:
                 fh.write(content)
         _copy_build_inputs(tmp)
@@ -450,6 +600,55 @@ def main() -> int:
             failures.append(
                 "\\keylayout{compact} gave the inline key: the opt-out does "
                 "not override the class default")
+
+        # Answers taller than their weighted blanks: the student copy makes the
+        # room, so the key is its page to the pixel and has nothing to warn of.
+        tall_student = rasterize(build(tmp, "tallstudent", "", doc="tall.tex"),
+                                 "g", tmp)
+        tall_key_pdf = build(tmp, "tallkey", r"\def\ShowKey{}", doc="tall.tex")
+        tall_key = rasterize(tall_key_pdf, "h", tmp)
+        if len(tall_student) != len(tall_key):
+            failures.append(
+                f"tall answers: page counts differ (student {len(tall_student)}, "
+                f"key {len(tall_key)}) -- the key made room the student copy "
+                "did not")
+            return report(failures)
+        for i, (pg, ph) in enumerate(zip(tall_student, tall_key), 1):
+            if i < FIRST_PROBLEM_PAGE:
+                continue
+            total, moved, added = compare(os.path.join(tmp, pg),
+                                          os.path.join(tmp, ph))
+            log(f"  p{i}: tall answers  student ink {total:6d}  moved {moved:5d}  "
+                f"added by key {added:6d}")
+            if moved or added == 0:
+                failures.append(
+                    f"p{i}: with answers taller than their blanks the key is not "
+                    f"the student page ({moved} px moved, {added} px added)")
+        with open(os.path.join(tmp, "tallkey.log"), encoding="utf-8",
+                  errors="replace") as fh:
+            if "Package texlib-solutions Warning" in fh.read():
+                failures.append(
+                    "tall answers: the key's log warns that a solution did not "
+                    "fit -- the student copy should have made its room")
+
+        # A one-line part answer runs in after its header; a taller one keeps
+        # the header on a line of its own. Read off the key's text when there
+        # is a pdftotext to read it with.
+        if PDFTOTEXT is not None:
+            text = subprocess.run([PDFTOTEXT, "-layout", tall_key_pdf, "-"],
+                                  capture_output=True, text=True,
+                                  encoding="utf-8", errors="replace",
+                                  timeout=120).stdout
+            runin = len(re.findall(r"Solution\.[ \t]+RUNIN", text))
+            stacked = len(re.findall(r"^[ \t]*Solution\.[ \t]*$", text, re.M))
+            log(f"  one-line answers run in: {runin} of 3; stacked headers: "
+                f"{stacked}")
+            if runin != 3:
+                failures.append(
+                    f"one-line answers: {runin} of 3 set on the header's line")
+            if stacked == 0:
+                failures.append(
+                    "multi-line answers lost their own header line")
         return report(failures)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
         log(f"SKIP: build environment failed -- {type(exc).__name__}: {exc}")
