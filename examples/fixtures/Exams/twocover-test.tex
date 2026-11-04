@@ -1,0 +1,43 @@
+% twocover-test.tex -- one document with no \versions and two cover pages: two
+% exams typeset back to back, for test_engine_correctness.py.
+%
+% The version loop does not typeset this document, so \AutoExamBeginCopy never
+% runs and \maketitle is the only reset it has. The second cover has to restart
+% the Part and problem numbers, and the section after it has to \clearpage
+% although the section before it was an {mcproblems}, or the second exam's
+% first problem is set on the cover page. This is the document that breaks if
+% the per-copy resets are MOVED out of \maketitle instead of shared with it.
+\documentclass{autoexam}
+\setexamseed{7}
+\examsetup{number=1, date={Engine Test}}
+
+\begin{problem}{tcone}[topic=fr]
+	TCSTEMONE first exam, free response.
+\end{problem}
+
+\begin{problem}{tcmc}[topic=mc]
+	TCSTEMMC first exam, multiple choice.
+	\begin{choices}
+		\cchoice TCRIGHT
+		\choice TCWRONG
+	\end{choices}
+\end{problem}
+
+\begin{problem}{tctwo}[topic=fr]
+	TCSTEMTWO second exam, free response.
+\end{problem}
+
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem{tcone}
+\end{problems}
+\begin{mcproblems}
+	\problem{tcmc}
+\end{mcproblems}
+\clearpage
+\maketitle
+\begin{problems}
+	\problem{tctwo}
+\end{problems}
+\end{document}

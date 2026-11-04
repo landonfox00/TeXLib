@@ -170,7 +170,8 @@ the note in the Not-yet-done section below.
 
 ```latex
 \DocumentMetadata{lang=en, tagging=on,
-  tagging-setup={math/setup={mathml-AF}, table/header-rows=1},
+  tagging-setup={math/setup={mathml-AF}, table/header-rows=1,
+    viewer/pane/mathml=false},
   pdfstandard={ua-2, a-4f}}
 \documentclass{thesis}          % add [twoside] to shift margins for binding
 
@@ -197,6 +198,12 @@ the note in the Not-yet-done section below.
 \makereferences
 \end{document}
 ```
+
+`viewer/pane/mathml=false` keeps the MathML files, one per formula, out of the
+list PDF viewers show as the document's attachments; each stays attached to its
+formula, where Firefox and Foxit read it. Without it a dissertation lists
+thousands of `mathml-N.xml` attachments, and SumatraPDF shows them in the
+bookmarks pane. See `ACCESSIBILITY.md`.
 
 Accessible theorem environments (`theorem`, `lemma`, `corollary`, `proposition`,
 `definition`, `example`, `remark`) render as plain headed paragraphs rather than

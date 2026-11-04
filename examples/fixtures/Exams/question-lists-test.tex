@@ -1,0 +1,45 @@
+% question-lists-test.tex -- two {questions} lists in one unversioned copy,
+% for the part-label assertions in test_engine_correctness.py.
+%
+% Each \begin{questions} restarts the question counter, so both lists have a
+% Problem 1, and both Problem 1s have parts. {parts} resumes its lettering when
+% the question number equals the one it last saw, which is how the {cols} list
+% below continues the list before it. A question NUMBER does not identify a
+% question: the second Problem 1 resumed the first and printed 1c, 1d, until
+% the class cleared the stored count on every step of the question counter.
+%
+% The second Problem 1 has two lists. The first has to restart at 1a and the
+% {cols} list has to continue at 1c. A fix that restarted every list at a would
+% pass the first check and fail the second.
+%
+% The lists are exam.cls's own {questions}. {problems} carries the question
+% number from one section to the next, so two of its questions share a number
+% only after a second \maketitle in the copy. There is no \versions, so the
+% engine's version loop does not run and neither does \AutoExamBeginCopy: the
+% step of the question counter is the only reset.
+\documentclass{autoexam}
+\examsetup{number=1, date={Engine Test}}
+
+\begin{document}
+\begin{questions}
+	\question QLSTEMONE the first list's problem.
+	\begin{parts}
+		\part QLPARTA alpha.
+		\part QLPARTB bravo.
+	\end{parts}
+\end{questions}
+
+\begin{questions}
+	\question QLSTEMTWO the second list's problem.
+	\begin{parts}
+		\part QLPARTC charlie.
+		\part QLPARTD delta.
+	\end{parts}
+	\begin{cols}
+		\begin{parts}
+			\part QLPARTE echo.
+			\part QLPARTF foxtrot.
+		\end{parts}
+	\end{cols}
+\end{questions}
+\end{document}

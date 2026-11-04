@@ -1,0 +1,25 @@
+% commented-begin-test.tex -- comments that name \begin{document} and
+% \end{document}.  The version loop (autoexam_run_versions) reads its body out of
+% this file: the lines after the first \begin{document} that is not in a comment,
+% up to the first \end{document} that is not in one.  Four comments here name a
+% marker: this header, the one after \setexamseed, the first line of the body
+% and the last line of the file.  Taken for the marker, the header's
+% \begin{document} puts the preamble into every copy (an error at \documentclass
+% and at the real \begin{document}, and "autoexam" typeset on a page of its own),
+% the body comment's \end{document} ends the body before the problem, and the
+% last line's carries the real \end{document} into the body, which then ends the
+% document after its first copy.  test_engine_correctness.py reads the copies
+% back.
+\documentclass{autoexam}
+\versions{A,B}
+\setexamseed{7}  % seeded in the preamble, before \begin{document}
+\examsetup{number=1, date={Engine Test}}
+\loadbank{vmap-bank.tex}
+
+\begin{document}
+% every line from here to \end{document} is input once per copy
+\begin{problems}
+	\problem{vprob}
+\end{problems}
+\end{document}
+% TeX reads nothing after \end{document}

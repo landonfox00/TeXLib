@@ -17,8 +17,8 @@ The largest TeXLib class. Builds randomized, multi-version exams from a problem 
 	(`\ShowKey`/`\keys`) now implies for this class.
 - Smart-columns environment (`problems`) that groups problems into
 	TWO-column or FULL-width layouts based on per-problem hints.
-- Rubric overlays, common-errors lists, and a scorepage option for
-	the final.
+- Grading rubrics and common-errors lists, printed with the solutions
+	they annotate, and a scorepage option for the final.
 - A printable title page assembled from `coursemeta.tex` plus a
 	`\examsetup{number=…, date=…, ps=…}` preamble call.
 
@@ -70,8 +70,9 @@ lualatex exam5.tex
 For the answer key, redefine `\ShowKey` (or call `\keys` in source)
 and recompile. This builds the instructor **key copies only** (no blank
 student copy) — each problem interleaved with its solution, and one key
-per version in a multi-version exam. Add `\def\ShowRubric{}` to also
-overlay the grading rubrics. To build the blank student copies **and**
+per version in a multi-version exam. Add `\def\ShowRubric{}` to print
+each solution's grading rubric under its answer; that build also emits
+the blank student copies. To build the blank student copies **and**
 the keys together (the fuller production build the Sublime builder then
 slices apart), use `\def\ShowSolutions{}` instead.
 
@@ -94,6 +95,37 @@ Options pass through to `exam.cls`. Default base size is 11pt.
 Declare the versions. In standalone mode (no `\Version` defined), the
 class loops over all versions in one compilation. In builder mode
 (`\def\Version{A}` passed externally), only the named version is built.
+
+`\theExamVersion`
+The version label of the copy being typeset. A document that declares no
+versions gets `A`, the label that seeds the engine and the one `\byversion`
+and `\vercase` select. `quiz.cls` does not define the macro.
+
+`\IfExamVersioned{versioned}{unversioned}`
+Takes the first branch in a document that calls `\versions` and the second in
+one that does not. Expandable. `quiz`, `didactic` and `bank` define it as well
+and always take the second branch, so a problem in a shared bank can call it
+whichever class draws it.
+
+A macro that selects content by version label has to ask before it compares.
+`\theExamVersion` alone is wrong in two places. An exam with no `\versions` (a
+final, a review sheet) reports `A`; when the bank's labels are anything else
+(section numbers, say) a selector comparing against it prints nothing, with
+exit code 0 and no warning. A quiz raises `Undefined control sequence`. Name
+the branch a document with no versions prints:
+
+```latex
+\ExplSyntaxOn
+\NewDocumentCommand{\onver}{ m m }{
+	\IfExamVersioned
+		{ \str_if_eq:eeT { #1 } { \theExamVersion } { #2 } }
+		{ \str_if_eq:nnT { #1 } { 1301 } { #2 } }
+}
+\ExplSyntaxOff
+```
+
+Under `\versions{1301, 1302}`, `\onver{1302}{...}` prints on version 1302
+only. A document with no versions prints the `1301` branch.
 
 ### Per-exam metadata via `\meta`
 
@@ -146,8 +178,10 @@ The cover word is keyed on `\ifinstructor`, not `\ifkey`: after the 0.8.0
 rename the student-facing key is the `solutions` build, so labelling it
 "Answer Key" while the instructor copy said "Solutions" had the two backwards.
 
-`\ShowRubric` / `\rubrics` overlays the grading rubrics on top of either
-(rubrics live inside a shown solution, so they need one of the above too).
+`\ShowRubric` / `\rubrics` prints the grading rubrics and common-error lists
+with the solutions they annotate, so they show only in a copy that shows
+solutions. `\ShowRubric` raises `\ifsolutions` itself; `\rubrics` in the source
+raises `\ifrubric` alone and needs `\solutions` or `\keys` beside it.
 
 ### Problem bank workflow
 
@@ -318,10 +352,21 @@ asks for the other layout: the answer space closes and the solutions flow, which
 suits a sheet with no work space.
 
 `\rubric{points}{description}`
-Add a rubric line. Rendered as an overlay in rubric builds.
+Add a rubric line to the solution it is written in. It prints in a build that
+shows rubrics (see [Build flags](#build-flags-texlib-unified-cli)). A
+whole-problem `{solution}` sets its rubric in the grading footer: under the
+worked answer, inside the solution's box, on the right, with `{commonerrors}`
+on the left. A `{partsolution}` sets its rubric in a right-aligned box under
+the part's answer, and `\rubricboxwidth` is that box's width. A problem in
+`{mcproblems}` prints no rubric. The layout is `\@emit@sol@footer` and
+`\@emit@rubric@overlay` in `texlib-solutions.sty`.
 
 `\begin{commonerrors} ... \end{commonerrors}`
-List common student errors; renders only in solutions/key build.
+List common student errors. It prints only in a build that shows rubrics: an
+instructor copy has it and a `solutions` key does not. Inside a `{solution}` it
+is the left panel of the grading footer, wherever in the solution it is
+written; inside a `{partsolution}` it prints where it stands. A problem in
+`{mcproblems}` prints none.
 
 `\ppart`
 Insert a part marker compatible with the autoexam shuffler.
@@ -364,9 +409,11 @@ Set a problem's parts in `n` columns (default 2), inside a problem body.
 The nesting order matters and the failures are quiet. Inverted — `{parts}`
 outside, `{cols}` in — the build dies with "missing `\item`". Used with bare
 `\ppart` and no inner `{parts}` at all, every item is silently dropped and
-the PDF still builds clean. In an accessible build `{cols}` drops to a single
-column (multicol cannot be tagged); the parts and their labels survive, only
-the two-up layout is lost.
+the PDF still builds clean.
+
+An accessible build keeps the columns. In the tagged PDF's structure tree the
+parts are one list in label order, so the reading order runs down the first
+column and then the next.
 
 > **Never use `{cols}` in a problem that lives in a shared bank.** `cols` is
 > defined by `autoexam.cls` **only** — `quiz.cls` does not have it. A bank
@@ -389,6 +436,29 @@ exam number/date, version letter (if versioned), the instructions
 
 `\blankpage`
 Force a blank page between sections.
+
+Running header
+Left: the exam title. Right: the current part, or "Scratch Work" on a
+`\blankpage` leaf. Center: empty on a student copy. On a copy that shows
+solutions (the `solutions` and `instructor` builds), the center of each numbered
+exam page reads the points on that page, "14 points" or "1 point".
+
+| Page | Center header on a solutions copy |
+|---|---|
+| A numbered exam page | The total of the questions and parts that begin on it |
+| A numbered exam page where no pointed item begins | Empty |
+| The cover, a `\blankpage` leaf, a `\scorepage` | Empty |
+
+A point value counts on the page where its own question or part begins. When a
+problem's points are given by part (`\problem[4,2]{id}`, or `\part[n]` in the
+bank), each part counts on its own page. Under `\keylayout{inline}` a key has
+the student copy's pages, so the totals are those of the paper the students
+sat. A compact key reflows: a problem that breaks across two pages splits its
+part points between them, and a page that holds only the end of a solution has
+no total. Extra credit is not counted, as in the `points` check. Each version
+has its own totals, so a `\shuffle`d page carries its total to wherever it
+lands. The totals come from the `.aux` file and appear on the second pass, like
+the "k of n" footer.
 
 `\scorepage[questions]`
 Add a final scoring page (defaults to 20 questions).
@@ -422,6 +492,18 @@ grid with the body drawn on it, so the key keeps the student copy's pagination.
 (default `0.7`); the starred form drops the y tick labels; an empty body is a
 grid that prints blank in every copy. Defined in `texlib-problembank.sty`, so it
 works from a quiz and from lecture notes as well.
+
+The grid lines are drawn in `\sketchgridcolor` (default `black!40`) at width
+`\sketchgridwidth` (default `0.3pt`). To change them for a course, redefine
+either in the preamble; inside a group the change holds for that group's grids.
+
+```latex
+\renewcommand{\sketchgridcolor}{black!55}   % any xcolor expression
+\renewcommand{\sketchgridwidth}{0.4pt}      % does not scale with [scale]
+```
+
+The axes and tick marks are 0.4pt black, so a grid darker than about `black!60`
+is hard to tell from them.
 
 Do not also draw the answer's grid inside `{partsolution}`: the key then prints
 two grids, and the second is what pushes the problem onto another page.
@@ -458,6 +540,21 @@ Reserved blank space for student work.
 	`<jobname>_A.pdf`, `<jobname>_B.pdf`, ... afterward. Passing
 	`\def\Version{X}` externally (or on a raw command line) forces only
 	that one version to build.
+- **Exams with no cover page:** every copy of a versioned exam numbers its
+	Parts from I, its problems from 1 and its problem pages from "1 of N",
+	with or without `\maketitle`. Every copy also starts with the page number,
+	header, footer and marks the document had when `\begin{document}` ended,
+	so a page set before the first `{problems}` / `{mcproblems}` reads the
+	same on every copy. `\maketitle` empties the header and footer for its
+	cover and for the pages before the first section, so front matter after a
+	cover carries no page number. With no cover, three things to know about
+	those pages:
+	- They are numbered apart from the problem pages. The first is page 1, and
+	  so is the first problem page.
+	- Their "of N" is `exam.cls`'s `\numpages`, the page number the last copy
+	  ends on. It is not the copy's own count.
+	- A `\blankpage` that opens a copy is page 1 of it and reads the first-page
+	  header and footer: no "Scratch Work" label, and a page number.
 - **Filenames the builder produces:** `<jobname>_A.sco`, `<jobname>_autoexam_body_A.tex`, `<jobname>.srcmap`, `<jobname>.vmap`, and similar — these are intermediate artifacts you can ignore between rebuilds.
 
 ## Related
