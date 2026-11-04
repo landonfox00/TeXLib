@@ -1,0 +1,258 @@
+% profiles/university-of-connecticut.tex — University of Connecticut
+% ============================================================================
+% source: https://registrar.uconn.edu/graduation/doctoral-degrees/
+%         ("Dissertation Information" / "Dissertation Specifications", the
+%         numbered filing requirements #1-#14)
+% source: https://registrar.media.uconn.edu/wp-content/uploads/sites/1604/2026/07/Dissertation-Samples-1-4-2-1_TimesNewRoman.docx
+%         (the sample the page links as a starting document — "Use these
+%         properly formatted, accessible dissertation samples ... as starting
+%         documents for guidance"; an Arial twin sits beside it. Uploaded
+%         July 2026, the most recent artifact of the set.)
+% accessed: 2026-09-13
+% checked:  texlib-thesis-profile-round
+%
+% WHY THE REGISTRAR AND NOT A GRADUATE SCHOOL. UConn's dissertation filing
+% requirements are published by the Office of the Registrar, which administers
+% degree completion there; grad.uconn.edu carries no competing specifications
+% page. This is the institution's own filing requirement document, not a
+% department page or a library guide, and it is the one the submission portal
+% enforces.
+%
+% VERIFIED and set here: geometry, spacing, title page, the advisory committee
+% page, and a full set of accessibility requirements.
+% NOT set: chapter-opening margin (UConn states none) and the typeface (see
+% below — UConn "recommends", and adds a font-format rule this class cannot
+% satisfy literally).
+
+\thesisinstitution{University of Connecticut}
+
+% "Minimum Margins: The minimum acceptable margins for all pages of the
+% dissertation and the abstract are 1 inch on left and 1 inch on the top,
+% bottom, and right."
+%
+% Note "minimum" — wider is in spec, and UConn states no binding allowance.
+% Note also that the rule explicitly covers the ABSTRACT, which at UConn is a
+% separate unpaginated document ahead of the title page.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Spacing: The text of the dissertation should be double-spaced. Long
+% quotations, footnotes, appendices, and references may be single-spaced and
+% indented."
+\thesissetspacing{double}
+
+% --- Typeface: NOT set, and there are two separate reasons ---------------------
+% "Font and Point Size: Recommended fonts include Arial, Times New Roman, and
+% Helvetica with a point size of either 11 or 12. For accessibility purposes, a
+% sans serif font (e.g., Arial, Helvetica) is recommended, unless a specific
+% serif font is an industry standard. The font selected must be an embedded,
+% True Type (not scalable) font."
+%
+% The first half is "recommended", twice, so there is nothing to require. The
+% second half is a "must" this class cannot satisfy to the letter: lualatex
+% embeds OpenType faces as Type0/CID rather than as TrueType. Everything IS
+% embedded, which is the substance of the rule, but a filer bounced on the
+% font format should know the sentence exists. No font choice available to this
+% file would change how lualatex embeds, which is why it is recorded here
+% rather than encoded.
+
+% --- Accessibility -----------------------------------------------------------
+% UConn is the second school in this round with enforceable accessibility rules
+% and the only one that names WCAG. The requirement is dated, and the date is
+% in the near future rather than the past:
+%
+%   "EFFECTIVE for SPRING 2027 GRADUATES:
+%    Accessibility: In accordance with the final ruling by the Department of
+%    Justice which updated Title II of the Americans with Disabilities Act,
+%    your dissertation must meet the Web Content Accessibility Guidelines
+%    (WCAG) 2.1."
+%
+% Spring 2027 is the next graduating class for anyone filing now, so these are
+% recorded as requirements rather than as advice. (Note the Title II date here
+% is UConn's own; other profiles in this set carry different compliance dates
+% for the same rule, legitimately — large public entities and smaller ones have
+% different deadlines. Do not reconcile them against each other.)
+%
+% UConn also restates it in the body of the specifications: "The copy of your
+% dissertation that is uploaded must be digitally accessible, as outlined above
+% in #1."
+\thesisrequiretagging
+
+% THE ONE INFERENCE IN THIS FILE, made deliberately and flagged. UConn's
+% enumerated list does not name the document language; what it names is
+% conformance to WCAG 2.1 as a whole, and "Language of Page" (SC 3.1.1) is a
+% Level A criterion of WCAG 2.1, so it is required by reference. The list is
+% introduced with "This includes", which is non-exhaustive on its face.
+%
+% It is set rather than omitted because the asymmetry favours it: a false
+% positive here costs a build-time warning, while a false negative costs a
+% filed document that fails the standard UConn names. A reviewer who wants only
+% what UConn enumerates should delete this one line; nothing else depends on it.
+\thesisrequiredocumentlanguage
+
+% NOT set: \thesisrequirepdfstandard. UConn names no PDF standard anywhere —
+% it names WCAG, which is a web content standard, and lists document
+% properties. Inventing PDF/A or PDF/UA here would be a claim about what the
+% submission portal checks.
+
+\thesisaccessibilityrequirement{WCAG 2.1}
+	{In accordance with the final ruling by the Department of Justice which
+	 updated Title II of the Americans with Disabilities Act, your dissertation
+	 must meet the Web Content Accessibility Guidelines (WCAG) 2.1. Effective
+	 for Spring 2027 graduates.}
+\thesisaccessibilityrequirement{Document title}
+	{Document Title (Word: File > Info or PDF: File > Document Properties).}
+\thesisaccessibilityrequirement{Headings}
+	{Headings (H1 title of document, H2 main sections, H3 subsections), using
+	 Styles in Microsoft Word or a similar feature in other applications. The
+	 sample document sets the dissertation title itself in Heading 1.}
+\thesisaccessibilityrequirement{Table headings}
+	{Ensure tables have a clear, simple structure with properly designated
+	 header rows and/or columns.}
+\thesisaccessibilityrequirement{Alt text}
+	{Alt text or captions for images. Photographs, graphics, and scanned images
+	 should be high quality and include a text alternative (Alt Text) that
+	 serves the equivalent purpose for each image.}
+\thesisaccessibilityrequirement{Colour contrast}
+	{Adequate color contrast for text. Use an accessibility checker, such as
+	 Microsoft Word or Acrobat Pro, and a color contrast checker, such as
+	 WebAIM.}
+
+% --- Profile-local fields -----------------------------------------------------
+% UConn's title page lists the author's PRIOR degrees, one per line, under the
+% name — "B.A., Smith State College, [year awarded] / M.A., University of
+% Connecticut, [year awarded]" — and repeats the abbreviations after the name
+% on the committee page ("Jane Mary Doe, B.A., M.A."). Neither has a slot in
+% the class's metadata model.
+%
+% Both default to empty rather than to a placeholder: a student with no prior
+% graduate degree legitimately has little or nothing to put here, so an empty
+% value is a real answer and the lines simply do not print.
+\newcommand{\thesis@uc@priordegrees}{}
+\newcommand{\uconnpriordegrees}[1]{\renewcommand{\thesis@uc@priordegrees}{#1}}
+\newcommand{\thesis@uc@postnominals}{}
+\newcommand{\uconnpostnominals}[1]{\renewcommand{\thesis@uc@postnominals}{#1}}
+% "[year of graduation]" on both pages. Its own field because UConn asks for a
+% bare year where \graddate usually holds a term and a year.
+\newcommand{\thesis@uc@year}{\the\year}
+\newcommand{\uconnyear}[1]{\renewcommand{\thesis@uc@year}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% The sample's layout. Everything on the page is centred: the title paragraph
+% carries no explicit justification of its own but is styled Heading 1, and
+% Heading 1 in that document's styles.xml sets w:jc="center". (Read the style,
+% not the paragraph — the paragraph alone looks left-aligned.)
+%
+%   The Title of the Dissertation in Upper and Lower Case Letters
+%   Jane Mary Doe
+%   B.A., Smith State College, [year awarded]
+%   M.A., University of Connecticut, [year awarded]
+%   A Dissertation
+%   Submitted in Partial Fulfillment of the
+%   Requirements for the Degree of
+%   Doctor of Philosophy
+%   at the
+%   University of Connecticut
+%   [year of graduation]
+%   i (may be suppressed)
+%
+% "Upper and Lower Case Letters" is title case, so \@title is set as typed and
+% NOT uppercased. The page number may be suppressed, and is here: "Pagination:
+% ... The title page number may be suppressed."
+%
+% ONE THING THE SOURCES DO NOT PRESCRIBE: where the block sits vertically. The
+% specifications say nothing about it, and the sample is a Word document whose
+% spacing comes from empty paragraphs rather than from a stated measurement, so
+% reading an exact figure off it would be reading more than it says. The block
+% is centred vertically here, which is the conservative choice; if a reviewer
+% has a UConn filing to compare against and it sits higher, this is the line to
+% change.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing
+		\vspace*{\fill}
+		{\centering
+			\thesis@tagtitle{Title}{\@title}\par
+			\vspace{3\baselineskip}
+			\@author\par
+			\ifx\thesis@uc@priordegrees\@empty\else
+				\vspace{2\baselineskip}
+				\thesis@uc@priordegrees\par
+			\fi
+			\vspace{3\baselineskip}
+			A \thesis@DocNoun\par
+			Submitted in Partial Fulfillment of the\par
+			Requirements for the Degree of\par
+			\thesis@degree\par
+			at the\par
+			University of Connecticut\par
+			\thesis@uc@year\par
+		\par}
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Advisory committee page --------------------------------------------------
+% UConn calls it the advisory committee page and gives it a place in the
+% sequence: "The appropriate order of the major sections of the dissertation
+% follows: the abstract, the title page, the copyright page (optional), the
+% advisory committee page, acknowledgments, table of contents, the text,
+% appendices (if any), and the references."
+%
+% The sample's layout, headed by the degree rather than by the word "Approval":
+%
+%   Doctor of Philosophy Dissertation
+%   The Title of the Dissertation in Upper and Lower Case Letters
+%   Presented by
+%   Jane Mary Doe, B.A., M.A.
+%   Approved by
+%   Major Advisor: John A. Jones
+%   Associate Advisor:  Mary J. Smith
+%   Associate Advisor:  James S. Williams
+%   University of Connecticut
+%   [year of graduation]
+%
+% NO SIGNATURE RULES, and that is what the sample shows: typed names on the
+% same line as their role. UConn does collect real signatures, but on the
+% approval FORMS rather than on this leaf — "Original, scanned, or electronic
+% signatures are accepted", and "All members of a student's advisory committee
+% must provide an original signature ... however, signatures may be on
+% different pages or come from multiple faculty emails". So the page records
+% who approved; the forms carry the signing.
+%
+% This page IS numbered (it sits inside the Roman-numbered preliminary pages),
+% so unlike the class's neutral approval page it does not set
+% \thispagestyle{empty}. The document still owns \pagenumbering{roman}.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage
+	\loadgeometry{normal}\singlespacing
+	{\centering
+		\thesis@degree{} \thesis@DocNoun\par
+		\vspace{2\baselineskip}
+		\@title\par
+		\vspace{3\baselineskip}
+		Presented by\par
+		\vspace{\baselineskip}
+		\@author\ifx\thesis@uc@postnominals\@empty\else
+			, \thesis@uc@postnominals
+		\fi\par
+		\vspace{3\baselineskip}
+		Approved by\par
+		\vspace{\baselineskip}
+		% Role and name on one line, no rule. The class default
+		% \thesis@memberline draws a signature rule and puts the role AFTER the
+		% name; UConn's sample does neither.
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			\ifx\relax##2\relax##1\else##2: ##1\fi\par
+		}%
+		Major Advisor: \thesis@advisor\par
+		\thesis@committee
+		\endgroup
+		\vspace{3\baselineskip}
+		University of Connecticut\par
+		\thesis@uc@year\par
+	\par}
+	\clearpage
+}
