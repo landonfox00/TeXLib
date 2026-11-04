@@ -1,0 +1,203 @@
+% profiles/university-of-georgia.tex — University of Georgia
+% ============================================================================
+% source: https://grad.uga.edu/wp-content/uploads/2025/08/theses_and_dissertations-STYLE-GUIDE_2025.pdf
+%         (Graduate School, "Theses and Dissertations: Student Guide to
+%          Preparation and Processing", 2025 — "Revised: August 2025" on its
+%          own title page)
+% source: https://grad.uga.edu/current-students/fundamentals/theses-dissertations-overview/
+%         (the live Graduate School page that links it: "All ETDs must conform
+%          to the Graduate School style requirements")
+% accessed: 2026-09-11
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, the 1.75in section-opening top margin,
+% spacing, the title page and the approval page. Nothing is left to the neutral
+% fallback.
+%
+% SUPERSEDED EDITION STILL ON THE SERVER: a 2022 copy of this same guide is
+% served from a DEPARTMENT host (comm.uga.edu/sites/default/files/
+% theses_and_dissertations-STYLE-GUIDE_2022.pdf) and ranks well in search. The
+% Graduate School's own page links only the 2025 edition, so that is what this
+% file follows. Do not "correct" a figure here against the 2022 copy.
+%
+% URL TRAP: grad.uga.edu/development/academic/theses-dissertations-overview/
+% formatting and .../current-students/policies-procedures/... are both DEAD
+% (404); the live path is /current-students/fundamentals/. Search results still
+% point at the old ones.
+
+\thesisinstitution{University of Georgia}
+
+% --- Filing figures ----------------------------------------------------------
+% "The left and right margins must be 1 inch for all pages. However, a left
+% margin of 1.5 inches may be used for binding purposes. The right margin may
+% only be set to 1 inch." and "Text must not fall below the 1 inch bottom
+% margin, except for page numbers."
+%
+% A CHOICE, and this profile takes the plain one. 1in left is always in spec;
+% 1.5in is permitted only "for binding purposes", which the filed electronic
+% copy is not. A document being printed and bound may set
+% \thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in} instead --
+% both are within the rule, and neither may be alternated by `twoside', since
+% UGA requires margins to "be consistent throughout the document".
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "The first page of each section in the front matter as well as main body
+% sections (title pages for chapters, main references section, and appendices)
+% must have a top margin of 1.75 inches (with the exception of the copyright
+% page). The top margin of all subsequent pages must be set at 1 inch."
+%
+% 1.75in is the TOTAL UGA prints, which is exactly what this hook takes; the
+% class subtracts the geometry's own 1in. The guide's own instructions confirm
+% the reading -- "set the top margin to 1 inch as standard, and then hit the
+% enter key twice ... Your text will now appear at the 1.75 inch top margin."
+\thesissetchapteropening{1.75in}
+
+% "The body of the entire thesis or dissertation and the abstract must be
+% double-spaced." Single spacing is "permitted but optional" in footnotes, block
+% quotations, tables and figures and their captions, and bibliography entries.
+\thesissetspacing{double}
+
+% No face is set: UGA requires only that the document be typed in ONE typeface
+% throughout, at "either 11 or 12 point type", with "No typeface larger than 12
+% point ... acceptable". The class default satisfies all three.
+
+% --- Accessibility -----------------------------------------------------------
+% NOT PUBLISHED, and this one is a genuine absence rather than a failed search.
+% The 2025 style guide contains no occurrence of "accessib", "alt text",
+% "alternative text", "tagged", "WCAG", "screen reader" or "PDF/A" anywhere in
+% its 45 pages, and neither do the four ETD sub-pages (Formatting, Selecting
+% Software, Converting to PDF, Creating PDF Files with Adobe Acrobat) or the
+% Front Matter Templates page. The Graduate School does publish an
+% accessibility policy at grad.uga.edu/accessibility-policy/, but it is about
+% the Graduate School's WEBSITE -- "the accessibility of its website", Section
+% 508 and WCAG 2.0 -- and says nothing about a submitted manuscript.
+\thesisaccessibilityrequirement{Not published}
+	{The University of Georgia publishes no accessibility requirement for a
+	 filed thesis or dissertation. Its Graduate School accessibility policy
+	 covers the Graduate School's website, not student-submitted documents.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduces the guide's <Dissertation Title Page> sample (p. 23), whose own
+% annotation is the spec: the title goes "CENTERED, ALL CAPS, AND DOUBLE
+% SPACED". The guide adds "Must include ALL of the information indicated by the
+% appropriate sample title page in this manual", "The year at the bottom is your
+% graduation year", and "Do not include major information in degree listings".
+%
+% UGA lists the author's PRIOR DEGREES under the name -- "B.S., The University
+% of Georgia, 1994" / "M.Ed., The University of Georgia, 1996" -- with the note
+% that "International students must include the name of the country between the
+% school and the date the degree was received". The class has no field for that,
+% so the profile mints one. Give it one \\-separated line per degree.
+\providecommand{\thesispriordegrees}{}
+
+% The degree line is the degree ALONE, uppercased, with no major: the sample
+% reads "DOCTOR OF PHILOSOPHY", not "Doctor of Philosophy in Mathematics".
+% \thesis@program is therefore deliberately NOT printed on this page.
+%
+% The date line is the GRADUATION YEAR only, under "ATHENS, GEORGIA". The
+% class's \graddate default ("May, 20XX") is out of spec here; a document
+% filing at UGA should set \graddate{2027}.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{0.75in}
+		\begingroup\doublespacing
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\endgroup
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\@author}\par
+		\ifx\thesispriordegrees\@empty\else
+			\thesispriordegrees\par
+		\fi
+		\vfill
+		\begin{minipage}{0.88\textwidth}
+			\centering
+			A \thesis@DocNoun{} Submitted to the Graduate Faculty of The
+			University of Georgia in Partial Fulfillment of the Requirements
+			for the Degree\par
+		\end{minipage}\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\thesis@degree}\par
+		\vfill
+		ATHENS, GEORGIA\par
+		\thesis@date\par
+		\vspace*{0.5in}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Approval page -------------------------------------------------------------
+% REQUIRED -- the guide marks it "Approval Page (Required)" -- and it is page
+% "iii", "assigned but not typed". "Includes the names of all the committee
+% members on the latest approved advisory committee form. Format it exactly like
+% the sample page."
+%
+% NO SIGNATURES. The page is headed "Electronic Version Approved:" and carries
+% the Dean's TYPED name; UGA collects committee approval on a separate advisory
+% committee form. The class's default signature rule is therefore replaced.
+%
+% The sample's own annotation: "you should not include a title alongside
+% committee members names, such as Dr., PhD, or Professor."
+%
+% HOW THE NAMES ARE FED. UGA splits the committee into a "Major Professor:" line
+% and a "Committee:" block, which the class's flat \committeemember list does not
+% model. This profile reads \thesis@advisor (set with \gradadvisor) as the major
+% professor and prints the \committeemember entries as the Committee block, with
+% their ROLE ARGUMENTS DROPPED -- UGA forbids titles beside the names. So: put
+% the major professor in \gradadvisor and NOT in \committeemember, or the name
+% appears twice.
+%
+% "The date at the bottom is the graduation month and year (not the month in
+% which you submit the document)" -- note this differs from the title page,
+% which takes the graduation YEAR alone.
+\providecommand{\thesisapprovaldate}{\thesis@date}
+
+% The Dean's name is printed on the sample and WILL rot. It is a \providecommand
+% so a document can correct it without editing this file; check it against the
+% current guide before filing.
+\providecommand{\thesisgraduatedean}{Ron Walcott}
+\providecommand{\thesisgraduatedeantitle}{%
+	Vice Provost for Graduate Education and Dean of the Graduate School}
+
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\thesis@tagtitle{H1}{{\color{white}\tiny Approval Page}}\par
+	\begin{center}
+		\vspace*{0.75in}
+		\begingroup\doublespacing
+		\MakeUppercase{\@title}\par
+		\endgroup
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\@author}\par
+	\end{center}
+	\vfill
+	% The sample sets this block left-aligned, indented to the right of centre.
+	\hspace*{0.35\textwidth}%
+	\begin{minipage}{0.6\textwidth}
+		\raggedright
+		Major Professor: \thesis@advisor\par
+		\vspace{\baselineskip}
+		\begingroup
+		% Names only: UGA forbids Dr./PhD/Professor beside a member's name, so
+		% the role argument is discarded rather than printed.
+		\renewcommand{\thesis@memberline}[2]{##1\par}%
+		Committee: \parbox[t]{0.62\textwidth}{\raggedright\thesis@committee}\par
+		\endgroup
+	\end{minipage}\par
+	\vfill
+	{\raggedright
+		Electronic Version Approved:\par
+		\vspace{\baselineskip}
+		\thesisgraduatedean\par
+		\thesisgraduatedeantitle\par
+		The University of Georgia\par
+		\thesisapprovaldate\par}
+	\vspace*{0.5in}%
+	\loadgeometry{normal}\doublespacing\clearpage
+}
