@@ -261,6 +261,14 @@ local function pbank_texify(s)
 end
 
 autoexam_shuffle_pages = false  -- set true by \shuffle in the preamble
+-- Granularity of that shuffle: 'problems' (the default -- every problem is
+-- movable, the authored per-page COUNTS are refilled in the new order) or
+-- 'pages' (\shuffle[pages] -- each authored page keeps its own problems, in
+-- their authored order, and the PAGE BLOCKS are permuted).  Page mode is what
+-- an exam wants when a page was laid out to fit: problem-level shuffling can
+-- land two full-page problems in one page's two slots and overflow it, while
+-- permuting whole pages cannot change any page's contents.
+autoexam_shuffle_grain = 'problems'
 pbank_first_on_page = true   -- reset by \begin{problems} and patched \newpage;
 								-- read by pbank_problem_item to decide separator
 -- Render mode of the active problem-section: 'mc' inside {mcproblems}, 'fr'
@@ -1698,35 +1706,52 @@ function pbank_emit_section(partno)   -- `partno` arg unused; see pbank_emit_par
 	pbank_collected = nil
 	if not c then return end
 
-	-- Section index WITHIN THIS COPY, NOT \arabic{texlibpartno}: texlibpartno
-	-- accumulates across a version's student + solutions copies (it doesn't
-	-- reset per copy), so the two copies would seed differently and shuffle
-	-- differently -- but the answer key MUST match the student exam. This Lua
-	-- counter is reset to 0 per copy by autoexam_run_versions, so equal sections
-	-- of the two copies share one order while distinct sections (MC vs FR) still
-	-- desynchronise.
+	-- Section index WITHIN THIS COPY, counted here and NOT read from
+	-- \arabic{texlibpartno}. The seed below has to be the same for a version's
+	-- student and solutions copies -- the answer key MUST match the student
+	-- exam -- and different for the sections of one copy (MC vs FR). This Lua
+	-- counter moves in two places only: here, and in autoexam_run_versions,
+	-- which resets it to 0 per copy. texlibpartno restarts per copy as well
+	-- (\AutoExamBeginCopy), but also at every \maketitle: read from it, the
+	-- sections after a second cover in one copy would repeat the seeds of the
+	-- sections before it.
 	pbank_emit_partno = (pbank_emit_partno or 0) + 1
 	local sect = pbank_emit_partno
 	local run, subno = {}, 0
 	local function flush()
 		if #run == 0 then return end
 		subno = subno + 1
-		-- Authored per-page counts (item.brk marks a new page; first never does).
-		local page_sizes, cur = {}, 0
+		-- The authored pages, as lists of item indices (item.brk marks a new
+		-- page; the first item never does).  Problem-grain shuffling needs only
+		-- their SIZES -- it refills those counts from a permutation of all the
+		-- items -- while page-grain shuffling permutes these lists themselves.
+		local pages = {}
 		for i, it in ipairs(run) do
-			if i > 1 and it.brk then page_sizes[#page_sizes + 1] = cur; cur = 0 end
-			cur = cur + 1
+			if i == 1 or it.brk then pages[#pages + 1] = {} end
+			local pg = pages[#pages]
+			pg[#pg + 1] = i
 		end
-		page_sizes[#page_sizes + 1] = cur
 
-		local order
-		if autoexam_shuffle_pages then
-			local seed = ((current_exam_seed or 0) * 33 + sect * 97 + subno)
-				% 2147483647
-			order = problem_shuffle.permute(run, seed)
+		local seed = ((current_exam_seed or 0) * 33 + sect * 97 + subno)
+			% 2147483647
+		local order, page_sizes = {}, {}
+		if autoexam_shuffle_pages and autoexam_shuffle_grain == 'pages' then
+			-- Permute the page BLOCKS. Each page emits its own problems in
+			-- authored order, so no page's contents (and so no page's fit)
+			-- changes -- only which page of the paper it becomes.  `pages` has
+			-- no .xc entries (extra credit is deferred TeX-side and never
+			-- reaches the collect stream), so permute just Fisher-Yates it.
+			for _, pi in ipairs(problem_shuffle.permute(pages, seed)) do
+				page_sizes[#page_sizes + 1] = #pages[pi]
+				for _, idx in ipairs(pages[pi]) do order[#order + 1] = idx end
+			end
 		else
-			order = {}
-			for i = 1, #run do order[i] = i end
+			for _, pg in ipairs(pages) do page_sizes[#page_sizes + 1] = #pg end
+			if autoexam_shuffle_pages then
+				order = problem_shuffle.permute(run, seed)
+			else
+				for i = 1, #run do order[i] = i end
+			end
 		end
 
 		-- Emit each item as a \@problem@item macro call (via the @-free
@@ -1764,38 +1789,61 @@ end
 -- ============================================================
 -- MULTI-VERSION BODY READER
 -- ============================================================
+
+-- The \begin{document} pattern takes the rest of its line, so the body starts
+-- on the line below it.
+local BEGIN_DOCUMENT = "\\begin%s*{document}[^\n]*\n?"
+local END_DOCUMENT   = "\\end%s*{document}"
+
+-- First match of `pattern` at or after `init` that is not commented out: no
+-- unescaped % precedes it on its line.  Returns the match's start and end, or
+-- nil when every match is in a comment.  The test looks one character behind
+-- each % on the line, so it is wrong in two ways: the % of \\% reads as escaped
+-- (a mention after it counts as live), and a % in \verb or under another
+-- catcode reads as a comment sign (a marker after it counts as commented out).
+-- When the second leaves no match at all, autoexam_read_body falls back to the
+-- scan it had before.
+local function find_uncommented(text, pattern, init)
+	local pos = init or 1
+	while true do
+		local s, e = text:find(pattern, pos)
+		if not s then return nil end
+		local line_start = text:sub(1, s):match("()[^\n]*$") or 1
+		local prefix = text:sub(line_start, s - 1)
+		if not (prefix:find("^%%") or prefix:find("[^\\]%%")) then
+			return s, e
+		end
+		pos = e + 1
+	end
+end
+
 function autoexam_read_body()
 	local filename = tex.jobname .. ".tex"
 	local f = io.open(filename, "r")
 	if not f then return nil end
 	local content = f:read("*all")
 	f:close()
-	local _, begin_end = content:find("\\begin%s*{document}[^\n]*\n?")
-	if not begin_end then return nil end
-	-- Find the REAL \end{document}: the first occurrence that is NOT inside a TeX
-	-- comment. A raw (non-commented) \end{document} in a problem body would
-	-- itself end the document, so the first non-comment occurrence is always the
-	-- true end. This is robust against a stray \end{document} sitting in a
-	-- trailing comment, which the old "last occurrence" scan mis-sliced (pulling
-	-- the real \end{document} into the returned body).
-	local end_start, pos = nil, begin_end + 1
-	while true do
-		local s, e = content:find("\\end%s*{document}", pos)
-		if not s then break end
-		local line_start = content:sub(1, s):match("()[^\n]*$") or 1
-		local prefix = content:sub(line_start, s - 1)
-		-- Commented out if an unescaped % precedes it on the same line.
-		if not (prefix:find("^%%") or prefix:find("[^\\]%%")) then
-			end_start = s
-			break
-		end
-		pos = e + 1
+	-- The body opens at the first \begin{document} that is not in a comment. A
+	-- comment above it that names the marker (a file header saying where the
+	-- body starts) was once taken for it, and the version loop then input the
+	-- preamble as part of every copy.
+	local _, begin_end = find_uncommented(content, BEGIN_DOCUMENT)
+	if not begin_end then
+		-- Defensive fallback: original first-occurrence scan.
+		_, begin_end = content:find(BEGIN_DOCUMENT)
 	end
+	if not begin_end then return nil end
+	-- The body closes at the first \end{document} that is not in a comment. A
+	-- live \end{document} in a problem body would itself end the document, so
+	-- the first live one is the true end. The older last-occurrence scan took a
+	-- mention in a trailing comment for it and pulled the real \end{document}
+	-- into the body.
+	local end_start = find_uncommented(content, END_DOCUMENT, begin_end + 1)
 	if not end_start then
 		-- Defensive fallback: original last-occurrence heuristic.
-		pos = begin_end + 1
+		local pos = begin_end + 1
 		while true do
-			local s = content:find("\\end%s*{document}", pos)
+			local s = content:find(END_DOCUMENT, pos)
 			if s then end_start = s; pos = s + 1 else break end
 		end
 	end
@@ -1880,6 +1928,15 @@ end
 --   Called by \shuffle in the preamble.
 function set_autoexam_shuffle_pages()
 	autoexam_shuffle_pages = true
+end
+
+-- set_autoexam_shuffle_grain(grain)
+--   Called by \shuffle[<grain>].  Anything other than the literal 'pages'
+--   keeps the default problem-level grain, so a typo degrades to the
+--   documented behaviour rather than to no shuffle at all.
+function set_autoexam_shuffle_grain(grain)
+	autoexam_shuffle_pages = true
+	autoexam_shuffle_grain = (grain == 'pages') and 'pages' or 'problems'
 end
 
 -- ============================================================
@@ -2089,7 +2146,9 @@ function autoexam_run_versions()
 		elseif c.sol == false then tex.sprint("\\solutionsfalse") end
 	end
 
-	-- Fast path: a single copy with no page shuffle needs no temp file.
+	-- Fast path: a single copy with no page shuffle needs no temp file. It does
+	-- not run \AutoExamBeginCopy either: no copy precedes this one, so the
+	-- class's per-copy state is still as the class loaded it.
 	if #copies == 1 and not autoexam_shuffle_pages then
 		local c = copies[1]
 		local body = autoexam_read_body()
@@ -2161,6 +2220,10 @@ function autoexam_run_versions()
 		-- Reset the per-copy section counter so this copy's sections shuffle the
 		-- same as any other copy of the same version (e.g. student vs solutions).
 		tex.sprint("\\directlua{local _ENV=texlib;pbank_emit_partno=0}")
+		-- The class resets its own per-copy state (Part and question numbers,
+		-- the {parts} resume tracker, the page number, the header and footer,
+		-- the marks): see \AutoExamBeginCopy in texlib-autoexam.cls.
+		tex.sprint("\\AutoExamBeginCopy")
 		tex.sprint("\\input{" .. body_tmp .. "}")
 		if i < #copies then
 			tex.sprint("\\clearpage")

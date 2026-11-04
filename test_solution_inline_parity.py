@@ -30,6 +30,15 @@ Deliberate fixture details, both load-bearing:
   * every problem carries \workbox answer space. With no blank to draw into,
     the inline layout has nothing to preserve and the test passes vacuously;
     the `added by key` assertion below also guards that.
+  * `four` has FOUR part solutions and a problem below it. Each part solution
+    once cost the line after it its interline glue, about 3pt; two of them
+    stay inside the 2px tolerance once the page's stretch has shared the loss
+    out, and four do not.
+  * `twocol` ends each {cols} column with a part solution, and has a problem
+    below it. An overlay that is the last thing in its list changes the
+    enclosing box's depth unless the list is closed with the depth it had, and
+    a column is such a list. The question lines carry descenders so there is a
+    depth to lose.
 
 The cover is excluded on purpose: a key has to be identifiable as a key, and
 the class prints a red "Solutions" badge under the date that reflows page 1.
@@ -116,6 +125,80 @@ BANK_TEX = r"""\begin{problem}{whole}[topic=whole]
 			\workbox{2}
 	\end{parts}
 \end{problem}
+
+\begin{problem}{four}[topic=four]
+	Evaluate $g$ at each point.
+	\begin{parts}
+		\ppart $g(1)$, simplifying fully
+			\begin{partsolution}
+				$2$.
+			\end{partsolution}
+			\workbox{1}
+		\ppart $g(2)$, simplifying fully
+			\begin{partsolution}
+				$5$.
+			\end{partsolution}
+			\workbox{1}
+		\ppart $g(3)$, simplifying fully
+			\begin{partsolution}
+				$10$.
+			\end{partsolution}
+			\workbox{1}
+		\ppart $g(4)$, simplifying fully
+			\begin{partsolution}
+				$17$.
+			\end{partsolution}
+			\workbox{1}
+	\end{parts}
+\end{problem}
+
+\begin{problem}{tail}[topic=tail]
+	State the domain of $\sqrt{x}$.
+	\workbox{2}
+	\begin{solution}
+		$[0, \infty)$.
+	\end{solution}
+\end{problem}
+
+\begin{problem}{twocol}[topic=twocol]
+	Answer each for the graph of $g$.
+	\begin{cols}
+		\raggedright
+		\begin{parts}
+			\ppart On what intervals is $g$ increasing?
+				\begin{partsolution}
+					$(0, 1)$.
+				\end{partsolution}
+			\ppart On what intervals is $g$ decreasing?
+				\begin{partsolution}
+					$(1, 2)$.
+				\end{partsolution}
+		\end{parts}
+	\end{cols}
+	\workbox{1}
+	\begin{cols}
+		\raggedright
+		\begin{parts}
+			\ppart Identify the local maximum point.
+				\begin{partsolution}
+					$(1, 3)$.
+				\end{partsolution}
+			\ppart Identify the local minimum point.
+				\begin{partsolution}
+					$(2, 0)$.
+				\end{partsolution}
+		\end{parts}
+	\end{cols}
+	\workbox{1}
+\end{problem}
+
+\begin{problem}{tailtwo}[topic=tailtwo]
+	State the range of $\sqrt{x}$.
+	\workbox{2}
+	\begin{solution}
+		$[0, \infty)$.
+	\end{solution}
+\end{problem}
 """
 
 EXAM_TEX = r"""\documentclass[exam-number=1, points=20]{autoexam}
@@ -129,6 +212,16 @@ EXAM_TEX = r"""\documentclass[exam-number=1, points=20]{autoexam}
 	\newpage
 
 	\problem[5,5]{topic=parts}
+
+	\newpage
+
+	\problem[2,2,2,2]{topic=four}
+	\problem[10]{topic=tail}
+
+	\newpage
+
+	\problem[2,2,3,3]{topic=twocol}
+	\problem[10]{topic=tailtwo}
 \end{problems}
 \end{document}
 """
@@ -159,8 +252,9 @@ def _copy_build_inputs(tmp: str) -> None:
                 shutil.copy2(src, dest)
 
 
-def build(tmp: str, jobname: str, macro: str, timeout: int = 300) -> str:
-    arg = f"{macro}\\input{{doc.tex}}" if macro else "doc.tex"
+def build(tmp: str, jobname: str, macro: str, timeout: int = 300,
+          doc: str = "doc.tex") -> str:
+    arg = f"{macro}\\input{{{doc}}}" if macro else doc
     cmd = [LUALATEX, "-interaction=nonstopmode", "-halt-on-error",
            "-shell-escape", f"-jobname={jobname}", arg]
     proc = None
@@ -284,6 +378,43 @@ def main() -> int:
                 failures.append(
                     f"p{i}: the inline key added no ink -- the solution did not "
                     "render, so parity on this page is vacuous")
+
+        # \keylayout{inline}: the same layout as a document's standing
+        # preference. Two things have to hold. Built with no flag the document
+        # is still the student copy, to the pixel, cover included -- the
+        # preference must not turn a plain build into a key. Built with the
+        # ordinary \ShowKey the builder's `solutions' variant passes, it is the
+        # inline key.
+        with open(os.path.join(tmp, "doc_kl.tex"), "w", encoding="utf-8") as fh:
+            fh.write(EXAM_TEX.replace(r"\loadbank{bank.tex}",
+                                      "\\keylayout{inline}\n\\loadbank{bank.tex}"))
+        kl_plain = rasterize(build(tmp, "klplain", "", doc="doc_kl.tex"), "c", tmp)
+        kl_key = rasterize(build(tmp, "klkey", r"\def\ShowKey{}",
+                                 doc="doc_kl.tex"), "d", tmp)
+        if len(kl_plain) != len(a) or len(kl_key) != len(a):
+            failures.append(
+                f"\\keylayout{{inline}}: page counts differ (student {len(a)}, "
+                f"plain {len(kl_plain)}, key {len(kl_key)})")
+            return report(failures)
+        for i, (pa, pc, pd) in enumerate(zip(a, kl_plain, kl_key), 1):
+            total, moved, added = compare(os.path.join(tmp, pa),
+                                          os.path.join(tmp, pc))
+            if moved or added:
+                failures.append(
+                    f"p{i}: \\keylayout{{inline}} changed the plain build "
+                    f"({moved} px moved, {added} px added) -- it must stay the "
+                    "student copy")
+            if i < FIRST_PROBLEM_PAGE:
+                continue
+            total, moved, added = compare(os.path.join(tmp, pa),
+                                          os.path.join(tmp, pd))
+            pct = 100.0 * (total - moved) / total if total else 100.0
+            log(f"  p{i}: \\keylayout{{inline}} + \\ShowKey  preserved "
+                f"{pct:6.2f}%  added by key {added:6d}")
+            if pct < MIN_PRESERVED or added == 0:
+                failures.append(
+                    f"p{i}: \\keylayout{{inline}} with \\ShowKey is not the "
+                    f"inline key ({pct:.2f}% preserved, {added} px added)")
         return report(failures)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
         log(f"SKIP: build environment failed -- {type(exc).__name__}: {exc}")

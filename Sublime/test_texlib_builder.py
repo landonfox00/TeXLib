@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sys
 import types
 import tempfile
@@ -42,7 +43,7 @@ if "sublime" in sys.modules:  # only true inside Sublime's plugin host
 
 # --- 1. Stub the LaTeXTools PdfBuilder base class ---------------------------
 
-from _testkit import install_native_builder  # noqa: E402
+from _testkit import install_native_builder, without_defer  # noqa: E402
 TexlibBuilder = install_native_builder()
 from texlib_build import (  # noqa: E402  (native core)
     GRADEBOOK_SHEETS, MAX_RERUNS, STATE_ONLY_RERUNS, TexlibBuildCore, _surname,
@@ -227,30 +228,6 @@ def check(label, condition, detail=""):
         print(f"  FAIL  {label}")
         if detail:
             print(f"        {detail}")
-
-
-# A document argument carries a deferral prefix whenever the preamble scanner
-# found something this document never uses -- which, for the synthetic one-line
-# documents in this file, is everything. That prefix is not a MODE macro, and
-# the cases below are about mode macros, so they compare against the argument
-# with any prefix stripped.
-_DEFER_PREFIX_RE = re.compile(r"^(?:\\def\\TeXLibNo[A-Za-z]+\{\})+")
-
-
-def without_defer(arg):
-    r"""`arg` minus its \def\TeXLibNo... prefix, unwrapped from \input{...}.
-
-    "doc.tex" -> "doc.tex"
-    "\def\TeXLibNoBib{}\input{doc.tex}" -> "doc.tex"
-    "\def\ShowKey{}\input{doc.tex}" -> "\def\ShowKey{}\input{doc.tex}"  (a mode
-    macro survives, which is exactly what these assertions must still catch.)
-    """
-    arg = str(arg)
-    stripped = _DEFER_PREFIX_RE.sub("", arg)
-    if stripped == arg:
-        return arg                      # nothing was stripped; leave it alone
-    match = re.fullmatch(r"\\input\{(.*)\}", stripped)
-    return match.group(1) if match else stripped
 
 
 # --- 3. Test cases ---------------------------------------------------------
@@ -844,6 +821,361 @@ def main():
     check("fan-out: the reason is reported once",
           disp.count("luamml mathml-SE bug") == 1,
           "%d times" % disp.count("luamml mathml-SE bug"))
+
+    # (k1d) THE TAGGED LANE ACROSS THE ABORT. The aborted probe has already
+    # reopened <jobname>.aux and <jobname>.toc for writing, so it leaves the
+    # .aux cut short and the .toc empty. The retry used to start from that, and
+    # because the verdict is not kept between builds every build aborted again:
+    # a document whose table of contents adds a page never settled, however
+    # often it was built. The lane's cross-pass state is now read before the
+    # probe and put back after the abort.
+    def drive_lanes(options, script, seed=None, meta=None, runner=None,
+                    doc=_ACC_DOC):
+        """Drive commands() with a callback that plays the engine.
+
+        `script(item, out_dir)` is called for every (argv, message) once the
+        builder has yielded it, with the directory that pass writes into. It
+        sees the lane exactly as the pass would, may rewrite it as the pass
+        would, and returns the output to feed back. `seed` maps a path under
+        the tex dir to the text an earlier build left there.
+
+        Returns (commands, display). The scratch directory is removed before
+        returning, so anything a case wants from a lane it reads in `script`.
+        """
+        tmp = tempfile.mkdtemp(prefix="texlib_lane_")
+        try:
+            files = dict(seed or {})
+            files["doc.tex"] = doc
+            if meta:
+                files["doc.buildmeta"] = meta
+            for rel, text in files.items():
+                path = os.path.join(tmp, *rel.split("/"))
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w", encoding="utf-8", newline="") as fh:
+                    fh.write(text)
+            b = TexlibBuilder()
+            b.tex_root = os.path.join(tmp, "doc.tex")
+            b.tex_name, b.base_name, b.tex_dir = "doc.tex", "doc", tmp
+            b.engine, b.out = "pdflatex", ""
+            b.options = list(options)
+            if runner is not None:
+                b.builder_settings = {"build_jobs": 4}
+                b.run_parallel = runner
+            cmds = []
+            gen = b.commands()
+            try:
+                item = next(gen)
+                while True:
+                    cmds.append(item)
+                    out_dir = next(
+                        (str(x).split("=", 1)[1] for x in item[0]
+                         if str(x).startswith("-output-directory=")), tmp)
+                    b.out = script(item, out_dir) or ""
+                    item = gen.send(0)
+            except StopIteration:
+                pass
+            return cmds, getattr(b, "_displayed", "")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def lane_files(d):
+        """{name: text} for the files in one lane directory."""
+        found = {}
+        for name in (sorted(os.listdir(d)) if os.path.isdir(d) else []):
+            path = os.path.join(d, name)
+            if os.path.isfile(path):
+                with open(path, "r", encoding="utf-8", newline="") as fh:
+                    found[name] = fh.read()
+        return found
+
+    def put(d, name, text):
+        with open(os.path.join(d, name), "w", encoding="utf-8",
+                  newline="") as fh:
+            fh.write(text)
+
+    def is_tagged(item):
+        return r"\DocumentMetadata" in str(item[0][-1])
+
+    _AUX = "\\relax \n\\newlabel{sec:a}{{1}{2}}\n\\gdef \\@abspage@last{6}\n"
+    _TOC = "\\contentsline {section}{\\numberline {1}A}{2}{}%\n"
+    _CUT = "\\relax \n"
+
+    def aborting_probe(seen):
+        """A script whose first tagged pass truncates its lane and aborts.
+
+        `seen` collects the lane as each tagged pass finds it.
+        """
+        def script(item, out_dir):
+            if not is_tagged(item):
+                return ""
+            seen.append(lane_files(out_dir))
+            if len(seen) > 1:
+                return ""
+            put(out_dir, "doc.aux", _CUT)
+            put(out_dir, "doc.toc", "")
+            put(out_dir, "doc.lof", "")
+            put(out_dir, "doc.log", "aborted")
+            put(out_dir, "doc-luamml-mathml.html", "<math")
+            return _ABORT
+        return script
+
+    seen = []
+    drive_lanes(_ACC_OPT, aborting_probe(seen),
+                seed={"a11y/doc.aux": _AUX, "a11y/doc.toc": _TOC,
+                      "a11y/doc.bbl": "bbl"})
+    probe = seen[0] if seen else {}
+    retry = seen[1] if len(seen) > 1 else {}
+    check("lane state: the probe reads what the last build left",
+          probe.get("doc.aux") == _AUX and probe.get("doc.toc") == _TOC,
+          sorted(probe))
+    check("lane state: after the abort the retry reads the settled .aux",
+          retry.get("doc.aux") == _AUX, repr(retry.get("doc.aux")))
+    check("lane state: and the complete .toc, not the emptied one",
+          retry.get("doc.toc") == _TOC, repr(retry.get("doc.toc")))
+    check("lane state: a state file the aborted pass created is removed",
+          "doc.lof" not in retry, sorted(retry))
+    check("lane state: a state file it left alone keeps its content",
+          retry.get("doc.bbl") == "bbl", repr(retry.get("doc.bbl")))
+    check("lane state: files outside the cross-pass state are not touched",
+          retry.get("doc.log") == "aborted", sorted(retry))
+    check("lane state: the truncated luamml sidecar is still cleared",
+          "doc-luamml-mathml.html" not in retry, sorted(retry))
+
+    #   a cold lane has nothing to put back, so the retry starts from nothing.
+    #   A truncated .aux is not a state any real pass leaves behind.
+    seen = []
+    drive_lanes(_ACC_OPT, aborting_probe(seen))
+    retry = seen[1] if len(seen) > 1 else {}
+    check("lane state: on a cold lane the retry starts from nothing",
+          len(seen) > 1
+          and not any(name.endswith((".aux", ".toc", ".lof")) for name in retry),
+          sorted(retry))
+
+    #   without an abort, run 1's output is run 2's input and must stay.
+    seen = []
+
+    def clean_passes(item, out_dir):
+        if not is_tagged(item):
+            return ""
+        seen.append(lane_files(out_dir))
+        put(out_dir, "doc.aux", "written by pass %d" % len(seen))
+        return ""
+
+    drive_lanes(_ACC_OPT, clean_passes, seed={"a11y/doc.aux": _AUX})
+    check("lane state: without an abort nothing is put back",
+          len(seen) == 2 and seen[1].get("doc.aux") == "written by pass 1",
+          [s.get("doc.aux") for s in seen])
+
+    #   an ordinary error is the document's own, and is not undone.
+    seen = []
+
+    def broken_pass(item, out_dir):
+        if not is_tagged(item):
+            return ""
+        seen.append(lane_files(out_dir))
+        if len(seen) > 1:
+            return ""
+        put(out_dir, "doc.aux", _CUT)
+        return "! Undefined control sequence.\nl.7 \\nope"
+
+    drive_lanes(_ACC_OPT, broken_pass, seed={"a11y/doc.aux": _AUX})
+    check("lane state: an ordinary error does not restore the lane",
+          len(seen) == 2 and seen[1].get("doc.aux") == _CUT,
+          [s.get("doc.aux") for s in seen])
+
+    #   the fan-out's base twin is the same probe in another directory.
+    seen = []
+    drive_lanes(["--texlib-mode=default"], aborting_probe(seen), doc=_FAN_DOC,
+                seed={"variants/base-a11y/doc.aux": _AUX,
+                      "variants/base-a11y/doc.toc": _TOC})
+    retry = seen[1] if len(seen) > 1 else {}
+    check("lane state: the fan-out's base twin gets its state back too",
+          retry.get("doc.aux") == _AUX and retry.get("doc.toc") == _TOC
+          and "doc.lof" not in retry, sorted(retry))
+
+    #   a lane that could not get a directory of its own writes into the one
+    #   the normal half uses (the fallback in _accessible_out_dir). The files
+    #   there are not the lane's, so none is read, rewritten or removed.
+    shared = tempfile.mkdtemp(prefix="texlib_shared_")
+    sb = TexlibBuilder()
+    sb.tex_root = os.path.join(shared, "doc.tex")
+    sb.tex_name, sb.base_name, sb.tex_dir = "doc.tex", "doc", shared
+    put(shared, "doc.aux", _AUX)
+    check("lane state: a directory shared with the normal half is not read",
+          sb._lane_state(shared) is None, sb._lane_state(shared))
+    put(shared, "doc.aux", _CUT)
+    put(shared, "sibling.aux", "another document's")
+    sb._restore_lane_state(shared, sb._lane_state(shared))
+    check("lane state: and nothing in it is rewritten or removed",
+          lane_files(shared) == {"doc.aux": _CUT,
+                                 "sibling.aux": "another document's"},
+          lane_files(shared))
+    shutil.rmtree(shared, ignore_errors=True)
+
+    # (k1e) THE SETTLE RULE. tagpdf numbers the parent tree from the page count
+    # the previous pass recorded, so a tagged pass that ships a page more than
+    # its predecessor writes a PDF whose last page fails PDF/UA (clause 8.2.2).
+    # The kernel says so in that pass's log, and the pass is run again. Two
+    # fixed passes kept that PDF whenever the second was the first to read a
+    # complete table of contents.
+    _WRONG = ("LaTeX Warning: Hook 'shipout/lastpage' executed on wrong page "
+              "(5 not 6).\n               Rerun to correct this.\n")
+    _EXTRA = ("LaTeX Warning: Temporary extra page added at the end. Rerun to "
+              "get it removed.\n")
+    _LABELS = ("LaTeX Warning: Label(s) may have changed. Rerun to get "
+               "cross-references right.\n")
+
+    def tagged_outputs(outs, then=""):
+        """A script feeding outs[i] to the i-th tagged pass, `then` after."""
+        count = [0]
+
+        def script(item, out_dir):
+            if not is_tagged(item):
+                return ""
+            i, count[0] = count[0], count[0] + 1
+            return outs[i] if i < len(outs) else then
+        return script
+
+    def tagged_of(cmds):
+        return [c for c in cmds if is_tagged(c)]
+
+    cmds, disp = drive_lanes(_ACC_OPT, tagged_outputs(["", _WRONG]))
+    tagged = tagged_of(cmds)
+    check("settle: a second pass on the wrong last page buys a third",
+          len(tagged) == 3, [c[1] for c in tagged])
+    check("settle: the third pass is labelled as one",
+          len(tagged) == 3 and "run 3 (settle)" in tagged[2][1],
+          [c[1] for c in tagged])
+    check("settle: and is the same command as the second",
+          len(tagged) == 3 and tagged[2][0] == tagged[1][0],
+          tagged[2][0] if len(tagged) == 3 else "")
+    check("settle: a lane that settles on its third pass reports no ceiling",
+          len(tagged) == 3 and "unsettled" not in disp, repr(disp))
+
+    cmds, _ = drive_lanes(_ACC_OPT, tagged_outputs(["", _EXTRA]))
+    check("settle: a temporary extra page buys a third pass too",
+          len(tagged_of(cmds)) == 3, [c[1] for c in tagged_of(cmds)])
+
+    #   The page count is the only trigger. Changed labels are not one.
+    cmds, _ = drive_lanes(_ACC_OPT, tagged_outputs(["", _LABELS]))
+    check("settle: changed labels alone do not buy a pass",
+          len(tagged_of(cmds)) == 2, [c[1] for c in tagged_of(cmds)])
+
+    #   Only the last pass's verdict counts. On a cold lane half the example
+    #   corpus ends run 1 with one of the two messages and run 2 clean.
+    cmds, _ = drive_lanes(_ACC_OPT, tagged_outputs([_WRONG, ""]))
+    check("settle: a wrong last page in run 1 alone costs nothing",
+          len(tagged_of(cmds)) == 2, [c[1] for c in tagged_of(cmds)])
+
+    #   After an abort on a cold lane: probe, AF, AF with a page more, AF.
+    cmds, _ = drive_lanes(_ACC_OPT, tagged_outputs([_ABORT, "", _WRONG, ""]))
+    tagged = tagged_of(cmds)
+    check("settle: abort on a cold lane -> probe plus three AF passes",
+          len(tagged) == 4
+          and "mathml-SE" in tagged[0][0][-1]
+          and all("mathml-SE" not in c[0][-1] for c in tagged[1:]),
+          [c[1] for c in tagged])
+    check("settle: the passes are numbered through the retry",
+          [c[1].split("] ", 1)[-1] for c in tagged]
+          == ["run 1...", "run 1 (MathML-AF)...", "run 2 (settle)...",
+              "run 3 (settle)..."],
+          [c[1] for c in tagged])
+
+    #   A document that never settles stops at the ceiling and says so.
+    cmds, disp = drive_lanes(_ACC_OPT, tagged_outputs([], then=_WRONG))
+    check("settle: a lane that never settles stops at MAX_RERUNS passes",
+          len(tagged_of(cmds)) == MAX_RERUNS,
+          "%d tagged passes" % len(tagged_of(cmds)))
+    check("settle: and the ceiling is reported",
+          "still unsettled after %d passes" % MAX_RERUNS in disp, repr(disp))
+    cmds, _ = drive_lanes(_ACC_OPT, tagged_outputs([_ABORT], then=_WRONG))
+    check("settle: the aborted probe does not count toward the ceiling",
+          len(tagged_of(cmds)) == 1 + MAX_RERUNS,
+          "%d tagged passes" % len(tagged_of(cmds)))
+
+    #   The fan-out, serial: tagged twins only.
+    def by_message(outs):
+        """A script feeding outs[key] to the pass whose message holds key."""
+        def script(item, out_dir):
+            return next((o for key, o in outs.items() if key in item[1]), "")
+        return script
+
+    cmds, _ = drive_lanes(
+        ["--texlib-mode=default"],
+        by_message({"[student-a11y] run 2": _WRONG,
+                    "[student] run 2": _WRONG}),
+        doc=PSET, meta=FULL_META)
+    msgs = [c[1] for c in cmds]
+    check("settle/fan-out: an unsettled tagged twin runs a third pass",
+          any("[student-a11y] run 3 (settle)" in m for m in msgs), msgs)
+    check("settle/fan-out: an untagged variant never does",
+          any("[student] run 2" in m for m in msgs)
+          and not any("[student] run 3" in m for m in msgs), msgs)
+    check("settle/fan-out: the settled twins keep their two passes",
+          all(any("[%s-a11y] run 2" % v in m for m in msgs)
+              and not any("[%s-a11y] run 3" % v in m for m in msgs)
+              for v in ("base", "solutions", "instructor")),
+          msgs)
+
+    #   The fan-out, parallel: a lane is a fixed list the host runs, so its
+    #   verdict is read back from the lane's own log once the wave returns.
+    def lane_runner(waves, logs):
+        """A run_parallel that records each wave and leaves every lane the log
+        its last pass would have written: logs(label, wave number) -> text."""
+        def runner(lanes, jobs):
+            waves.append((list(lanes), jobs))
+            for label, _cmds, lane_dir in lanes:
+                put(lane_dir, "doc.log", logs(label, len(waves)))
+        return runner
+
+    def quiet(item, out_dir):
+        return ""
+
+    waves = []
+    drive_lanes(["--texlib-mode=default"], quiet, doc=PSET, meta=FULL_META,
+                runner=lane_runner(
+                    waves, lambda label, n: _WRONG
+                    if "student-a11y" in label and n == 1 else ""))
+    check("settle/parallel: one unsettled twin costs one more wave",
+          len(waves) == 2, len(waves))
+    first = {l: (c, a) for l, c, a in waves[0][0]} if waves else {}
+    again = waves[1][0] if len(waves) > 1 else []
+    check("settle/parallel: the wave holds that lane alone",
+          len(again) == 1 and "student-a11y" in again[0][0],
+          [l for l, _c, _a in again])
+    planned = next((v for l, v in first.items() if "student-a11y" in l),
+                   ([], None))
+    check("settle/parallel: one pass of the command the lane was planned with",
+          len(again) == 1 and again[0][1] == planned[0][:1],
+          again[0][1] if again else "")
+    check("settle/parallel: into the lane's own directory",
+          len(again) == 1 and again[0][2] == planned[1],
+          again[0][2] if again else "")
+
+    waves = []
+    drive_lanes(["--texlib-mode=default"], quiet, doc=PSET, meta=FULL_META,
+                runner=lane_runner(
+                    waves, lambda label, n: _WRONG
+                    if label.endswith("[student]") else ""))
+    check("settle/parallel: an untagged lane is never run again",
+          len(waves) == 1
+          and any(l.endswith("[student]") for l, _c, _a in waves[0][0]),
+          [[l for l, _c, _a in w] for w, _n in waves])
+
+    waves = []
+    _, disp = drive_lanes(
+        ["--texlib-mode=default"], quiet, doc=PSET, meta=FULL_META,
+        runner=lane_runner(waves, lambda label, n: _WRONG))
+    check("settle/parallel: lanes that never settle stop at MAX_RERUNS passes",
+          len(waves) == 1 + (MAX_RERUNS - 2), len(waves))
+    check("settle/parallel: every later wave is the three tagged twins",
+          len(waves) > 1
+          and all(len(w) == 3 and all("-a11y" in l for l, _c, _a in w)
+                  for w, _n in waves[1:]),
+          [[l for l, _c, _a in w] for w, _n in waves[1:]])
+    check("settle/parallel: the ceiling is reported once per lane",
+          disp.count("still unsettled after %d passes" % MAX_RERUNS) == 3,
+          disp.count("still unsettled"))
 
     # (k1c) solutions-inline has to be DISCOVERABLE. It is deliberately never
     # planned into a default set -- it is a layout preference, and
@@ -2204,7 +2536,7 @@ def main():
 
     # ====================================================================== #
     # Copy-back from the aux dir. The .schedmeta case is the one with an
-    # out-of-build consumer: TeXLib Sync reads it from beside the source, so a
+    # out-of-build consumer: Kalends reads it from beside the source, so a
     # builder build that left it in %TEMP% would look to that tool like "the
     # schedule was never built" -- or worse, hand it a stale in-place copy.
     # ====================================================================== #
@@ -2255,10 +2587,12 @@ def main():
     _spec_path = os.path.join(_repo, "Sublime", "texlib", "texlib_buildspec.py")
     check("buildspec: the single source exists", os.path.isfile(_spec_path))
 
-    _redefiners = []
+    _redefiners, _spec_scanned = [], set()
     for _dirpath, _dirnames, _filenames in os.walk(_repo):
-        if any(part in _dirpath for part in (os.sep + ".git", os.sep + ".claude")):
-            continue
+        # Pruned by NAME below the root. Matching on the absolute path skipped
+        # every directory of a checkout that itself lives under .claude/, the
+        # root included, and the check passed having read no file.
+        _dirnames[:] = [d for d in _dirnames if d not in (".git", ".claude")]
         for _fn in _filenames:
             if not _fn.endswith(".py") or _fn == "texlib_buildspec.py":
                 continue
@@ -2267,6 +2601,7 @@ def main():
                 _txt = open(_p, encoding="utf-8", errors="replace").read()
             except OSError:
                 continue
+            _spec_scanned.add(os.path.relpath(_p, _repo).replace(os.sep, "/"))
             # Markers assembled at runtime: spelled out literally, this file
             # would match itself and the check would fail on its own source.
             for _marker in ("LUALATEX_CLASSES = " + "{",
@@ -2276,6 +2611,11 @@ def main():
                     _redefiners.append(os.path.relpath(_p, _repo) + " :: " + _marker)
     check("buildspec: no module redefines the shared constants",
           not _redefiners, "; ".join(_redefiners))
+    # The two modules that once held the copies, and this file.
+    check("buildspec: that scan reached the harness and the builder",
+          {"smoke_test.py", "Sublime/texlib/texlib_build.py",
+           "Sublime/test_texlib_builder.py"} <= _spec_scanned,
+          "%d files scanned" % len(_spec_scanned))
 
     # Every lua class must actually be one -- bingo and schedule \directlua at
     # class load, thesis loads fontspec; pdflatex cannot compile any of them.
@@ -2295,6 +2635,21 @@ def main():
           and _bs.ACCESSIBLE_MACRO_AF_ONLY
           == _bs.ACCESSIBLE_MACRO.replace(",mathml-SE", ""),
           _bs.ACCESSIBLE_MACRO_AF_ONLY)
+    # Each MathML file stays in its Formula's /AF and leaves the EmbeddedFiles
+    # name tree, which viewers list as the document's attachments -- SumatraPDF
+    # in its bookmarks pane, one entry per distinct formula.
+    check("buildspec: MathML files stay out of the attachment list",
+          "viewer/pane/mathml=false" in _bs.ACCESSIBLE_MACRO
+          and "viewer/pane/mathml=false" in _bs.ACCESSIBLE_MACRO_AF_ONLY)
+    # The thesis templates bring their own \DocumentMetadata, which the prefix
+    # never reaches, so they have to set the key themselves.
+    for _tpl in (("examples", "templates", "Thesis", "thesis-template.tex"),
+                 ("examples", "scenarios", "thesis", "frontmatter",
+                  "template.tex")):
+        with open(os.path.join(_repo, *_tpl), encoding="utf-8") as _f:
+            _tpl_src = _f.read()
+        check("buildspec: %s keeps MathML out of the attachment list"
+              % "/".join(_tpl), "viewer/pane/mathml=false" in _tpl_src)
     # The retry fires on luamml's abort and on nothing else -- an ordinary
     # LaTeX error must stay the document's own failure.
     check("buildspec: luamml_se_aborted recognises the abort",
@@ -2322,6 +2677,32 @@ def main():
           all(_bs.luamml_se_aborted(
               _bs.LUAMML_SE_ABORT[:i] + "\n" + _bs.LUAMML_SE_ABORT[i:])
               for i in range(1, len(_bs.LUAMML_SE_ABORT))))
+
+    # lastpage_unsettled: the kernel's two verdicts on its own last-page guess,
+    # in the form the engine printed them (TeX Live 2026), and nothing else.
+    # "Label(s) may have changed" has to stay out: a tagged pass prints it
+    # whenever a recorded count moves, and the settle rule would then spend a
+    # pass on documents whose PDF is already right.
+    check("buildspec: lastpage_unsettled recognises the wrong-page warning",
+          _bs.lastpage_unsettled(
+              "LaTeX Warning: Hook 'shipout/lastpage' executed on wrong page "
+              "(37 not 38).\n               Rerun to correct this.\n"))
+    check("buildspec: lastpage_unsettled recognises the temporary page",
+          _bs.lastpage_unsettled(
+              "LaTeX Warning: Temporary extra page added at the end. Rerun to "
+              "get it removed.\n"))
+    check("buildspec: lastpage_unsettled ignores every other rerun request",
+          not _bs.lastpage_unsettled(
+              "LaTeX Warning: Label(s) may have changed. Rerun to get "
+              "cross-references right.\n"
+              "Package rerunfilecheck Warning: Rerun to get outlines right.\n")
+          and not _bs.lastpage_unsettled("Output written on doc.pdf (6 pages).")
+          and not _bs.lastpage_unsettled("")
+          and not _bs.lastpage_unsettled(None))
+    check("buildspec: lastpage_unsettled survives a wrap at any position",
+          all(_bs.lastpage_unsettled(m[:i] + "\n" + m[i:])
+              for m in (_bs.LASTPAGE_WRONG_PAGE, _bs.LASTPAGE_EXTRA_PAGE)
+              for i in range(1, len(m))))
 
     # accessible_macro_for: a document with its OWN \DocumentMetadata (the
     # thesis template's layout) must get the marker only -- the TL2026 kernel
@@ -2405,10 +2786,10 @@ def main():
     _pair = [
         _mf.Example("examples/fixtures/Shared", "first.tex", "fixture", ("smoke",),
                     expect=["FIRSTMARK"], absent=["FIRSTLEAK"],
-                    artifact=["*_first_grid.tex"]),
+                    artifact=["*_first_grid.tex"], tagged={"L": 1}),
         _mf.Example("examples/fixtures/Shared", "second.tex", "fixture", ("smoke",),
                     expect=["SECONDMARK"], absent=["SECONDLEAK"],
-                    artifact=["*_second_grid.tex"]),
+                    artifact=["*_second_grid.tex"], tagged={"LI": 2}),
     ]
     _k1 = ("examples/fixtures/Shared", "first.tex")
     _k2 = ("examples/fixtures/Shared", "second.tex")
@@ -2418,6 +2799,7 @@ def main():
         _v_text = _mf.expect_text()
         _v_absent = _mf.expect_absent()
         _v_artifact = _mf.expect_artifact_nonempty()
+        _v_tagged = _mf.expect_tagged()
     finally:
         _mf.EXAMPLES = _real_examples
 
@@ -2431,6 +2813,9 @@ def main():
           _v_artifact.get(_k1) == ["*_first_grid.tex"]
           and _v_artifact.get(_k2) == ["*_second_grid.tex"],
           str(_v_artifact))
+    check("manifest: two examples in one module keep both tagged sets",
+          _v_tagged.get(_k1) == {"L": 1} and _v_tagged.get(_k2) == {"LI": 2},
+          str(_v_tagged))
 
     # The same claim against the REAL corpus, as a conservation law: every
     # declared assertion set survives into its view. This is the form that
@@ -2440,6 +2825,7 @@ def main():
         ("absent", _mf.expect_absent(), [e for e in _mf.EXAMPLES if e.absent]),
         ("artifact", _mf.expect_artifact_nonempty(),
          [e for e in _mf.EXAMPLES if e.artifact]),
+        ("tagged", _mf.expect_tagged(), [e for e in _mf.EXAMPLES if e.tagged]),
     ) if len(view) != len(declared)]
     check("manifest: no declared assertion set is dropped by its view", not _lost,
           "collapsed views: " + ", ".join(_lost))
@@ -2455,41 +2841,200 @@ def main():
           _dupe_raised)
 
     # -----------------------------------------------------------------------
+    # The tagged-structure check behind a manifest entry's `tagged=`.
+    #
+    # It counts structure elements by STANDARD type, so it has to resolve the
+    # LaTeX tagging code's own tag names ("item", "itembody") through their
+    # namespace -- and it has to do so WITHOUT the document-level /RoleMap,
+    # which is the PDF 1.7 fallback and maps Artifact down to Private. The
+    # synthetic tree carries both maps, laid out the way tagpdf writes them, an
+    # item whose label comes first and an item whose body does.
+    # -----------------------------------------------------------------------
+    if _have_pypdf:
+        from pypdf.generic import (ArrayObject, DictionaryObject, NameObject,
+                                   NumberObject, TextStringObject)
+        sys.path.insert(0, _repo)
+        import smoke_test as _st  # noqa: E402
+
+        def _pn(s):
+            return NameObject("/" + s)
+
+        _ns_pdf2 = DictionaryObject({
+            _pn("Type"): _pn("Namespace"),
+            _pn("NS"): TextStringObject("http://iso.org/pdf2/ssn"),
+        })
+        _ns_latex = DictionaryObject({
+            _pn("Type"): _pn("Namespace"),
+            _pn("NS"): TextStringObject("https://www.latex-project.org/ns/dflt"),
+            _pn("RoleMapNS"): DictionaryObject({
+                _pn(_tag): ArrayObject([_pn(_role), _ns_pdf2])
+                for _tag, _role in (("enumerate", "L"), ("item", "LI"),
+                                    ("itemlabel", "Lbl"), ("itembody", "LBody"))
+            }),
+        })
+
+        def _se(tag, ns, *kids):
+            return DictionaryObject({
+                _pn("Type"): _pn("StructElem"), _pn("S"): _pn(tag),
+                _pn("NS"): ns, _pn("K"): ArrayObject(kids),
+            })
+
+        # Marked content sits among the children as a bare id or as an /MCR
+        # dictionary. Neither is a structure element and neither is counted.
+        _mcr = DictionaryObject({_pn("Type"): _pn("MCR"),
+                                 _pn("MCID"): NumberObject(1)})
+        _tw = PdfWriter()
+        _tw.add_blank_page(width=72, height=72)
+        _tw.root_object[_pn("StructTreeRoot")] = DictionaryObject({
+            _pn("Type"): _pn("StructTreeRoot"),
+            _pn("RoleMap"): DictionaryObject({_pn("Artifact"): _pn("Private"),
+                                              _pn("item"): _pn("LI")}),
+            _pn("K"): _se(
+                "Document", _ns_pdf2,
+                _se("enumerate", _ns_latex,
+                    _se("item", _ns_latex,
+                        _se("itemlabel", _ns_latex, NumberObject(0)),
+                        _se("itembody", _ns_latex, _mcr)),
+                    _se("item", _ns_latex,
+                        _se("itembody", _ns_latex),
+                        _se("itemlabel", _ns_latex))),
+                _se("Artifact", _ns_pdf2)),
+        })
+        _tagged_pdf = os.path.join(tempfile.mkdtemp(prefix="texlib_tagged_"),
+                                   "tagged.pdf")
+        with open(_tagged_pdf, "wb") as fh:
+            _tw.write(fh)
+        _tw.close()
+
+        _tk = ("examples/fixtures/Synthetic", "tagged.tex")
+
+        def _tagged_case(expected):
+            _st.EXPECT_TAGGED[_tk] = expected
+            try:
+                return _st.check_tagged_structure(_tk[0], _tk[1], _tagged_pdf)
+            finally:
+                del _st.EXPECT_TAGGED[_tk]
+
+        _tprobs, _tskip = _tagged_case(
+            {"Document": 1, "L": 1, "LI": 2, "Lbl": 2, "LBody": 2,
+             "Artifact": 1, "Private": 0})
+        check("tagged: tags resolve through their namespace, not the 1.7 RoleMap",
+              not _tskip and len(_tprobs) == 1 and " x" not in _tprobs[0],
+              str(_tprobs))
+        check("tagged: an item whose body precedes its label is reported",
+              _tprobs == ["tagged structure: 1 list item(s) not a label then a body"],
+              str(_tprobs))
+        _tprobs, _ = _tagged_case({"LI": 3})
+        check("tagged: a wrong count names the type, the count and the expectation",
+              len(_tprobs) == 1 and "LI x2 (expected 3)" in _tprobs[0],
+              str(_tprobs))
+        check("tagged: a document that declares nothing is not opened",
+              _st.check_tagged_structure("examples/fixtures/Synthetic",
+                                         "undeclared.tex",
+                                         os.path.join(_repo, "no-such.pdf"))
+              == ([], False))
+    else:
+        print("  SKIP  pypdf not installed -- tagged-structure tests skipped")
+
+    # -----------------------------------------------------------------------
     # (y) Accessibility report. The accessible build writes veraPDF's
     # conformance report beside <base>_accessible.pdf. veraPDF is NOT required
     # to run these: the binary and the subprocess are both stubbed, because this
     # suite is the builder's logic harness and must stay runnable on a machine
     # with no JRE. smoke_test --accessible is what exercises the real tool.
     # -----------------------------------------------------------------------
-    def _report_case(returncode, settings=None, exe="VP", stdout=b"<html/>"):
+    class _Proc:
+        def __init__(self, returncode, stdout):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = b"boom"
+
+    def _folder(d):
+        """{name: contents} for the files in `d`, so a case can ask both what
+        a build left there and what it wrote into it."""
+        found = {}
+        for name in sorted(os.listdir(d)):
+            path = os.path.join(d, name)
+            if os.path.isfile(path):
+                with open(path, "rb") as fh:
+                    found[name] = fh.read()
+        return found
+
+    # The two rows veraPDF 1.30.2 prints under "Validation information" in the
+    # HTML report of one file, as it prints them. A failing copy's count is
+    # read from the second.
+    def _report_html(failed, passed=7963):
+        return ('            <tr>\n'
+                '               <td width="250"><b>Passed Checks:</b></td>\n'
+                '               <td>%d</td>\n'
+                '            </tr>\n'
+                '            <tr>\n'
+                '               <td width="250"><b>Failed Checks:</b></td>\n'
+                '               <td>%d</td>\n'
+                '            </tr>\n' % (passed, failed)).encode("utf-8")
+
+    # What the report of an earlier build holds, in the cases that put one in
+    # the folder before this build's copies land.
+    _EARLIER = b"left by an earlier build"
+
+    def _report_case(returncode=0, settings=None, exe="VP", stdout=b"<html/>",
+                     copies=("base",), results=None, run=None, blocked=(),
+                     earlier=(), stuck=False):
+        """Queue one tagged PDF per variant in `copies`, then run the check and
+        print its summary, with veraPDF stubbed.
+
+        Each fake run exits `returncode` and prints `stdout`, unless `results`
+        gives its variant another (exit status, output). `run`, if given, is
+        called with the command first, on the thread the check runs on.
+        `blocked` names reports that cannot be written. `earlier` names the
+        variants whose report an earlier build left, each holding _EARLIER.
+        `stuck` makes the files in the folder impossible to delete, or, as
+        "once", makes the first attempt on each fail and the next succeed.
+        -> ({file: contents} left in the folder, the command lines, the display)
+        """
         d = tempfile.mkdtemp(prefix="texlib_a11y_")
-        pdf = os.path.join(d, "doc_accessible.pdf")
-        with open(pdf, "wb") as fh:
-            fh.write(b"%PDF-1.7 tagged")
-        calls = []
-
-        class _Proc:
-            def __init__(self):
-                self.returncode = returncode
-                self.stdout = stdout
-                self.stderr = b"boom"
-
-        def _fake_run(cmd, **kw):
-            calls.append(cmd)
-            return _Proc()
-
         b = TexlibBuilder(); b.tex_dir = d; b.base_name = "doc"
         if settings is not None:
             b.builder_settings = settings
+        if stuck:
+            tried, really = set(), b._force_remove
+
+            def _held(path):
+                if stuck == "once" and path in tried:
+                    really(path)
+                tried.add(path)
+
+            b._force_remove = _held
+        for name in blocked:
+            os.makedirs(os.path.join(d, name))
+        for variant in earlier:
+            with open(os.path.join(
+                    d, b._variant_report_name("doc", variant)), "wb") as fh:
+                fh.write(_EARLIER)
+        answers = {}
+        for variant in copies:
+            pdf = os.path.join(d, b._variant_pdf_name("doc", variant, True))
+            with open(pdf, "wb") as fh:
+                fh.write(b"%PDF-1.7 tagged")
+            b._note_tagged_copy(variant, pdf)
+            answers[pdf] = (results or {}).get(variant, (returncode, stdout))
+        calls = []
+
+        def _fake_run(cmd, **kw):
+            calls.append(cmd)
+            if run is not None:
+                run(cmd)
+            return _Proc(*answers[cmd[-1]])
+
         _old_find, _old_run = _tb.find_verapdf, _tb.subprocess.run
         _tb.find_verapdf = lambda: exe
         _tb.subprocess.run = _fake_run
         try:
-            b._write_accessible_report(d, pdf)
+            b._check_tagged_copies(d)
+            b._display_conformance_summary()
         finally:
             _tb.find_verapdf, _tb.subprocess.run = _old_find, _old_run
-        files = sorted(os.listdir(d))
-        return files, calls, "".join(b._displayed)
+        return _folder(d), calls, "".join(b._displayed)
 
     files, calls, disp = _report_case(0)
     check("a11y report: written beside the tagged PDF, on by default",
@@ -2502,6 +3047,9 @@ def main():
           calls and "--success" not in calls[0], calls)
     check("a11y report: points at the itemized form",
           "accessible_report_full" in disp, repr(disp))
+    check("a11y report: a conforming file's line gives its count and its report",
+          "    doc_accessible.pdf  PASSED, 0 failed checks  "
+          "-> doc_accessible-report.html\n" in disp, repr(disp))
 
     # The report matters MOST when it fails, so exit 1 -- veraPDF's
     # "non-conformant" status, not an error -- must still write the file.
@@ -2510,6 +3058,31 @@ def main():
           "doc_accessible-report.html" in files, files)
     check("a11y report: non-conformance is reported FAILED",
           "FAILED" in disp, repr(disp))
+    # That fake report states no total. The verdict is the exit status alone,
+    # and the line says the count is missing; it does not print a 0.
+    check("a11y report: a failing report with no total is FAILED with no count",
+          "FAILED, failed-check count not found" in disp
+          and "0 failed" not in disp, repr(disp))
+
+    # The count comes from the report veraPDF printed, on the same run.
+    files, calls, disp = _report_case(1, stdout=_report_html(17))
+    check("a11y report: the failed-check count is on the verdict line",
+          "    doc_accessible.pdf  FAILED, 17 failed checks  "
+          "-> doc_accessible-report.html\n" in disp, repr(disp))
+    check("a11y report: the count costs no second veraPDF run",
+          len(calls) == 1, calls)
+    files, calls, disp = _report_case(1, stdout=_report_html(1))
+    check("a11y report: one failed check is singular",
+          "FAILED, 1 failed check  ->" in disp, repr(disp))
+    check("a11y report: the count is read from veraPDF's own markup",
+          _tb.verapdf_failed_checks(_report_html(315)) == 315)
+    check("a11y report: the count is read from text as well as bytes",
+          _tb.verapdf_failed_checks(_report_html(315).decode("utf-8")) == 315)
+    check("a11y report: the passed-check row is not taken for the count",
+          _tb.verapdf_failed_checks(_report_html(0, passed=11855)) == 0)
+    check("a11y report: a report with no such row gives None, not 0",
+          _tb.verapdf_failed_checks(b"<html/>") is None
+          and _tb.verapdf_failed_checks(b"") is None)
 
     # Exit >1 is veraPDF itself failing; there is no report to write.
     files, calls, disp = _report_case(2)
@@ -2517,16 +3090,44 @@ def main():
           "doc_accessible-report.html" not in files, files)
     check("a11y report: the tool error names its exit code",
           "exit 2" in disp, repr(disp))
+    check("a11y report: a copy veraPDF could not read still has its line",
+          "    doc_accessible.pdf  NOT CHECKED -- " in disp
+          and "PASSED" not in disp, repr(disp))
+
+    # Never fails the build: a launch that raises is that copy's line too.
+    def _no_java(cmd):
+        raise OSError("no such file")
+
+    def _broken(cmd):
+        raise ValueError("unexpected")
+
+    files, calls, disp = _report_case(0, run=_no_java)
+    check("a11y report: a launch that fails is a line, not an exception",
+          "NOT CHECKED -- veraPDF did not run (no such file)" in disp
+          and "doc_accessible-report.html" not in files, repr(disp))
+    files, calls, disp = _report_case(0, run=_broken)
+    check("a11y report: nor does any other failure inside a check raise",
+          "NOT CHECKED -- the check did not finish (unexpected)" in disp,
+          repr(disp))
+    files, calls, disp = _report_case(
+        0, blocked=("doc_accessible-report.html",))
+    check("a11y report: a report that cannot be written keeps its verdict",
+          "    doc_accessible.pdf  PASSED, 0 failed checks  "
+          "-- could not write " in disp, repr(disp))
 
     files, calls, disp = _report_case(0, settings={"accessible_report_full": True})
     check("a11y report: accessible_report_full adds --success",
           calls and "--success" in calls[0], calls)
+    check("a11y report: an itemized build drops the pointer to itself",
+          "PASSED" in disp and "accessible_report_full" not in disp, repr(disp))
 
     files, calls, disp = _report_case(0, settings={"accessible_report": False})
     check("a11y report: accessible_report off writes nothing",
           "doc_accessible-report.html" not in files, files)
     check("a11y report: accessible_report off does not run veraPDF",
           not calls, calls)
+    check("a11y report: accessible_report off prints no verdict",
+          "PDF/UA-2" not in disp, repr(disp))
 
     files, calls, disp = _report_case(0, exe=None)
     check("a11y report: a missing veraPDF is a soft skip, not a failure",
@@ -2537,7 +3138,11 @@ def main():
     # _copy_back_variant, NOT _copy_back_accessible -- which finds nothing,
     # since the variant builds write to <aux>/<variant>-a11y/ and it looks in
     # <aux>/a11y/. Without a hook there the primary workflow produced tagged
-    # PDFs and no report at all. Base only: one veraPDF run per build.
+    # PDFs and no report at all. Every tagged twin is queued there. Only the
+    # base was until 2026-10, on the premise that a variant has the base copy's
+    # tag structure. A key's solutions are structure the base copy never has:
+    # each shown {partsolution} failed five checks in a tagged key, beside a
+    # base report that passed.
     def _variant_case(variant, tagged):
         d = tempfile.mkdtemp(prefix="texlib_var_")
         out = os.path.join(d, "out"); os.makedirs(out)
@@ -2545,20 +3150,570 @@ def main():
             fh.write(b"%PDF-1.7 tagged")
         b = TexlibBuilder(); b.tex_dir = d; b.base_name = "doc"
         b._variant_pdfs = []
-        reported = []
-        b._write_accessible_report = lambda td, p: reported.append(
-            os.path.basename(p))
         b._copy_back_variant(d, variant, tagged, out)
-        return reported, sorted(os.listdir(d))
+        return [(v, os.path.basename(p))
+                for v, p in getattr(b, "_tagged_copies", [])]
 
-    reported, files = _variant_case("base", True)
-    check("a11y report: the fan-out's BASE tagged PDF gets a report",
-          reported == ["doc_accessible.pdf"], reported)
-    reported, files = _variant_case("base", False)
-    check("a11y report: the untagged base gets none", not reported, reported)
-    reported, files = _variant_case("solutions", True)
-    check("a11y report: other tagged variants get none (one run per build)",
-          not reported, reported)
+    queued = _variant_case("base", True)
+    check("a11y report: the fan-out's BASE tagged PDF is queued for veraPDF",
+          queued == [("base", "doc_accessible.pdf")], queued)
+    queued = _variant_case("base", False)
+    check("a11y report: the untagged base is not queued", not queued, queued)
+    for _v in sorted(_tb.VARIANT_MACROS):
+        queued = _variant_case(_v, True)
+        check(f"a11y report: the tagged {_v} twin is queued too",
+              queued == [(_v, f"doc_{_v}_accessible.pdf")], queued)
+        queued = _variant_case(_v, False)
+        check(f"a11y report: the untagged {_v} copy is not queued",
+              not queued, queued)
+
+    # One build, three tagged copies, and the case this exists for: the base
+    # copy conforms and both keys fail.
+    _KEY = _report_html(17, passed=11855)
+    _TWINS = ("doc_accessible", "doc_solutions_accessible",
+              "doc_instructor_accessible")
+    files, calls, disp = _report_case(
+        copies=("base", "solutions", "instructor"),
+        results={"solutions": (1, _KEY), "instructor": (1, _KEY)},
+        settings={"build_jobs": 4})
+    check("a11y report: one veraPDF run per tagged copy",
+          sorted(os.path.basename(c[-1]) for c in calls)
+          == sorted(t + ".pdf" for t in _TWINS), calls)
+    check("a11y report: every copy's report is beside it, under its own name",
+          all(t + "-report.html" in files for t in _TWINS), sorted(files))
+    check("a11y report: each report holds its own copy's output",
+          files.get("doc_accessible-report.html") == b"<html/>"
+          and files.get("doc_solutions_accessible-report.html") == _KEY
+          and files.get("doc_instructor_accessible-report.html") == _KEY,
+          sorted(files))
+    check("a11y report: a verdict line per copy, each with its count, in "
+          "build order",
+          [ln for ln in disp.splitlines() if ln.startswith("    ")] == [
+              "    doc_accessible.pdf  PASSED, 0 failed checks  "
+              "-> doc_accessible-report.html",
+              "    doc_solutions_accessible.pdf  FAILED, 17 failed checks  "
+              "-> doc_solutions_accessible-report.html",
+              "    doc_instructor_accessible.pdf  FAILED, 17 failed checks  "
+              "-> doc_instructor_accessible-report.html"],
+          repr(disp))
+    check("a11y report: the verdicts are one block under one heading",
+          disp.count("TeXLib: PDF/UA-2 conformance") == 1, repr(disp))
+
+    files, calls, disp = _report_case(
+        copies=("base", "solutions", "instructor"),
+        results={"solutions": (2, b"")}, settings={"build_jobs": 4})
+    check("a11y report: one copy's tool error leaves the others' verdicts",
+          disp.count("PASSED, 0 failed checks") == 2
+          and "    doc_solutions_accessible.pdf  NOT CHECKED" in disp
+          and "doc_solutions_accessible-report.html" not in files,
+          repr(disp))
+
+    files, calls, disp = _report_case(
+        exe=None, copies=("base", "solutions", "instructor"))
+    check("a11y report: a missing veraPDF is said once per build, not per copy",
+          disp.count("veraPDF not found") == 1 and not calls, repr(disp))
+
+    # The launches overlap, build_jobs wide: most of one is the JVM starting.
+    # Each fake run waits at a barrier, which proves either case without timing
+    # anything. Three runs that are in flight together all pass a barrier of
+    # three; run one after another, the first waits at it alone until it
+    # breaks. And with build_jobs=1 no two runs may ever meet at a barrier of
+    # two.
+    import threading
+
+    def _overlap_case(jobs, parties, wait):
+        gate, met, alone = threading.Barrier(parties), [], []
+
+        def _run(cmd):
+            try:
+                gate.wait(timeout=wait)
+                met.append(os.path.basename(cmd[-1]))
+            except threading.BrokenBarrierError:
+                alone.append(os.path.basename(cmd[-1]))
+
+        _report_case(copies=("base", "solutions", "instructor"),
+                     settings={"build_jobs": jobs}, run=_run)
+        return met, alone
+
+    met, alone = _overlap_case(3, parties=3, wait=30)
+    check("a11y report: the copies are checked at once, build_jobs wide",
+          len(met) == 3 and not alone, (met, alone))
+    met, alone = _overlap_case(1, parties=2, wait=0.5)
+    check("a11y report: build_jobs=1 checks them one at a time",
+          not met and len(alone) == 3, (met, alone))
+
+    _b = TexlibBuilder(); _b.tex_dir = tempfile.mkdtemp(prefix="texlib_a11y_")
+    _b.base_name = "doc"; _b.builder_settings = {"accessible_report": False}
+    _b._note_tagged_copy("base", os.path.join(_b.tex_dir, "doc_accessible.pdf"))
+    _b._check_tagged_copies(_b.tex_dir)
+    check("a11y report: the queue is emptied even when the check is off",
+          _b._tagged_copies == [] and _b._conformance == [],
+          (_b._tagged_copies, _b._conformance))
+
+    # A report describes the PDF it was written for. The sweep further down
+    # takes one away when a build stops producing its PDF. These cases are the
+    # other half: a build REPLACES a tagged PDF and does not check the new
+    # copy. Until 2026-10 the earlier build's report stayed beside the new PDF
+    # in each of the three ways that happens (the switch off, veraPDF missing,
+    # a tool error), and nothing in the build output said so.
+    _R = "doc_accessible-report.html"
+    _RS = "doc_solutions_accessible-report.html"
+    _RI = "doc_instructor_accessible-report.html"
+    _ONE = "a stale accessibility report (its PDF was rebuilt %s): "
+
+    def _removal_lines(disp):
+        """The lines about an earlier build's reports. The sweep's own line
+        ("removed stale artifacts no longer planned") is not one of them."""
+        return [ln for ln in disp.splitlines()
+                if "stale accessibility report" in ln]
+
+    # A check that writes a report, passing or failing, writes it over the
+    # earlier one, and there is no removal to announce.
+    files, calls, disp = _report_case(0, earlier=("base",))
+    check("a11y report: a passing check replaces an earlier build's report",
+          files.get(_R) == b"<html/>" and not _removal_lines(disp),
+          (files, disp))
+    files, calls, disp = _report_case(
+        1, stdout=_report_html(17), earlier=("base",))
+    check("a11y report: a failing check replaces it too",
+          files.get(_R) == _report_html(17) and not _removal_lines(disp),
+          (files, disp))
+
+    # 1. The switch is off. Nothing is run, and the one line printed is the
+    # removal. With no earlier report there is nothing to say.
+    files, calls, disp = _report_case(
+        0, settings={"accessible_report": False}, earlier=("base",))
+    check("a11y report: accessible_report off removes the report of a PDF "
+          "the build replaced", _R not in files and not calls, (files, calls))
+    check("a11y report: accessible_report off says so in one line, and names "
+          "the switch",
+          disp == "TeXLib: removed " + _ONE % "with accessible_report off"
+          + _R + "\n", repr(disp))
+    files, calls, disp = _report_case(0, settings={"accessible_report": False})
+    check("a11y report: accessible_report off with no earlier report prints "
+          "nothing", disp == "", repr(disp))
+    _prev = os.environ.get("TEXLIB_A11Y_REPORT")
+    os.environ["TEXLIB_A11Y_REPORT"] = "0"
+    try:
+        files, calls, disp = _report_case(0, earlier=("base",))
+    finally:
+        if _prev is None:
+            os.environ.pop("TEXLIB_A11Y_REPORT", None)
+        else:
+            os.environ["TEXLIB_A11Y_REPORT"] = _prev
+    check("a11y report: TEXLIB_A11Y_REPORT=0 removes it the same way",
+          _R not in files and not calls and len(_removal_lines(disp)) == 1,
+          (files, calls, disp))
+
+    # 2. veraPDF is not installed.
+    files, calls, disp = _report_case(0, exe=None, earlier=("base",))
+    check("a11y report: a missing veraPDF removes the earlier report",
+          _R not in files, files)
+    check("a11y report: a missing veraPDF names the report it removed",
+          _removal_lines(disp)
+          == ["TeXLib: removed " + _ONE % "without a new report" + _R]
+          and disp.count("veraPDF not found") == 1, repr(disp))
+
+    # 3. veraPDF fails: an exit above 1, a launch that raises, anything else
+    # that stops a check from finishing.
+    for _label, _how in (
+            ("a veraPDF tool error", {"returncode": 2}),
+            ("a launch that fails", {"run": _no_java}),
+            ("a check that does not finish", {"run": _broken})):
+        files, calls, disp = _report_case(earlier=("base",), **_how)
+        check(f"a11y report: {_label} removes the earlier report",
+              _R not in files, files)
+        check(f"a11y report: {_label} names the report it removed, above the "
+              "copy's NOT CHECKED line",
+              _removal_lines(disp)
+              == ["TeXLib: removed " + _ONE % "without a new report" + _R]
+              and 0 <= disp.find("TeXLib: removed")
+              < disp.find("    doc_accessible.pdf  NOT CHECKED"), repr(disp))
+
+    # Several copies. Only a copy left without a report from this build loses
+    # the earlier one, and one line names every report removed.
+    files, calls, disp = _report_case(
+        copies=("base", "solutions", "instructor"),
+        earlier=("base", "solutions", "instructor"),
+        results={"solutions": (2, b"")}, settings={"build_jobs": 4})
+    check("a11y report: beside checked copies, the unchecked one alone loses "
+          "its report",
+          files.get(_R) == b"<html/>" and files.get(_RI) == b"<html/>"
+          and _RS not in files, sorted(files))
+    check("a11y report: and it alone is named",
+          _removal_lines(disp)
+          == ["TeXLib: removed " + _ONE % "without a new report" + _RS],
+          repr(disp))
+    files, calls, disp = _report_case(
+        exe=None, copies=("base", "solutions", "instructor"),
+        earlier=("base", "solutions", "instructor"))
+    check("a11y report: with veraPDF missing, every rebuilt copy loses its "
+          "report", not [n for n in files if n.endswith("-report.html")],
+          sorted(files))
+    check("a11y report: the removals are one line, in build order",
+          _removal_lines(disp) == [
+              "TeXLib: removed stale accessibility reports (their PDFs were "
+              "rebuilt without a new report): " + ", ".join((_R, _RS, _RI))]
+          and disp.count("veraPDF not found") == 1, repr(disp))
+
+    # The report of a PDF this build did not copy out still describes the file
+    # beside it, and is not this check's to touch.
+    files, calls, disp = _report_case(
+        exe=None, copies=("base",), earlier=("base", "solutions"))
+    check("a11y report: the report of a PDF the build did not replace is "
+          "left alone",
+          _R not in files and files.get(_RS) == _EARLIER
+          and _RS not in disp, (sorted(files), disp))
+
+    # A report that cannot be deleted is still stale, and the build says that
+    # instead. A check that then writes over it has nothing to say.
+    files, calls, disp = _report_case(2, earlier=("base",), stuck=True)
+    check("a11y report: a report that cannot be removed is reported as stale",
+          files.get(_R) == _EARLIER and _removal_lines(disp)
+          == ["TeXLib: could not remove " + _ONE % "without a new report" + _R],
+          (files, disp))
+    files, calls, disp = _report_case(0, earlier=("base",), stuck=True)
+    check("a11y report: a check that writes over such a report says nothing "
+          "of it", files.get(_R) == b"<html/>" and not _removal_lines(disp),
+          (files, disp))
+    # A file held for a moment at the copy (a sync client, a scanner) may be
+    # free by the time the check ends, so the removal is tried again there.
+    files, calls, disp = _report_case(2, earlier=("base",), stuck="once")
+    check("a11y report: a report that could not be removed at the copy is "
+          "tried again after the check",
+          _R not in files and _removal_lines(disp)
+          == ["TeXLib: removed " + _ONE % "without a new report" + _R],
+          (files, disp))
+
+    # The list of earlier reports is this build's, like the queue.
+    _b = TexlibBuilder(); _b.tex_dir = tempfile.mkdtemp(prefix="texlib_a11y_")
+    _b.base_name = "doc"; _b.builder_settings = {"accessible_report": False}
+    with open(os.path.join(_b.tex_dir, _R), "wb") as _fh:
+        _fh.write(_EARLIER)
+    _b._note_tagged_copy("base", os.path.join(_b.tex_dir, "doc_accessible.pdf"))
+    _noted = list(getattr(_b, "_earlier_reports", ()))
+    _b._check_tagged_copies(_b.tex_dir)
+    check("a11y report: the earlier reports are noted at the copy and "
+          "forgotten once they are reported",
+          _noted == [_R] and getattr(_b, "_earlier_reports", None) == [],
+          (_noted, getattr(_b, "_earlier_reports", None)))
+
+    # A folder that has the report's name is not a report. It is still there
+    # when the check writes (the write fails on it), and no removal is claimed.
+    files, calls, disp = _report_case(0, blocked=(_R,))
+    check("a11y report: a folder under the report's name is not removed or "
+          "mentioned",
+          "-- could not write " in disp and not _removal_lines(disp),
+          repr(disp))
+
+    # A copy can be checked and still end with no report: veraPDF gave its
+    # verdict and the file could not be written. The earlier report is gone
+    # all the same, and the line about it must not call that copy unchecked.
+    def _in_the_way(cmd):
+        os.makedirs(os.path.join(os.path.dirname(cmd[-1]), _R))
+
+    files, calls, disp = _report_case(0, earlier=("base",), run=_in_the_way)
+    check("a11y report: a checked copy whose report could not be written is "
+          "not called unchecked",
+          "    doc_accessible.pdf  PASSED, 0 failed checks  "
+          "-- could not write " in disp
+          and _removal_lines(disp)
+          == ["TeXLib: removed " + _ONE % "without a new report" + _R]
+          and "not checked" not in disp.lower(), repr(disp))
+
+    # The report goes when its PDF is replaced, at the copy, and not when the
+    # check runs: a serial build that is cancelled after the copy never
+    # reaches the check, and must not leave the report either. Nothing is
+    # printed at the copy, since the check usually writes the next report.
+    def _copied_case(variant, tagged, produced=True):
+        d = tempfile.mkdtemp(prefix="texlib_var_")
+        out = os.path.join(d, "out"); os.makedirs(out)
+        if produced:
+            with open(os.path.join(out, "doc.pdf"), "wb") as fh:
+                fh.write(b"%PDF-1.7 rebuilt")
+        b = TexlibBuilder(); b.tex_dir = d; b.base_name = "doc"
+        b._variant_pdfs = []
+        for name in (b._variant_pdf_name("doc", variant, True),
+                     b._variant_report_name("doc", variant)):
+            with open(os.path.join(d, name), "wb") as fh:
+                fh.write(_EARLIER)
+        b._copy_back_variant(d, variant, tagged, out)
+        return _folder(d), b._displayed
+
+    for _v in ("base", "solutions"):
+        _pdf = TexlibBuilder._variant_pdf_name("doc", _v, True)
+        _rep = TexlibBuilder._variant_report_name("doc", _v)
+        files, disp = _copied_case(_v, True)
+        check(f"a11y report: copying the tagged {_v} PDF out removes its "
+              "earlier report at once",
+              files.get(_pdf) == b"%PDF-1.7 rebuilt" and _rep not in files
+              and disp == "", (sorted(files), disp))
+        files, disp = _copied_case(_v, False)
+        check(f"a11y report: copying the untagged {_v} PDF out leaves the "
+              "tagged pair alone",
+              files.get(_pdf) == _EARLIER and files.get(_rep) == _EARLIER,
+              sorted(files))
+        files, disp = _copied_case(_v, True, produced=False)
+        check(f"a11y report: a tagged {_v} build that produced no PDF keeps "
+              "the earlier pair",
+              files.get(_pdf) == _EARLIER and files.get(_rep) == _EARLIER,
+              sorted(files))
+
+    # The stale sweep. A report is evidence about one PDF, so it goes when a
+    # build stops producing that PDF, whichever copy it is. Only names the
+    # variant scheme owns are touched.
+    def _sweep_case(built, present):
+        d = tempfile.mkdtemp(prefix="texlib_sweep_")
+        for name in present:
+            with open(os.path.join(d, name), "wb") as fh:
+                fh.write(b"x")
+        b = TexlibBuilder(); b.tex_dir = d; b.base_name = "doc"
+        b._variants_built = built
+        b._sweep_stale_variants(d)
+        return sorted(os.listdir(d)), "".join(b._displayed)
+
+    # The rubrics came out of the document: the instructor copies are no
+    # longer planned, and their report goes with them.
+    left, disp = _sweep_case(
+        [("base", False), ("base", True),
+         ("solutions", False), ("solutions", True)],
+        ["doc.pdf", "doc_accessible.pdf", "doc_accessible-report.html",
+         "doc_solutions.pdf", "doc_solutions_accessible.pdf",
+         "doc_solutions_accessible-report.html",
+         "doc_instructor.pdf", "doc_instructor_accessible.pdf",
+         "doc_instructor_accessible-report.html"])
+    check("sweep: a twin that is no longer built loses its report with its PDF",
+          not [n for n in left if "instructor" in n], left)
+    check("sweep: the reports of the twins that were built stay",
+          "doc_accessible-report.html" in left
+          and "doc_solutions_accessible-report.html" in left, left)
+    check("sweep: the removed report is named in the build output",
+          "doc_instructor_accessible-report.html" in disp, repr(disp))
+
+    # tagged_twins off: no tagged PDF is produced, so none keeps its report.
+    left, disp = _sweep_case(
+        [("base", False), ("solutions", False)],
+        ["doc.pdf", "doc_solutions.pdf", "doc_accessible.pdf",
+         "doc_accessible-report.html", "doc_solutions_accessible.pdf",
+         "doc_solutions_accessible-report.html"])
+    check("sweep: with no tagged twin built, every report goes",
+          left == ["doc.pdf", "doc_solutions.pdf"], left)
+
+    # A report whose PDF was deleted by hand is stale all the same, and a
+    # different document that shares the prefix is not this build's to touch.
+    left, disp = _sweep_case(
+        [("base", False), ("base", True)],
+        ["doc.pdf", "doc_accessible.pdf", "doc_accessible-report.html",
+         "doc_solutions_accessible-report.html",
+         "doc_review_accessible.pdf", "doc_review_accessible-report.html"])
+    check("sweep: a report outlives no PDF, even one already deleted",
+          "doc_solutions_accessible-report.html" not in left, left)
+    check("sweep: another document's report is left alone",
+          "doc_review_accessible.pdf" in left
+          and "doc_review_accessible-report.html" in left
+          and "doc_accessible-report.html" in left, left)
+
+    # A single-compile build planned no set, and is no evidence about any twin.
+    left, disp = _sweep_case(
+        None, ["doc.pdf", "doc_solutions_accessible.pdf",
+               "doc_solutions_accessible-report.html"])
+    check("sweep: a build that planned no variant set removes nothing",
+          len(left) == 3, left)
+
+    # End to end through commands(), with stand-in engines that leave a PDF
+    # wherever a pass was told to write: the serial base twin, the parallel
+    # lanes, and the accessible pair's a11y/ directory.
+    def _built_case(options, parallel=True, settings=None, seed=(),
+                    results=None, exe="VP", cancel=None):
+        """`cancel`, if given, is asked before each command after the first,
+        with the folder; once it says yes the build is abandoned there, as a
+        host does when it is cancelled: commands() is not resumed."""
+        os.environ["TEXLIB_NO_FORMAT_CACHE"] = "1"
+        tmp = tempfile.mkdtemp(prefix="texlib_twins_")
+        for name, text in (("doc.tex", PSET), ("doc.buildmeta", FULL_META)):
+            with open(os.path.join(tmp, name), "w", encoding="utf-8") as fh:
+                fh.write(text)
+        for name in seed:
+            with open(os.path.join(tmp, name), "wb") as fh:
+                fh.write(_EARLIER)
+        b = TexlibBuilder()
+        b.tex_root = os.path.join(tmp, "doc.tex")
+        b.tex_name, b.base_name, b.tex_dir = "doc.tex", "doc", tmp
+        b.engine, b.out = "pdflatex", ""
+        b.options = list(options)
+        b.builder_settings = dict({"build_jobs": 4}, **(settings or {}))
+
+        def _typeset(cmd):
+            out_dir = tmp
+            for arg in cmd:
+                if str(arg).startswith("-output-directory="):
+                    out_dir = str(arg).split("=", 1)[1]
+            with open(os.path.join(out_dir, "doc.pdf"), "wb") as fh:
+                fh.write(b"%PDF-1.7\n")
+
+        if parallel:
+            b.run_parallel = lambda lanes, n: [
+                _typeset(cmd) for _l, cmds, _a in lanes for cmd in cmds]
+        calls = []
+        _old_find, _old_run = _tb.find_verapdf, _tb.subprocess.run
+
+        def _fake_run(cmd, **kw):
+            if not cmd or cmd[0] != "VP":
+                return _old_run(cmd, **kw)
+            calls.append(os.path.basename(cmd[-1]))
+            return _Proc(*(results or {}).get(calls[-1], (0, b"<html/>")))
+
+        _tb.find_verapdf = lambda: exe
+        _tb.subprocess.run = _fake_run
+        try:
+            gen = b.commands()
+            try:
+                cmd, _msg = next(gen)
+                while True:
+                    _typeset(cmd)
+                    cmd, _msg = gen.send(0)
+                    if cancel is not None and cancel(tmp):
+                        gen.close()
+                        break
+            except StopIteration:
+                pass
+        finally:
+            _tb.find_verapdf, _tb.subprocess.run = _old_find, _old_run
+        return _folder(tmp), calls, "".join(b._displayed)
+
+    _ALL = ["doc_accessible.pdf", "doc_student_accessible.pdf",
+            "doc_solutions_accessible.pdf", "doc_instructor_accessible.pdf"]
+    _FAILS = {"doc_solutions_accessible.pdf": (1, _KEY),
+              "doc_instructor_accessible.pdf": (1, _KEY)}
+    for _host, _par in (("parallel host", True), ("serial host", False)):
+        files, calls, disp = _built_case(
+            ["--texlib-mode=default"], parallel=_par, results=_FAILS)
+        check(f"fan-out ({_host}): veraPDF reads every tagged twin once",
+              sorted(calls) == sorted(_ALL), calls)
+        check(f"fan-out ({_host}): every tagged twin has its report",
+              all(n[:-4] + "-report.html" in files for n in _ALL),
+              sorted(files))
+        check(f"fan-out ({_host}): the summary has a verdict line per twin",
+              [ln.split("  ")[2:4] for ln in disp.splitlines()
+               if "_accessible.pdf  " in ln and ", " in ln] == [
+                  ["doc_accessible.pdf", "PASSED, 0 failed checks"],
+                  ["doc_student_accessible.pdf", "PASSED, 0 failed checks"],
+                  ["doc_solutions_accessible.pdf", "FAILED, 17 failed checks"],
+                  ["doc_instructor_accessible.pdf", "FAILED, 17 failed checks"]],
+              repr(disp[-900:]))
+        check(f"fan-out ({_host}): the verdicts close the build summary",
+              0 <= disp.find("TeXLib: build finished")
+              < disp.find("TeXLib: variants produced")
+              < disp.find("TeXLib: PDF/UA-2 conformance"), repr(disp[-900:]))
+
+    files, calls, disp = _built_case(["--texlib-mode=accessible"])
+    check("accessible pair: its one tagged PDF is read and reported",
+          calls == ["doc_accessible.pdf"]
+          and "doc_accessible-report.html" in files
+          and "    doc_accessible.pdf  PASSED, 0 failed checks  "
+              "-> doc_accessible-report.html" in disp,
+          (calls, sorted(files), disp[-400:]))
+
+    # tagged_twins off, over a folder an earlier full build left: the tagged
+    # PDFs are swept, and so is every report that described one.
+    files, calls, disp = _built_case(
+        ["--texlib-mode=default"], settings={"tagged_twins": False},
+        seed=[n for n in _ALL] + [n[:-4] + "-report.html" for n in _ALL])
+    check("fan-out, tagged_twins off: veraPDF is not run",
+          not calls and "PDF/UA-2 conformance" not in disp, (calls, disp[-400:]))
+    check("fan-out, tagged_twins off: no tagged PDF and no report is left",
+          not [n for n in files if "_accessible" in n], sorted(files))
+    check("fan-out, tagged_twins off: the sweep's line is the only one about "
+          "those reports",
+          not _removal_lines(disp)
+          and "removed stale artifacts no longer planned" in disp,
+          repr(disp[-600:]))
+
+    # The same folder, rebuilt by a build that cannot check what it writes.
+    # Every tagged twin is replaced, so no earlier report may stay, and one
+    # line names the four removed, in the order the twins were built.
+    _REPORTS = [n[:-4] + "-report.html" for n in _ALL]
+    for _host, _par in (("parallel host", True), ("serial host", False)):
+        for _why, _kw, _said in (
+                ("accessible_report off",
+                 {"settings": {"accessible_report": False}},
+                 "with accessible_report off"),
+                ("veraPDF missing", {"exe": None}, "without a new report")):
+            files, calls, disp = _built_case(
+                ["--texlib-mode=default"], parallel=_par,
+                seed=_ALL + _REPORTS, **_kw)
+            check(f"fan-out ({_host}), {_why}: every twin is rebuilt and none "
+                  "keeps the earlier report",
+                  all(files.get(n) == b"%PDF-1.7\n" for n in _ALL)
+                  and not [n for n in files if n.endswith("-report.html")]
+                  and not calls, (sorted(files), calls))
+            check(f"fan-out ({_host}), {_why}: one line names the four "
+                  "reports removed",
+                  _removal_lines(disp) == [
+                      "TeXLib: removed stale accessibility reports (their "
+                      "PDFs were rebuilt " + _said + "): "
+                      + ", ".join(_REPORTS)], repr(disp[-900:]))
+
+    # One twin veraPDF could not read, beside three it could.
+    files, calls, disp = _built_case(
+        ["--texlib-mode=default"], seed=_ALL + _REPORTS,
+        results={"doc_solutions_accessible.pdf": (2, b"")})
+    check("fan-out, one tool error: that twin alone has no report, and the "
+          "other three are this build's",
+          [n for n in _REPORTS if n not in files]
+          == ["doc_solutions_accessible-report.html"]
+          and [files.get(n) for n in _REPORTS if n in files]
+          == [b"<html/>"] * 3, sorted(files))
+    check("fan-out, one tool error: its removed report is named, and its "
+          "line in the summary says NOT CHECKED",
+          _removal_lines(disp) == [
+              "TeXLib: removed a stale accessibility report (its PDF was "
+              "rebuilt without a new report): doc_solutions_accessible-report.html"]
+          and "    doc_solutions_accessible.pdf  NOT CHECKED -- " in disp,
+          repr(disp[-900:]))
+
+    files, calls, disp = _built_case(
+        ["--texlib-mode=accessible"], settings={"accessible_report": False},
+        seed=["doc_accessible.pdf", "doc_accessible-report.html"])
+    check("accessible pair, accessible_report off: the rebuilt PDF keeps no "
+          "earlier report, and the build says so",
+          files.get("doc_accessible.pdf") == b"%PDF-1.7\n"
+          and "doc_accessible-report.html" not in files and not calls
+          and _removal_lines(disp) == [
+              "TeXLib: removed a stale accessibility report (its PDF was "
+              "rebuilt with accessible_report off): "
+              "doc_accessible-report.html"], (sorted(files), disp[-400:]))
+
+    # A serial build cancelled once the base twin has been copied out, before
+    # any check. That twin is new and has no report. The twins the build never
+    # reached are the earlier build's, and so are their reports.
+    def _base_twin_rebuilt(tmp):
+        with open(os.path.join(tmp, "doc_accessible.pdf"), "rb") as fh:
+            return fh.read() != _EARLIER
+
+    files, calls, disp = _built_case(
+        ["--texlib-mode=default"], parallel=False, seed=_ALL + _REPORTS,
+        cancel=_base_twin_rebuilt)
+    check("fan-out (serial host), cancelled after the base twin: its earlier "
+          "report is gone with no check run",
+          files.get("doc_accessible.pdf") == b"%PDF-1.7\n"
+          and "doc_accessible-report.html" not in files and not calls,
+          (sorted(files), calls))
+    check("fan-out (serial host), cancelled after the base twin: the twins "
+          "not yet rebuilt keep their reports",
+          all(files.get(n) == _EARLIER for n in _ALL[1:] + _REPORTS[1:]),
+          sorted(files))
+
+    # A single compile writes no tagged PDF, so a tagged pair in the folder is
+    # still a PDF and the report that describes it.
+    files, calls, disp = _built_case(
+        ["--texlib-mode=base"],
+        seed=["doc_accessible.pdf", "doc_accessible-report.html"])
+    check("single compile: a tagged pair it did not rebuild is left as it was",
+          files.get("doc_accessible.pdf") == _EARLIER
+          and files.get("doc_accessible-report.html") == _EARLIER
+          and not calls and not _removal_lines(disp),
+          (sorted(files), calls, disp[-400:]))
 
     # The finder must not regress to shutil.which: veraPDF's installer does not
     # put it on PATH, which is what made local conformance checks soft-skip.
@@ -2568,6 +3723,85 @@ def main():
     check("a11y report: report name pairs with the tagged PDF",
           _bs.VERAPDF_REPORT_SUFFIX.startswith("_accessible"),
           _bs.VERAPDF_REPORT_SUFFIX)
+
+    # ====================================================================== #
+    # Poppler lookup.
+    #
+    # A content suite that finds no poppler pdftotext soft-skips with exit 0,
+    # so a lookup that misses an installed one fails nothing. Two ways it has
+    # missed: Git Bash puts Git's xpdf pdftotext ahead of TeX Live's on PATH,
+    # and the fallback path named TeX Live 2025 on a machine that has 2026.
+    # ====================================================================== #
+    print("\n-- poppler lookup --")
+    _ptmp = tempfile.mkdtemp(prefix="texlib_poppler_")
+    _sfx = ".exe" if os.name == "nt" else ""
+
+    def _tool(*parts):
+        p = os.path.join(_ptmp, *parts) + _sfx
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        open(p, "wb").close()
+        return p
+
+    _xpdf = _tool("git", "pdftotext")
+    _engine = _tool("tl", "bin", "lualatex")
+    _beside = _tool("tl", "bin", "pdftotext")
+    _y2025 = _tool("texlive", "2025", "bin", "windows", "pdftotext")
+    _y2026 = _tool("texlive", "2026", "bin", "windows", "pdftotext")
+    _globs = [os.path.join(_ptmp, "texlive", "*", "bin", "windows")]
+
+    def _find(on_path, globs=(), poppler=lambda p: p != _xpdf):
+        _old = (_bs.shutil.which, _bs._texlive_bin_globs, _bs._is_poppler)
+        _bs.shutil.which = lambda name, *a, **k: on_path.get(name)
+        _bs._texlive_bin_globs = lambda: list(globs)
+        _bs._is_poppler = poppler
+        try:
+            return _bs.find_poppler("pdftotext")
+        finally:
+            _bs.shutil.which, _bs._texlive_bin_globs, _bs._is_poppler = _old
+
+    check("poppler: an xpdf pdftotext first on PATH loses to the one beside "
+          "the engine",
+          _find({"pdftotext": _xpdf, "lualatex": _engine}) == _beside)
+    check("poppler: a poppler pdftotext on PATH still wins",
+          _find({"pdftotext": _beside, "lualatex": _engine}, _globs) == _beside)
+    check("poppler: with nothing on PATH the newest TeX Live year is taken",
+          _find({}, _globs) == _y2026)
+    os.remove(_y2026)
+    check("poppler: an older year is found when it is the only one",
+          _find({}, _globs) == _y2025)
+    check("poppler: no candidate with a poppler banner means None",
+          _find({"pdftotext": _xpdf}, _globs, poppler=lambda p: False) is None)
+    check("poppler: a candidate that does not exist is never probed",
+          _find({"lualatex": os.path.join(_ptmp, "gone", "lualatex" + _sfx)})
+          is None)
+    shutil.rmtree(_ptmp, ignore_errors=True)
+
+    # The pinned year lived in six private copies of this lookup. A pattern
+    # with the year spelled out matches no line of this file, so the check
+    # cannot trip on its own source.
+    _pinned_re = re.compile(r"texlive[\\/]+20\d\d[\\/]+bin", re.I)
+    _pinned, _scanned = [], set()
+    for _dirpath, _dirnames, _filenames in os.walk(_repo):
+        # Pruned by NAME below the root. Matching on the absolute path would
+        # skip every directory of a checkout that itself lives under .claude/.
+        _dirnames[:] = [d for d in _dirnames if d not in (".git", ".claude")]
+        for _fn in _filenames:
+            if not _fn.endswith(".py"):
+                continue
+            _p = os.path.join(_dirpath, _fn)
+            try:
+                _txt = open(_p, encoding="utf-8", errors="replace").read()
+            except OSError:
+                continue
+            _scanned.add(os.path.relpath(_p, _repo).replace(os.sep, "/"))
+            if _pinned_re.search(_txt):
+                _pinned.append(os.path.relpath(_p, _repo))
+    check("poppler: no Python file pins a TeX Live year in a bin path",
+          not _pinned, "; ".join(_pinned))
+    check("poppler: that scan reached the repo-root suites and the tools",
+          {"test_mode_effects.py", "version_diff.py",
+           "Sublime/_testkit.py"} <= _scanned,
+          "%d files scanned" % len(_scanned))
 
     # ====================================================================== #
     # (y) Preamble deferral + the precompiled-preamble cache.

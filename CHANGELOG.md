@@ -6,6 +6,121 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Added
 
+- **`\shuffle[pages]` — permute whole PAGES between versions, not individual
+  problems.** Plain `\shuffle` preserves the authored per-page *counts* and
+  refills them from a permutation of every problem in the section, so a page
+  authored as "two short problems" can receive two full-page ones and overflow.
+  The new grain permutes the page **blocks**: each page keeps the problems
+  authored on it, in their authored order, and only its position in the paper
+  changes. A paper that fits in one version therefore fits in all of them, which
+  is what a page-laid-out exam needs. Under `[pages]` the `\newpage`s in the
+  driver become structure rather than layout — they define the blocks that
+  travel. MC option shuffling is on either way, and `\shuffle` with no argument
+  is unchanged. Written for a twelve-version exam whose two graph-bearing
+  problems each own a page.
+
+- **A key's center header reads the points on each page.** On a copy that
+  shows solutions (`solutions`, `instructor`), every numbered exam page of an
+  `autoexam` document is headed "14 points" or "1 point": the total of the
+  questions and parts that begin on that page. A page where no pointed item
+  begins has an empty center, and so do the cover, `\blankpage` leaves and
+  every page of a student copy. A value counts where its own question or part
+  begins, so a compact key that breaks a problem across two pages splits its
+  part points between them; a `\keylayout{inline}` key has the student copy's
+  pages and therefore that paper's totals. Extra credit is not counted. The
+  totals are recorded per copy against `autoexamabspage`, which never resets.
+  `exam.cls`'s own `\pointsonpage` is keyed on `\thepage`, which every copy
+  restarts at 1, so it would add the copies of a versioned exam together.
+  Checked on a twelve-version `\shuffle[pages]` exam (50 points on four pages,
+  14 + 14 + 10 + 12): all 48 key pages carry the total of the problems printed
+  on them, and no word on any student page moved. New fixture
+  `pagepoints-test.tex`, asserted by `test_engine_correctness.py`.
+
+- **`{sketchaxes}` — the grid a graphing problem is answered on, with the answer
+  as its body.** `\begin{sketchaxes}[<scale>]{xmin}{xmax}{ymin}{ymax}` …
+  `\end{sketchaxes}` prints a blank labeled grid on a student copy and the same
+  grid with its body drawn on it on every copy that shows solutions. A bank that
+  put a blank grid in the stem and a second, filled grid inside `{partsolution}`
+  printed both in a key: on a twelve-version Math 126 exam the key ran 9 pages a
+  version against the student copy's 7, and with `{sketchaxes}` it runs 7. The
+  body is TikZ in grid units; `\sketchwindow` is the grid's rectangle, for
+  `\clip`; the star drops the y tick labels. A student copy discards the body
+  unread, and `test_mode_effects.py` checks that in every mode of `autoexam` and
+  `quiz`. Defined in `texlib-problembank.sty`, so every class that draws from a
+  bank has it. On a three-problem probe the tagged student copy passes PDF/UA-2
+  with 0 failed checks, and the tagged solutions copy reports the same 10 failed
+  checks with the grids as without them: a shown `{partsolution}` already fails
+  four Table 5 rules there, and `{sketchaxes}` adds none.
+
+  The grid lines are stroked in `\sketchgridcolor` at width `\sketchgridwidth`,
+  `black!40` and `0.3pt` by default, and a course changes either with
+  `\renewcommand`. The first draft of the environment hardcoded `black!18` at
+  TikZ's 0.2pt help-line width, and printed Math 126 exams came back with some
+  of those lines missing (reported 2026-10-07). The default is the weight that course
+  then overlaid on the grid from its preamble, and `\graph` in `autoexam`
+  already draws its dashed grid in `black!40`. No template, fixture or scenario
+  draws a `{sketchaxes}`, so no visual reference changes.
+
+- **`\texlibpartsolheader` — a `{partsolution}`'s header, set apart from
+  `{solution}`'s.** It defaults to `\texlibsolheader`, so no document changes
+  until one sets it. `\renewcommand{\texlibpartsolheader}{}` removes the line:
+  the tint and the accent still mark each answer, and a page of one-line part
+  answers gets a line back per part. A sixteen-page Math 126 review whose key
+  ran eighteen pages runs sixteen with it. The headerless box keeps the header
+  box's shape (one line of height, the rest depth), which the inline key relies
+  on to hang an answer below its question.
+
+- **`\keylayout{inline}` — a document says once that its keys keep the student
+  copy's page.** Every answer-bearing copy the builder makes of that document
+  (`_solutions`, `_instructor`) is then laid out with the inline layout: the
+  answer space stays, each solution is drawn into it, and every problem prints
+  where the student copy prints it. The plain build is still the student copy,
+  pixel for pixel, cover included. The tagged twins keep the compact layout:
+  they are read through their structure, and on a probe of whole-problem
+  solutions the compact tagged key passes PDF/UA-2 with 0 failed rules where
+  the inline one fails four. The layout existed
+  only as the `solutions-inline` build mode, chosen by hand at each build and
+  never planned by the default fan-out; a preference in the source needs no
+  builder change, and the key lands under the names every tool already reads.
+  `\keylayout{compact}`, the default, is the layout keys had: the space closes
+  and the solutions flow.
+
+- **The inline key makes room for a solution taller than its blank.** The
+  overlay was unbounded: a solution taller than the answer space it was drawn
+  into printed over the next question, and nothing reported it. Whether it fits
+  cannot be known where the solution is typeset, because the blank is `\stretch`
+  glue and is sized when the page is. Each overlay now ends in a marker box
+  carrying how far below it the ink reaches, and `texlib_keyfit.lua`, called
+  from the kernel's `build/page/before` hook, checks the finished page. Where a
+  solution is short of room, the space after it is raised to what it needs and
+  the page's other stretchable spaces give that up in proportion to their
+  stretch; the page height does not change. A page on which everything fits is
+  not touched, so it stays identical to the student copy. Measured on five exams
+  (181 pages) with every solution set solid red: before, black ink inside a
+  solution block on one page of each of six versions of one exam and on two
+  pages of another; after, none on any page.
+
+  A page that cannot hold its solutions however the space is shared is split.
+  Each solution's reach becomes real depth on the box that owns it, the list is
+  cut at the column height with `\vsplit`, the part that fits is shipped, and
+  the rest is returned to the main vertical list from `build/page/after`
+  followed by a page break. The key is one page longer there, a part stays with
+  its own answer, and the log carries a warning: `Page N cannot hold its
+  solutions … the key continues on an added page`. On two quizzes whose pages
+  are 94pt and 189pt short, every line of every solution is on the paper and
+  nothing is printed over.
+
+  A page of several problems is cut between two of them. Left to `\vsplit`, the
+  cut falls at the last break that fits, and on both quizzes that was the line
+  under the second problem's stem: the stem stayed at the foot of the page and
+  its graph went to the next. Inside `{problems}` the separator between
+  problems now carries an attribute (`\pbank@sep@marked`; no node is added, so
+  the page is the same page), and the page is cut at the last separator that
+  leaves each side a page's worth. The separator is dropped there, as it is
+  before a problem that starts a page. With no such separator `\vsplit`
+  chooses, as before. `test_solution_inline_fit.py` asserts all four cases on
+  word positions from `pdftotext -bbox`.
+
 - **The viewer opens on `<base>.pdf` as soon as the base compile ends, not when
   the fan-out does.** That PDF is final at that moment — everything after it
   writes *other* files (the tagged twins, the variant copies, the per-version
@@ -21,6 +136,35 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   skipped, since `<base>.pdf` does not survive that one. New setting:
   `open_pdf_early` (default on).
 
+- **The accessible gate builds a tagged `{cols}` and asserts its two columns.**
+  No workflow built one. `accessible.yml` builds the documents registered in
+  `examples/manifest.py`, none of which used the environment, and CI builds
+  its one user in the repository, the scenario `examples/scenarios/exam/cols`,
+  untagged. `{cols}` has wrapped its parts in `multicols` in every build since
+  v0.7.4, and the comment above it in `Exams/texlib-autoexam.cls` keeps the
+  earlier single-column guard for a toolchain whose multicol breaks under
+  tagging. Neither that breakage nor the guard coming back would have turned a
+  check red.
+
+  `examples/fixtures/Exams/cols-test.tex` is a `{cols}` around four `{parts}`,
+  registered with the `smoke` tag, so `smoke_test.py --accessible` builds it
+  tagged and veraPDF 1.30.2 validates it: 2586 checks, 0 failed. veraPDF
+  validates the structure tree and does not read where the text sits. With the
+  guard restored in a scratch copy of the class, the tagged fixture is set in
+  one column and veraPDF reports the same 2586 checks and 0 failed. So
+  `accessible.yml` also runs a new `test_cols_tagged_layout.py`, which builds
+  the fixture as a normal copy and as a tagged copy, reads the word boxes with
+  `pdftotext -bbox`, and requires parts a and b at least 72 pt to the left of
+  parts c and d in each. On TeX Live 2026 they start at 166.61 and 407.28 pt in
+  the normal copy and at 164.79 and 405.46 pt in the tagged copy. With the
+  guard restored all four start at 164.79 pt in the tagged copy and the test
+  fails. The test soft-skips without poppler's `pdftotext`, so the workflow
+  checks for it before the test runs.
+
+  The comment above `{cols}` and the header of the scenario name the fixture
+  and the test. Restoring the guard turns the test red, and the comment says
+  so: the test's expectation for the tagged copy has to change with it.
+
 - **`tagged_twins` / `TEXLIB_TAGGED_TWINS` — keep the write loop off the PDF/UA
   path.** Tagging is where a build's time actually goes. Measured on a
   twelve-version exam: an untagged pass is 6.8s, a tagged one ~20s, and the
@@ -30,7 +174,124 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   removes the ones a previous build left, rather than leaving a tagged PDF that
   no longer matches its source.
 
+- **`\IfExamVersioned{versioned}{unversioned}` — ask whether the document
+  declares versions.** `\theExamVersion` cannot say. `autoexam` defines it as
+  `A` when no `\versions` is declared, and `quiz` does not define it. A course
+  macro that picked content by comparing a section label with
+  `\theExamVersion`, falling back to the first label when the macro did not
+  exist, printed nothing in an exam with no versions: `A` matched no label and
+  the fallback never ran. A final exam or a review sheet that drew such a
+  problem printed it as a stem with no content, with exit code 0 and no
+  warning. The query takes its first branch in a document that calls
+  `\versions` and its second everywhere else. `texlib-problembank.sty` defines
+  it, so `quiz`, `didactic` and `bank` answer it too and a problem in a shared
+  bank can call it whichever class draws it. It is expandable, so it works
+  inside `\setvar`.
+  `\theExamVersion` keeps its `A`: the label seeds the engine, and changing it
+  would redraw every existing exam that declares no versions. The idiom is
+  under "Versions" in `Exams/README.md`. Tests: `versions-none-test` and
+  `versions-none-quiz` in `test_engine_correctness.py`.
+
 ### Changed
+
+- **A build checks every tagged PDF it writes, and reports each one.** A build
+  ran veraPDF over `<base>_accessible.pdf` and no other file. The builder gave
+  its reason: a variant is the same document with different content revealed,
+  so its tag structure is the base copy's, and one run per build keeps a JVM
+  launch per variant out of the edit loop. A key has structure the base copy
+  never has, its solutions. Every shown `{partsolution}` failed five checks in
+  `<base>_solutions_accessible.pdf` while `<base>_accessible-report.html` said
+  `PASSED` (the part-solution entry under Fixed), and a Math 126 review key
+  failed 315 checks with nothing in the build output to say so.
+
+  Every tagged PDF is validated now: the base twin, each variant's twin, and
+  the accessible pair's. Each gets a report beside it, named after its PDF
+  (`<base>_solutions_accessible-report.html`), and the build summary ends with
+  one line per tagged PDF: its name, `PASSED` or `FAILED`, the number of failed
+  checks, and the report. `texlib_cli.py build` on a two-page exam with three
+  part solutions, compiled against `texlib-solutions.sty` as it stood before
+  the part-solution fix, ends with
+  `exam1_accessible.pdf  PASSED, 0 failed checks`,
+  `exam1_solutions_accessible.pdf  FAILED, 17 failed checks` and
+  `exam1_instructor_accessible.pdf  FAILED, 17 failed checks`. veraPDF's XML
+  report gives the same three totals, and with the fix all three lines read
+  `PASSED, 0 failed checks`. Every tagged PDF the build wrote has a line: one
+  veraPDF could not read says `NOT CHECKED` and the reason.
+
+  A report is written for every copy, pass or fail. The cost of a check is the
+  veraPDF launch, and the verdict needs that launch whether or not the report
+  is kept: the HTML is the launch's own output, and the failed-check count is
+  read from it. Keeping a report only for a copy that fails would save no time,
+  and "no report" would then mean either a copy that passed or a copy nothing
+  checked.
+
+  The launches run at once, `build_jobs` wide, after the last copy has landed.
+  On 12 logical cores one copy took 5.0 s (1.6 s of it validation, the rest
+  the JVM starting), and that exam's three copies took 8.0 s together and
+  15.8 s in turn. With a dozen other TeX and Java processes running, the same
+  three measurements were 6.7 s, 9.4 s and 21.2 s. A build with three tagged
+  PDFs therefore ends about 3 s later than it did, and `build_jobs: 1` checks
+  them in turn. One veraPDF launch does take several files (three in 4.8 s, as
+  XML), but its HTML for a batch is a summary table with no rule in it, and the
+  HTML is the report.
+
+  The stale sweep follows the reports: a twin's report is removed with its PDF
+  when a build stops producing it, where the base report alone was removed
+  before. The rest is as it was. `accessible_report: false` runs nothing, a
+  missing veraPDF is a soft skip said once per build, no verdict changes a
+  build's exit status, and exit 1 from veraPDF is a non-conforming file.
+
+  That switch did not work where it is documented. The Sublime build command
+  copies the build settings out of `TeXLib.sublime-settings` by name, and its
+  list held seven of the nine the builder reads. `accessible_report` and
+  `accessible_report_full` were the two missing, so setting either in the
+  editor did nothing, and the report could be switched off only with
+  `TEXLIB_A11Y_REPORT=0`. Both are passed now. `test_texlib_runner.py` reads
+  the builder's keys off its source and fails when the editor's list lacks
+  one.
+
+- **A report no longer outlives the PDF it was written for.** A build that
+  replaced a tagged PDF and wrote no report for the new copy left the earlier
+  build's report beside it. That happened three ways: `accessible_report:
+  false` (or `TEXLIB_A11Y_REPORT=0`), veraPDF not installed, and a veraPDF
+  tool error (an exit above 1, or a launch that raises). Each ended with this
+  build's `<base>_accessible.pdf` beside an earlier build's
+  `<base>_accessible-report.html`, and nothing in the build output said the
+  report was about another file. The stale sweep already deleted a report
+  whose PDF a build stopped producing. It did not cover a PDF the build wrote
+  again.
+
+  The earlier report is now deleted as its PDF is replaced, for every tagged
+  PDF a build copies out. A check that runs writes the new report as before,
+  passing or failing. A build that writes none ends with no report beside
+  that PDF and says what it removed, once per build:
+  `TeXLib: removed a stale accessibility report (its PDF was rebuilt without
+  a new report): exam1_solutions_accessible-report.html`. A report that cannot
+  be deleted is named as still there, and the report of a tagged PDF the build
+  did not write is left alone.
+
+  The deletion is at the copy and not at the check, so it holds for a build
+  that never reaches the check. A serial build cancelled after a tagged PDF
+  landed used to leave the old report beside it, and now leaves none. Nothing
+  is printed in that case.
+
+  `accessible_report: false` deletes the earlier report too. The switch means
+  "do not check", and the PDF that report described has been overwritten. The
+  line then reads `rebuilt with accessible_report off`. It is the only line
+  about reports that a build prints with the switch off, and only a build that
+  removes one prints it.
+
+  Run as real builds of the `pset` template through `texlib_cli.py build`. A
+  default build with the check on wrote three reports. The same build with
+  `TEXLIB_A11Y_REPORT=0` rebuilt the three tagged PDFs, left no report, and
+  printed one line naming the three. In `--mode accessible`, a stand-in
+  veraPDF that exits 2 and a veraPDF lookup that finds nothing each ended with
+  a new `ps3_accessible.pdf`, no report, and that line, and the next build
+  with the check on wrote the report again.
+
+  No verdict and no removal changes a build's exit status, a missing veraPDF
+  is still said once per build, and exit 1 from veraPDF still writes its
+  report.
 
 - **A document with one problem-section is no longer headed "Part I".** The
   `Part N —` prefix now appears only when there really are two or more headed
@@ -58,7 +319,219 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   remembered. The cover line is emitted conditionally too, so an absent date
   leaves no blank strut behind.
 
+- **An exam problem with no parts lines its solution up with the parts'.** In
+  an autoexam key, a part's solution starts at the part's text, but a problem
+  with no parts had its `{solution}` pulled back to the text margin, about 42pt
+  further left. It now starts where a part's solution would and still ends at
+  the right margin. Quiz and bank keep the full-width box. `\splitpage` gave its
+  parts a margin 1pt wider than every other `{parts}`, so it now keeps
+  exam.cls's; on a student copy only a `\splitpage` problem moves, 1pt left.
+
 ### Fixed
+
+- **Six switches and fields that a document set and the page ignored.** Found
+  by an audit of `main`, each reproduced with a one-page document and now
+  checked by `test_class_render.py`:
+  - The exam cover printed "Math" before the course number whatever
+    `course-subject` said, so a STAT 152 exam read "Math 152" on the cover and
+    "STAT 152" in its footer. The cover now uses `\GetCourse`, as the footer
+    does.
+  - A problem set with no `pset-due` printed a bare "Due:" line. The test
+    compared the getter's name with `\\` and was never true.
+  - `\drafts` in the preamble, and didactic's `draft=true` option, drew no
+    watermark. Only the command-line `\ShowDraft` did, because `\ifdraft` was
+    read once when `texlib-build` loaded, before either could set it.
+  - `\rubrics` in an exam's source gave a key cover reading "Solutions", not
+    "Solutions and Rubrics". `\if@autoexam@rubric` was a `\let` copy of
+    `\ifrubric` taken at class load. The class now reads `\ifrubric`, and the
+    alias is re-taken at `\begin{document}` for code that still uses it.
+  - `\IfSyllSet` answered "set" for every field. It tested a `g__syll_…`
+    store the move to coursemeta removed; it now asks `\IfMetaSet`.
+  - `texlib-tikzexternal` stopped at load under LuaLaTeX on
+    `\pdfshellescape`, a pdfTeX primitive. It now reads `\pdf@shellescape`
+    from `pdftexcmds`, which every engine defines.
+
+- **A tagged PDF listed every formula's MathML file as an attachment.** Under
+  `mathml-AF` LaTeX writes one MathML file per distinct formula into the `/AF`
+  entry of its Formula structure element, and by default (`viewer/pane/mathml`,
+  latex-lab-math) it also adds each file to the document's `EmbeddedFiles` name
+  tree, which viewers show as the attachment list. SumatraPDF shows that list in
+  its bookmarks pane, one top-level row per file after the outline: 4,036 rows
+  under a 241-page document built with the thesis class, 4,035 of them
+  `mathml-N.xml`. `ACCESSIBLE_DOCMETA` (and with it the AF-only fallback) and
+  both thesis templates now set `viewer/pane/mathml=false`. On that document the
+  name tree went from 4,036 entries to its one real attachment, all 7,700
+  Formula elements kept their `/AF` (4,035 distinct MathML files, as before),
+  and veraPDF still passes PDF/UA-2 and PDF/A-4f; the Notes template's tagged
+  twin keeps all 18 of its Formula `/AF`s and passes both. A document with no
+  attachment of its own now carries LaTeX's PDF/A-4f placeholder,
+  `pdf-A4f.txt`, as the tree's one entry, as a document without mathematics
+  already did. `test_texlib_builder.py` asserts the key in both prefixes and
+  both templates.
+
+- **A failed build stamped itself as current, so the NEXT build did nothing.**
+  The freshness stamp is written only after a clean pass, and "clean" was
+  decided by scanning the log for a line starting with `!`. Every TeXLib pass
+  carries `-file-line-error`, which writes the error's origin *instead* of the
+  bang — `./doc.tex:12: Undefined control sequence.` — so a broken document
+  logs no such line at all (verified against TL2026 pdflatex: a two-error
+  document, zero bangs). The guard never fired. Pressing Ctrl+B again after a
+  failed build therefore ran no engine, reported `doc.pdf is already current --
+  nothing to rebuild`, and opened the stale PDF; the error was simply gone. It
+  could also strand a genuinely stale PDF, since a failing pass may never reach
+  an `\input` and its `.fls` is then an incomplete dependency list — the exact
+  case the guard exists for. Error detection now lives in `LOG_ERROR_RE` /
+  `log_reports_error()` and recognises both shapes, and an unreadable log is no
+  longer treated as clean.
+
+- **A failed fan-out build still raised the viewer, on the previous build's
+  PDF.** `default`/`full` — plain Ctrl+B — offer `<base>.pdf` the moment the
+  base compile ends, and that offer was made with no check that the compile had
+  succeeded. The host's own classification is correct and withholds the
+  post-build open on an error, but it is reached at the *end* of the build,
+  while the preview fires in the middle: SumatraPDF came forward showing a
+  document that compiled while the panel reported the one that did not. The
+  preview now reads the base compile's log (same helper as above) and declines.
+  Single-compile modes were never affected — they offer no preview.
+
+- **An unchanged rebuild pulled the viewer off the copy `preferred_pdf` had
+  chosen.** `"solutions"` and `"student"` are resolved by searching the PDFs the
+  build produced, and a skipped build produces none, so they fell back to the
+  combined `<base>.pdf` — and `_remember_preferred` then stored that, sending
+  the standalone *View PDF* command after it. The stamp now carries the
+  producing build's output list and the skip restores it, so a no-op rebuild
+  answers exactly as the build that wrote the stamp did. Each name is still
+  checked against the disk, a slice deleted since falls back as before, and a
+  stamp written by an older version restores nothing rather than failing.
+
+  All three are covered by a new suite, `Sublime/test_texlib_viewer.py`, whose
+  fake engine writes a `.log` holding what it printed — two of the three are
+  invisible to a harness whose engine leaves none behind.
+
+- **A `{tasks}` grid failed PDF/UA-2 in an accessible build.** The `tasks`
+  package (1.4a, 2022) is not tagging-aware. It sets each task, and each label,
+  as a paragraph in a box of its own and puts a row's boxes on one line. The
+  first task of a row is boxed between paragraphs. Every later one is boxed
+  after the row's line has begun, so its paragraphs are recorded inside the
+  row's open paragraph, and veraPDF rejects each of them twice, on ISO 32005
+  Table 5: `<P> shall not contain <Part>` and `<P> shall not contain <P>`. Six
+  tasks in three columns fail 16 checks; the ten grids of a real lecture unit
+  (Math 126 Unit 1, 27 pages) fail 84. A one-column grid passed, as loose
+  paragraphs with every label placed after its task. The defect is upstream: a
+  bare `article` with `\DocumentMetadata{tagging=on}` and one `{tasks}` list
+  fails with the same 16 checks. The LaTeX Team tracks it as
+  [latex3/tagging-project#370](https://github.com/latex3/tagging-project/issues/370),
+  open since 2024-07-30.
+
+  The new `texlib-tasks.sty` wraps four functions of `tasks` and calls each
+  original, so `tasks` still does all of the typesetting. In the tagged PDF a
+  grid is one `<L>`, each task is an `<LI>` holding its `<Lbl>` and then its
+  `<LBody>`, and a row carries no structure. `texlib-build.sty` loads the
+  package in an accessible build whenever `tasks` is loaded, by a class or by
+  the document. Both documents above now report 0 failed checks.
+
+  A normal build does not read the file. Measured on the fixture below (2
+  pages) and on the lecture unit (27 pages), built against the library before
+  and after: 0 differing pixels on every page (ImageMagick AE, no fuzz), in the
+  normal PDF and in the tagged twin.
+
+  Three details hold the structure together.
+
+  - `tasks` wraps its grid in `\list{}{}\item` for the margins, and the tagged
+    block code makes that a one-item list around the real one. For the length
+    of that scaffold its structure names are reassigned: list, item and body
+    to `NonStruct`, the empty label to `Artifact`. The label is empty on the
+    page and still carries marked content (the item's link target). As
+    `NonStruct` it puts that content directly under the enclosing section, and
+    veraPDF answers `<Sect> shall not contain content items`.
+  - `tasks` typesets a task's text before its label, and a structure element's
+    children are recorded in the order they are created. The `<LBody>` is
+    opened stashed and attached after the `<Lbl>`. Typesetting the label early
+    gives the same tree and changes the page: a label reads its counter, and a
+    grid nested in the task has moved the counter by then.
+  - `tasks` typesets every label a second time, into a box it measures and
+    discards. Tagging is suspended between tasks. With tagging live there, a
+    label that holds a formula leaves an empty `<Formula>` under the `<L>` for
+    every task, and veraPDF fails `<L> shall not contain <Formula>`.
+
+  Guarded by `examples/fixtures/Notes/tasks-tagging.tex`, nine grids in the
+  accessible gate. veraPDF passing shows that the nesting is legal. It does not
+  show that a grid is a list, so a manifest entry can now declare `tagged=`:
+  exact counts of structure elements by standard type, read from the tagged
+  PDF with pypdf (`check_tagged_structure` in `smoke_test.py`), together with
+  the order of every list item's children. Against the library without the
+  package the fixture fails both ways: `Table 5. P-Part, Table 5. P-P` (50
+  checks), and `LI x13 (expected 27)`.
+
+  The package installs nothing, and says so in the log, when the `tasks`
+  functions it wraps or the tagging interfaces it calls are missing. It was
+  written against `tasks` 1.4a and LaTeX 2026-06-01.
+
+- **A tagged build never settled for a document that trips the luamml
+  mathml-SE abort and gains a page from its table of contents.** Every build
+  kept a tagged PDF that failed PDF/UA-2 on its last page (ISO 14289-2:2024
+  clause 8.2.2), printed the previous pass's page total in its footer and listed
+  every contents entry one page low. Measured on a 38-page Math 126 unit built
+  three times in a row: 37 pages then 38 on every build, 20 failed checks of
+  that clause, all on page 38, and a last footer reading "38 of 37". Both tagged
+  paths were affected, `accessible` mode and the fan-out's base tagged twin, by
+  two defects in the builder core.
+
+  **Lane state across the abort.** LaTeX reopens `<jobname>.aux` for writing at
+  `\begin{document}` and `\tableofcontents` reopens `<jobname>.toc`, so the
+  probe that dies on the abort leaves the `.aux` cut short, with no
+  `\@abspage@last` record, and the `.toc` empty (on a settled 6-page lane:
+  `.aux` 112 lines → 95, `.toc` 48 lines → 0). The AF-only retry started from
+  that. The mathml-SE verdict is held per build, so the next build aborted and
+  emptied the lane again, and no number of rebuilds helped. The builder now
+  reads the lane's cross-pass state (the `STATE_EXTS` files in its output
+  directory) before the probe and puts it back after the abort. State files the
+  aborted pass created are removed, so a cold lane retries from nothing.
+
+  **Settling the tagged half.** tagpdf numbers the parent tree from the page
+  count the previous pass recorded: pages take the keys below it, annotations
+  the keys from it up. A pass that ships a page more gives that page and the
+  first link one key (`/Nums` held key 5 twice in a 6-page reproduction), and
+  the kernel reports `Hook 'shipout/lastpage' executed on wrong page (5 not
+  6)`. Two fixed passes kept that PDF whenever the second pass was the first to
+  read a complete table of contents. A tagged lane now runs again while its last
+  pass carries that message, or the one the kernel prints when the document has
+  shrunk (`Temporary extra page added at the end`), to a ceiling of `MAX_RERUNS`
+  passes. In a parallel fan-out the verdict is read from each lane's log and the
+  unsettled lanes run again as one more wave. A lane whose second pass is clean
+  keeps its two passes: the 19 other documents of the `accessible` corpus, built
+  through the builder core, take the same two tagged passes as before on cold
+  and on warm lanes.
+
+  Measured on the reproduction (`examples/fixtures/MathML/nth-root-toc.tex`, 6
+  pages), three builds from a cold lane: 5 then 6 pages and 54 failed checks on
+  every build before; 5, 6, 6 pages on the first build and 6, 6 on the next two
+  after, with none failed. Restoring the lane alone still fails the first build,
+  and settling alone pays the third pass on every build. The Math 126 unit has
+  no failed check of clause 8.2.2 on its first build after the change, and
+  "38 of 38" in its last footer.
+
+  Two kinds of lane that never run the probe had the same failure on a first
+  build, and the settle rule fixes both. A document with the same table of
+  contents and no nth-root pair failed 48 checks on its first build and none on
+  its second. A variant's tagged twin (`<base>_student_accessible.pdf`) failed
+  54, with no report to say so, because veraPDF is run on the base twin only.
+
+  The mathml-SE verdict is still not kept between builds. With the lane's state
+  preserved the probe costs time only, about a fifth of the build on the 38-page
+  unit (22 s of 97 s). A stored verdict is sound only if its key covers every
+  file the probe read, and an edit to any of those discards it, so it would save
+  the pass only on builds where nothing read before the abort has changed.
+  `smoke_test.py`'s own retry is unchanged: it builds in a fresh directory, and
+  its rerun loop already spends the third pass (5, 6, 6 pages on the fixture).
+
+  Covered by 40 checks in `Sublime/test_texlib_builder.py` (401 → 441: of the
+  34 that drive the core, 23 fail against the old one and 11 pin what must not
+  change; 6 cover the new helpers), by
+  `Sublime/test_accessible_settle_integration.py`, which drives the real core
+  through two builds of a bare `article` of the same shape and runs in
+  `tests.yml` (18 checks, 12 failing against the old core), and by the fixture
+  in the smoke and accessible gates.
 
 - **The inline key was only half inline: a full-problem `{solution}` still
   displaced the page.** `\ShowKeyInline` exists so a key page *is* its student
@@ -100,6 +573,58 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   stretch and the unfixed library scores 100% on it; and the cover is excluded,
   because the key's red "Solutions" badge is supposed to reflow it.
 
+- **A `{solution}` or `{partsolution}` ending in a figure broke PDF/UA tagging
+  for every problem after it.** In a build that does not render solutions, both
+  environments open a discard box and suspend tagging. The opening branch has
+  `\par`ed since the para-hook fix, so a body that *starts* in horizontal mode is
+  handled; the closing branch never did. A body that *ends* in vertical mode —
+  which is precisely what a solution whose last content is a `\begin{center}`
+  figure looks like — therefore left the enclosing `{problems}` list open across
+  the `\egroup`, and every later `\problem` emitted its `<LI>` as a sibling of
+  the `<L>` instead of a child. veraPDF fails that as ISO 32005 Table 5,
+  *"`<Sect>` shall not contain `<LI>`"*, once per following problem; a
+  twelve-version exam with one such solution drew 40. Both discard branches now
+  mirror the opening `\par`.
+
+  Three things make this expensive to find, and they are the reason for the
+  length of this entry. The **ordinary PDF is flawless** — only the tagged twin
+  is wrong. The symptom lands on the problems *after* the offending one and
+  never on it, so on a shuffled exam the versions where that problem fell last
+  passed and the rest did not, which reads like a shuffle bug. And the obvious
+  suspect — a nested `enumerate` inside a `\ppart` — is **innocent**: verified by
+  putting one back after this fix (0 failures). Do not rewrite authoring idioms
+  to chase it. To isolate one of these, build a two-problem probe (suspect,
+  `\newpage`, anything) with `--mode accessible`: it reproduces in seconds
+  instead of minutes, and the failure count moves as you strip the suspect line
+  by line.
+
+- **An inline `{partsolution}` moved what followed it.** The layout's contract
+  is that a key page is its student page with the answers drawn in, and for a
+  part solution it did not hold. Two causes. The overlay ended with
+  `\nointerlineskip`, which left `\prevdepth` at −1000pt, so the line after the
+  answer space got no interline glue and sat about 3pt high, once per part
+  solution. And an overlay that was the last thing in its list (a part answer
+  ending a `{cols}` column) changed the enclosing box's depth, because the
+  question line's depth was no longer the list's last depth. Both inline
+  solutions now go through one macro, `\@sol@overlay`, which carries
+  `\prevdepth` across the overlay and closes the list with an empty box of the
+  depth it had. On a twelve-version exam the key's 48 problem pages kept between
+  70.3% and 97.2% of the student page's ink in place (1px tolerance at 100 dpi);
+  they now keep 100.000%, every page. `test_solution_inline_parity.py` gained
+  the two pages that tell the cases apart: one fails on the old code at 81.6%,
+  the other on the `\prevdepth` fix alone at 86.9%.
+
+- **A tagged key raised TeX errors when a solution ended in a display.** A
+  shown solution's body is collected into a box, and the closing brace ends its
+  last paragraph without the `\par` token, so the tagging code's
+  end-of-paragraph hook never ran. After running text the next `\par` outside
+  closed the structure. After `\[ … \]` nothing did, and tagpdf stopped with
+  `there is no open structure on the stack`: twelve errors for a
+  `{partsolution}` in either layout, two for a `{solution}` in the inline
+  layout, a PDF written anyway, exit 0. Both render branches now end the body
+  with a real `\par` in an accessible build, under the guard the discard
+  branches already use. `test_solution_tagged_key.py` reads the log for it.
+
 - **A luaotfload cache-path race cost roughly one parallel build in five.** The
   lane died before LaTeX started, with a traceback and no PDF:
   `"no writeable cache path, quiting"`. luaotfload decides whether a
@@ -115,6 +640,380 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   hosts recognise the abort and spend the pass again. It is a startup failure,
   so the retry costs a startup and nothing else.
 
+- **A versioned exam with no cover page numbered straight through its copies.**
+  Three things restart when a copy starts: the Part counter, the question
+  number carried from one problem-section to the next, and the flag that lets a
+  section run on from an `{mcproblems}` without a page break. `\maketitle`
+  restarted them and nothing else did, so a document that never called it kept
+  all three from one copy to the next. Two versions of a one-problem exam with
+  keys read Problem 1, 2, 3, 4 on their four copies, headed "Part I" to
+  "Part IV" although each copy has one section, with footers "1 of 4" to
+  "4 of 4". With text before the first section and an `{mcproblems}` last,
+  every copy after the first also set its first section on the page that
+  carried the text. The version loop is what knows where a copy starts, and
+  `\AutoExamBeginCopy`, which it runs before each copy's body, now makes the
+  three resets through a macro it shares with `\maketitle`. `\maketitle` keeps
+  them because the loop does not reach every cover: a document with no
+  `\versions` is never looped, and a document may set a second cover to open a
+  second exam.
+
+  Measured before and after at 150 dpi (ImageMagick AE, no fuzz) on 100
+  builds: the five exam scenario packs, the exam template and the Math 181 and
+  TeXam example exams in eight build modes each, the Math 181 quiz, and the
+  engine fixtures. All 76 builds of a document that calls `\maketitle` are
+  pixel-identical on every page (378 pages, AE = 0), as are the 8 single-copy
+  builds of a fixture with no cover page. The 16 that differ are the fixtures
+  with no cover page in the builds that typeset more than one copy. Each of the
+  four copies of `vmap-test` is now pixel-identical to a forced `\Version`
+  build of that copy; before, each was 3,863 to 4,515 pixels away.
+
+  Tests: `nocover-test` in `test_engine_correctness.py` reads the problem
+  numbers, Part headings and footers on all four copies of a two-version exam
+  with keys, and fails 20 of its 27 checks on the unchanged class.
+  `twocover-test` reads a document with two covers, which sets its second
+  exam's first problem on the cover page if the resets are moved out of
+  `\maketitle`.
+
+- **A copy with no cover page started with the page number, header, footer and
+  marks that the copy before it left.** While it sets a copy the class changes
+  the page number, six header and footer slots, the first-page head rule and
+  the marks. The first problem-section sets the page number to 1 and redefines
+  the slots, `\blankpage` and `\scorepage` empty two of them, and every
+  section heading and every `\blankpage` sets a mark. `\maketitle` put all of
+  that back, for its cover and the pages before the first section, and nothing
+  else did. In a versioned exam that never calls `\maketitle`:
+
+  - Text before the first section printed, on every copy after the first,
+    under the previous copy's running header and page count. On a two-page
+    exam the first copy's page of text has no header and reads "1 of 2"; the
+    others read "Exam 1" and "Part II — Multiple Choice" above the text and
+    "3 of 2" below it.
+  - After a copy that ended in `\blankpage`, that text had no page number and
+    was headed "Scratch Work".
+  - So was the problem page of a copy that opens on an unheaded section
+    (`\begin{problems}*`), which sets no mark of its own.
+  - A centre header set in the preamble printed on the first copy and on no
+    other.
+
+  The class now records the page number and those slots when
+  `\begin{document}` ends, and `\AutoExamBeginCopy` puts them back and clears
+  the marks before each copy. A copy with no cover page starts as the first
+  copy does, with what the document had at the end of its preamble.
+  `\maketitle` is unchanged: it still empties the slots, so a cover and the
+  pages after it carry no page number.
+
+  The marks are cleared in the kernel's record of the page
+  (`\mark_clear_structure:n`, and LuaTeX's `\clearmarks` for a kernel older
+  than 2025-06-01, where `\rightmark` reads TeX's `\firstmark`). They are not
+  cleared with `\markboth{}{}`, which is what `\maketitle` uses. A mark is a
+  node and ships with the next page that has something on it. When a copy
+  opens on a section, an empty mark set at the start of the copy lands on that
+  section's first page ahead of the section's own mark, and `\rightmark` reads
+  the first mark on a page: built that way, all four copies of `vmap-test`
+  lose the section label from their header.
+
+  Measured before and after at 150 dpi (ImageMagick AE, no fuzz) on 166
+  builds: the five exam scenario packs, the exam template, the Math 181 and
+  TeXam example exams and the twelve exam fixtures in eight build modes each
+  (default, student, key, dual, instructor, rubric, a forced `\Version`, its
+  key), and two quizzes in three. Two builds of the unchanged library agree on
+  all 736 pages, so a difference is the change. All 94 builds of a document
+  that calls `\maketitle` are pixel-identical on every page (492 pages,
+  AE = 0, same extracted text). So are 60 of the 72 builds of a fixture with
+  no cover page: every build that sets one copy, and every build of the seven
+  fixtures whose copies open on a headed section. The 12 that differ are
+  `nocover-test` and `nocover-front-test` in the six modes that set more than
+  one copy. They differ on 48 of their 136 pages, each a page of a copy after
+  the first: the text before the first section and, in `nocover-front-test`,
+  the problem page that was headed "Scratch Work". Every copy of the collated
+  `nocover-test`, `nocover-front-test` and `vmap-test` is now pixel-identical
+  to a forced `\Version` build of that copy; before, the later copies of the
+  first two were 827 to 3,921 pixels away on those pages.
+
+  Not changed: what the pages before the first section read on the first
+  copy, and so in a document with no `\versions`. They are numbered apart
+  from the problem pages ("1 of 2" on the text and again on the first problem
+  page), their count is `exam.cls`'s `\numpages`, and a `\blankpage` that
+  opens a copy is page 1 of it and prints the first-page header and footer,
+  with no "Scratch Work" label. Every copy now reads that way; "Notes &
+  gotchas" in `Exams/README.md` lists the three. On a copy after the first
+  such a leaf used to be a labelled scratch page, because it was not page 1.
+
+  Tests: `test_engine_correctness.py` goes from 164 checks to 195.
+  `nocover-test` reads the page of text on all four copies: no header,
+  "1 of 2", and the same text as on the first copy. 6 of those 8 checks fail
+  on the unchanged class. `nocover-front-test` is a new fixture with two pages
+  of text, an unheaded section, `\chead` in the preamble and `\blankpage`
+  last, read page by page on both copies; 5 of its 19 checks fail on the
+  unchanged class. `vmap-test` checks that each copy's header carries its
+  section label, which passes on the unchanged class and fails on all four
+  copies with `\markboth{}{}` as the clearing step.
+
+- **A versioned exam's part labels ran on from one copy to the next.** `{parts}`
+  resumes its lettering when the question number equals the one it last saw,
+  which is how a second list in the same question (`{cols}`, `\splitpage`)
+  continues the first. Neither the tracked number nor the stored count was
+  cleared between copies, and every copy numbers its questions from 1, so the
+  first `{parts}` of a copy resumed the last list of the copy before it
+  whenever the two questions shared a number. An exam whose only problem with
+  parts was Problem 1 printed 1a, 1b on its first version, 1c, 1d on its second
+  and 1k, 1l on its sixth, and a build that typeset the keys in the same pass
+  carried the lettering on through them. An exam was unaffected whenever the
+  last question with parts on one copy and the first on the next had different
+  numbers, which is why an exam with two such problems never showed it. The
+  version loop now runs `\AutoExamBeginCopy` before it reads each copy's body,
+  and that macro clears both counters. Measured on a six-version exam: the
+  first copy and all six covers are pixel-identical before and after
+  (ImageMagick AE = 0), and each later copy differs on the one page that
+  carries the parts, by 203 to 311 pixels at 110 dpi. Test: `versions-test` in
+  `test_engine_correctness.py` reads the labels on all twelve copies of a
+  six-version exam with keys, including a `{cols}` list that has to continue at
+  1c on every copy.
+
+- **Two `{questions}` lists in one exam ran their part labels together.**
+  `\begin{questions}` restarts the question number at 1, and `{parts}` decides
+  whether to resume its lettering by comparing question numbers, so the first
+  `{parts}` of the second list's Problem 1 resumed the first list's Problem 1:
+  1a, 1b in the first list and 1c, 1d in the second. An exam built on
+  `{problems}` did the same after a second `\maketitle` in one copy, because
+  `\maketitle` restarts its numbering. The stored count is now cleared on every
+  step of the question counter (`\@addtoreset{global_partno_storage}{question}`
+  in `texlib-autoexam.cls`), so a question's first `{parts}` starts at a. A
+  second list inside the same question (`{cols}`, `\splitpage`) still continues
+  the first, because nothing steps the counter between the two. The step also
+  restarts the lettering on every copy of a versioned exam, which leaves
+  `\AutoExamBeginCopy` one case: a list that a copy opens before its first
+  question. Measured on the repository's seventeen `autoexam` documents, each
+  built five ways (default, student, key, instructor and the tagged copy): all
+  85 builds are pixel-identical before and after (ImageMagick AE = 0 on 355
+  pages at 110 dpi). Test: `question-lists-test` in
+  `test_engine_correctness.py` reads 1a, 1b from each of two lists in one copy,
+  then 1c, 1d from a `{cols}` list in the second list's question.
+
+- **A tagged instructor copy printed `2=0 [0 pts]` for a common error's
+  `[-2 pts]`, and no instructor copy has printed a bare `\item`'s bullet.** In a
+  tagged copy every `{commonerrors}` entry was wrong. In an untagged one a bare
+  `\item` printed `=0 [0 pts]` where its square bullet belongs, and has since
+  the deduction labels arrived in v0.6.1. Each entry cost three TeX errors
+  (`Missing number, treated as zero`, `Missing = inserted for \ifnum`, and the
+  first again). The run recovered and wrote its PDF, and veraPDF had nothing to
+  fail, so the log and the page were the only places it showed.
+
+  The panel's `\makelabel` read its argument. It ran `\ifnum#1=0` to choose
+  between a deduction and the muted `[0 pts]`, and it compared the argument
+  with a default label of `\relax` to recognise a bare `\item`. That argument
+  is not the label the author wrote. The kernel's `\item` hands over a bare
+  item's label as the unexpanded `\@itemlabel`, which never compared equal, so
+  the bullet was unreachable and the `\ifnum` ran on `\relax`. The tagged list
+  code (latex-lab-testphase-block, the `item` template) hands over
+  `\MakeLinkTarget[..]{}` and then a token list that holds the label, and the
+  `\ifnum` met `\MakeLinkTarget`.
+
+  `\makelabel` now typesets what it is handed and reads nothing. Inside the
+  panel's list `\item` is `\@cerr@item` (`texlib-solutions.sty`), which takes
+  the number where the author wrote it and passes the kernel's `\item` the
+  deduction already formatted, `\item[\@cerr@pts{2}]`. A bare `\item` goes
+  through unchanged and gets the list's default label, which is the bullet.
+  `\@cerr@item` acts only while `\@itemlabel` is that default label. Every list
+  sets its own, so an `itemize`, an `enumerate` or a `description` nested in an
+  entry keeps its own labels, in a tagged copy and an untagged one.
+
+  TeX errors in the instructor copy, before and after: one panel with one
+  `\item[2]`, tagged 3 → 0; five panels with eight labelled entries, tagged
+  24 → 0, and the same under `quiz`; three panels with five bare entries and a
+  labelled one, tagged 18 → 0 and untagged 15 → 0. veraPDF reports no failed
+  check before or after. In each of these the panels of the tagged and the
+  untagged copy now print the same text, entry for entry. On the `autoexam`
+  pages that carry a panel, the two renders (`pdftoppm`, 200 dpi) differ only
+  on the heading lines that print a point value and on the footer line, and on
+  no row of a panel.
+
+  An untagged copy whose entries are all labelled does not change. Two
+  fixtures' four copies (student, `solutions`, `solutions-inline`,
+  `instructor`) and the `quiz` instructor copy have the same page content
+  streams byte for byte before and after, and the same renders at 200 dpi. An
+  untagged copy with a bare `\item` changes, which is the fix: the bullet,
+  where `=0 [0 pts]` was.
+
+  `test_solution_tagged_conformance.py` covers it. Its fixture now carries two
+  `{commonerrors}` blocks, one in a whole-problem solution and one in a part
+  solution, and the test reads the labels off the page: `[-2 pts]`, `[-1 pt]`,
+  `[0 pts]`, and nothing ahead of a bare entry. It reads them in the tagged
+  instructor copy and in an untagged one that it builds for the comparison, and
+  requires the other three copies to print no common error. Run on the package
+  as it was, four of its checks fail.
+
+- **A tagged key failed PDF/UA-2 at every part solution it showed.** veraPDF
+  reported four ISO 32005 Table 5 rules for each shown `{partsolution}`: `LI-P`
+  (two checks), `LI-Part`, `P-P` and `P-Part`, five failed checks, in the
+  `solutions` and `instructor` twins and in the inline layout. A Math 126 review
+  key with 63 part solutions failed 315. The student copies passed and no build
+  raised a TeX error. Nothing reported it: the accessible gate builds each
+  document's default copy, a build writes its veraPDF report for the base
+  tagged copy only, and no template here uses `{partsolution}`.
+
+  The frame around a solution (the tint and the left accent) is a `\parbox`,
+  and the kernel's tagging code for `\parbox` assumes a paragraph is open. It
+  ends the innermost structure, taking it for that paragraph's, opens a `<Div>`,
+  and afterwards opens a new paragraph structure. `{partsolution}` assembles its
+  frame in a box register with no paragraph open, which is what lets SyncTeX
+  stamp it. The structure that was ended there is the part's `<LBody>`, so the
+  `<Div>`, the paragraph after it and anything the part went on to say became
+  children of the `<LI>`. A bare `article` reproduces it with
+  `\sbox0{\parbox{1cm}{x}}\noindent\box0` inside a list item: the same four
+  rules, five checks, and none with the `\parbox` in an artifact group.
+  Upstream has it open as latex3/tagging-project issues 54 and 345.
+
+  The frame is one artifact now. `\texlib@acc@artifactbegin` and
+  `\texlib@acc@artifactend` in `texlib-solutions.sty` put it in tagpdf's
+  artifact group: the tint and the accent are marked as layout decoration, the
+  `\parbox` opens no structure, and the solution's header and body, which were
+  tagged when they were typeset, stay in the `<LBody>`. `{solution}` draws its
+  frame the same way in both layouts. Its compact layout sets the frame in a
+  live paragraph, and passed. Its inline layout boxes it, and a tagged inline
+  key of whole-problem solutions failed the same four rules. The
+  inline-key entry above met this in the Bank template and put it down to "a
+  structure level". The cause there was this `\parbox`, set into a box with no
+  paragraph open: with the compact frame boxed the way that draft boxed it, the
+  Bank template fails 27 checks on `origin/main` and none with the frame an
+  artifact.
+
+  Failed checks, before and after. The regression fixture (three part solutions
+  and three whole-problem solutions, one in the side-by-side multiple-choice
+  key): `solutions` 17 → 0, `solutions-inline` 31 → 0, `instructor` 17 → 0,
+  student copy 0 → 0, and the same exam under `quiz` 17, 29 and 17 → 0. The
+  Math 126 review key, rebuilt from a copy of the course with this change
+  applied: 315 → 0.
+
+  Nothing moves on the page. The pair is empty in a normal build: the fixture's
+  four untagged copies are the same PDFs byte for byte before and after, apart
+  from the trailer `/ID`, with `SOURCE_DATE_EPOCH` fixed. In a tagged build the
+  pair sets node attributes and adds no node: the four tagged copies differ on
+  0 pixels (`pdftoppm` at 150 dpi, compared exactly), and so do all four PDFs
+  of the 16-page review at 100 dpi.
+
+  Guarded by a new `test_solution_tagged_conformance.py`, which `accessible.yml`
+  runs ahead of the module suite. It builds one exam's tagged student copy and
+  its three tagged keys and requires, of each, no TeX error in the log, no
+  failed veraPDF check, and a label and a body in every list item. The last is
+  read off the structure tree with pypdf, so the defect is still caught where
+  veraPDF is not installed.
+
+  Not fixed here: a solution whose body ends in a display or a list fails in
+  the student copy as well. That is the missing `\par` before the box closes,
+  with its own fixes in PR #182 (a hidden solution) and PR #281 (a shown one).
+  Built with those two and this one together, every construct tried (thirteen,
+  in four tagged copies each) has no failed check.
+
+- **A tagged key read a solution's answer before its "Solution." header.** In
+  the structure tree, which is the order a screen reader follows, a shown
+  `{solution}` or `{partsolution}` had its answer first and its header after
+  it. The page drew the header above the answer. Both environments typeset the
+  body into a box before the header exists, so that the SyncTeX harvest can
+  run on it first, and a structure element lists its
+  children in the order they are created. veraPDF checks which element may hold
+  which and says nothing about their order, so it passed every key. A part
+  solution with no header line (`\renewcommand{\texlibpartsolheader}{}`) had
+  nothing out of order.
+
+  A shown solution is one `<Div>` now, and the header is its first child.
+  `\texlib@acc@solbegin` in `texlib-solutions.sty` opens the `<Div>` before the
+  body is boxed and `\texlib@acc@solend` closes it once header and body are
+  assembled, so the body's paragraphs are its children as they stand. The
+  header paragraph is set inside a `<NonStruct>` that carries tagpdf's
+  `firstkid` key, which puts an element at the front of its parent's children.
+  The kernel's float code puts a caption first with the same key. A rubric
+  stays after its answer, as on the page: under a part solution's, and in the
+  footer of a whole-problem solution's (the next entry). The `<Div>` also
+  keeps the grouping that the frame shows: the frame is an artifact (the entry
+  above), and without the `<Div>` nothing in the tree says which paragraphs are
+  one solution.
+
+  The other way to reorder is to open the body's element with `stash` and
+  attach it after the header with `\tag_struct_use_num:n`. That needs a second
+  `<Div>`, around the body, and tagpdf 1.0e warns twice for every paragraph
+  inside a stashed `<Div>` (`Parent-Child 'STASHED' --> 'Part'`, and the same
+  for `'P'`), because it cannot check them against a parent it does not know
+  yet. `firstkid` raises no warning, and has been in tagpdf since 0.99f.
+
+  Headers read after their answer, before and after, on the regression fixture
+  (three part solutions and three whole-problem solutions, one in the
+  side-by-side multiple-choice key): 6 → 0 in each of `solutions`,
+  `solutions-inline` and `instructor`, under `autoexam` and under `quiz`. No
+  copy has a failed veraPDF check, a TeX error or a tagpdf warning, before or
+  after. Fifteen solutions of other shapes (a body that ends in a display, a
+  centered table or a list, one that is only a display, one that holds a table
+  or an `align*`, the inline and the stacked multiple-choice key, a
+  whole-problem solution after part solutions): 15 → 0 in each key, no failed
+  check in a key before or after, and the same pages.
+
+  Nothing moves on the page. The four commands are empty in a normal build: the
+  fixture's four untagged copies, under `autoexam` and under `quiz`, are the
+  same PDFs byte for byte before and after, apart from the trailer `/ID`, with
+  `SOURCE_DATE_EPOCH` fixed. In a tagged build they add no node: the eight
+  tagged copies differ on 0 pixels (`pdftoppm` at 150 dpi, compared exactly),
+  and a tagged student copy is the same file apart from the `/ID` and the
+  random UUID tagpdf gives its namespace.
+
+  Two Math 126 documents, built from a copy of the course before and after: the
+  Exam 1 review (16 pages; 63 part solutions with no header line and two
+  whole-problem solutions) and Quiz 3 (three solutions). In their tagged keys
+  the headers read after their answer go 2 → 0 and 3 → 0. veraPDF reports no
+  failed check and the logs no error and no tagpdf warning, before or after,
+  and all eight PDFs match on every page at 100 dpi.
+
+  `test_solution_tagged_conformance.py` asserts the order. veraPDF cannot, so
+  the test reads the text of every marked-content sequence out of the page
+  content streams with pypdf, decoding it with each font's `/ToUnicode` map,
+  and requires the innermost `<Div>` around each answer to hold that one
+  solution and to start with "Solution.". It builds a fifth copy as well, a
+  `solutions` key with `\texlibpartsolheader` emptied, where a part solution's
+  `<Div>` starts at its answer. On the code before this change the new
+  assertion fails in all four keys.
+
+  Not changed: a paragraph that holds only a box leaves an empty `<P>`, as it
+  did. There is one after each solution, for its frame, and one inside a part
+  solution, for its body.
+
+- **An instructor copy printed a whole-problem solution's rubric twice.** A
+  `{solution}` with `\rubric` lines showed the teal "Rubric:" box straight
+  after its "Solution." header and again in the grading footer under the
+  answer, and the first box pushed the answer down by its own depth. A
+  `{partsolution}` printed its rubric once. `autoexam`, `quiz` and a `bank`
+  catalogue built with `\rubrics` all did it, tagged or not, and a tagged copy
+  read the solution as "Solution.", rubric, answer, rubric.
+
+  The first box is the placement that the grading footer replaced in v0.6.1
+  (the entry "The grading rubric moved out from over the solution and under
+  it", under 0.7.0 below). The footer's commit (`f87ee55`) deleted the header
+  line's call to `\@emit@rubric@overlay`. The day before, `main` had moved the
+  header line, call included, into a new `\vtop` (`0661da3`). `main` was merged
+  into the footer's branch eight minutes after that commit (`8fd4f92`), and the
+  `\vtop` merged in with no conflict: the conflict was over the lines the
+  footer's commit had edited, and it could only be settled for main's
+  `\box\@sol@vtop`. So the call came back without a conflict marker ever
+  touching it, and v0.6.1 shipped both boxes. `\end{solution}` no longer makes
+  the call. `\@emit@rubric@overlay` stays for `{partsolution}`, which sets it
+  under the part's answer.
+
+  What changes is a whole-problem solution with a rubric, in a copy that shows
+  rubrics: the first box is gone and the answer starts under the header, as it
+  does in a `solutions` key. Seven fixtures were built before and after in 31
+  copies (`autoexam`, `quiz` and `bank`; compact and inline layouts; tagged and
+  untagged). The eleven copies that print such a rubric changed. The other
+  twenty render identically at 150 dpi, an instructor copy whose only rubric is
+  a part solution's among them: the thirteen untagged ones are byte-identical
+  apart from the trailer `/ID`, and the seven tagged ones differ in three
+  objects, which are the namespace UUID that the tagging code mints on every
+  run, the object stream that holds it and the cross-reference stream. All
+  twelve tagged copies have 0 failed veraPDF checks before and after. An
+  instructor copy under `\keylayout{inline}` went from five pages to three,
+  against the student copy's two: a shorter solution overruns its blank by
+  less. `test_solution_tagged_conformance.py` asserts that the copy that shows
+  rubrics prints each rubric line once and that no other copy prints one. On
+  the code before this change that is its one failing check of 34: "Rubric:"
+  printed three times for the fixture's two rubrics.
+
 - **The stale sweep missed two whole classes of artifact.** It walked
   `VARIANT_MACROS`, which does not contain `base`, so `<base>_accessible.pdf`
   outlived any build that stopped producing it; and it only ever considered the
@@ -125,6 +1024,150 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   the obvious pattern and is wrong, because `exam1`'s sweep matches
   `exam1_review_instructor.pdf`, a different document that merely starts with
   the same characters.
+
+- **`Sublime/test_texlib_build.py` had failed on `main` since 2026-09-05, and no
+  workflow ran it.** PR #120 put the deferral prefix (`\def\TeXLibNo<Name>{}`,
+  one per package the scanner defers) at the front of the engine argument and
+  added `without_defer()` to `test_texlib_builder.py` to strip it. This file
+  kept comparing against the old argument, so `autoexam/base: bare \input arg`
+  and `pset/key: \ShowKey macro injected before \input` failed. Both now strip
+  the prefix with the same helper, which moved to `Sublime/_testkit.py` so the
+  two suites share one copy; the first is relabelled `autoexam/base: no mode
+  macro before \input`, since the argument is no longer bare. Against
+  deliberately broken builders, the base check fails when base mode injects a
+  macro, and the key check fails when the macro is dropped or lands ahead of
+  the deferral prefix. The file now runs in the `builder-logic` job of
+  `tests.yml`. It holds the only tests of the A → B → A oscillation stop, the
+  filter for biblatex's own rerun flags, and the `TEXLIB_STATE_RERUN=0` opt-out.
+
+  It also switches the format cache off, as `test_texlib_builder.py` already
+  did. With the cache on, the quick-mode case started `pdftex -ini` to dump a
+  format wherever TeX was on `PATH`; the `builder-logic` job installs no TeX, so
+  a local run and CI took different paths. The file took 1.3s with the cache on
+  and 0.3s with it off, measured locally.
+
+- **Two test guards passed without checking anything.** Both now fail on a
+  planted fault.
+
+  `test_engine_emit_edges.py` feeds the engine-emitted `.vmap` through the
+  builder's real slicer, and printed `SKIP  slicer sub-check (TexlibBuilder /
+  pypdf unavailable)` on every run, with pypdf installed. Its `_load_builder()`
+  kept a private LaTeXTools stub that never registered the `TeXLib` package, so
+  `from texlib_builder import TexlibBuilder` raised `ModuleNotFoundError: No
+  module named 'TeXLib'` and a bare `except Exception` turned that into the
+  skip. It now calls `install_native_builder()` from `_testkit.py`, as
+  `test_synctex_integration.py` and `test_biber_integration.py` do. A missing
+  pypdf is the only soft skip, the message names it, and the summary line
+  counts it; a builder that does not import is a FAIL. The suite goes from 34
+  checks to 52, all passing: emitter and slicer agree. With the sidecar's A and
+  B labels swapped before slicing, 8 of the 18 new checks fail; with every
+  marker moved one page late, 9 do.
+
+  `test_texlib_builder.py`'s "no module redefines the shared constants" scan
+  skipped a directory when `.git` or `.claude` appeared anywhere in its
+  *absolute* path. A checkout under `.claude/worktrees/<name>`, where agent
+  sessions run, had every directory skipped, the repo root included, and the
+  check passed having read 0 files. The walk now prunes those two names below
+  the root, and a companion check requires the scan to have reached
+  `smoke_test.py`, `Sublime/texlib/texlib_build.py` and the test file itself.
+  From such a worktree, a scratch `.py` holding a literal redefinition of
+  `LUALATEX_CLASSES` passed the old scan and fails the new one; restoring the
+  old prune fails the companion check with "0 files scanned". 401 checks
+  become 402.
+
+- **Fifteen more test files ran in no workflow.** No workflow globs for tests:
+  a file runs in CI only when a workflow names it. Of the 44 tracked
+  `test_*.py` and `test_*.lua` files, fifteen were named by none. Twelve were
+  added between 2026-07-10 and 2026-07-12, the newest on 2026-08-24. The
+  workflows now name all 44.
+
+  Thirteen need no TeX and run in the `builder-logic` job of `tests.yml`, in
+  three steps: `test_texlib_modes.py`; the plugin-module files
+  `test_texlib_complete.py`, `test_texlib_doctor.py`, `test_texlib_editor.py`,
+  `test_texlib_gallery.py`, `test_texlib_locate.py`, `test_texlib_scaffold.py`,
+  `test_texlib_texmf.py` and `test_texlib_tools.py`; and the course-tool files
+  `test_bank_report.py`, `test_collate_keys.py`, `test_coursemeta_lint.py` and
+  `test_version_diff.py`. `Schedule/test_schedule_schedmeta.lua` and
+  `Sublime/test_engine_emit_edges.py` run in `biber-integration`, the job with
+  `texlua`, `lualatex`, poppler and pypdf. That job runs on every push; the
+  Schedule file's two siblings stay in `smoke.yml`, which runs for `main` only.
+
+  With the entry above, `test_engine_emit_edges.py` runs its slicer sub-check in
+  that job, where pypdf is installed and a builder that does not import is a
+  failure.
+
+  `test_texlib_doctor.py` had one check tied to the machine. `N3: no texinputs
+  -> no warning` called the real `shadows_checkout()`, which asks `kpsewhich`
+  for `TEXMFHOME`. With a TeXLib copy under its `tex/latex/texlib` the file
+  exited 1, and with none the check passed whatever the gate did: removing the
+  gate from `_shadow_warning_line`, or gating on the `texinputs` setting alone,
+  left all 12 checks passing. Every N3 check now sets the derived TEXINPUTS and
+  the shadow state itself. Each of those two faults fails one check, a copy
+  planted under a throwaway `TEXMFHOME` no longer changes the result, and a new
+  check fails if any N3 check consults the machine's `TEXMFHOME`. 12 checks
+  become 14.
+
+  A new `test_workflow_coverage.py` runs last in `builder-logic` and fails when
+  a tracked `test_*.py` or `test_*.lua` is not run by a workflow: an
+  interpreter, then the file's path from the repo root, on a line that is not a
+  comment. It also fails when a workflow runs a test path that is not tracked.
+  Each of these fails it: a run line deleted, a run line commented out, a file
+  named only in a job's comment block, and a new tracked file that nothing
+  names. A test that must stay out of CI goes in the file's `EXEMPT` table with
+  the reason.
+
+- **Five content suites soft-skipped from Git Bash on a machine with TeX Live
+  2026, and `version_diff.py` could not run there.** `test_mode_effects.py`,
+  `test_engine_correctness.py`, `test_bank_catalog.py`, `test_class_render.py`,
+  `test_mc_schedule_render.py` and `version_diff.py` each carried a private copy
+  of the poppler lookup: `shutil.which("pdftotext")`, then the literal
+  `C:\texlive\2025\bin\windows\pdftotext.exe`. In Git Bash the first resolves to
+  Git's xpdf build (4.06, whose banner does not say poppler), and with TeX Live
+  2026 installed the second does not exist. Each suite printed its `SKIP` line
+  and exited 0, so the build-mode leakage guard and four other content checks
+  verified nothing; `version_diff.py` reported `no poppler pdftotext` for every
+  version.
+
+  The lookup is now `find_poppler` in `Sublime/texlib/texlib_buildspec.py`,
+  declared once and imported by all six. `Sublime/_testkit.py`, which had
+  already moved to a year glob, calls it too. Candidates are tried in this
+  order, and the first whose `-v` banner says poppler wins: the tool on PATH;
+  the directory of the `lualatex` or `pdflatex` on PATH, since TeX Live for
+  Windows ships poppler's tools beside the engines; then
+  `C:\texlive\*\bin\windows`, newest year first.
+
+  Run from Git Bash with PATH untouched, on TeX Live 2026 with poppler 25.02.0:
+  `test_mode_effects.py` 72 passed, `test_engine_correctness.py` 53,
+  `test_bank_catalog.py` 6, `test_class_render.py` 17,
+  `test_mc_schedule_render.py` 12, each of which printed `SKIP` before.
+  `test_texlib_builder.py` gains eight checks on the candidate order, one of
+  which fails if any `.py` file in the repo names a TeX Live year in a `bin`
+  path.
+
+- **A comment that names `\begin{document}` put the preamble into every copy of
+  a versioned exam.** The version loop typesets each copy from text it reads
+  back out of the source file, from the line after `\begin{document}` to
+  `\end{document}`, and it took the first `\begin{document}` in the file whether
+  or not a `%` stood before it. A header comment above `\documentclass` that
+  mentions the marker therefore started the body: every copy input the rest of
+  the header and the whole preamble ahead of the real body, with
+  `! LaTeX Error: Can be used only in preamble.` at `\documentclass` and again
+  at the real `\begin{document}`, and the class name typeset on a page of its
+  own at the front of the copy. The search for `\end{document}` already passed
+  over a mention that follows an unescaped `%` on its line. Both searches now
+  go through one helper (`find_uncommented` in `problem_engine.lua`), so the
+  body runs from the first `\begin{document}` outside a comment to the first
+  `\end{document}` outside one. A build of a single copy with no `\shuffle`
+  printed correctly before and after: there TeX reads the body itself, and the
+  engine's reading of it feeds only the point check and the score sheet.
+
+  Measured on the new fixture `commented-begin-test.tex`, two versions of a
+  one-problem exam with four comments that name a marker: 4 errors and 4 pages
+  before, no error and 2 pages after. For each of the other 161 `.tex` files in
+  the repository the old and the new reader return the same body, so no
+  document that built correctly reads different text. `test_read_body.lua`
+  (new, runs under `texlua`) checks the reader on 15 sources, and
+  `test_engine_correctness.py` builds the fixture and reads both copies back.
 
 ## [0.9.0] — 2026-09-08
 
