@@ -23,6 +23,13 @@ on:
         type: boolean
         default: false
 
+env:
+  # The toolchain, by digest: texlive-full:20260701 plus the pinned
+  # ImageMagick, poppler, veraPDF and pypdf, built once from
+  # .github/ci-image/Dockerfile. The same line is in tests.yml, smoke.yml and
+  # accessible.yml; move all four together (.github/ci-image/README.md).
+  CI_IMAGE: ghcr.io/landonfox00/texlib-ci:20261104-b3d4fa5@sha256:4412e258f79649c3f3e2aed1a87635959297cc870281cced384c3cf60790dc28
+
 jobs:
   visual:
     runs-on: ubuntu-latest
@@ -35,39 +42,28 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Pinned to the commit v2 resolved to, so rendering stays byte-stable over
-      # time (a silent TeX Live bump would otherwise invalidate every ref).
-      # That silent bump DID happen: the action SHA pinned only the action, while
-      # `scheme: full` tracked texlive-full:latest. Pinning the image does NOT
-      # pin the apk packages either: `apk add` resolves against Alpine's LIVE
-      # v3.24 index, which is how ImageMagick rolled to the 7.1.2.27 Beta under
-      # a pinned image on 2026-07-29 and cost this gate its fuzz tolerance. The
-      # outcome-deciding apk packages are therefore version-pinned below; when
-      # Alpine drops a pinned version this fails loudly at `apk add`, and the
-      # bump (plus a ref regen if rendering shifts) happens deliberately.
+      # Pinned to the commit v2 resolved to; the action only runs `docker run`
+      # on the image below. That image, not the action, is the toolchain, and
+      # the refs are regenerated in it (update_refs dispatch), so refs and
+      # checks share one.
       #
-      # That is not hypothetical: Alpine dropped 7.1.2.27-r0 and this gate went
-      # red on every PR with "unable to select packages: imagemagick-7.1.2.30-r0
-      # breaks world[imagemagick=7.1.2.27-r0]" -- the pin failing loudly, as
-      # designed, but at `apk add` rather than at a diff, so the job never
-      # reaches a render. Two things to know when it happens again: the failure
-      # looks nothing like a visual regression (~1m20s, no image comparison in
-      # the log), and an `update_refs` dispatch dies the same way BEFORE
-      # regenerating, so its artifact is the plain checkout -- check
-      # .regen-manifest before committing anything from it. Bumped to
-      # 7.1.2.30-r0 on 2026-08-30, to 7.1.2.34-r0 on 2026-10-24 when Alpine
-      # dropped 7.1.2.30-r0 the same way, and to 7.1.2.35-r0 on 2026-11-03
-      # when it dropped 7.1.2.34-r0 before that bump had merged.
-      # 20260701 is TeX Live 2026; the refs are regenerated in this same
-      # container (update_refs dispatch), so refs and checks share a toolchain.
+      # Every tool is IN the image (CI_IMAGE above), resolved when the image
+      # was built, so nothing here installs anything. It used to: `apk add
+      # imagemagick=<exact>` at job time, pinned because an unpinned roll to
+      # the 7.1.2.27 Beta on 2026-07-29 cost this gate its fuzz tolerance.
+      # Alpine keeps only the newest build of a package, so the pin broke this
+      # gate on every PR whenever Alpine moved on (-> .30 on 2026-08-30, -> .34
+      # on 2026-10-24, -> .35 on 2026-11-03), at `apk add`, ~1m20s in, before
+      # any render. A version bump is now an image rebuild plus a digest move
+      # in one PR, and a ref regen in that PR if renders move.
       - name: Visual regression in pinned TeX Live
         uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
-          docker_image: ghcr.io/xu-cheng/texlive-full:20260701
+          docker_image: ${{ env.CI_IMAGE }}
           # poppler-utils -> pdftoppm (PDF->PNG); imagemagick -> magick compare.
           run: |
             set -e
-            apk add --no-cache python3 poppler-utils=25.12.0-r1 imagemagick=7.1.2.35-r0
+            cat /etc/texlib-ci/manifest
             # Fail loudly if the compare tool is missing: smoke_test soft-skips
             # visual checks when ImageMagick is absent, which would make this
             # gate pass vacuously.
@@ -95,7 +91,7 @@ jobs:
               # never a commit.
               {
                 echo "run_id=${{ github.run_id }}"
-                echo "image=ghcr.io/xu-cheng/texlive-full:20260701"
+                echo "image=${{ env.CI_IMAGE }}"
                 head -1 /tmp/magick-version.txt
                 head -1 /tmp/pdftoppm-version.txt
               } > tests/visual_refs/.regen-manifest

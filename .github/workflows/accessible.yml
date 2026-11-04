@@ -29,6 +29,13 @@ on:
     - cron: "30 7 * * *"   # nightly; offset from visual.yml's 07:00
   workflow_dispatch:
 
+env:
+  # The toolchain, by digest: texlive-full:20260701 plus the pinned
+  # ImageMagick, poppler, veraPDF and pypdf, built once from
+  # .github/ci-image/Dockerfile. The same line is in tests.yml, smoke.yml and
+  # visual.yml; move all four together (.github/ci-image/README.md).
+  CI_IMAGE: ghcr.io/landonfox00/texlib-ci:20261104-b3d4fa5@sha256:4412e258f79649c3f3e2aed1a87635959297cc870281cced384c3cf60790dc28
+
 jobs:
   accessible:
     runs-on: ubuntu-latest
@@ -52,56 +59,27 @@ jobs:
       # are regenerated in this same container line (visual.yml's update_refs
       # dispatch), so the two gates share one toolchain.
       #
-      # The apk versions below are pinned too: the image pin does NOT freeze
-      # apk -- `apk add` resolves against Alpine's live v3.24 index. A dropped
-      # version fails loudly at `apk add`; bump it deliberately.
+      # Every tool is IN the image (CI_IMAGE above): poppler, pypdf, and
+      # veraPDF 1.30.2, hash-verified when the image was built. This job used
+      # to `apk add` its packages and download veraPDF at job time; an Alpine
+      # update could fail that install, and a veraPDF release cannot reach
+      # this gate except through an image rebuild.
       - name: PDF/UA-2 conformance in pinned TeX Live
         uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
-          docker_image: ghcr.io/xu-cheng/texlive-full:20260701
+          docker_image: ${{ env.CI_IMAGE }}
           run: |
             set -e
-            apk add --no-cache python3 py3-pip poppler-utils=25.12.0-r1 openjdk17-jre curl unzip
+            # Record what actually ran: TeX Live, veraPDF, pypdf, poppler. The
+            # image used to float, and nothing in the log said which TeX Live
+            # produced a result -- which is what made the first failure here
+            # expensive to diagnose.
+            cat /etc/texlib-ci/manifest
 
-            # Record what actually ran. The image used to float, and nothing in
-            # the log said which TeX Live produced a result -- which is what made
-            # the first failure here expensive to diagnose.
-            # No `cmd | head`: the action shell runs with pipefail, and a writer
-            # that outlives head's early close dies of SIGPIPE (141). This line
-            # had only been surviving by winning that race.
-            tex --version > /tmp/tool-version.txt 2>&1 || true
-            head -1 /tmp/tool-version.txt
-
-            # veraPDF ships as an IzPack installer; drive it headlessly.
-            # Pinned + hash-verified: veraPDF is the conformance authority for
-            # this gate, and the bare /releases/verapdf-installer.zip URL is a
-            # rolling "latest" -- a veraPDF release would otherwise change
-            # pass/fail here with no commit in this repo.
-            curl -sSL -o /tmp/verapdf.zip https://software.verapdf.org/releases/1.30/verapdf-greenfield-1.30.2-installer.zip
-            echo "6cc6341cb1af644044054b81f00a6590a7918abb18f762243de115258bcad838  /tmp/verapdf.zip" | sha256sum -c -
-            unzip -q /tmp/verapdf.zip -d /tmp/verapdf-installer
-            INSTALLER="$(find /tmp/verapdf-installer -name 'verapdf-izpack-installer-*.jar' | head -1)"
-            [ -n "$INSTALLER" ] || { echo "veraPDF installer jar not found in the release zip"; exit 1; }
-            cat > /tmp/verapdf-auto-install.xml <<'XML'
-            <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-            <AutomatedInstallation langpack="eng">
-              <com.izforge.izpack.panels.htmlhello.HTMLHelloPanel id="welcome"/>
-              <com.izforge.izpack.panels.target.TargetPanel id="install_dir">
-                <installpath>/opt/verapdf</installpath>
-              </com.izforge.izpack.panels.target.TargetPanel>
-              <com.izforge.izpack.panels.packs.PacksPanel id="sdk_pack_select">
-                <pack index="0" name="veraPDF GUI" selected="true"/>
-                <pack index="1" name="veraPDF Batch files" selected="true"/>
-                <pack index="2" name="veraPDF Validation model" selected="false"/>
-                <pack index="3" name="veraPDF Documentation" selected="false"/>
-                <pack index="4" name="veraPDF Sample Plugins" selected="false"/>
-              </com.izforge.izpack.panels.packs.PacksPanel>
-              <com.izforge.izpack.panels.install.InstallPanel id="install"/>
-              <com.izforge.izpack.panels.finish.SimpleFinishPanel id="finish"/>
-            </AutomatedInstallation>
-            XML
-            java -jar "$INSTALLER" /tmp/verapdf-auto-install.xml
-            export PATH="/opt/verapdf:$PATH"
+            # veraPDF sits outside find_verapdf()'s fallback roots on purpose
+            # (the Dockerfile says why): this is the one job that runs it, and
+            # it does so by putting it on PATH here.
+            export PATH="$TEXLIB_VERAPDF_HOME:$PATH"
 
             # Fail loudly if veraPDF is missing. smoke_test SOFT-SKIPS veraPDF
             # validation when the CLI is absent (the pdftotext/ImageMagick
@@ -118,9 +96,8 @@ jobs:
             # first runs of this gate logged "accessible/PDF-UA [pypdf MISSING ->
             # those checks skipped]" while still reporting per-module PASS. The
             # veraPDF guard above was written to stop exactly that vacuous green
-            # and then left the second half of the check unguarded. Alpine's
-            # python is externally managed (PEP 668), hence the flag.
-            pip install --no-cache-dir --break-system-packages pypdf==6.16.2
+            # and then left the second half of the check unguarded. pypdf
+            # 6.16.2 is in the image.
             python3 -c 'import pypdf' \
               || { echo "pypdf not importable; PDF/UA checks would soft-skip"; exit 1; }
 

@@ -5,6 +5,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  # The toolchain for biber-integration, by digest: texlive-full:20260701 plus
+  # the pinned ImageMagick, poppler, veraPDF and pypdf, built once from
+  # .github/ci-image/Dockerfile. The same line is in smoke.yml, visual.yml and
+  # accessible.yml; move all four together (.github/ci-image/README.md).
+  CI_IMAGE: ghcr.io/landonfox00/texlib-ci:20261104-b3d4fa5@sha256:4412e258f79649c3f3e2aed1a87635959297cc870281cced384c3cf60790dc28
+
 jobs:
   # Fast: the builder's decision logic + multi-pass orchestration, simulated.
   # No TeX toolchain needed, so this runs in seconds on every push.
@@ -220,18 +227,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # As in the other three workflows, the action SHA pins the action and not
-      # the toolchain; `scheme: full` tracked texlive-full:latest. 20260701 is
-      # TeX Live 2026. poppler-utils and pypdf are version-pinned as well —
-      # the image pin does not freeze apk or pip, which resolve live.
+      # the toolchain; `scheme: full` tracked texlive-full:latest. CI_IMAGE
+      # above is texlive-full 20260701 (TeX Live 2026) with poppler-utils and
+      # pypdf already installed, by digest, so nothing resolves live here.
+      # The image's veraPDF stays off PATH and outside find_verapdf()'s roots,
+      # so the settle test's veraPDF verdict soft-skips here as before.
       - name: Real biber + SyncTeX + shuffle + mode-effect tests in pinned TeX Live
         uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d
         with:
-          docker_image: ghcr.io/xu-cheng/texlive-full:20260701
+          docker_image: ${{ env.CI_IMAGE }}
           run: |
             set -e
-            apk add --no-cache python3 py3-pip poppler-utils=25.12.0-r1
-            pip install --break-system-packages --quiet pypdf==6.16.2 \
-              || pip install --quiet pypdf==6.16.2
+            cat /etc/texlib-ci/manifest
             texlua test_exam_seed.lua
             texlua test_read_body.lua
             python3 Sublime/test_biber_integration.py

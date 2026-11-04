@@ -42,10 +42,11 @@ when either is missing the check soft-skips.
 
 `.github/workflows/visual.yml` diffs against these refs inside a **pinned** TeX
 Live container on PRs + nightly; it is a required check under `main`'s branch
-protection (promoted 2026-08-25). The real pin is the `docker_image` tag
-(`ghcr.io/xu-cheng/texlive-full:20260701`, TeX Live 2026) plus the apk version
-pins in the workflow — the action SHA alone pins only the action, not the
-toolchain. The pin keeps rendering stable so the committed refs stay valid —
+protection (promoted 2026-08-25). The real pin is the `CI_IMAGE` digest in the
+workflow: `ghcr.io/landonfox00/texlib-ci`, which is
+`ghcr.io/xu-cheng/texlive-full:20260701` (TeX Live 2026) with ImageMagick and
+poppler built in at exact versions (`.github/ci-image/`). The action SHA alone
+pins only the action, not the toolchain. The pin keeps rendering stable so the committed refs stay valid —
 they match that container byte-for-byte. If the refs ever drift, regenerate
 them **in the container**: run
 the `visual` workflow manually with `update_refs=true` (Actions ▸ visual ▸ Run

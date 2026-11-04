@@ -301,7 +301,9 @@ def _verapdf_candidates():
     `shutil.which` alone reports "not installed" on a machine where it plainly
     is -- the local smoke runs were soft-skipping conformance for exactly this
     reason while a full veraPDF sat in the user's home directory. `/opt/verapdf`
-    is where `.github/workflows/accessible.yml` installs it.
+    is the conventional Linux root. CI's image installs it at
+    `/opt/verapdf-<version>` instead, outside these roots, so that only
+    `accessible.yml`, which puts it on PATH, runs it (`.github/ci-image/`).
     """
     home = os.path.expanduser("~")
     roots = [os.path.join(home, "verapdf")]

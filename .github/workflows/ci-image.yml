@@ -1,0 +1,87 @@
+name: ci-image
+
+# Builds .github/ci-image/Dockerfile and pushes it to
+# ghcr.io/landonfox00/texlib-ci. The four gate workflows (tests, smoke, visual,
+# accessible) run that image BY DIGEST, so pushing a new image changes nothing
+# until a commit moves their `CI_IMAGE` lines to the new digest. See
+# .github/ci-image/README.md for the bump procedure.
+#
+# Triggers:
+# - workflow_dispatch on any branch (Actions > ci-image > Run workflow).
+# - a push that changes .github/ci-image/ on any branch but main. That is how a
+#   bump PR gets its image before the workflow file exists on main (dispatch
+#   only lists workflows that are on the default branch), and it means the
+#   digest a PR cites was built from that PR's Dockerfile. Not on main: the
+#   merge would only build a second, unreferenced copy of the image the PR
+#   already pushed.
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths:
+      - ".github/ci-image/**"
+      - "!.github/ci-image/README.md"
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ci-image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/texlib-ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          tag="$(date -u +%Y%m%d)-${GITHUB_SHA::7}"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          docker build --pull -t "$IMAGE:$tag" .github/ci-image
+
+      # The checks each gate relies on, against the built image, before it is
+      # pushed: a gate soft-skips when a tool is missing, so a broken image
+      # would otherwise show up as a vacuous green, not as a failure.
+      - name: Check the image
+        run: |
+          set -euo pipefail
+          docker run --rm "$IMAGE:$TAG" /bin/bash -eo pipefail -c '
+            cat /etc/texlib-ci/manifest
+            command -v lualatex pdflatex biber texlua synctex >/dev/null
+            command -v pdftotext pdftoppm pdfinfo >/dev/null
+            command -v magick >/dev/null
+            python3 -c "import pypdf"
+            "$TEXLIB_VERAPDF_HOME/verapdf" --version
+            # find_verapdf() must NOT find it without PATH (see the Dockerfile).
+            [ ! -e /opt/verapdf ] || { echo "/opt/verapdf exists"; exit 1; }
+          '
+
+      - name: Push
+        run: |
+          set -euo pipefail
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "$IMAGE:$TAG"
+          digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE:$TAG")"
+          docker run --rm "$IMAGE:$TAG" cat /etc/texlib-ci/manifest > manifest.txt
+          {
+            echo "### Pushed"
+            echo
+            echo "Paste into the \`CI_IMAGE\` line of tests.yml, smoke.yml, visual.yml and accessible.yml:"
+            echo
+            echo '```'
+            echo "${IMAGE}:${TAG}@${digest#*@}"
+            echo '```'
+            echo
+            echo '```'
+            cat manifest.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "CI_IMAGE: ${IMAGE}:${TAG}@${digest#*@}"
