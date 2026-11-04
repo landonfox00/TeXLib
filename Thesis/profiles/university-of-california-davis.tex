@@ -1,0 +1,216 @@
+% profiles/university-of-california-davis.tex — University of California-Davis
+% ============================================================================
+% source: https://grad.ucdavis.edu/preparing-filing-your-thesis-or-dissertation
+%         (Graduate Studies, "Filing Your Thesis or Dissertation" — the page
+%          Graduate Studies reviews a submission against: "One of them will
+%          conduct a formatting review to ensure your format matches the
+%          requirements included on this page.")
+% source: https://ucdavis.box.com/v/TitlePageSample-TD
+%         ("TitlePageSample.pdf", Graduate Studies — an annotated specimen on
+%          page 1 and the clean specimen on page 2)
+% accessed: 2026-09-09
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, the ABSENCE of a
+% separate approval page, and the accessibility requirements.
+% NOT set:
+%   * \thesissetchapteropening — no deeper chapter-opening margin is prescribed.
+%   * \thesisrequirepdfstandard — Graduate Studies names no PDF standard.
+%
+% CURRENCY. The page is undated but plainly live: it lists filing deadlines
+% through Spring 2027 and workshop dates from October 2026, and its
+% accessibility section is written around the April 2026 Title II date. There is
+% no superseded edition to reconcile.
+%
+% THE COMMITTEE APPROVAL IS ON THE TITLE PAGE. That is why
+% \thesisnoapprovalpage is set below rather than a page being written:
+%
+%     "This is the front page of your thesis or dissertation, on which the
+%      signatures of your committee members will signify your completion. All
+%      signatures must appear on the same single title page."
+%     "The title page & the abstract are the only required preliminary pages".
+%
+% There are TWO versions of that page and only one of them is the filed leaf:
+%
+%     "The title page in your ProQuest ETD upload will be unsigned, and include
+%      blank signature lines."
+%     "Graduate Studies requires one copy of your title page signed by all
+%      committee members. Electronic signatures are accepted, and committee
+%      members may use any format or application to sign, except only typing
+%      their name. The signed title page must be submitted via GradSphere."
+%
+% So the page typeset below — blank rules, names beneath — IS the version that
+% belongs in the filed PDF, and the signed copy travels separately through
+% GradSphere. This is the opposite of the Arizona and Mount Sinai arrangement,
+% where the signed sheet is scanned back INTO the document. Do not "fix" the
+% blank rules.
+%
+% SIGNATURES: yes, but electronic ones are accepted and never appear in the
+% filed manuscript.
+%
+% ONE REQUIREMENT THIS PROFILE CANNOT EXPRESS. "Use a font size between 10 and
+% 13 points" and "Any font type is acceptable, as long as the font is legible
+% and used consistently throughout. All your fonts must be embedded fonts."
+% There is no profile field for type size; texlib-thesis loads report at 12pt,
+% inside the range, and embeds every face. If the class's base size ever changes
+% this institution's requirement breaks silently.
+%
+% PAGE NUMBERING, and the one place this profile fights the class. Graduate
+% Studies requires the title page to DISPLAY its number: "The title page is
+% always page i", "All page numbers must be centered at the bottom of the page",
+% and "Your thesis or dissertation should include no blank pages, and no
+% unnumbered pages, with the exception of an optional copyright page." Every
+% other profile in this directory suppresses the folio on the title page. This
+% one does not — it uses \thispagestyle{plain} and the normal geometry so the
+% centred folio prints. A document filed at Davis must therefore call
+% \frontmatter before \thesistitlepage, so that folio is a lower-case roman i,
+% and \mainmatter at chapter 1, where "All pages following the preliminary pages
+% ... are numbered with Arabic numerals beginning at 1."
+
+\thesisinstitution{University of California, Davis}
+
+% "All pages must include a one inch (1\") margin on all sides (top, bottom,
+% left and right), including all figures, charts, graphs, illustrations and
+% appendices." Flat, with one stated relaxation that runs the other way: "The
+% page numbers may appear outside the 1\" margins." The class's `includefoot'
+% geometry keeps the folio inside the text block instead, which is stricter than
+% required and therefore in spec.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "The thesis or dissertation must be double spaced, except in specified places
+% on the title page, and places where conventional usage calls for single
+% spacing -- footnotes, indented quotations, tables, and the bibliography."
+% The title-page exceptions are honoured explicitly below.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Davis publishes a real, dated, binding accessibility requirement — one of the
+% few in this directory that names a WCAG level AND a compliance date AND makes
+% the student attest to it.
+%
+% \thesisrequiretagging is set on the strength of the second quoted sentence
+% below: a PDF that "contain[s] code or markup language" making content
+% "navigable and readable by screen readers" is a tagged PDF, and there is no
+% other way to satisfy WCAG 2.1 SC 1.3.1 in a PDF.
+%
+% \thesisrequiredocumentlanguage is a DERIVATION, and is flagged as one: Davis
+% does not name the document language, but WCAG 2.1 Level AA conformance
+% includes SC 3.1.1 Language of Page (Level A), which is exactly that. A
+% reviewer who wants this profile to encode only what Davis writes in so many
+% words should strike this one line; nothing else here depends on it.
+%
+% NOTE THE DATE. April 2026 is what Davis publishes, and it is the large-public-
+% entity Title II date. Other profiles in this directory correctly say April
+% 2027 for smaller entities. These are both right; do not reconcile them.
+\thesisrequiretagging
+\thesisrequiredocumentlanguage
+\thesisaccessibilityrequirement{WCAG 2.1 Level AA}
+	{``As of April 2026, all electronic theses and dissertations (ETDs) must
+	 conform to WCAG 2.1 Level AA web accessibility requirements prior to
+	 submission in order to comply with nondiscrimination provisions outlined in
+	 Title II of the Americans with Disabilities Act.''}
+\thesisaccessibilityrequirement{Machine-readable structure}
+	{``PDFs should contain code or markup language that ensure that the content
+	 is navigable and readable by screen readers or other assistive technology.
+	 You can confirm that your PDF meets these requirements by using an
+	 Accessibility Checker such as those included in Adobe Acrobat Pro or in
+	 Microsoft Word.''}
+\thesisaccessibilityrequirement{Student certification}
+	{``As part of the degree completion process, students will be required to
+	 certify that their PDF meets accessibility requirements.'' The filer, not
+	 the tool, signs for this.}
+\thesisaccessibilityrequirement{Embedded fonts}
+	{``All your fonts must be embedded fonts.''}
+
+% --- Title page ----------------------------------------------------------------
+% "The spacing, language, and capitalization on your title page must match the
+% sample/template exactly", and the specimen's own footer repeats it: "Your
+% title page must maintain the exact line spacing and language shown in this
+% sample." The clean specimen (page 2 of TitlePageSample.pdf) reads:
+%
+%     UC Davis Graduate Studies Title Page Sample:
+%     A Review of Current Literature
+%     By
+%     STUDENT NAME
+%     DISSERTATION
+%     Submitted in partial satisfaction of the requirements for the degree of
+%     DOCTOR OF PHILOSOPHY
+%     in
+%     Human Development
+%     in the
+%     OFFICE OF GRADUATE STUDIES
+%     of the
+%     UNIVERSITY OF CALIFORNIA
+%     DAVIS
+%     Approved:
+%     ____________________   Chair's Name, Chair
+%     ____________________   Member's Name
+%     ____________________   Member's Name
+%     Committee in Charge
+%     2021
+%                                    i
+%
+% The annotations on page 1 are prescriptive and each is honoured here:
+%   - "Capitalize only the first letters of words normally capitalized in a
+%     title" — so \@title is emitted AS WRITTEN, never uppercased.
+%   - "Multiple title lines must be single spaced."
+%   - "FULL NAME and PAPER-TYPE must be in all caps and single spaced."
+%   - "Do NOT include previous degrees."
+%   - "Program name (do not add specialization). Only the first letters of words
+%     are capitalized" — \thesis@program is emitted as written.
+%   - "in the" / "of the" are NOT capitalized.
+%   - "Do NOT bold, underline, or vary the font size on any area of your title
+%     page" — which is why nothing here is \bfseries or \large, unlike the
+%     class's neutral title page.
+%   - "Do NOT add titles to committee member names (Prof., Dr., PhD, MD, etc.)."
+%   - "Include ,Chair or ,Co-Chair label. Do NOT include labels for members."
+%   - "The year your degree will be conferred" — a bare year, so \graddate{2027}.
+%   - "All lines, except multiple title lines and your NAME/PAPER, should be
+%     double spaced."
+%
+% \thesis@memberline is replaced because the class default sets a 3in rule and
+% then "Name, Role" flush with it; Davis centres both, and wants no role text at
+% all for ordinary members. Pass the chair's role as \committeemember{Name}{Chair}
+% and leave the second argument EMPTY for everyone else.
+\renewcommand{\thesistitlepage}{%
+	\clearpage
+	% Not \thispagestyle{empty}: Davis requires the folio on this page. See the
+	% header. \frontmatter must have been called for it to read `i'.
+	\thispagestyle{plain}%
+	\begin{center}
+		\doublespacing
+		% Title: as written, single spaced across its own lines.
+		{\singlespacing\thesis@tagtitle{Title}{\@title}\par}%
+		By\par
+		% Name and paper type: all caps, single spaced together.
+		{\singlespacing
+		 \MakeUppercase{\@author}\par
+		 \MakeUppercase{\thesis@docnoun}\par}%
+		Submitted in partial satisfaction of the requirements for the degree of\par
+		\MakeUppercase{\thesis@degree}\par
+		in\par
+		\thesis@program\par
+		in the\par
+		OFFICE OF GRADUATE STUDIES\par
+		of the\par
+		UNIVERSITY OF CALIFORNIA\par
+		DAVIS\par
+		Approved:\par
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			\rule{3.2in}{0.4pt}\par
+			##1\ifx\relax##2\relax\else, ##2\fi\par
+		}%
+		\thesis@committee
+		\endgroup
+		Committee in Charge\par
+		\thesis@date\par
+	\end{center}%
+	\clearpage
+}
+
+% --- Committee approval page ---------------------------------------------------
+% None. The committee signs the title page above, and Graduate Studies lists the
+% title page and the abstract as "the only required preliminary pages". A
+% separate approval leaf is not part of a Davis filing.
+\thesisnoapprovalpage
