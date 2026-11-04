@@ -1,0 +1,219 @@
+% profiles/washington-state-university.tex — Washington State University
+% ============================================================================
+% source: https://gradschool.wsu.edu/documents/2014/12/dissertation-and-thesis-formatting-guidelines.pdf/
+%         ("WSU Thesis and Dissertation Formatting Guidelines", the page footer
+%          of every page reads "Updated 1/15/2026 - v1.3" — current)
+% source: https://gradschool.wsu.edu/documents/2014/12/etd-formatting-checklist.pdf/
+%         ("WSU Electronic Theses and Dissertations (ETD) Formatting Checklist",
+%          footer "Updated 8/28/2024 - v1")
+% source: https://gradschool.wsu.edu/documents/2017/03/thesis-dissertation-template.docx/
+%         (the Graduate School's own Word template — the only place the exact
+%          committee-page sentence is printed)
+% source: https://gradschool.wsu.edu/dissertations-theses/
+%         (the Graduate School's submission page, for the accessibility section)
+% accessed: 2026-09-14
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, title page, committee (approval)
+% page, and the accessibility finding.
+% NOT set: \thesissetchapteropening — WSU requires only that "Chapters must
+% always start on a new page" and states no deeper opening margin, so the body
+% margin governs. \thesisrequiretagging and friends are deliberately NOT set;
+% see the accessibility note below.
+%
+% The Graduate School dictates exactly three pages — "Whereas the Graduate
+% School prescribes formatting for three pages (title, committee, and abstract),
+% and for a few elements of the ETD (font, margins, spacing, etc.), we do not
+% require any specific formatting or styling guide requirements for the
+% remainder of the document." Two of those three are profile hooks and are
+% implemented below; the abstract is an author's page, not a class hook, and its
+% rules are recorded here in prose instead:
+%
+%   * the title must be copied from the title page and match "EXACTLY, even down
+%     to the first word of each line";
+%   * "Abstract" in Title Case, three or more blank lines below the title;
+%   * name (with the new degree abbreviation), "Washington State University",
+%     and month/year of graduation, three single-spaced lines in Title Case;
+%   * a blank line, then "Chair: <name>" with no degree abbreviation
+%     ("Co-Chairs: A and B" if there are two);
+%   * no charts, graphs, images or figures in the abstract body.
+%
+% WHERE THE PROSE GUIDE AND THE TEMPLATE DIFFER, the guide wins (RESEARCHING.md,
+% "prefer the prose requirements where they disagree"). Two places where they do
+% not quite agree, both resolved toward the guide and noted for the reviewer:
+%   * The guide lists the title-page contents (step 5: "Next is your name") with
+%     no "By" line. The template prints "By" above the name. The template is the
+%     Graduate School's own file and is what the review desk compares against, so
+%     the "By" line is kept; the guide does not forbid it.
+%   * The guide says the title is "in capital letters, double-spaced"; the
+%     template adds "ARRANGED IN THE SHAPE OF AN INVERTED PYRAMID". That shape
+%     cannot be produced mechanically from an arbitrary title and is not stated
+%     as a requirement in the guide, so it is left to the author.
+
+\thesisinstitution{Washington State University}
+
+% "Margins on all pages must be a minimum of 1" on all sides for the main
+% content of the ETD (e.g., text, figures, equations, tables). Exceptions
+% include page numbers, running heads, and marginal notes." The class's
+% `normal' layout carries includefoot, so the page number sits inside the 1in
+% band with the text block above it — i.e. it takes the exception WSU names.
+%
+% NOT IMPLEMENTED, and left for the reviewer: WSU also says "Page numbers
+% should be centered at the bottom of the page, 0.5 inches from the edge." The
+% class centres the number in the foot but does not pin it to 0.5in from the
+% paper edge. It does stay clear of WSU's hard limit — "The 'absolute margin'
+% should be a minimum of 0.5" on all sides. Nothing should extend into this
+% region" — so a build against this profile is inside the rule that is stated
+% as a rule, and outside the one stated as "should".
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Text in the body of the abstract, acknowledgment (if applicable), dedication
+% (if applicable), and throughout the ETD body must be at least 1.5 spaced.
+% Select one spacing format and use it consistently throughout these sections of
+% your ETD. a. We recommend double spacing."
+%
+% So WSU offers a choice with a floor. This profile takes the recommendation;
+% \thesissetspacing{onehalf} is equally in spec. Note also the separate LaTeX
+% clause — "For students using LaTeX/Overleaf: Line spacing should be between
+% 120-145% of the point size of the text. At a minimum, the line spacing should
+% be 1.2 times the font size" — which reads as an alternative formulation for
+% LaTeX authors, not a second requirement; setspace's double spacing sits above
+% its floor.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% WSU publishes an accessibility statement for ETDs, but it is ENCOURAGEMENT,
+% not a filing requirement: nothing on the Graduate School's pages names a
+% tagged PDF, a PDF standard, a document language or a WCAG level as something
+% the ETD must satisfy, and the formatting guidelines PDF — the document that
+% carries every rule the review desk enforces — does not contain the word
+% "accessibility" at all. \thesisrequiretagging, \thesisrequiredocumentlanguage
+% and \thesisrequirepdfstandard are therefore NOT set. Declaring them would put
+% a requirement in this graduate school's mouth that it has not published.
+\thesisaccessibilityrequirement{Best practices (encouraged, not required)}
+	{"As you prepare your thesis/dissertation, please be sure to follow best
+	 practices for accessibility. Document accessibility is important so that
+	 people who rely on assistive technology can also read and engage with your
+	 work." The Graduate School then links three guides — one from WSU
+	 Libraries, one from WSU Web Communication, one from the University of
+	 Washington — and names no standard, level or checkable property of the
+	 filed PDF.}
+\thesisaccessibilityrequirement{Text colour}
+	{"All text should be in black, as colored text does not always print clearly
+	 due to dithering and blending of inks. Other colored text is allowed as
+	 parts of figures, tables, etc., but fine details in figures should be in
+	 black for clarity." Stated as a formatting rule rather than an
+	 accessibility one, but it constrains contrast, so it is recorded.}
+\thesisaccessibilityrequirement{Internal links}
+	{"All internal links should be black to maintain consistency with the rest of
+	 the text."}
+
+% --- Title page --------------------------------------------------------------
+% "All text on the title page must be centered." / "Do not use bold or underline
+% font effects on this page." / "The title page is the only page of your ETD
+% without a visible page number." The class's neutral title page sets the title
+% in bold, which WSU forbids, so the page is replaced rather than adjusted.
+%
+% Order and spacing are the guide's, step by step:
+%   4. title in capital letters, double-spaced
+%   5. name, with "several blank lines above and below"
+%   6. the requirements phrase, single-spaced, broken exactly as WSU prints it
+%   7. a blank line, then the degree in capital letters
+%   8. two blank lines, then the university name in capital letters,
+%      single-spaced with the degree-granting unit
+%   9. a blank line, then month and year of graduation, in capital letters
+%  10. (optional) the copyright block — NOT emitted here, because it is
+%      optional and because \makecopyrightpage already exists for authors who
+%      want it. WSU's wording for it is "© <year> <name>" then, single-spaced,
+%      "All Rights Reserved".
+%
+% \thesis@program carries the "name of your department, school, or another
+% degree-granting unit"; \thesis@degree carries the degree name, which WSU wants
+% without the discipline for doctorates ("DOCTOR OF PHILOSOPHY") and with it for
+% master's ("MASTER OF SCIENCE IN CHEMISTRY"). Both are uppercased here, so the
+% author may set them in ordinary case.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\centering
+		\vspace*{\fill}
+		\begin{doublespace}
+			\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\end{doublespace}
+		\vspace{4\baselineskip}
+		\singlespacing
+		By\par
+		\vspace{\baselineskip}
+		\MakeUppercase{\@author}\par
+		\vspace{4\baselineskip}
+		A \thesis@docnoun{} submitted in partial fulfillment of\\
+		the requirements for the degree of\par
+		\vspace{\baselineskip}
+		\MakeUppercase{\thesis@degree}\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{Washington State University}\\
+		\thesis@program\par
+		\vspace{\baselineskip}
+		\MakeUppercase{\thesis@date}\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee page ------------------------------------------------------------
+% WSU calls this the "committee page", not an approval page, and it is required:
+% it is prefatory page 2 of 6 and "Format specified for WSU".
+%
+% NO SIGNATURES. The Graduate School's own template prints the committee as
+% plain typed lines with no rules, and neither the guide nor the checklist
+% mentions a signature, a date line or a seal anywhere. The class's default
+% \thesis@memberline draws a 3in signature rule, which would be wrong here, so
+% it is replaced for this page only.
+%
+% Layout, from the guide:
+%   3. left-justified "To the Faculty of Washington State University:"
+%   4. an acceptance paragraph with its first line indented, capital C in
+%      "Committee", "the thesis of" or "the dissertation of", and the author's
+%      name exactly as on the title page
+%   5. committee names right-justified, chair first, each with the abbreviation
+%      of their highest degree, the chair's followed by ", Chair" (or ",
+%      Co-Chair" for both co-chairs)
+%   1. no font effects (no bold, italic or underline)
+%   2. all lines double-spaced
+%
+% The sentence itself is not printed in the guide — only its constraints are.
+% It is taken verbatim from the Graduate School's Word template: "The members of
+% the Committee appointed to examine the [thesis/dissertation] of FULL NAME
+% [ALL CAPS, must match title page exactly] find it satisfactory and recommend
+% that it be accepted."
+%
+% PAGE NUMBER. "Begin using lowercase Roman numerals (ii, iii, iv, etc.) on the
+% committee page which is numbered as 'ii'." That is a property of this page, so
+% this page sets it: roman numbering, counter forced to 2, and a visible folio
+% (the class's other two prefatory hooks suppress the folio, which is right for
+% the title page and wrong here). It assumes WSU's prescribed order — title page
+% first, committee page second — which is the order the guide requires.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage
+	\loadgeometry{normal}%
+	\pagenumbering{roman}\setcounter{page}{2}\thispagestyle{plain}%
+	\begin{doublespace}
+		\thesis@tagtitle{H1}{{\color{white}\tiny Committee Approval Page}}\par
+		\vspace*{\fill}
+		\noindent To the Faculty of Washington State University:\par
+		\vspace{\baselineskip}
+		\par The members of the Committee appointed to examine the
+		\thesis@docnoun{} of \MakeUppercase{\@author} find it satisfactory and
+		recommend that it be accepted.\par
+		\vspace{2\baselineskip}
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			\raggedleft ##1\ifx\relax##2\relax\else, ##2\fi\par
+		}%
+		\raggedleft
+		\thesis@committee
+		\endgroup
+		\vspace*{\fill}
+	\end{doublespace}%
+	\clearpage
+}
