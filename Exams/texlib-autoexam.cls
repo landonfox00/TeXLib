@@ -83,7 +83,13 @@
 % Backward-compat aliases for autoexam's internal naming. Existing logic
 % (and downstream documents) using \if@autoexam@rubric / \@autoexam@rubrictrue
 % continues to work; new code should use \ifrubric / \rubrics.
+%
+% \let copies \ifrubric's meaning at the moment it runs, so this one is a
+% snapshot: a \rubrics in the preamble flips \ifrubric and leaves the alias at
+% \iffalse. The class itself therefore reads \ifrubric, and the alias is
+% re-taken at \begin{document} so downstream code sees the preamble's setting.
 \let\if@autoexam@rubric\ifrubric
+\AtBeginDocument{\let\if@autoexam@rubric\ifrubric}
 \let\@autoexam@rubrictrue\rubrictrue
 \let\@autoexam@rubricfalse\rubricfalse
 
@@ -105,6 +111,11 @@
 \@autoexam@versionedfalse
 
 % Handle Versions
+% \theExamVersion is defined in EVERY autoexam document.  With no \versions and
+% no forced \Version it is A: that label seeds the engine (\AtBeginDocument
+% below) and is what \byversion and \vercase select, so changing it would redraw
+% every existing exam that declares no versions.  The macro therefore cannot
+% tell such a document from version A of a versioned one; \IfExamVersioned can.
 \ifdefined\Version
 	\newcommand{\theExamVersion}{\Version}
 \else
@@ -222,7 +233,7 @@
 	\ifinstructor
 		Instructor Version%
 	\else
-		Solutions\if@autoexam@rubric\space and Rubrics\fi
+		Solutions\ifrubric\space and Rubrics\fi
 	\fi}
 
 % texlib-problembank.sty loads problem_engine.lua and defines the shared
@@ -291,11 +302,108 @@
 % True once an {mcproblems} section has just closed; read (and implicitly
 % cleared, by being overwritten) by the NEXT section's \problems@begin@hook to
 % skip its \clearpage -- an MC section flowing straight into the following FR
-% (or MC) section, rather than always forcing a fresh page.  Reset per copy in
-% \maketitle so a new version/instructor-student copy always starts its first
-% section with a \clearpage regardless of how the previous copy ended.
+% (or MC) section, rather than always forcing a fresh page.  Reset per copy
+% (\@autoexam@resetsections) so a new version/instructor-student copy always
+% starts its first section with a \clearpage regardless of how the previous copy
+% ended.
 \newif\if@texlib@prevmc
 \@texlib@prevmcfalse
+
+% \@autoexam@resetsections -- put the problem-section state back to its start:
+% the Part counter, the question number carried from one section to the next,
+% and the flag above.  The next section then opens Part I at question 1 and
+% always \clearpages.
+%   It has two callers.  \AutoExamBeginCopy runs it before every copy the
+%   version loop typesets: the loop is what knows where a copy starts.  While
+%   only \maketitle ran these resets, a versioned document with no cover page
+%   numbered straight through its copies.  Two versions of a one-problem exam
+%   with keys read Problem 1 to Problem 4 on their four copies, headed Part I
+%   to Part IV, with footers "1 of 4" to "4 of 4".
+%   \maketitle runs it as well.  A document may set a second cover inside one
+%   copy to open a second exam, and a document the loop does not typeset (no
+%   \versions, or the single-copy fast path) has no other reset.
+%   Not reset here: the page number, the header and footer slots and the
+%   marks.  The two callers want different values.  \maketitle empties them
+%   itself, for its cover and the pages before the first section.
+%   \AutoExamBeginCopy puts back what the document started with
+%   (\@autoexam@restorepagestate).
+\newcommand{\@autoexam@resetsections}{%
+	\setcounter{texlibpartno}{0}%
+	\setcounter{@texlib@qcarry}{0}%
+	\global\@texlib@prevmcfalse
+}
+
+% \@autoexam@savepagestate, \@autoexam@restorepagestate -- what a copy starts
+% with: the page number, the header and footer slots and the marks.
+%   The class changes all of them while it sets a copy.  The first
+%   problem-section sets the page number to 1 and redefines \@lhead, \@chead,
+%   \@rhead, the first-page head rule, \@cfoot, \run@chead and \run@cfoot
+%   (\problems@begin@hook).  \blankpage and \scorepage empty the two running
+%   slots.  Every section heading and every \blankpage sets a mark.
+%   \maketitle sets the page number to 1, empties the same slots and sets an
+%   empty mark, and nothing else put any of it back.  In a copy with no cover
+%   page, text before the first section printed under whatever the copy before
+%   it left: the second copy of a two-page exam read "Exam 1" and "Part II ---
+%   Multiple Choice" above that text and "3 of 2" below it.
+%   \@autoexam@savepagestate records the page number and those slots when
+%   \begin{document} ends, after anything the preamble set.
+%   \@autoexam@restorepagestate puts them back and clears the marks, and
+%   \AutoExamBeginCopy runs it: a page set before the first section reads on
+%   every copy as it does on the first.  A copy that opens on \maketitle is
+%   not changed, since the cover sets all of this again, and neither is one
+%   that opens on a headed section.  An unheaded section (\begin{problems}*)
+%   sets no mark, so its pages were headed by the last mark of the copy
+%   before, "Scratch Work" after a \blankpage; they are now headed as on the
+%   first copy.
+%   Not saved: the slots the class never changes (the left and right footers,
+%   the left and right running headers, the other three rules).  A body that
+%   redefines one of them hands it to the next copy, as before.
+\newcommand{\@autoexam@savepagestate}{%
+	\xdef\@autoexam@start@page{\the\c@page}%
+	\global\let\@autoexam@start@lhead\@lhead
+	\global\let\@autoexam@start@chead\@chead
+	\global\let\@autoexam@start@rhead\@rhead
+	\global\let\@autoexam@start@cfoot\@cfoot
+	\global\let\@autoexam@start@runchead\run@chead
+	\global\let\@autoexam@start@runcfoot\run@cfoot
+	\if@headrule
+		\gdef\@autoexam@start@headrule{\global\@headruletrue}%
+	\else
+		\gdef\@autoexam@start@headrule{\global\@headrulefalse}%
+	\fi
+}
+\newcommand{\@autoexam@restorepagestate}{%
+	\global\c@page\@autoexam@start@page\relax
+	\global\let\@lhead\@autoexam@start@lhead
+	\global\let\@chead\@autoexam@start@chead
+	\global\let\@rhead\@autoexam@start@rhead
+	\global\let\@cfoot\@autoexam@start@cfoot
+	\global\let\run@chead\@autoexam@start@runchead
+	\global\let\run@cfoot\@autoexam@start@runcfoot
+	\@autoexam@start@headrule
+	\@autoexam@clearmarks
+}
+% \@autoexam@clearmarks -- forget every mark set so far, without setting one.
+%   \markboth{}{} is what \maketitle uses, and it is wrong here.  A mark is a
+%   node, and it ships with the next page that has something on it.  When a
+%   copy opens on a section nothing ships before that section's first page, so
+%   the empty mark lands there ahead of the section heading's mark, and
+%   \rightmark reads the FIRST mark on a page.  Built that way, all four copies
+%   of vmap-test lose the section label from their header.  \maketitle is safe
+%   because its cover is a page of its own.
+%   What \rightmark reads depends on the kernel.  From LaTeX 2025-06-01 it is
+%   the kernel's record of the page region, which \mark_clear_structure:n
+%   empties.  Before that it is TeX's \firstmark, which LuaTeX's \clearmarks
+%   empties.  Both run when they exist, and each was checked alone: the first
+%   is the one that clears the header on the 2026 kernel, the second with
+%   latexrelease rolled back to 2024-11-01.
+\ExplSyntaxOn
+\cs_new_protected:Npn \@autoexam@clearmarks
+	{
+		\cs_if_exist:NT \tex_clearmarks:D { \tex_clearmarks:D \c_zero_int }
+		\cs_if_exist:NT \mark_clear_structure:n { \mark_clear_structure:n { page } }
+	}
+\ExplSyntaxOff
 
 % True while the cover's date line is being emitted (see \maketitle): the
 % build-mode label under it needs to know whether there is a line to break from.
@@ -324,7 +432,15 @@
 		% the same page), by which point this environment's own group (and any
 		% plain \def make here) has already closed.
 		\gdef\@lhead{\bfseries\GetExamTitle}%
-		\gdef\@chead{}%
+		% Center: this page's points on a copy that shows solutions, nothing on
+		% a student copy (see \@autoexam@pagepoints).  Decided here, not in the
+		% slot: the header is set when the page ships, and the last page of a
+		% copy can ship after the loop has moved \ifsolutions on to the next.
+		\ifsolutions
+			\gdef\@chead{\@autoexam@pagepoints}%
+		\else
+			\gdef\@chead{}%
+		\fi
 		\gdef\@rhead{\rightmark}%
 		\global\@headruletrue%
 		% Per-copy "X of N": freeze THIS copy's id into the footer denominator.
@@ -332,7 +448,7 @@
 		\xdef\@cfoot{%
 			\noexpand\thepage\noexpand\space of\noexpand\space\noexpand\@ifundefined{r@@lastqpage@\theautoexamcopyno}{\noexpand\numpages}{\noexpand\pageref*{@lastqpage@\theautoexamcopyno}}%
 		}%
-		\gdef\run@chead{}%
+		\global\let\run@chead\@chead
 		\global\let\run@cfoot\@cfoot
 	\fi
 }
@@ -373,9 +489,12 @@
 % handled by the engine's pbank_suppress_redirect flag, set by
 % autoexam_run_versions before the version loop iterates.
 
-% \shuffle is provided by texlib-problembank.sty
+% \shuffle (and \shuffle[pages]) is provided by texlib-problembank.sty
 % (shared with quiz).  The autoexam version loop reads its flag to reorder
 % problems per version; the engine also shuffles each MC problem's options.
+% \shuffle[pages] permutes whole PAGES instead of individual problems, which is
+% what a page-laid-out exam wants: every version then prints the same pages in a
+% different order, so none of them can overflow.
 
 % The multiple-choice key frame (\@mcframe@* side-by-side override) and the
 % left-shifted \choiceshook are provided by texlib-solutions.sty (shared with
@@ -407,6 +526,19 @@
 	\edef\@vc@want{#1}%
 	\ifx\@vc@cur\@vc@want #2\fi
 }
+% \IfExamVersioned{versioned}{unversioned}
+%   The first branch when the document called \versions (or \examversions), the
+%   second otherwise; expandable.  texlib-problembank.sty documents the query
+%   and supplies the second branch for the classes that have no versions.
+%   A \Version forced on a document that declares none still takes the second
+%   branch: \theExamVersion is then a label the document never declared.
+\renewcommand{\IfExamVersioned}{%
+	\if@autoexam@versioned
+		\expandafter\@firstoftwo
+	\else
+		\expandafter\@secondoftwo
+	\fi
+}
 
 % \importproblem is provided by texlib-problembank.sty.
 
@@ -428,6 +560,8 @@
 	% the declared total (\meta{points}, default 100; extra credit excluded).
 	% Runs in every build mode (independent of the version loop below).
 	\directlua{texlib.autoexam_check_points("\luaescapestring{\GetExamPoints}")}%
+	% What every copy starts with, recorded before the loop sets the first one.
+	\@autoexam@savepagestate
 	% Unconditional: the Lua function checks #autoexam_versions == 0 and
 	% returns immediately when no versions are declared.  Keeping the TeX
 	% side conditional-free avoids an open \ifx on the stack when Lua
@@ -471,17 +605,132 @@
 }
 \newcommand{\AutoExamVmapClose}{\immediate\closeout\vmapfile}
 
+% Points on each page -- the center header of a copy that shows solutions reads
+% "14 points", the total of the questions and parts that begin on that page.
+% A page where no pointed item begins reads nothing, as does every page that is
+% not a numbered exam page (the cover, a \blankpage leaf, a \scorepage) and
+% every page of a student copy.
+%
+% Each item counts on the page its own first line is set on: a question whose
+% parts carry the points counts part by part, so when a compact key breaks a
+% problem across two pages each page totals the parts that start on it, and a
+% page holding only the end of a solution has no total.  A \keylayout{inline}
+% key keeps the student copy's pages, so there the totals are that copy's.
+% Extra credit is left out, as it is from the declared total (\extracredit
+% prints its own points; a \bonusquestion is skipped below).
+%
+% Not exam.cls's \pointsonpage: that table is keyed on \thepage, which every
+% copy restarts at 1, so the copies of a versioned exam would add into one
+% another's pages.  The key here is autoexamabspage, which never resets, and
+% that is also what keeps a \shuffle'd version's totals its own.
+%
+% \@readpoints[N] is the one path exam.cls takes for an item that has points
+% (question, part, subpart alike).  The record is a \write whatsit, so its page
+% is read when the page ships; it rides the item's first paragraph (para/begin)
+% rather than the vertical list, where a page break could fall between the
+% record and the line it describes.  An item set in a box that is thrown away
+% (a measuring pass) records nothing.
+%
+% The totals reach the header through the .aux file, so they print from the
+% second pass on, like the "k of n" footer.
+\let\@autoexam@orig@readpoints\@readpoints
+\def\@readpoints[#1]{%
+	\ifsolutions\if@bonus\else\@autoexam@notepoints{#1}\fi\fi
+	\@autoexam@orig@readpoints[#1]%
+}
+\newcommand{\@autoexam@notepoints}[1]{%
+	\begingroup
+		\def\half{.5}%
+		\edef\reserved@a{\endgroup
+			\noexpand\AddToHookNext{para/begin}{\noexpand\@autoexam@writepoints{#1}}}%
+	\reserved@a
+}
+\newcommand{\@autoexam@writepoints}[1]{%
+	\write\@auxout{\string\@autoexam@addpagepoints{\the\c@autoexamabspage}{#1}}%
+}
+% #1 = absolute page, #2 = points.  Read back from the .aux file at
+% \begin{document}; switched off before \end{document} reads the file again.
+\newcommand{\@autoexam@addpagepoints}[2]{%
+	\edef\reserved@a{\fpeval{\ifcsname @autoexam@pts@#1\endcsname
+		\csname @autoexam@pts@#1\endcsname\else 0\fi + #2}}%
+	\expandafter\global\expandafter\let\csname @autoexam@pts@#1\endcsname\reserved@a
+}
+\AddToHook{enddocument/afterlastpage}{\let\@autoexam@addpagepoints\@gobbletwo}
+% The header is set before its page ships and autoexamabspage is stepped as it
+% ships, so the page being headed is the next one.
+\newcommand{\@autoexam@pagepoints}{%
+	\ifcsname @autoexam@pts@\number\numexpr\c@autoexamabspage+1\relax\endcsname
+		\edef\reserved@a{%
+			\csname @autoexam@pts@\number\numexpr\c@autoexamabspage+1\relax\endcsname}%
+		\ifdim\reserved@a\p@>\z@
+			\reserved@a\ \ifdim\reserved@a\p@=\p@ point\else points\fi
+		\fi
+	\fi
+}
+
 % Smart Nested Columns
 \newif\ifinparts
 \inpartsfalse
 \newcounter{global_partno_storage}
 \newcounter{tracker_question_no}
 \setcounter{tracker_question_no}{-1}
+% Every step of the question counter clears the stored count.
+%   {parts} below resumes its lettering when the question number equals the one
+%   it last saw, which is how a second list in the same question ({cols},
+%   \splitpage) carries on from the first.  A question NUMBER does not identify
+%   a question: a second {questions} list starts again at 1, and so does every
+%   copy of a versioned exam.  Before this reset, the first {parts} of a second
+%   Problem 1 resumed the first Problem 1's list and printed 1c, 1d.
+%   Only a step runs the reset.  \question reaches \refstepcounter through the
+%   list's \item, and \extracredit steps the counter itself.  \setcounter and
+%   \addtocounter clear nothing: \begin{questions} and {problems} set the
+%   number that way, and the \question that follows is what clears the count.
+\@addtoreset{global_partno_storage}{question}
+
+% \AutoExamBeginCopy -- run by the version loop (autoexam_run_versions in
+% problem_engine.lua) before it reads each copy's body.
+%   Clears the tracker and the stored count for a list that a copy opens before
+%   its first \question.  The question counter has not stepped in that copy yet
+%   and still holds the last number of the copy before, so without this such a
+%   list resumes that copy's last one.
+\newcommand{\AutoExamBeginCopy}{%
+	\setcounter{tracker_question_no}{-1}%
+	\setcounter{global_partno_storage}{0}%
+	% Parts from I and questions from 1: see \@autoexam@resetsections.
+	\@autoexam@resetsections
+	% The page number, header, footer and marks the document started with: see
+	% \@autoexam@restorepagestate.
+	\@autoexam@restorepagestate
+}
 
 \let\oldparts\parts
 \let\endoldparts\endparts
 
+% A {solution} in a problem with no parts starts where a part's solution would:
+% the problem's body indent plus the left margin exam.cls gives {parts}, worked
+% out the same way (the width of "(m)" and \labelsep, then \partshook). {parts}
+% records the copy and question it opened in; the key is per copy because every
+% version of a multi-version exam numbers its questions from 1 again. Outside
+% the problems list (\@totalleftmargin zero, as in the MC key's minipage) the
+% box keeps its full measure.
+\gdef\@autoexam@partsq{}
+\RenewDocumentCommand{\texlib@sol@setinset}{}{%
+	\edef\@tempa{\the\c@autoexamcopyno:\the\c@question}%
+	\texlib@sol@inset\z@
+	\ifx\@tempa\@autoexam@partsq\else
+		\ifdim\@totalleftmargin>\z@
+			\begingroup
+				\settowidth{\leftmargin}{(m)\hskip\labelsep}%
+				\partshook
+				\edef\@tempa{\endgroup
+					\texlib@sol@inset\the\dimexpr\@totalleftmargin+\leftmargin\relax}%
+			\@tempa
+		\fi
+	\fi
+}
+
 \RenewDocumentEnvironment{parts}{}{%
+	\xdef\@autoexam@partsq{\the\c@autoexamcopyno:\the\c@question}%
 	\oldparts\inpartstrue
 	\ifnum\value{question}=\value{tracker_question_no}
 		\ifnum\value{global_partno_storage}>0
@@ -498,12 +747,18 @@
 
 % {cols} keeps its multicols in EVERY build. An accessible build used to drop
 % to a single column ("multicol cannot be tagged"), but multicol now carries
-% latex-lab tagging support: the columns tag as ordinary text-units and
-% veraPDF passes PDF/UA-2 with the two-up layout in place (verified on TeX
-% Live 2025 locally; accessible.yml gates it on the pinned TL2026 container),
-% so the tagged exam now matches the print layout. If a toolchain bump ever
-% regresses this, the old guard was: \ifdefined\TeXLibAccessibleMode skip the
-% two \begin/\end{multicols}.
+% tagging support: the columns tag as ordinary text-units and veraPDF passes
+% PDF/UA-2 with the two-up layout in place, so the tagged exam matches the
+% print layout. accessible.yml gates conformance and layout on one fixture,
+% in the pinned container: `smoke_test.py --accessible` builds
+% examples/fixtures/Exams/cols-test.tex tagged and runs veraPDF on it, and
+% test_cols_tagged_layout.py asserts that the tagged copy sets its parts in
+% two columns, which veraPDF does not check. CI builds the scenario packs
+% untagged; `python a11y_gallery.py exam` builds examples/scenarios/exam/cols
+% tagged, locally. If a toolchain bump regresses multicol under tagging, the
+% old guard was: \ifdefined\TeXLibAccessibleMode skip the two
+% \begin/\end{multicols}. Restoring it turns test_cols_tagged_layout.py red:
+% that test asserts two columns in the tagged copy and has to change with it.
 \DeclareDocumentEnvironment{cols}{O{2}}{%
 	\par
 	\setlength{\columnseprule}{0pt}
@@ -553,7 +808,8 @@
 	\par\noindent
 	\begin{minipage}[t]{0.48\linewidth}%
 		\renewcommand{\partshook}{%
-			\setlength{\leftmargin}{\leftmarginii}%  match standard nested-list indent
+			% \leftmargin stays as exam.cls set it for {parts}, so these parts and
+			% their solutions start where every other problem's parts do.
 			\setlength{\labelsep}{0.5em}%
 			\setlength{\labelwidth}{1.5em}%
 		}%
@@ -564,7 +820,8 @@
 	\hfill
 	\begin{minipage}[t]{0.48\linewidth}%
 		\renewcommand{\partshook}{%
-			\setlength{\leftmargin}{\leftmarginii}%  match standard nested-list indent
+			% \leftmargin stays as exam.cls set it for {parts}, so these parts and
+			% their solutions start where every other problem's parts do.
 			\setlength{\labelsep}{0.5em}%
 			\setlength{\labelwidth}{1.5em}%
 		}%
@@ -883,14 +1140,10 @@
 	% version's \blankpage.  \begin{problems} resets the counter again to 1, so
 	% Q1 is always page 1 of the problem section.
 	\setcounter{page}{1}%
-	% Reset the per-copy Part counter and the cross-section question carry so each
-	% version/copy renumbers its Parts from I and its questions from 1.
-	\setcounter{texlibpartno}{0}%
-	\setcounter{@texlib@qcarry}{0}%
-	% This copy's first problem-section must always \clearpage (ship the title
-	% page just typeset above), regardless of how the PREVIOUS copy's last
-	% section ended.
-	\global\@texlib@prevmcfalse%
+	% Parts from I and questions from 1 for the exam this cover opens.  Its first
+	% problem-section must also always \clearpage (ship the title page typeset
+	% below), regardless of how the section before the cover ended.
+	\@autoexam@resetsections
 	% Clear first-page header slots so nothing appears above the title block.
 	\def\@lhead{}\def\@chead{}\def\@rhead{}%
 	\@headrulefalse%
@@ -909,7 +1162,7 @@
 	% ---- title block ---------------------------------------------------------
 	\begin{center}
 		\huge Exam \GetExamNumber \\
-		\LARGE Math \theCourseNumber\ \theCourseTitle \\
+		\LARGE \GetCourse \\
 		\vspace{0.1em}
 		% Term + section, relocated here from the running header (which now
 		% carries the part label).  Emitted only when non-empty: \GetTermSection
@@ -934,7 +1187,7 @@
 			\if@autoexam@dateline \\ \fi
 			\large\textcolor{red}{\textbf{\@autoexam@solword}}%
 		\else
-			\if@autoexam@rubric
+			\ifrubric
 				\if@autoexam@dateline \\ \fi
 				\large\textcolor{red}{\textbf{Rubrics}}%
 			\fi

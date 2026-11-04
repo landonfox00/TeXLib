@@ -74,6 +74,9 @@
 \@ifundefined{TeXLibLoadTikz}{}{\TeXLibLoadTikz}
 \RequirePackage{tikz}
 \usetikzlibrary{external}
+% \pdf@shellescape is defined under every engine; the primitive
+% \pdfshellescape exists only in pdfTeX, so LuaLaTeX stopped at the test below.
+\RequirePackage{pdftexcmds}
 
 \providecommand{\TeXLibExternalDir}{texlib-figures/}
 
@@ -91,7 +94,7 @@
 	% write18 is guarded on shell escape actually being available: without it
 	% externalisation cannot work at all, so warn and stay inline rather than
 	% failing.
-	\ifnum\pdfshellescape=1
+	\ifnum\pdf@shellescape=\@ne
 		\immediate\write18{mkdir "\TeXLibExternalDir"}%
 		\tikzexternalize[prefix=\TeXLibExternalDir]%
 	\else

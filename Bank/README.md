@@ -39,6 +39,14 @@ not in the bank — which is what makes them hard to place.
   top-level override.** Write `\problem{id}`, not `\problem[6]{id}`, or the
   problem header contradicts the per-part points printed beneath it. Use
   `\problem[n]{id}` only for single-statement problems.
+- **A macro that selects content by version label must ask `\IfExamVersioned`
+  before it reads `\theExamVersion`.** `\theExamVersion` is the copy's label
+  only in an exam that calls `\versions`. An exam with no versions defines it
+  as `A` and `quiz.cls` does not define it, so a selector that compares against
+  it prints nothing in a final or a review sheet whose bank is keyed to other
+  labels, and raises `Undefined control sequence` in a quiz. `\vercase` and
+  `\byversion` are `autoexam`-only, like `{cols}`. The idiom is under
+  "Versions" in [`Exams/README.md`](../Exams/README.md).
 
 `bank.cls` loads the same problem/solution rendering stack the assessment classes
 use (`texlib-problembank` + `texlib-solutions`), so catalog problems typeset
