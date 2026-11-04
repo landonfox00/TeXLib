@@ -418,6 +418,21 @@ ok &= check("\n./doc.tex:14: Undefined control sequence.\n" in report,
             "report: error line kept unprefixed (stays clickable)")
 ok &= check(("%s:1: [full build log" % log_path) in report,
             "report: full-log link is a clickable path:1: line")
+ok &= check("inline key" not in report,
+            "report: no keyfit block when every key solution fit")
+
+# 7. The core's keyfit_summary gets a block of its own, above the warnings:
+#    as a warning it was one first line in a list capped at MAX_WARNINGS.
+_kf_row = "doc_solutions.pdf  page 2: problem 15b is 23pt too tall"
+report = texlib._build_report(
+    "doc", [], ["LaTeX Warning: x"] * (texlib.MAX_WARNINGS + 5), log_path,
+    [_kf_row])
+_kf_at = report.find("TeXLib: inline key solutions taller")
+ok &= check(_kf_at != -1 and ("\n    " + _kf_row + "\n") in report
+            and texlib_build.KEYFIT_ADVICE in report,
+            "report: keyfit rows get their own block, with the fix")
+ok &= check(_kf_at < report.find("LaTeX Warning: x"),
+            "report: the keyfit block comes before the capped warnings")
 
 # 7. Regression: that link has to name the log the ENGINE actually writes. It is
 #    built from the tex root alone, so it must agree with the -output-directory

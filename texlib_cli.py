@@ -863,6 +863,16 @@ class CliHost:
                              "reported -- see the log above)\n")
         elif self.warnings and not self.quiet:
             sys.stderr.write("\ntexlib: %d warning(s)\n" % len(self.warnings))
+        # Even under --quiet: an inline key whose solutions did not fit looks
+        # finished, and this is the only place that says it is not.
+        keyfit = getattr(self.host, "keyfit_summary", None) or []
+        if keyfit:
+            sys.stderr.write(
+                "\ntexlib: inline key solutions taller than their answer "
+                "space in %s:\n" % os.path.basename(self.root))
+            for row in keyfit:
+                sys.stderr.write("  %s\n" % row)
+            sys.stderr.write("  %s\n" % self.core_mod.KEYFIT_ADVICE)
 
 
 def cmd_build(args):

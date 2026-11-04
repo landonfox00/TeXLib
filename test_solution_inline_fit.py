@@ -8,7 +8,7 @@ guards that). Nothing bounded the overlay: a solution taller than the blank it
 was drawn into printed over the next question. texlib_keyfit.lua now checks
 each finished page.
 
-Four pages, four behaviours:
+Five pages, five behaviours:
 
   * FITS    -- the solution is shorter than its blank. The page must come out
                exactly as the student copy: the problem after it does not move.
@@ -31,6 +31,14 @@ Four pages, four behaviours:
                whole to the added page, stem first. Cut at the last break that
                fits instead, the page keeps the second problem's stem and its
                part (a) and sends part (b) on alone.
+  * WORKBOX -- a part solution taller than the \workbox it is drawn into, with
+               room on the page below it. The page makes the room, so the key
+               no longer matches the student copy there, and the author is
+               told: the log names the part as printed ("8a"), how far it ran
+               over and how far it moved what follows, and the build summary
+               (texlib_build's _display_keyfit_summary, read off this log)
+               has a line for it. SHORT is the same for a whole-problem
+               solution, and NOROOM and BETWEEN name theirs too.
 
 Asserted on word positions from poppler's `pdftotext -bbox`, since the point is
 where things are printed and the text is the same in every case. Soft-skips
@@ -51,6 +59,10 @@ import tempfile
 
 TEXLIB_ROOT = os.path.dirname(os.path.abspath(__file__))
 LUALATEX = shutil.which("lualatex")
+
+# The build core, for the summary it makes of the key's log.
+sys.path.insert(0, os.path.join(TEXLIB_ROOT, "Sublime", "texlib"))
+import texlib_build  # noqa: E402
 
 
 def _find_poppler_pdftotext() -> str | None:
@@ -97,8 +109,13 @@ COURSEMETA_TEX = r"""\metasetup{
 """
 
 NOROOM_PARTS = 6
+WORKBOX_LINES = 6
 NOROOM_LINES = 9
 BETWEEN_LINES = 16
+
+WORKBOX_ANSWER = "\n".join(
+    rf"				Line {n} of the first part's answer. WBLINE{n}\par"
+    for n in range(1, WORKBOX_LINES + 1))
 
 TALL_LINES = "\n".join(
     rf"		Line {n} of a long worked solution. TALLLINE{n}\par" for n in range(1, 8))
@@ -178,6 +195,22 @@ BANK_TEX = r"""\begin{problem}{fits}[topic=fits]
 			\workbox{1}
 	\end{parts}
 \end{problem}
+
+\begin{problem}{workbox}[topic=workbox]
+	WBSTEM Explain both.
+	\begin{parts}
+		\ppart WBA Explain the first.
+			\begin{partsolution}
+""" + WORKBOX_ANSWER + r"""
+			\end{partsolution}
+			\workbox{0.05}
+		\ppart WBB Explain the second.
+			\begin{partsolution}
+				Short.
+			\end{partsolution}
+			\workbox{4}
+	\end{parts}
+\end{problem}
 """
 
 # The second optional argument of \problem is the stretch of the answer space
@@ -203,6 +236,10 @@ EXAM_TEX = r"""\documentclass[exam-number=1, points=50]{autoexam}
 
 	\problem[10][1]{topic=first}
 	\problem[1,1]{topic=second}
+
+	\newpage
+
+	\problem[1,1]{topic=workbox}
 \end{problems}
 \end{document}
 """
@@ -291,12 +328,13 @@ def main() -> int:
                   errors="replace") as fh:
             keylog = fh.read()
 
-        # Page indices: 0 is the cover, then FITS, SHORT, NOROOM, BETWEEN; the
-        # key has two more, a continuation after NOROOM and one after BETWEEN.
+        # Page indices: 0 is the cover, then FITS, SHORT, NOROOM, BETWEEN,
+        # WORKBOX; the key has two more, a continuation after NOROOM and one
+        # after BETWEEN.
         check("the key is the student copy plus one page for each page split",
-              len(student) == 5 and len(key) == 7,
+              len(student) == 6 and len(key) == 8,
               f"student {len(student)} page(s), key {len(key)}")
-        if len(student) != 5 or len(key) != 7:
+        if len(student) != 6 or len(key) != 8:
             return report(failures)
 
         s_fit, k_fit = student[1], key[1]
@@ -326,13 +364,20 @@ def main() -> int:
         else:
             check("SHORT: solution and following stem are on the page", False,
                   f"key page tokens: {sorted(t for t in k_sh if t.isupper())[:12]}")
-        check("SHORT: the log records the room made",
-              "made room for 1 tall solution(s)" in keylog)
+        check("SHORT: the log warns that problem 3 is too tall, and what moved",
+              re.search(r"Package texlib-solutions Warning: Page \d+: a solution "
+                        r"is too tall\.\n\(texlib-solutions\) +3: \d+pt too tall;"
+                        r" what follows moved \d+pt\n", keylog) is not None)
 
         check("NOROOM, BETWEEN: the log says each page cannot hold its solutions",
               keylog.count("cannot hold its solutions") == 2
               and keylog.count("continues on an added page") == 2,
               f"{keylog.count('cannot hold its solutions')} warning(s), not 2")
+        named = re.findall(r"^\(texlib-solutions\) +(\w+): \d+pt too tall$",
+                           keylog, re.M)
+        check("NOROOM, BETWEEN: the warnings name the solutions that ran over",
+              all(f"5{p}" in named for p in "abcde") and "6" in named
+              and "7a" in named, named)
         pages = (key[3], key[4])
         where: dict[str, int] = {}
         lost, twice = [], []
@@ -394,6 +439,47 @@ def main() -> int:
             check("BETWEEN: nothing is printed past the footer",
                   footer is not None
                   and all(moved[t][1] <= footer[0] for t in two))
+
+        s_wb, k_wb = student[5], key[7]
+        last = f"WBLINE{WORKBOX_LINES}"
+        if all(t in k_wb for t in (last, "WBB")) and "WBB" in s_wb:
+            check("WORKBOX: the part's answer ends above the next part",
+                  k_wb[last][1] < k_wb["WBB"][0],
+                  f"answer ends at y={k_wb[last][1]:.1f}, part (b) starts at "
+                  f"y={k_wb['WBB'][0]:.1f}")
+            check("WORKBOX: part (b) moved down, off the student copy's place",
+                  k_wb["WBB"][0] - s_wb["WBB"][0] > 20,
+                  f"moved {k_wb['WBB'][0] - s_wb['WBB'][0]:.1f}pt")
+        else:
+            check("WORKBOX: the answer and the next part are on the page", False)
+        m = re.search(r"Package texlib-solutions Warning: Page (\d+): a solution "
+                      r"is too tall\.\n\(texlib-solutions\) +8a: (\d+)pt too "
+                      r"tall; what follows moved (\d+)pt\n", keylog)
+        check("WORKBOX: the log names part 8a, by how much, and what moved",
+              m is not None and int(m.group(2)) > 20 and int(m.group(3)) > 20,
+              m.group(0) if m else "no warning naming 8a")
+        check("WORKBOX: the warning says how to fix it",
+              "Fix: more stretch (\\problem[pts][stretch])," in keylog
+              and "a bigger \\workbox, or a shorter solution." in keylog)
+
+        shown: list[str] = []
+        core = texlib_build.TexlibBuild(
+            tex_root=os.path.join(tmp, "doc.tex"), engine="lualatex",
+            options=[], display=shown.append)
+        core._keyfit = []
+        core._note_keyfit("doc_solutions.pdf",
+                          os.path.join(tmp, "inlinekey.log"))
+        core._display_keyfit_summary()
+        block = "".join(shown)
+        row = (f"    doc_solutions.pdf  page {m.group(1)}: problem 8a is "
+               f"{m.group(2)}pt too tall (what follows moved {m.group(3)}pt)\n"
+               if m else "8a")
+        check("WORKBOX: the build summary has a line for part 8a",
+              block.startswith("TeXLib: inline key solutions taller than "
+                               "their answer space:\n") and row in block,
+              block)
+        check("summary: one line per page the warnings name",
+              len(core.keyfit_summary) == 4, core.keyfit_summary)
         return report(failures)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
         log(f"FAIL: build environment failed -- {type(exc).__name__}: {exc}")

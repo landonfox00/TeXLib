@@ -32,8 +32,28 @@
 --   is cut between two of them where it can be (cut_between_problems).
 --
 -- Called from the kernel's build/page/before hook, on \@outputbox.
+--
+-- Only the first outcome is silent. In the second the key's page no longer
+-- matches the student copy's, and in the third the key has a page more, so
+-- both write a `Package texlib-solutions Warning' naming each solution that
+-- did not fit by the label the student copy prints ("15b"), how far it ran
+-- over, and in the second, how far that moved what follows it. The build
+-- reads these back out of the log for its summary
+-- (texlib_buildspec.keyfit_notices), so their wording is parsed: change both.
 
 local M = {}
+
+-- Each overlay's marker carries an index into this list (see name()): the
+-- solution's printed label and, in a document of several versions, its
+-- version. Fixed when the solution is typeset, because by the time the page
+-- is finished the counters have moved on to whatever follows it.
+M.labels = {}
+
+function M.name(label, version)
+	local i = #M.labels + 1
+	M.labels[i] = { label = label, version = version }
+	return i
+end
 
 local HLIST = node.id("hlist")
 local VLIST = node.id("vlist")
@@ -166,7 +186,41 @@ local function cut_between_problems(box, items, sepattr)
 	end
 end
 
-function M.fit(boxnumber, attr, sepattr)
+-- One line per solution that ran over, for the two warnings below. Whole
+-- points: the 6pt of clearance in every reach makes a decimal look surer
+-- than it is.
+local HALF_PT = 32768
+
+local function overrun_lines(short, moved_of)
+	local out = {}
+	for _, s in ipairs(short) do
+		local line = string.format("%s: %dpt too tall", s.label, round(s.over / 65536))
+		if moved_of then
+			local d = moved_of(s)
+			if d == nil then
+				line = line .. "; nothing follows it"
+			elseif d >= HALF_PT then
+				line = line .. string.format("; what follows moved %dpt", round(d / 65536))
+			elseif d <= -HALF_PT then
+				line = line .. string.format("; what follows rose %dpt", round(-d / 65536))
+			else
+				line = line .. "; nothing after it moved"
+			end
+		end
+		out[#out + 1] = line
+	end
+	return out
+end
+
+local PREFIX = "(texlib-solutions)                "
+
+local function warn(first, lines)
+	texio.write_nl("term and log", "Package texlib-solutions Warning: " .. first)
+	for _, l in ipairs(lines) do texio.write_nl("term and log", PREFIX .. l) end
+	texio.write_nl("term and log", "")
+end
+
+function M.fit(boxnumber, attr, sepattr, whichattr)
 	local box = tex.getbox(boxnumber)
 	if not box or box.id ~= VLIST or not box.head then return end
 
@@ -217,7 +271,7 @@ function M.fit(boxnumber, attr, sepattr)
 	-- the short ones, because the spaces that are generous now are the ones
 	-- that will be asked to give. A run with no stretchable glue can only be
 	-- helped by a kern after the owner.
-	local floor_of, extra, short_count = {}, {}, 0
+	local floor_of, extra, avail_of, short_count = {}, {}, {}, 0
 	for owner, r in pairs(reach) do
 		local avail, flex_i = 0, nil
 		local k = owner + 1
@@ -226,6 +280,7 @@ function M.fit(boxnumber, attr, sepattr)
 			if items[k].flex and not flex_i then flex_i = k end
 			k = k + 1
 		end
+		avail_of[owner] = avail
 		local lack = r - avail
 		if flex_i then
 			floor_of[flex_i] = math.max(floor_of[flex_i] or 0, items[flex_i].size + lack)
@@ -235,6 +290,24 @@ function M.fit(boxnumber, attr, sepattr)
 		if lack > 0 then short_count = short_count + 1 end
 	end
 	if short_count == 0 then return end
+
+	-- The solutions that ran over, by name and in page order. An owner holding
+	-- several (the parts of a {cols} problem) lists only those that did.
+	local short, version = {}, nil
+	for _, m in ipairs(markers) do
+		local over = m.bottom + m.need - items[m.owner].bottom - avail_of[m.owner]
+		if over > 0 then
+			local which = whichattr and node.get_attribute(m.node, whichattr)
+			local named = which and M.labels[which]
+			local label = named and named.label ~= "" and named.label or "a solution"
+			if named and named.version ~= "" then version = version or named.version end
+			short[#short + 1] = { label = label, over = over, owner = m.owner, at = m.bottom }
+		end
+	end
+	table.sort(short, function(a, b)
+		if a.owner ~= b.owner then return a.owner < b.owner end
+		return a.at < b.at
+	end)
 
 	-- TEXLIB_KEYFIT_TRACE=1 writes the page as fit() read it to the log: one
 	-- line per top-level item, in points. The decisions below are arithmetic
@@ -259,7 +332,7 @@ function M.fit(boxnumber, attr, sepattr)
 		if it.flex then
 			local nat = it.node.width
 			local f = {
-				node = it.node, nat = nat, str = it.node.stretch,
+				index = i, node = it.node, nat = nat, str = it.node.stretch,
 				floor = math.max(floor_of[i] or nat, nat),
 			}
 			flex[#flex + 1] = f
@@ -271,6 +344,8 @@ function M.fit(boxnumber, attr, sepattr)
 	for _, e in pairs(extra) do kerns = kerns + e end
 	local budget = total - kerns
 	local page = tex.count[0]
+	local where = version and string.format("Page %d (version %s)", page, version)
+		or string.format("Page %d", page)
 
 	-- Each message line is kept under the engine's 79-column wrap, which would
 	-- otherwise break it mid-word wherever the numbers put it.
@@ -291,13 +366,12 @@ function M.fit(boxnumber, attr, sepattr)
 		for _, m in ipairs(markers) do node.unset_attribute(m.node, attr) end
 		if sepattr and sepattr >= 0 then cut_between_problems(box, items, sepattr) end
 		tex.count["@sol@spillstate"] = 1
-		texio.write_nl("term and log", string.format(
-			"Package texlib-solutions Warning: Page %d cannot hold its solutions:", page))
-		texio.write_nl("term and log", string.format(
-			"(texlib-solutions)                they need %.1fpt more room than it has;",
-			(floors - budget) / 65536))
-		texio.write_nl("term and log",
-			"(texlib-solutions)                the key continues on an added page.")
+		local lines = {
+			string.format("they need %.1fpt more room than it has;", (floors - budget) / 65536),
+			"the key continues on an added page.",
+		}
+		for _, l in ipairs(overrun_lines(short)) do lines[#lines + 1] = l end
+		warn(where .. " cannot hold its solutions:", lines)
 		return
 	end
 
@@ -326,18 +400,36 @@ function M.fit(boxnumber, attr, sepattr)
 		if not again then break end
 	end
 
+	-- How much each item grew, glue by its new size and an owner by the kern
+	-- set after it; what follows an item moved by the sum above it.
+	local grew = {}
 	for j, f in ipairs(flex) do
-		fix(f.node, clamped[j] and f.floor or round(f.nat + f.str * u))
+		local size = clamped[j] and f.floor or round(f.nat + f.str * u)
+		grew[f.index] = size - items[f.index].size
+		fix(f.node, size)
 	end
 	for owner, e in pairs(extra) do
 		local k = node.new(KERN)
 		k.kern = e
 		box.head = node.insert_after(box.head, items[owner].node, k)
+		grew[owner] = (grew[owner] or 0) + e
 	end
 	box.glue_set, box.glue_sign, box.glue_order = 0, 0, 0
-	texio.write_nl("log", string.format(
-		"texlib-solutions: page %d: made room for %d tall solution(s).",
-		page, short_count))
+
+	local function moved_of(s)
+		local k = s.owner + 1
+		while items[k] and not items[k].solid do k = k + 1 end
+		if not items[k] then return nil end
+		local d = 0
+		for i = 1, k - 1 do d = d + (grew[i] or 0) end
+		return d
+	end
+	local lines = overrun_lines(short, moved_of)
+	lines[#lines + 1] = "The key no longer matches the student copy."
+	lines[#lines + 1] = "Fix: more stretch (\\problem[pts][stretch]),"
+	lines[#lines + 1] = "a bigger \\workbox, or a shorter solution."
+	warn(string.format("%s: %s too tall.", where,
+		#short == 1 and "a solution is" or (#short .. " solutions are")), lines)
 end
 
 return M

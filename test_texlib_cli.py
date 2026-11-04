@@ -288,5 +288,35 @@ finally:
     else:
         os.environ[core.VARIANT_ENV] = _saved
 
+# --- The keyfit block in the condensed tail ----------------------------------
+# An inline key whose solutions did not fit builds cleanly and looks finished.
+# The core's keyfit_summary is repeated on stderr, under --quiet too, and a key
+# with nothing in it adds nothing.
+import contextlib  # noqa: E402
+import io  # noqa: E402
+import types  # noqa: E402
+
+
+def _tail(rows, quiet):
+    fake = types.SimpleNamespace(
+        errors=[], warnings=["Package texlib-solutions Warning: Page 2: ..."],
+        fatal=False, quiet=quiet, root="exam.tex",
+        host=types.SimpleNamespace(keyfit_summary=rows), core_mod=core)
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        C.CliHost.report(fake)
+    return err.getvalue()
+
+
+_row = "exam_solutions.pdf  page 2: problem 15b is 23pt too tall"
+for quiet in (False, True):
+    out = _tail([_row], quiet)
+    ok &= check("inline key solutions taller than their answer space in "
+                "exam.tex:\n  " + _row + "\n  " + core.KEYFIT_ADVICE in out,
+                "report: the keyfit rows and the fix reach stderr%s"
+                % (" under --quiet" if quiet else ""))
+ok &= check("inline key" not in _tail([], False),
+            "report: a key whose solutions fit adds nothing")
+
 print("\nALL PASS" if ok else "\nFAILURES ABOVE")
 sys.exit(0 if ok else 1)
