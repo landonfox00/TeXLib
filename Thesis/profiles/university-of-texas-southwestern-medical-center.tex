@@ -1,0 +1,246 @@
+% profiles/university-of-texas-southwestern-medical-center.tex — University of Texas Southwestern Medical Center
+% ============================================================================
+% source: https://library.utsouthwestern.edu/portals/ETD/etdUniversalInstructions.pdf
+%         ("Instructions for the Preparation of Electronic Theses and
+%          Dissertations at UT Southwestern Medical Center", footed
+%          "Revised 12/30/2025" on every page — THE CURRENT DOCUMENT, and the
+%          source of every figure below)
+% source: https://library.utsouthwestern.edu/portals/etd/etdGradInstructions.pdf
+%         ("INSTRUCTIONS For Preparation Of MASTERS THESES and DOCTORAL
+%          DISSERTATIONS", "Revised, Fall 2016" — SUPERSEDED for the figures,
+%          but the only source of the page SPECIMENS; see below)
+% accessed: 2026-09-09
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the title-fly
+% (signature page).
+% NOT set:
+%   * \thesissetchapteropening — none prescribed.
+%   * every checkable accessibility declaration — see the accessibility note.
+%
+% TWO EDITIONS, AND THIS FILE USES BOTH ON PURPOSE. The current Universal
+% Instructions (12/30/2025) carry the margin, spacing, font, arrangement,
+% pagination and accessibility rules but print NO sample pages. The Fall 2016
+% Graduate School instructions are superseded on all of that, but they are the
+% only place the title-fly and title-page SPECIMENS exist, and RESEARCHING.md
+% allows an institution's own template as evidence of layout. So: every FIGURE
+% here comes from the 2025 document, every LAYOUT from the 2016 specimens, and
+% where they disagree the 2025 document wins. They disagree in two places, both
+% resolved toward 2025 and both recorded below.
+%
+% WHOSE DOCUMENT THIS IS. The ETD instructions are issued through the UT
+% Southwestern Library, which administers electronic thesis submission
+% (etd-utsw@utsouthwestern.edu, the Vireo system at utswmed-etd.tdl.org). This
+% is the institution's own filing-requirements document, not a library research
+% guide about how to write one — the distinction RESEARCHING.md draws. The same
+% arrangement holds at Mount Sinai, where the Levy Library issues the deposit
+% guides.
+%
+% SIGNATURES ARE PHYSICAL AND ORIGINAL. The title-fly specimen's own note: "The
+% top line is for the Supervising Professor's signature. There should be as many
+% lines as there are members of the committee. All signatures must be original
+% and in ink." So the rules this page draws are meant to be signed by hand.
+%
+% PAGINATION, which no profile field can express: "No page number should appear
+% on the title-fly (signature page), dedication page, title page, or copyright
+% page; however, all pages should be included in the counting." Preliminary
+% pages "beginning with the abstract page" take lowercase Roman numerals
+% "centered one inch from the bottom of each page" — so the abstract may open at
+% iv or v rather than i — and "For the thesis or dissertation text, the page
+% numbers will restart, beginning with the first page of Chapter One, and Arabic
+% numerals should be used."
+%
+% THE TYPEFACE RULE IS A RECOMMENDATION, so the class passes: "The recommended
+% font for use within the ETD is Times New Roman (size: 12 pt) ... If Times New
+% Roman is not available, then Arial or Helvetica may be substituted; fonts that
+% are proprietary to a specific program should not be used." Latin Modern is not
+% proprietary to a program, and the class is already at 12pt. Contrast Baylor
+% College of Medicine and Arizona State, whose closed lists the class fails.
+
+\thesisinstitution{The University of Texas Southwestern Medical Center}
+
+% "Margins should be 1 inch and be maintained throughout the body of the work,
+% and the text should be double-spaced. Each paragraph should be indented 1/2
+% inch (or 8-10 spaces)." Flat, four sides, no binding allowance -- the ETD is
+% filed electronically through Vireo.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "the text should be double-spaced", with one stated exception: "Prose
+% quotations over four lines should be single-spaced in a block quote and
+% indented on the left side only."
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% UT Southwestern devotes a section of the current instructions to digital
+% accessibility, names WCAG 2.1 Levels A and AA, and gives a hard date. But read
+% the two sentences together before declaring anything checkable: the OBLIGATION
+% is stated as one on the institution ("State institutions are required to
+% comply ... by April 24, 2026"), the ASK of the student is for "your assistance
+% to ensure that the final dissertation document ... is compliant", and the
+% element list that follows is introduced as "The major elements RECOMMENDED for
+% accessible documents". Nothing states that a non-conforming ETD is rejected.
+%
+% That is weaker than Purdue, which attaches a consequence ("Submissions that are
+% reviewed and found to be non-compliant ... will be returned to the student"),
+% and stronger than Arizona State, which publishes the same material as "best
+% practice". It sits in between, so the checkable declarations stay UNSET and the
+% wording is quoted in full for a reviewer to weigh. Note in particular that the
+% one sentence about tagging -- "This includes tags and bookmarks in PDFs" --
+% sits inside the recommended list, which is exactly why \thesisrequiretagging is
+% not set here.
+%
+% THE DATE IS APRIL 24, 2026, and it is the most precise in this directory. UC
+% Davis says April 2026 and Purdue says Spring 2027; all three are right, because
+% the ADA Title II compliance dates differ by entity size. Do not reconcile them.
+\thesisaccessibilityrequirement{WCAG 2.1 Levels A and AA}
+	{``State institutions are required to comply with Web Content Accessibility
+	 Guidelines (WCAG) 2.1 Levels A and AA success criteria and conformance
+	 standards by April 24, 2026, so we need your assistance to ensure that the
+	 final dissertation document that will be submitted as a PDF is compliant
+	 with the guidelines.''}
+\thesisaccessibilityrequirement{Structure}
+	{``Use outline headings and styles to convey structure. This includes tags
+	 and bookmarks in PDFs.''}
+\thesisaccessibilityrequirement{Alternative text}
+	{``Include alt-text to describe images, graphs, and figures.''}
+\thesisaccessibilityrequirement{Tables}
+	{``Use tables to present rows and columns of data, and explicitly identify
+	 row and/or column headers.''}
+\thesisaccessibilityrequirement{Lists, links, contrast and language}
+	{``Use automatic bullet points or list styles to create structured lists.''
+	 ``Provide a clearly defined label for the destination of hyperlinks.''
+	 ``Use sufficient contrast so content is readable.'' ``Use clear, simple
+	 language. Spell out initialisms on the first use.''}
+\thesisaccessibilityrequirement{Document properties}
+	{``You should also make sure that the document properties include the
+	 document title and that you are listed as the document author. If any other
+	 information is included in either field, please update it accordingly.''}
+\thesisaccessibilityrequirement{Force of these rules}
+	{UT Southwestern states the WCAG obligation as one on the institution and
+	 introduces the items above as ``the major elements \emph{recommended} for
+	 accessible documents''. No consequence for a non-conforming ETD is
+	 published. That is why no checkable declaration is set in this profile.}
+
+% --- Profile-local metadata ----------------------------------------------------
+% THE INSTITUTION'S NAME CHANGED, and the specimen has not caught up. The Fall
+% 2016 pages print "The University of Texas Southwestern Medical Center at
+% Dallas" three times; the current instructions title themselves "at UT
+% Southwestern Medical Center", and IPEDS records "University of Texas
+% Southwestern Medical Center". The current form is used here. A filer whose
+% graduate school still wants the older string can set it in one line.
+\newcommand{\utsw@name}{The University of Texas Southwestern Medical Center}
+\newcommand{\utswname}[1]{\renewcommand{\utsw@name}{#1}}
+% The city line beneath it on the title page.
+\newcommand{\utsw@city}{Dallas, Texas}
+\newcommand{\utswcity}[1]{\renewcommand{\utsw@city}{#1}}
+
+% --- Title-fly (signature page) ------------------------------------------------
+% Required for every school, and it comes FIRST -- before the title page -- which
+% is unusual enough to be worth stating: the 2025 arrangement table lists
+% "Title-Fly (Signature Page) / for title and listing of committee members" as
+% the first row, Required in both columns, with the Title Page two rows below.
+% This class emits \thesistitlepage then \thesisapprovalpage, so a document filed
+% here must call \thesisapprovalpage FIRST.
+%
+% The Fall 2016 specimen (its page 11):
+%
+%     TITLE OF DISSERTATION
+%     (13 spaces down from top, in capital letters, double spaced, and inverted
+%      pyramid form, if more than one line long)
+%
+%     APPROVED BY SUPERVISORY COMMITTEE
+%     (14 spaces down)
+%
+%     [signature rules, right half of the page, one per committee member,
+%      the top one for the Supervising Professor, no typed names]
+%
+% The parenthesised strings are the specimen's instructions to the reader, not
+% page content. The rules carry NO names -- unlike every other approval page in
+% this directory -- so \thesis@memberline is replaced with a rule alone and the
+% names passed to \committeemember are used only to count the rules.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\thesis@tagtitle{H1}{{\color{white}\tiny Title-Fly and Signature Page}}\par
+	\begin{center}
+		\vspace*{13\baselineskip}%
+		\MakeUppercase{\@title}\par
+		\vspace{14\baselineskip}
+		APPROVED BY SUPERVISORY COMMITTEE\par
+	\end{center}
+	\vspace{2\baselineskip}
+	\begingroup
+	\renewcommand{\thesis@memberline}[2]{%
+		{\raggedleft\rule{3in}{0.4pt}\par}%
+		\vspace{1.4\baselineskip}%
+	}%
+	\thesis@committee
+	\endgroup
+	\vspace*{\fill}
+	\loadgeometry{normal}\doublespacing\clearpage
+}
+
+% --- Title page ----------------------------------------------------------------
+% The Fall 2016 specimen (its page 12), with the parenthesised line counts again
+% being instructions rather than content:
+%
+%     TITLE OF DISSERTATION            (8 spaces down, capitals, double spaced,
+%                                       inverted pyramid if more than one line)
+%     by
+%     STUDENT'S FULL OFFICIAL NAME
+%     DISSERTATION / THESIS
+%     Presented to the Faculty of the Graduate School of Biomedical Sciences
+%     The University of Texas Southwestern Medical Center at Dallas
+%     In Partial Fulfillment of the Requirements
+%     For the Degree of
+%     DOCTOR OF PHILOSOPHY / MASTER OF SCIENCE / MASTER OF ARTS
+%     The University of Texas Southwestern Medical Center at Dallas
+%     Dallas, Texas
+%     June, 2002                       (Degree conferral month & year)
+%
+% "The degree candidate must use the same name on all materials exactly as it
+% appears on the official transcript."
+%
+% THE DATE FORMAT IS WHERE THE TWO EDITIONS DISAGREE, and the current one wins:
+% the 2016 specimen prints "June, 2002" with a comma, while the 2025 arrangement
+% table says the "conferral date should reflect the graduation term and be
+% displayed as MONTH YEAR (e.g., May 2020)". So set \graddate{May 2027} -- no
+% comma. The other disagreement is the institution's name, handled above.
+%
+% The school named in "Presented to the Faculty of..." is the Graduate School of
+% Biomedical Sciences; a student in another UT Southwestern school should
+% override it, which is what \gradprogram does not do -- it carries the program.
+% Left as the specimen prints it, since the 2016 document is the Graduate
+% School's own.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\centering\singlespacing
+		\vspace*{8\baselineskip}%
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{5\baselineskip}
+		by\par
+		\vspace{3\baselineskip}
+		\MakeUppercase{\@author}\par
+		\vspace{8\baselineskip}
+		% The specimen prints these four lines immediately under
+		% DISSERTATION/THESIS with no gap, and no gap between the degree and the
+		% closing block either. Inserting one of each overruns the page and
+		% pushes the university/city/date block onto a second sheet -- which is
+		% what a first pass at this file did, on a build that exited clean.
+		% Only the counts the specimen states are set; the slack is elastic.
+		\MakeUppercase{\thesis@DocNoun}\par
+		Presented to the Faculty of the Graduate School of Biomedical Sciences\\
+		\utsw@name\\
+		In Partial Fulfillment of the Requirements\\
+		For the Degree of\par
+		\vspace{4\baselineskip}
+		\MakeUppercase{\thesis@degree}\par
+		\vspace{\stretch{1}}
+		\utsw@name\\
+		\utsw@city\\
+		\thesis@date\par
+		\vspace*{\stretch{1}}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
