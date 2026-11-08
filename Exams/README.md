@@ -376,9 +376,11 @@ not. A solution with no `\award` is not checked.
 `\rubric{points}{description}`
 Add a rubric line to the solution it is written in, for credit that belongs to
 no single line of the answer. It prints in a build that shows rubrics (see
-[Build flags](#build-flags-texlib-unified-cli)), in the grading footer: under
-the worked answer, inside the solution's box, on the right, with
-`{commonerrors}` on the left. A `{partsolution}` has a footer of its own, the
+[Build flags](#build-flags-texlib-unified-cli)), in the grading footer. The
+footer goes beside the worked answer, its panels stacked at the right of the
+solution's box, when every line of the answer ends left of them; otherwise it
+goes under the answer, `{commonerrors}` on the left and the rubric on the
+right. A `{partsolution}` has a footer of its own, the
 same two panels at the part's width. A problem in `{mcproblems}` prints no
 rubric. The layout is `\@emit@sol@footer` in `texlib-solutions.sty`.
 

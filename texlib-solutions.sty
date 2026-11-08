@@ -550,7 +550,53 @@
 % left, rubric right) rather than stretching: a full-width rubric of four short
 % fragments reads as a table, and holding the edge makes a run of solutions
 % easier to skim.
+%
+% Beside the work when the work leaves room: a worked answer written as a
+% student writes it is a column of short lines, and the right part of its box
+% is empty. When every line's ink ends left of that column
+% (texlib_keyfit.work_right), both panels are stacked there, top-aligned with
+% the work, and the box grows only by what they need below its last line.
+% Otherwise they go under the answer, as below. The test reads the work, which
+% every copy sets alike, so the student copy keeps the same room either way.
+\newcommand{\@sol@besideshare}{0.42}
+\newlength{\@sol@sidewd}
+\newdimen\@sol@worktotal
+\newdimen\@sol@workright
+\newif\if@sol@beside
 \newcommand{\@emit@sol@footer}{%
+	\par
+	\@sol@besidefalse
+	\ifdefined\directlua
+		\setlength{\@sol@sidewd}{\@sol@besideshare\hsize}%
+		\@sol@workright=\directlua{texlib_keyfit.work_right()}sp\relax
+		\ifdim\dimexpr\@sol@workright+\@sol@sidewd+\@sol@footgap\relax<\hsize
+			\@sol@besidetrue
+		\fi
+	\fi
+	\if@sol@beside
+		\@emit@sol@footer@beside
+	\else
+		\@emit@sol@footer@below
+	\fi}
+\newcommand{\@emit@sol@footer@beside}{%
+	\@sol@worktotal=\directlua{texlib_keyfit.list_total()}sp\relax
+	\setbox\@tempboxa\vtop{%
+		\hsize\@sol@sidewd
+		\ifx\@sol@cerr\@empty\else
+			\noindent\@cerr@panel{\hsize}\par
+		\fi
+		\ifx\@sol@rubric\@empty\else
+			\ifx\@sol@cerr\@empty\else\vspace{4pt}\fi
+			\noindent\@rubric@panel{\hsize}\par
+		\fi}%
+	% Up to the top of the work, the panels, then down to the work's last line
+	% if they end above it: the list's total is the taller of the two.
+	\@tempdima\dimexpr\@sol@worktotal-\ht\@tempboxa-\dp\@tempboxa\relax
+	\nointerlineskip
+	\kern-\@sol@worktotal
+	\moveright\dimexpr\hsize-\@sol@sidewd\relax\box\@tempboxa
+	\ifdim\@tempdima>\z@ \kern\@tempdima \fi}
+\newcommand{\@emit@sol@footer@below}{%
 	\ifx\@sol@cerr\@empty
 		\ifx\@sol@rubric\@empty
 		\else
@@ -1150,8 +1196,17 @@
 		\ifrubric \ifdefined\TeXLibGhostInk\else
 			\textcolor{\texlibawardcolor}{\texlibawardformat{#1}}%
 		\fi \fi}}
+% amsmath sets each row of an {align} twice, first to measure it with
+% \ifmeasuring@ true; an award there is counted on the second pass only.
+\newcommand{\@award@count}{%
+	\ifcsname ifmeasuring@\endcsname
+		\expandafter\@award@count@ams
+	\else
+		\expandafter\@award@add
+	\fi}
+\newcommand{\@award@count@ams}[1]{\ifmeasuring@\else\@award@add{#1}\fi}
 \NewDocumentCommand{\award}{m}{%
-	\@award@add{#1}%
+	\@award@count{#1}%
 	\ifmmode
 		\tag*{\@award@mark{#1}}%
 	\else

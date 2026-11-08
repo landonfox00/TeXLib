@@ -16,13 +16,20 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   label ("Instructor Version") on the name line, so the cover is the student's
   too. A `{partsolution}` gets the same footer as a `{solution}`, its common
   errors beside its rubric, where it used to print a bare rubric box and set
-  `{commonerrors}` wherever it was written.
+  `{commonerrors}` wherever it was written. The footer goes beside the
+  worked answer, at the right of the solution's box, when the answer's lines
+  leave room for it (`texlib_keyfit.work_right` reads how far right their ink
+  reaches), and under it otherwise: a worked answer written line by line
+  leaves most of the box empty, and set beside it the footer usually costs no
+  height.
 
 - **`\award{n}`: the points a line of the answer earns.** Written at the end
   of a line of a worked solution, it prints "+n" in the right margin of an
-  instructor's copy, beside that line, and nothing elsewhere. The awards of a
-  solution must add up to the points of the problem or part it answers; a
-  build that shows rubrics stops with an error naming it when they do not.
+  instructor's copy, beside that line, and nothing elsewhere. In a display it
+  is the equation's tag, and in an `{align*}` it is counted once although
+  amsmath sets each row twice. The awards of a solution must add up to the
+  points of the problem or part it answers; a build that shows rubrics stops
+  with an error naming it when they do not.
 
 - **`\TeXLibGhostInk`, a parity check.** Defined ahead of an instructor or key
   build, it typesets every answer, footer, mark and `{sketchaxes}` answer and

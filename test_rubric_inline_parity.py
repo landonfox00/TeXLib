@@ -23,7 +23,10 @@ Also asserted:
 The fixture has a whole-problem {solution} with awards and {commonerrors}, a
 problem with part solutions carrying a rubric line and common errors, a
 graded {sketchaxes} answer (its ink is drawn at zero opacity under ghost ink),
-and two versions, so the per-problem point total has to restart each copy.
+an {align*} whose rows end in \award (amsmath sets each row twice; an award
+must count once), and two versions, so the per-problem point total has to
+restart each copy. The first problem's lines are short, so its common errors
+are set beside the work rather than under it.
 
 Builds with lualatex, rasterizes with pdftoppm and reads the PGM with the
 standard library (helpers from test_solution_inline_parity.py). Text checks use
@@ -87,6 +90,17 @@ BANK_TEX = r"""\begin{problem}{ineq}[topic=ineq]
 	\end{parts}
 \end{problem}
 
+\begin{problem}{aligned}[topic=aligned]
+	Solve $2x + 3 = 7$.
+	\begin{solution}
+		\begin{align*}
+			2x + 3 &= 7 \award{1} \\
+			2x &= 4 \award{1} \\
+			x &= \boxed{2} \award{1}
+		\end{align*}
+	\end{solution}
+\end{problem}
+
 \begin{problem}{graph}[topic=graph]
 	Graph $y = x$.
 	\begin{sketchaxes}{-3}{3}{-3}{3}
@@ -98,7 +112,7 @@ BANK_TEX = r"""\begin{problem}{ineq}[topic=ineq]
 \end{problem}
 """
 
-EXAM_TEX = r"""\documentclass[exam-number=1, points=18]{autoexam}
+EXAM_TEX = r"""\documentclass[exam-number=1, points=21]{autoexam}
 \keylayout{inline}
 \versions{A,B}
 \setexamseed{3}
@@ -110,6 +124,7 @@ EXAM_TEX = r"""\documentclass[exam-number=1, points=18]{autoexam}
 	\newpage
 	\problem[2,3][1,1]{topic=parts}
 	\newpage
+	\problem[3][0.3]{topic=aligned}
 	\problem[4][0.2]{topic=graph}
 \end{problems}
 \end{document}
