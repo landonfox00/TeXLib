@@ -645,15 +645,45 @@ end
 
 -- The natural height plus depth of the vertical list being built, for the
 -- floor of a {solution} whose footer only the instructor's copy draws.
-function M.list_total()
-	local head = tex.nest.top.head
+local function total_of(head)
 	local total = 0
 	if head and head.next then
 		local b = node.vpack(node.copy_list(head.next))
 		total = b.height + b.depth
 		node.flush_node(b)
 	end
-	tex.sprint(tostring(total))
+	return total
+end
+
+function M.list_total()
+	tex.sprint(tostring(total_of(tex.nest.top.head)))
+end
+
+-- Room for what only an instructor's copy draws (texlib-solutions.sty,
+-- \@sol@footerroom). mark_tail() remembers where the current vertical list
+-- ends; cut_tail() measures what was added since, removes it, and puts the
+-- list's end and \prevdepth back as they were, so the list continues as if
+-- nothing had been set. It prints the growth in sp.
+local mark
+
+function M.mark_tail()
+	local top = tex.nest.top
+	mark = { tail = top.tail, prevdepth = top.prevdepth,
+		total = total_of(top.head) }
+end
+
+function M.cut_tail()
+	local top = tex.nest.top
+	local grown = total_of(top.head) - mark.total
+	local rest = mark.tail.next
+	if rest then
+		mark.tail.next = nil
+		node.flush_list(rest)
+	end
+	top.tail = mark.tail
+	top.prevdepth = mark.prevdepth
+	mark = nil
+	tex.sprint(tostring(grown))
 end
 
 -- Line-edge nodes that a paragraph supplies and a run-in line must not keep:

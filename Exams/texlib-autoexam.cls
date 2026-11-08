@@ -241,6 +241,24 @@
 		Solutions\ifrubric\space and Rubrics\fi
 	\fi}
 
+% The cover's name line and postscript (\maketitle). #1 is set on the rule,
+% left-aligned in its 4in: empty on a student copy, the copy's label on an
+% inline key. \@autoexam@namelabel is \smash'ed, so the line is as tall and as
+% deep as an empty rule.
+\newcommand{\@autoexam@nameline}[1]{%
+	Name: \underline{\makebox[4in][l]{#1}}
+	\vfill
+
+}
+\newcommand{\@autoexam@postscript}{%
+	\ifthenelse{\equal{}{\GetExamPostscript}}%
+		{}%
+		{\textit{\GetExamPostscript}}}
+\newcommand{\@autoexam@namelabel}{%
+	\ifdefined\TeXLibGhostInk\else
+		\hspace{1em}\smash{\large\textcolor{red}{\textbf{\@autoexam@solword}}}%
+	\fi}
+
 % texlib-problembank.sty loads problem_engine.lua and defines the shared
 % machinery: \setvar/\setrng/\calcvar/\get, \pick* commands, \getlist/\geti/
 % \foreachpick, \begin{problem} environment,
@@ -664,12 +682,14 @@
 % The header is set before its page ships and autoexamabspage is stepped as it
 % ships, so the page being headed is the next one.
 \newcommand{\@autoexam@pagepoints}{%
+	\ifdefined\TeXLibGhostInk\else
 	\ifcsname @autoexam@pts@\number\numexpr\c@autoexamabspage+1\relax\endcsname
 		\edef\reserved@a{%
 			\csname @autoexam@pts@\number\numexpr\c@autoexamabspage+1\relax\endcsname}%
 		\ifdim\reserved@a\p@>\z@
 			\reserved@a\ \ifdim\reserved@a\p@=\p@ point\else points\fi
 		\fi
+	\fi
 	\fi
 }
 
@@ -1188,9 +1208,15 @@
 		% copy implies rubrics and says only "Instructor Version"), so this no
 		% longer appends one -- doing both produced "Instructor Version and
 		% Rubrics and Rubrics".
+		%
+		% Not here in an inline key: there the cover is the student's cover, and
+		% the label is written on the name line instead (below), where it takes
+		% no room. A line here would move everything under it.
 		\ifsolutions
-			\if@autoexam@dateline \\ \fi
-			\large\textcolor{red}{\textbf{\@autoexam@solword}}%
+			\ifsolinline\else
+				\if@autoexam@dateline \\ \fi
+				\large\textcolor{red}{\textbf{\@autoexam@solword}}%
+			\fi
 		\else
 			\ifrubric
 				\if@autoexam@dateline \\ \fi
@@ -1217,17 +1243,22 @@
 		\vfill
 
 		% Blank-copy furniture: the name rule and the postscript both address the
-		% student sitting the exam, so an instructor key / solutions copy carries
-		% neither.  \ifsolutions (not \ifkey) is the gate, so \ShowSolutions and
-		% \justsolutions builds drop them too -- every copy that shows answers is
-		% an instructor copy.
-		\ifsolutions\else
-			Name: \underline{\hspace{4in}}
-			\vfill
-
-			\ifthenelse{\equal{}{\GetExamPostscript}}%
-				{}%
-				{\textit{\GetExamPostscript}}%
+		% student sitting the exam, so a compact key carries neither.
+		% \ifsolutions (not \ifkey) is the gate, so \ShowSolutions and
+		% \justsolutions builds drop them too.
+		%
+		% An inline key keeps both, because its pages are the student's pages
+		% with ink added, the cover included: the copy's label is written on
+		% the name line, in a box of no height or depth, so the rule sits where
+		% the student's does.
+		\ifsolutions
+			\ifsolinline
+				\@autoexam@nameline{\@autoexam@namelabel}%
+				\@autoexam@postscript
+			\fi
+		\else
+			\@autoexam@nameline{}%
+			\@autoexam@postscript
 		\fi
 	\end{center}
 	% Title page is complete.  The user adds \blankpage after \maketitle to produce

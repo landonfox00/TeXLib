@@ -25,9 +25,9 @@
 % \rubric{pts}{text} appends a rubric item to one of two accumulators depending
 % on which environment is active (\@sol@rubric inside {solution}, \@partsol@rubric
 % inside {partsolution}).  The accumulators hold \@rubricline tokens, and each
-% is set ONCE, in a teal box at the right, beneath the answer it grades:
-% {solution}'s by \@emit@sol@footer, beside the common errors, and
-% {partsolution}'s by \@emit@rubric@overlay.  The box was an overlay on the
+% is set ONCE, in a teal box at the right, beneath the answer it grades, by
+% \@emit@sol@footer, beside the common errors: {partsolution}'s through
+% \@partsol@foot, at the part's width.  The box was an overlay on the
 % "Solution." line until the footer replaced that placement, and the names date
 % from then.  The \if@in@* flags tell \rubric which accumulator is active.
 
@@ -216,12 +216,27 @@
 	\newcommand{\@sol@marker}[2]{\hbox{#2}}
 \fi
 \newdimen\@sol@floordim
-% The parts of a solution that only an instructor's copy draws, measured so
-% that its floor can leave them out (\@sol@floordim is the reach less them).
-\newdimen\@sol@bodytotal
-\newcommand{\@sol@measurebody}{%
-	\par
-	\global\@sol@bodytotal=\directlua{texlib_keyfit.list_total()}sp\relax}
+% The grading footer's share of a solution that does not draw it: a key built
+% without rubrics, from a document whose instructor's copy has them. Its floor
+% is its reach plus this, the room the student copy keeps (\@sol@footerroom).
+\newdimen\@sol@foottotal
+% \@sol@footerroom -- set the footer at the end of the solution's list, as a
+% rubric build does, and measure it. A student copy keeps it (its overlay is
+% empty, and its reach is then the instructor's). A key shows its solution, so
+% the footer is measured and cut off the list again: what it added to the
+% list's total is the room left for it. Measuring the footer in place, rather
+% than in a box of its own, is what makes the room exact -- the interline glue
+% above it depends on the last line of the answer.
+\newcommand{\@sol@footerroom}{%
+	\if@sol@ghost
+		\@emit@sol@footer
+	\else
+		\par
+		\directlua{texlib_keyfit.mark_tail()}%
+		\@emit@sol@footer
+		\par
+		\global\@sol@foottotal=\directlua{texlib_keyfit.cut_tail()}sp\relax
+	\fi}
 
 % \if@sol@ghost -- a student copy typesetting a hidden solution the way the
 % inline key draws it, to leave the same marker with the same floor. Its ink
@@ -257,6 +272,17 @@
 		\@sol@shownfalse
 		\if@sol@floors \@sol@ghosttrue \@sol@showntrue \@sol@inlinetrue \fi
 	\fi}
+% \TeXLibGhostInk -- a check, not a copy anyone reads. Defined on the command
+% line of a key or instructor build, it typesets every inline answer, rubric and
+% \award exactly as that copy does and then draws none of them, nor the points
+% in the header or the copy's label on the cover. What is left must be the
+% student copy pixel for pixel: anything that differs is something the answers
+% moved. #1 is the overlay's box, emptied in place; its size is zero either way.
+\ifdefined\TeXLibGhostInk
+	\newcommand{\@sol@ghostink}[1]{\setbox#1\hbox{}}
+\else
+	\newcommand{\@sol@ghostink}[1]{}
+\fi
 \newcommand{\@sol@label}{}
 \newcommand{\@sol@qlabel}{\ifdefined\c@question\thequestion\fi}
 \newcommand{\@sol@plabel}{\@sol@qlabel\ifdefined\c@partno\thepartno\fi}
@@ -345,7 +371,9 @@
 		\fi}
 \fi
 \gdef\@partsol@rubric{}
+\gdef\@partsol@cerr{}
 \gdef\@sol@rubric{}
+\gdef\@sol@cerr{}
 
 \newlength{\rubricboxwidth}
 \setlength{\rubricboxwidth}{4.5cm}
@@ -367,11 +395,11 @@
 	#2\par\smallskip
 }
 
-% \@emit@rubric@overlay{accumulator} — the rubric box of a {partsolution}:
-% \rubricboxwidth wide, teal, headed "Rubric:".  The argument is the accumulator
-% to render.  The box has no placement of its own.  \end{partsolution} sets it
-% beneath the part's answer, after an \hfill, and nothing else calls it:
-% {solution}'s rubric is \@rubric@panel, in the footer below.  Until the footer,
+% \@emit@rubric@overlay{accumulator} — a lone rubric box, \rubricboxwidth wide,
+% teal, headed "Rubric:".  Nothing in the library calls it any more: a
+% {partsolution} sets its rubric in the grading footer (\@partsol@foot), as a
+% {solution} does, so that its common errors sit beside it.  Kept, with
+% \rubricboxwidth, for documents that call it themselves.  Until the footer,
 % this was the overlay \llap'd onto the "Solution." line of both environments;
 % the footer's comment says why that placement was wrong.
 \newcommand{\@emit@rubric@overlay}[1]{%
@@ -598,6 +626,7 @@
 \newenvironment{solution}{%
 	\TeXLibNoteSolution
 	\@sol@decide
+	\gdef\@award@sum{0}\global\@award@usedfalse
 	\if@sol@shown
 		\par
 		\gdef\@sol@rubric{}%
@@ -644,26 +673,24 @@
 			% than after \box\@sol@box below) is what puts the panels INSIDE the
 			% green fill, whose height is measured from this box.
 			%
-			% The student copy draws no footer, so the floor leaves it out: the
-			% body is measured before the footer is added to it. The footer's
-			% first act is a \par, so ending the paragraph here first changes
-			% nothing.
-			\global\@sol@bodytotal\z@
+			% The footer is drawn only in a rubric build, but every copy of an
+			% inline document keeps its room, so that the instructor's copy is
+			% the student's page with ink added (\@sol@footerroom). A student
+			% copy draws nothing here anyway, so it sets the footer and measures
+			% it; a key without rubrics measures it and takes it out again.
+			\global\@sol@foottotal\z@
 			\ifrubric
-				\if@sol@inline \ifdefined\directlua
-					\ifx\@sol@cerr\@empty \ifx\@sol@rubric\@empty \else
-						\@sol@measurebody \fi
-					\else
-						\@sol@measurebody
-					\fi
-				\fi \fi
 				\@emit@sol@footer
-			\fi
+			\else\if@sol@floors
+				\ifx\@sol@cerr\@empty \ifx\@sol@rubric\@empty \else
+					\@sol@footerroom \fi
+				\else
+					\@sol@footerroom
+				\fi
+			\fi\fi
 		\egroup
 		\@in@solutionfalse
-		\ifdim\@sol@bodytotal>\z@
-			\global\@sol@bodytotal\dimexpr\ht\@sol@box+\dp\@sol@box-\@sol@bodytotal\relax
-		\fi
+		\@award@check{Problem \@sol@qlabel}{\@sol@problempoints}%
 		% Harvest the inverse-search target from the BODY-ONLY box, before the
 		% vtop below mixes in the "Solution." header (whose glyphs carry this
 		% .sty's tag and would poison the target). See texlib_synctex.lua and
@@ -802,11 +829,12 @@
 		% no ink.
 		\if@sol@inline
 			\@sol@reachdim\dimexpr\baselineskip+\dp\@sol@vtop+6\p@\relax
-			\@sol@floordim\dimexpr\@sol@reachdim-\@sol@bodytotal\relax
+			\@sol@floordim\dimexpr\@sol@reachdim+\@sol@foottotal\relax
 			\if@sol@ghost
 				\setbox\@sol@outer\hbox{}%
 			\else
 				\sbox\@sol@outer{\raisebox{-\baselineskip}[\z@][\z@]{\@sol@frame}}%
+				\@sol@ghostink\@sol@outer
 			\fi
 			\let\@sol@label\@sol@qlabel
 			\@sol@overlay\@sol@outer\@sol@reachdim
@@ -854,12 +882,14 @@
 \newenvironment{partsolution}{%
 	\TeXLibNotePartSolution
 	\@sol@decide
+	\gdef\@award@sum{0}\global\@award@usedfalse
 	\if@sol@shown
 		\par
 		% The opening \smallskip is real vertical space, so it is suppressed in
 		% the inline layout for the same reason the box declares no size.
 		\if@sol@inline\else\smallskip\fi
 		\gdef\@partsol@rubric{}%
+		\gdef\@partsol@cerr{}%
 		\@in@partsolutiontrue
 		\texlib@acc@solbegin
 		\setbox\@partsol@box\vbox\bgroup
@@ -879,6 +909,7 @@
 		\ifdefined\TeXLibAccessibleMode\par\fi
 		\egroup
 		\@in@partsolutionfalse
+		\@award@check{Part \@sol@plabel}{\@sol@itempoints}%
 		% Same container-stamping as {solution}, and in the same ORDER, which is
 		% load-bearing: harvest the target from the body-only box (before the
 		% "Solution." header's own glyphs can poison it), then stamp the
@@ -911,24 +942,24 @@
 				\fi
 			\fi
 		\fi \fi \fi
-		% The floor leaves out what only an instructor's copy draws, the
-		% rubric: the same stack without it, measured from a copy of the body.
+		% The part's footer -- its common errors beside its rubric -- is drawn
+		% only in a rubric build, and every copy of an inline document keeps
+		% its room, as {solution} does (\@sol@footerroom). A copy that does not
+		% draw it measures the stack with it, from a copy of the body.
+		\@partsol@hasfootfalse
+		\ifx\@partsol@rubric\@empty\else \@partsol@hasfoottrue \fi
+		\ifx\@partsol@cerr\@empty\else \@partsol@hasfoottrue \fi
 		\@sol@floordim\z@
-		\if@sol@inline \ifrubric \ifx\@partsol@rubric\@empty\else
+		\if@sol@inline \if@sol@floors \ifrubric\else \if@partsol@hasfoot
 			\texlib@acc@tagsuspend
-			\setbox\@tempboxa\vtop{\@partsol@stack\copy}%
+			\setbox\@tempboxa\vtop{\@partsol@stack\copy\@partsol@foot}%
 			\texlib@acc@tagresume
 			\@sol@floordim\dimexpr\baselineskip+\dp\@tempboxa+6\p@\relax
-		\fi \fi \fi
-		% Header, body and any rubric share one vtop so a single fill backs them.
+		\fi \fi \fi \fi
+		% Header, body and any footer share one vtop so a single fill backs them.
 		\setbox\@partsol@wrap\vtop{%
 			\@partsol@stack\box
-			\ifrubric
-				\ifx\@partsol@rubric\@empty\else
-					\par\vspace{6pt}\noindent
-					\hfill\@emit@rubric@overlay{\@partsol@rubric}%
-				\fi
-			\fi
+			\ifrubric \if@partsol@hasfoot \@partsol@foot \fi \fi
 		}%
 		\texlib@acc@solend
 		% Stamp the assembled FRAME, not just the wrap inside it. {solution} can
@@ -972,6 +1003,7 @@
 			% solution, so a page of four part answers lost 12pt before its next
 			% problem.
 			\let\@sol@label\@sol@plabel
+			\@sol@ghostink\@partsol@outer
 			\@sol@overlay\@partsol@outer\@sol@reachdim
 		\else
 			\par\noindent\box\@partsol@outer\par\smallskip
@@ -985,6 +1017,16 @@
 		\egroup\texlib@acc@tagresume
 	\fi
 }
+
+% \@partsol@foot -- a part's grading footer: the same pair of panels as a whole
+% solution's, sized to the part's measure (\@partsol@stack has set \hsize).
+\newif\if@partsol@hasfoot
+\newcommand{\@partsol@foot}{%
+	\begingroup
+		\let\@sol@rubric\@partsol@rubric
+		\let\@sol@cerr\@partsol@cerr
+		\@emit@sol@footer
+	\endgroup}
 
 % \@partsol@stack{\box or \copy} -- the header and the body of a part answer,
 % for the vtop that {partsolution} frames.
@@ -1048,20 +1090,100 @@
 % which is precisely what the builder needs to know from a build that is not
 % rendering one. Inside the guard it would only ever fire in a build that
 % already knew.
+%
+% The accumulators fill in every build, not only a rubric build: in the inline
+% layout the student copy and a key without rubrics keep the room the rubric
+% takes in the instructor's copy (see \@sol@footerroom), so they have to know
+% what it holds. Whether it is drawn is decided where it is set.
 \NewDocumentCommand{\rubric}{mm}{%
 	\TeXLibNoteRubric
-	\ifrubric
-		\if@in@partsolution
-			\expandafter\gdef\expandafter\@partsol@rubric\expandafter{%
-				\@partsol@rubric\@rubricline{#1}{#2}}%
-		\else
-			\if@in@solution
-				\expandafter\gdef\expandafter\@sol@rubric\expandafter{%
-					\@sol@rubric\@rubricline{#1}{#2}}%
-			\fi
+	\if@in@partsolution
+		\expandafter\gdef\expandafter\@partsol@rubric\expandafter{%
+			\@partsol@rubric\@rubricline{#1}{#2}}%
+	\else
+		\if@in@solution
+			\expandafter\gdef\expandafter\@sol@rubric\expandafter{%
+				\@sol@rubric\@rubricline{#1}{#2}}%
 		\fi
 	\fi
 }
+
+% ---------------------------------------------------------------------------
+% \award{n} -- the points a line of the worked solution earns, as a grader marks
+% them: "+n" in the right margin beside that line, in an instructor's copy only.
+% Written at the END of a line of the answer: in text it fills the line out to
+% the right edge, and in a display it is the equation's tag. The mark is a box
+% of zero width, so every copy -- student, key, instructor -- sets the same
+% lines, and only the ink differs.
+%
+% The awards of one solution must add up to the points of the item it answers:
+% a {partsolution} to its part's, a {solution} to the whole problem's. A rubric
+% build checks this at the end of each solution and stops with an error that
+% names the item, so a rubric can never hand out more or fewer points than the
+% paper says. A solution with no \award is not checked.
+%
+% The item's points are read where exam.cls reads them, at \@readpoints, which
+% every question and part with points passes through. The problem's total
+% restarts at each bank \problem (\pbank@problembegin): a problem whose points
+% are on its parts opens with a bare \question (problem_engine.lua), which
+% reads none, and its parts add up into it. Neither \question nor its counter
+% can mark the start: exam.cls defines \question inside {questions}, so a hook
+% on the command never runs, and it reads a question's points before it steps
+% the counter.
+\newlength{\@award@gap}
+\setlength{\@award@gap}{10pt}
+\newcommand{\texlibawardcolor}{red!75!black}
+\newcommand{\texlibawardformat}[1]{\textsf{\textbf{+#1}}}
+\gdef\@award@sum{0}
+\gdef\@sol@itempoints{0}
+\gdef\@sol@qpoints{0}
+\def\pbank@problembegin{\gdef\@sol@qpoints{0}}
+\newif\if@award@used
+\newcommand{\@award@add}[1]{%
+	\begingroup
+		\def\half{.5}%
+		\xdef\@award@sum{\fpeval{\@award@sum+(#1)}}%
+	\endgroup
+	\global\@award@usedtrue}
+\newcommand{\@award@mark}[1]{%
+	\makebox[\z@][l]{\hskip\@award@gap
+		\ifrubric \ifdefined\TeXLibGhostInk\else
+			\textcolor{\texlibawardcolor}{\texlibawardformat{#1}}%
+		\fi \fi}}
+\NewDocumentCommand{\award}{m}{%
+	\@award@add{#1}%
+	\ifmmode
+		\tag*{\@award@mark{#1}}%
+	\else
+		% \ignorespaces: the end of the source line after \award{n} is a space,
+		% and when the paragraph does not end straight after it (a
+		% {commonerrors} block follows, which leaves a note in the list) that
+		% space stays on the line and pulls the mark in by its width.
+		\unskip\nobreak\hfill\@award@mark{#1}\expandafter\ignorespaces
+	\fi}
+\ifdefined\@readpoints
+	\let\@award@orig@readpoints\@readpoints
+	\def\@readpoints[#1]{%
+		\begingroup
+			\def\half{.5}%
+			\xdef\@sol@itempoints{\fpeval{#1}}%
+			\xdef\@sol@qpoints{\fpeval{\@sol@qpoints+(#1)}}%
+		\endgroup
+		\@award@orig@readpoints[#1]}
+\fi
+\newcommand{\@sol@problempoints}{\@sol@qpoints}
+% #1 = what is graded ("Problem 7", "Part 3b"), #2 = its points.
+\newcommand{\@award@check}[2]{%
+	\ifrubric \if@award@used
+		\ifdim\@award@sum\p@=#2\p@\else
+			\PackageError{texlib-solutions}{%
+				#1: the \string\award\space marks add up to \@award@sum,
+				but it is worth #2 point\ifdim#2\p@=\p@\else s\fi}{%
+				Make the awards in this solution add up to the points the
+				exam gives it.}%
+		\fi
+	\fi \fi
+	\gdef\@award@sum{0}\global\@award@usedfalse}
 
 % {commonerrors} — a block of common student errors (\item each), shown only in
 % rubric builds and only ever as the left panel of the solution footer.
@@ -1080,21 +1202,23 @@
 % Verbatim content remains unsupported -- \BODY, like the old discarded box,
 % re-reads the body as ordinary tokens.
 %
-% Outside a {solution} (a bare block, or one inside {partsolution}) there is no
-% footer to defer to, so it renders where it stands, in the same panel style.
+% Inside {partsolution} it is captured the same way, into \@partsol@cerr, and
+% set in the part's own footer beside its rubric. Captured in every build, for
+% the reason given at \rubric. Outside both (a bare block) there is no footer
+% to defer to, so it renders where it stands, in the same panel style.
 \NewEnviron{commonerrors}{%
 	\TeXLibNoteCommonErrors   % outside \ifrubric; see \rubric above
-	\ifrubric
-		\if@in@solution
-			\global\let\@sol@cerr\BODY
-		\else
-			\par\smallskip\noindent
-			\global\let\@sol@cerr\BODY
-			\@cerr@panel{\hsize}%
-			\global\let\@sol@cerr\@empty
-			\par\smallskip
-		\fi
-	\fi
+	\if@in@partsolution
+		\global\let\@partsol@cerr\BODY
+	\else\if@in@solution
+		\global\let\@sol@cerr\BODY
+	\else\ifrubric
+		\par\smallskip\noindent
+		\global\let\@sol@cerr\BODY
+		\@cerr@panel{\hsize}%
+		\global\let\@sol@cerr\@empty
+		\par\smallskip
+	\fi\fi\fi
 }
 
 % \workbox{n} — proportional answer space (= \vspace{\stretch{n}}), but suppressed

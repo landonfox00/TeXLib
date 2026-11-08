@@ -294,10 +294,11 @@ keeps the header on a line of its own.
 
 The room is the student copy's only where the keys are inline (`\keylayout`
 below) and the copy is not tagged. A multiple-choice key, which sets its
-answer beside the choices, takes none. An instructor's key also draws the
-rubric, which its student copy leaves out; where that rubric does not fit,
-the space after it grows to hold it and the page's other answer spaces give
-that up in proportion to their stretch. The same happens to a key drawn
+answer beside the choices, takes none. The room includes the grading
+footer, the rubric and common errors an instructor's copy draws under the
+answer, in every copy of the document: the student copy and a `solutions` key
+keep the space blank, so the instructor's copy is the student page with ink
+added, cover included (its label is written on the name line). A key drawn
 inline (the `solutions-inline` build mode) from a document whose keys are
 `compact`, since its student copy made no room. The page height does not
 change. Where room was made, the key page no longer matches the student page,
@@ -351,22 +352,50 @@ copy's page unless a page cannot hold its answers. `\keylayout{compact}` in the 
 asks for the other layout: the answer space closes and the solutions flow, which
 suits a sheet with no work space.
 
+`\award{points}`
+The points a line of the worked answer earns. Write it at the end of that line
+(in a display, it is the equation's tag); an instructor's copy prints "+2" in
+the right margin beside the line, the way a grader marks a paper, and every
+other copy prints nothing. The mark has no width, so it moves nothing. The
+awards in one solution must add up to the points of what it answers, a
+`{partsolution}` to its part's and a `{solution}` to the problem's; a build
+that shows rubrics stops with an error naming the problem or part when they do
+not. A solution with no `\award` is not checked.
+
+```latex
+\begin{solution}
+	$(x - 1)^{2}(x + 3) = 0 \implies x = -3, \ x = 1$ \award{2}
+
+	$\boxed{(-\infty, -3] \cup \{1\}}$ \award{2}
+	\begin{commonerrors}
+		\item[2] leaves out the isolated solution $x = 1$
+	\end{commonerrors}
+\end{solution}
+```
+
 `\rubric{points}{description}`
-Add a rubric line to the solution it is written in. It prints in a build that
-shows rubrics (see [Build flags](#build-flags-texlib-unified-cli)). A
-whole-problem `{solution}` sets its rubric in the grading footer: under the
-worked answer, inside the solution's box, on the right, with `{commonerrors}`
-on the left. A `{partsolution}` sets its rubric in a right-aligned box under
-the part's answer, and `\rubricboxwidth` is that box's width. A problem in
-`{mcproblems}` prints no rubric. The layout is `\@emit@sol@footer` and
-`\@emit@rubric@overlay` in `texlib-solutions.sty`.
+Add a rubric line to the solution it is written in, for credit that belongs to
+no single line of the answer. It prints in a build that shows rubrics (see
+[Build flags](#build-flags-texlib-unified-cli)), in the grading footer: under
+the worked answer, inside the solution's box, on the right, with
+`{commonerrors}` on the left. A `{partsolution}` has a footer of its own, the
+same two panels at the part's width. A problem in `{mcproblems}` prints no
+rubric. The layout is `\@emit@sol@footer` in `texlib-solutions.sty`.
 
 `\begin{commonerrors} ... \end{commonerrors}`
-List common student errors. It prints only in a build that shows rubrics: an
-instructor copy has it and a `solutions` key does not. Inside a `{solution}` it
-is the left panel of the grading footer, wherever in the solution it is
-written; inside a `{partsolution}` it prints where it stands. A problem in
-`{mcproblems}` prints none.
+List common student errors, each with the points it costs: `\item[2]` prints
+"[−2 pts]". It prints only in a build that shows rubrics: an instructor copy
+has it and a `solutions` key does not. Inside a `{solution}` or a
+`{partsolution}` it is the left panel of that solution's grading footer,
+wherever in the solution it is written. A problem in `{mcproblems}` prints
+none.
+
+`\def\TeXLibGhostInk{}` (command line)
+A check, not a copy to hand out. Defined ahead of an instructor or key build,
+it typesets every inline answer, footer, `\award` and `{sketchaxes}` answer as
+that copy does and draws none of them, nor the header's points or the cover's
+label. The result must match the student copy pixel for pixel; a page that
+differs is a page the answers moved. `test_rubric_inline_parity.py` builds one.
 
 `\ppart`
 Insert a part marker compatible with the autoexam shuffler.
