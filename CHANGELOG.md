@@ -264,6 +264,16 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   under "Versions" in `Exams/README.md`. Tests: `versions-none-test` and
   `versions-none-quiz` in `test_engine_correctness.py`.
 
+- **`texlib-thesis` takes `bibstyle=alphabetic`.** The class loaded biblatex
+  with `style=numeric` and no way to change it, so a document could not have
+  `[Lur09]`-style labels: biblatex fixes its style when it loads, and an
+  option passed to it beforehand is overridden by the class's own. The new
+  option selects `style=alphabetic` with `sorting=anyt`, biblatex's own
+  default for that style; `bibstyle=numeric` is the default and leaves the
+  class as it was. In either style an entry's `shorthand` field replaces its
+  label, so `shorthand = {HTT}` prints `[HTT]`. Documented in
+  `Thesis/README.md`.
+
 ### Changed
 
 - **A build checks every tagged PDF it writes, and reports each one.** A build
