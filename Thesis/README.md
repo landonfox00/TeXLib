@@ -139,6 +139,18 @@ lualatex thesis-template
 lualatex thesis-template
 ```
 
+Citations are numeric, `[12]`, by default. `bibstyle=alphabetic` gives labels
+from the authors' initials and the year, `[Lur09]`, `[BHS25]`, with the list
+sorted by label. In either style an entry with a `shorthand` field prints that
+instead, which suits a book cited by its title:
+
+```latex
+\documentclass[profile=unr, bibstyle=alphabetic]{texlib-thesis}
+
+@book{htt, author = {Lurie, Jacob}, title = {Higher Topos Theory},
+           year = {2009}, shorthand = {HTT}, ...}
+```
+
 Tagging is intrinsic, not optional: the document **must** begin with
 `\DocumentMetadata{...}` *before* `\documentclass{thesis}` (that is the only
 place PDF tagging can be switched on). The template already includes it; the

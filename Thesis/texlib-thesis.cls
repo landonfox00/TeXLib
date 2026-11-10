@@ -56,6 +56,21 @@
 % ---------------------------------------------------------------------------
 % 0. Options: oneside (default, per grad-school submission) / twoside (binding)
 % ---------------------------------------------------------------------------
+% bibstyle=numeric (default) or bibstyle=alphabetic picks the citation labels,
+% [12] or [Lur09]; an entry with a `shorthand' field prints that instead, e.g.
+% [HTT]. Alphabetic lists sort by label, then name, year and title (biblatex's
+% own default for that style). Declared by full name so the catch-all below
+% never sees them; any other value falls through to it and reaches report.
+\newcommand{\thesis@bibstyle}{numeric}
+\newcommand{\thesis@bibsorting}{nyt}
+\DeclareOption{bibstyle=numeric}{%
+	\renewcommand{\thesis@bibstyle}{numeric}%
+	\renewcommand{\thesis@bibsorting}{nyt}%
+}
+\DeclareOption{bibstyle=alphabetic}{%
+	\renewcommand{\thesis@bibstyle}{alphabetic}%
+	\renewcommand{\thesis@bibsorting}{anyt}%
+}
 % profile=<name> selects the institution profile (see the header). Declared
 % before the catch-all so it is consumed here rather than passed to report,
 % which would reject it. Default `generic': a class loaded with no profile must
@@ -234,7 +249,7 @@
 % a \cite and keeps it. The flag earns its place while a chapter is being
 % drafted on its own, which is the one build an author repeats all day.
 \TeXLibDefer{Bib}{%
-	\RequirePackage[backend=biber, style=numeric, sorting=nyt, maxbibnames=10, giveninits=true]{biblatex}%
+	\RequirePackage[backend=biber, style=\thesis@bibstyle, sorting=\thesis@bibsorting, maxbibnames=10, giveninits=true]{biblatex}%
 }
 
 \@ifundefined{TeXLibNoBib}{%
