@@ -433,6 +433,16 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Fixed
 
+- **An inline key page with a `\splitpage` answer stopped the fit pass.** When
+  a page could not hold one of its solutions and also carried an answer whose
+  ink ends inside its own row (a `\splitpage` part beside a taller column),
+  the warning in `texlib_keyfit.lua` read the room after that row, which the
+  fit pass never measures for an answer that needs none, and stopped on a Lua
+  error. The key was left as the overlay drew it, and the build summary did
+  not name the page. Such answers are now passed over, since none of their ink
+  is below their row. `test_solution_inline_fit.py` builds that page (SPLIT).
+  Found building Math 126's Exam 3 instructor keys.
+
 - **Six switches and fields that a document set and the page ignored.** Found
   by an audit of `main`, each reproduced with a one-page document and now
   checked by `test_class_render.py`:

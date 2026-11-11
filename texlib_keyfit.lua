@@ -526,9 +526,17 @@ function M.fit(boxnumber, attr, sepattr, whichattr, floorattr)
 
 	-- The solutions that ran over, by name and in page order. An owner holding
 	-- several (the parts of a {cols} problem) lists only those that did.
+	--
+	-- An owner none of whose solutions reaches below it -- a \splitpage row
+	-- whose answers end above its taller column -- is not in `reach`, so room()
+	-- never measured the space after it. Its solutions are skipped: none of
+	-- their ink is below the owner, so none can have run over. Counting such an
+	-- owner in reach_of instead would also give it a floor and, after a
+	-- negative \vspace, a lack of room it does not have.
 	local short, version = {}, nil
 	for _, m in ipairs(markers) do
-		local over = m.bottom + m.need - items[m.owner].bottom - avail_of[m.owner]
+		local avail = avail_of[m.owner]
+		local over = avail and m.bottom + m.need - items[m.owner].bottom - avail or 0
 		if over > 0 then
 			local which = whichattr and node.get_attribute(m.node, whichattr)
 			local named = which and M.labels[which]
