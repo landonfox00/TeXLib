@@ -1,0 +1,223 @@
+% profiles/dartmouth-college.tex — Dartmouth College
+% ============================================================================
+% source: https://graduate.dartmouth.edu/sites/graduate_studies.prod/files/graduate_studies/wysiwyg/thesis_guidelines_4.pdf
+%         (Guarini School of Graduate and Advanced Studies, thesis guidelines:
+%         deadlines, the annotated title-page formats, and the numbered
+%         formatting requirements. Every page foot reads "Updated 05/01/2025",
+%         which is the newest of the several editions on that server.)
+% accessed: 2026-09-13
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, title page including its signature
+% block, the absence of a separate approval page, and the absence of any
+% published accessibility rule. NOT set: chapter-opening margin (Guarini states
+% none) and the typeface (Guarini names no face, only a minimum size).
+%
+% ------------------------------------------------------------------------
+% THE SOURCE WAS A NUISANCE TO PIN DOWN. Two things to know before rechecking:
+%
+% 1. THE HTML PAGE EVERY SEARCH ENGINE POINTS AT IS GONE. Both Google and
+%    Dartmouth's own site search still return
+%    /academics/graduate-registrar/information-submission-thesis-dissertation-or-course-track-fulfillments,
+%    and it now serves Dartmouth's "Page Not Found". The PDFs it used to link
+%    are still live at the wysiwyg/ path above, which is why this profile cites
+%    the PDF directly.
+%
+% 2. FOUR EDITIONS OF THE GUIDELINES ARE LIVE ON THAT SERVER, and the filenames
+%    do not sort by date — one of them even misspells the school. All four
+%    return HTTP 200:
+%       thesis_guidelines_4.pdf                          Updated 05/01/2025  <- used
+%       guairni_school_thesis_guidelines_-_updated_2022.pdf  Updated 05/27/2022
+%       guairni_school_thesis_guidelines.pdf             (the "guairni" typo)
+%       guarini_school_thesis_guidelines.pdf             Updated 7/30/2018
+%    They agree on the margin and spacing rules but NOT on the list of approved
+%    majors, and the 2018 edition names degree majors Dartmouth no longer
+%    offers. Take the date from the page foot, never from the filename.
+% ------------------------------------------------------------------------
+
+\thesisinstitution{Dartmouth College}
+
+% "For binding purposes, the left-hand margin must be 1.5 inches wide on all
+% pages of the thesis including figures, appendices, etc. The top, bottom, and
+% right-hand margins should be between 0.5" to 1" wide."
+%
+% The left figure is exact and is a binding allowance. The other three are a
+% RANGE, and this profile takes the wide end of it — 1in — because that is the
+% conventional page and is unambiguously in spec. Anything from 0.5in up is
+% equally permitted, so a filer who needs more text per page may narrow them.
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "Line spacing must also be at least 18 points (1.5 lines), except for
+% footnotes and long quoted passages."
+%
+% A FLOOR, and this profile sits on it rather than above it: 1.5 is the figure
+% Guarini actually names. Double spacing also satisfies "at least 18 points"
+% and is equally in spec — \thesissetspacing{double} is a one-line change — but
+% onehalf is what the requirement says, and it is what the class's `onehalf'
+% keyword produces.
+\thesissetspacing{onehalf}
+
+% --- Two rules this file cannot express, recorded so they are not lost --------
+%
+% A BLANK PAGE FOLLOWS THE TITLE PAGE, and it is neither counted nor numbered:
+% "Each page in the thesis, except the title page and the blank page following
+% the title page, should be assigned a number. ... The title page counts as page
+% i but the number does not appear. The blank page is not counted or numbered."
+% A profile owns no hook for that leaf, so a Dartmouth filer must emit it
+% themselves after \thesistitlepage.
+%
+% MINIMUM TYPE SIZE: "Text must be at least 11-point font." A floor, not a
+% face, so there is nothing to set — but a document that shrinks below 11pt is
+% out of spec.
+%
+% Page numbers are "placed at the center bottom", which is the class's default.
+
+% --- Accessibility -----------------------------------------------------------
+% Recorded as an absence, and the absence was looked for. The whole of the
+% May 2025 guidelines was read and contains none of "accessib", "alt text",
+% "WCAG", "tagged", "PDF/A" or "screen reader". The HTML page that would have
+% been the other place to look is the one that now 404s.
+\thesisaccessibilityrequirement{Not published}
+	{The Guarini School publishes no accessibility requirement for a filed
+	 thesis or dissertation. Checked against the whole of the May 2025 thesis
+	 guidelines on 2026-09-13. Note that the Guarini submission page that would
+	 have been the second place to look was returning "Page Not Found" on that
+	 date, so this is an absence in the guidelines rather than across the whole
+	 site.}
+
+% --- Profile-local field ------------------------------------------------------
+% The Dean of the Guarini School signs every Dartmouth title page, so the name
+% belongs to the layout rather than to the student's metadata.
+%
+% Not hardcoded: the May 2025 specimen prints "F. Jon Kull, Ph.D.", which is one
+% copy-paste away for anyone who confirms it is still current, but an
+% office-holder's name baked into a profile rots silently and a stale name over
+% a signature line is a filing error that looks like a correct page.
+\newcommand{\thesis@dc@dean}{[SET THE GUARINI DEAN, WITH DEGREE]}
+\newcommand{\dartmouthdean}[1]{\renewcommand{\thesis@dc@dean}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% The "Title Page Format for all Degrees EXCEPT Engineering Sciences and MALS"
+% specimen, read from the rendered page. Its body, centred:
+%
+%   THE TITLE OF THE THESIS            (bold)
+%   A Thesis
+%   Submitted to the Faculty
+%   in partial fulfillment of the requirements for the
+%   degree of
+%   <Master of (Fine) Arts or Master of Science or Doctor of Philosophy>
+%   in
+%   <Degree Major>
+%   by Your Name
+%   Guarini School of Graduate and Advanced Studies
+%   Dartmouth College
+%   Hanover, New Hampshire
+%   Month and Year of Defense
+%
+% then a right-aligned signature block headed "Examining Committee:", with a
+% rule above each name and "(chair)" before the first, and finally a
+% bottom-left block: a rule, the Dean's name and degree, and "Dean of the
+% Guarini School of Graduate and Advanced Studies".
+%
+% THE SIGNATURES GO ON THIS PAGE. Guarini states it plainly — all signatures
+% must be on one title page, and electronic signatures are allowed, ideally as a
+% high-resolution image of an actual signature. That is why this profile draws
+% real rules here and declares no separate approval page below.
+%
+% TWO OTHER TITLE-PAGE FORMATS EXIST in the same PDF and are NOT encoded here:
+% Engineering Sciences (which adds a "Thayer School of Engineering" line above
+% the Guarini line) and MALS. A filer in either should override
+% \thesistitlepage; the difference is one line for Engineering Sciences.
+%
+% \thesis@program supplies the degree major, which Guarini requires to be drawn
+% from a published list — "List of approved majors on following page" — so set
+% \gradprogram to a name on that list rather than to a research area.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		% "The title page counts as page i but the number does not appear."
+		% THE WHOLE PAGE MUST FIT ONE TEXT BLOCK. It carries a great deal —
+		% thirteen centred lines, a four-signature committee block and the
+		% Dean's block — and the first arrangement of it pushed the Dean onto a
+		% second page, which would have put a signature line on a numbered page
+		% that Guarini's pagination rules say is the blank leaf. The skips below
+		% are therefore deliberately tight; with five committee signatures the
+		% page will start to crowd, and the fix is to reduce them further rather
+		% than to let it spill.
+		\thispagestyle{empty}\singlespacing
+		{\centering
+			\thesis@tagtitle{Title}{{\bfseries\MakeUppercase{\@title}}}\par
+			\vspace{1.5\baselineskip}
+			A \thesis@DocNoun\par
+			Submitted to the Faculty\par
+			in partial fulfillment of the requirements for the\par
+			degree of\par
+			\vspace{0.75\baselineskip}
+			\thesis@degree\par
+			\vspace{0.75\baselineskip}
+			in\par
+			\vspace{0.75\baselineskip}
+			\thesis@program\par
+			\vspace{0.75\baselineskip}
+			by \@author\par
+			\vspace{0.75\baselineskip}
+			Guarini School of Graduate and Advanced Studies\par
+			Dartmouth College\par
+			Hanover, New Hampshire\par
+			\vspace{0.75\baselineskip}
+			\thesis@date\par
+		\par}
+		\vspace{1.25\baselineskip}
+		% Examining committee, right-aligned: a rule to sign on, then the name
+		% beneath it. The class default \thesis@memberline puts a 3in rule and
+		% then "Name, Role"; Guarini wants the role only on the chair, and as a
+		% prefix rather than a suffix.
+		\hfill
+		\begin{minipage}{0.45\textwidth}
+			\raggedright
+			Examining Committee:\par
+			\vspace{0.75\baselineskip}
+			\begingroup
+			\renewcommand{\thesis@memberline}[2]{%
+				\vspace{1.5\baselineskip}%
+				\rule{\linewidth}{0.4pt}\par
+				##1\par
+			}%
+			\vspace{1.5\baselineskip}%
+			\rule{\linewidth}{0.4pt}\par
+			(chair) \thesis@advisor\par
+			\thesis@committee
+			\endgroup
+		\end{minipage}%
+		\par
+		\vspace{2\baselineskip}
+		% The Dean's block, bottom left. Wider than the committee block on
+		% purpose: at 0.45\textwidth the title line wrapped as "Dean of the
+		% Guarini School of / Graduate and Advanced Studies", where the specimen
+		% keeps it on one line. The signature rule stays the committee's width
+		% rather than the block's, which is also what the specimen shows.
+		\noindent
+		\begin{minipage}{0.75\textwidth}
+			\raggedright
+			\rule{0.45\textwidth}{0.4pt}\par
+			\thesis@dc@dean\par
+			Dean of the Guarini School of Graduate and Advanced Studies\par
+		\end{minipage}%
+		\par
+
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% There is no separate one, and as at Utah State this is not an inference from
+% silence: the signatures are demonstrably ON the title page above, over real
+% rules, and Guarini requires them to be in exactly one place — all signatures
+% on one title page.
+%
+% So \thesisnoapprovalpage here means "the approvals are already on the title
+% page", NOT "this school collects no signatures". Dartmouth does collect them;
+% it accepts electronic ones, ideally a high-resolution image of an actual
+% signature, and the separate Defense Outcome and Degree Completion Form that
+% travels to the Dean's office may also be signed digitally.
+\thesisnoapprovalpage
