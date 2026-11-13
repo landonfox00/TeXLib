@@ -1,0 +1,257 @@
+% profiles/utah-state-university.tex — Utah State University
+% ============================================================================
+% source: https://gradschool.usu.edu/files/publication-guide.pdf
+%         (School of Graduate Studies, "Publication Guide for Graduate
+%         Students", cover page reads "Updated 2025"; Appendix A carries the
+%         annotated sample title pages for three-, four- and five-member
+%         committees)
+% accessed: 2026-09-13
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, title page including its signature
+% grid, the absence of a separate approval page, and the absence of any
+% published accessibility rule.
+% NOT set: chapter-opening margin (USU states none) and the typeface (USU
+% permits "a 10-, 11-, or 12-point font or equivalent size (10 cpi) typeface"
+% and names no face, so there is nothing to encode).
+%
+% USU IS THE FIRST PROFILE IN THIS SERIES THAT STILL COLLECTS PHYSICAL
+% SIGNATURES, and it collects them on the TITLE PAGE rather than on a separate
+% leaf. That shapes the whole file: the signature rules below are real, not
+% decorative, and \thesisnoapprovalpage at the bottom means "the approvals are
+% already on the title page", not "nobody signs".
+
+\thesisinstitution{Utah State University}
+
+% "Left margin: 1 1/2 inches
+%  Right, top, and bottom margins: 1 inch"
+%
+% The wide left margin is a binding allowance and USU says why: "Exact margins
+% must be maintained for hard-binding processes. The binding process can result
+% in as much as 1/2 inch being trimmed from the top, right, and bottom edges of
+% pages." Note "Exact" — this is not a floor to improve on.
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "Double space the body of the paper." USU's exceptions are narrower and
+% belong to the document: direct quotes of more than three lines and footnotes
+% are single-spaced and indented on both sides.
+\thesissetspacing{double}
+
+% --- Two rules this file cannot express, recorded so they are not lost --------
+%
+% PAGE NUMBERS GO IN THE UPPER RIGHT, not the foot: "Page numbers should be
+% positioned in the upper right corner of the page (portrait mode), .75 inches
+% down from the top of the page and 1 inch from the right edge of the page.
+% Numbers appear with no periods, parentheses, hyphens, or the word 'Page.'"
+% That is a page style, and a profile owns no page-style hook, so a USU filer
+% must set it in the document. The class's default foot folio is wrong here.
+%
+% "A ragged right margin is strongly recommended." Strongly recommended, not
+% required, so it is not imposed — but \raggedright in the preamble is in spec
+% and is what USU would rather see.
+
+% --- Accessibility -----------------------------------------------------------
+% Recorded as an absence, and the absence was looked for. The whole 2025
+% Publication Guide was read. It contains the string "accessib" exactly once,
+% in "University remains accessible to the public even if the thesis or
+% dissertation is embargoed" — a statement about public availability, not about
+% assistive technology. It contains no "alt text", "WCAG", "tagged", "screen
+% reader" or "PDF/A" at all.
+\thesisaccessibilityrequirement{Not published}
+	{The USU School of Graduate Studies publishes no accessibility requirement
+	 for a filed thesis or dissertation. Checked against the whole of the 2025
+	 Publication Guide for Graduate Students on 2026-09-13.}
+
+% --- Profile-local fields -----------------------------------------------------
+% The Vice Provost for Graduate Studies signs every USU title page, so the name
+% is part of the layout rather than part of the student's metadata.
+%
+% It is NOT hardcoded here. The 2025 guide's samples print "David F. Feldon,
+% Ph.D.", and that is one copy-paste away for anyone who confirms it is still
+% current — but an office-holder's name in a profile rots silently, and a stale
+% name on a signature line is a filing error that looks like a correct page.
+% USU also makes the post-nominal letters mandatory on this line specifically:
+% "including the post-nominal letters after the Vice Provost's signature is
+% always required."
+\newcommand{\thesis@usu@viceprovost}{[SET THE VICE PROVOST, WITH DEGREE]}
+\newcommand{\usuviceprovost}[1]{\renewcommand{\thesis@usu@viceprovost}{#1}}
+% "The date indicates the year in which the paper is submitted to the School of
+% Graduate Studies and may differ from the date of the defense." Hence its own
+% field rather than a reuse of \graddate.
+\newcommand{\thesis@usu@year}{\the\year}
+\newcommand{\ususubmissionyear}[1]{\renewcommand{\thesis@usu@year}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% Appendix A's samples, cross-checked against the prose in "Title page":
+%
+%   "Type the title of the paper all in capital letters, double spaced, in
+%    inverted pyramid form. Use words instead of symbols whenever possible, and
+%    do not use abbreviations."
+%   "Use capitalization and spacing as shown in the sample. Do not use boldface
+%    type."
+%   "A specialization may be indicated in parentheses below the
+%    department/degree line."
+%   "Type the name of the major professor, each committee member, the Vice
+%    Provost for Graduate Studies below the signature line for each name,
+%    respectively. (If you have an odd number of signatories, center the
+%    odd-numbered one.)"
+%   "The use of 'Dr.' before a name is not allowed."
+%   "the title page being page 'i' but not numbered as such"
+%
+% The sample's body, which the layout below reproduces:
+%   TITLE (all caps, inverted pyramid)
+%   by / Your name
+%   A thesis submitted in partial fulfillment
+%   of the requirements for the degree
+%   of
+%   MASTER OF SCIENCE
+%   in
+%   English
+%   Approved:
+%   <signature grid>
+%   UTAH STATE UNIVERSITY / Logan, Utah / 2025
+%
+% INVERTED PYRAMID IS THE FILER'S JOB. A pyramid means successively shorter
+% centred lines, which cannot be derived from a title this class receives as
+% one string — so a filer with a title longer than one line must break it with
+% \\ and shape it themselves. The double spacing USU asks for comes from the
+% \setstretch below either way.
+%
+% \thesis@program supplies the department line ("English" in the sample), so
+% set \gradprogram to the department. A specialization goes in parentheses
+% below it, which is a document-level addition rather than something this file
+% can place.
+
+% The signature grid runs two to a row, which needs a count of what has been
+% emitted so far: an odd count means the current row still has room.
+\newcounter{thesis@usu@sig}
+% One signatory: a rule to sign above, then the name, then the role. USU puts
+% the name and role BELOW the line, which is why the rule comes first.
+% #1 name, #2 role. Left-aligned under the rule, as the paired entries are set
+% in every sample.
+\newcommand{\thesis@usu@sigbox}[2]{%
+	\parbox[t]{0.42\textwidth}{%
+		\raggedright
+		\rule{0.42\textwidth}{0.4pt}\\
+		#1\\
+		#2%
+	}%
+}
+% The same block for a signatory standing alone on its row, where the sample
+% centres the name and role under the rule rather than left-aligning them.
+\newcommand{\thesis@usu@sigboxc}[2]{%
+	\parbox[t]{0.42\textwidth}{%
+		\centering
+		\rule{0.42\textwidth}{0.4pt}\\
+		#1\\
+		#2%
+	}%
+}
+% Emit one signatory and decide whether the row continues or breaks.
+\newcommand{\thesis@usu@signatory}[2]{%
+	\stepcounter{thesis@usu@sig}%
+	\thesis@usu@sigbox{#1}{#2}%
+	\ifodd\value{thesis@usu@sig}%
+		\hfill
+	\else
+		\par\vspace{3\baselineskip}%
+	\fi
+}
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		% "the title page being page 'i' but not numbered as such"
+		\thispagestyle{empty}\singlespacing
+		\setcounter{thesis@usu@sig}{0}%
+		{\centering
+			% All capitals, double spaced. Not bold: "Do not use boldface type."
+			\thesis@tagtitle{Title}{%
+				\begingroup\setstretch{2}%
+				\MakeUppercase{\@title}\par
+				\endgroup
+			}%
+			\vspace{\baselineskip}
+			by\par
+			\vspace{\baselineskip}
+			\@author\par
+			\vspace{\baselineskip}
+			% Single-spaced pair, then "of", degree, "in", department, exactly
+			% as the sample sets them.
+			A \thesis@docnoun{} submitted in partial fulfillment\\
+			of the requirements for the degree\par
+			\vspace{\baselineskip}
+			of\par
+			\vspace{\baselineskip}
+			\MakeUppercase{\thesis@degree}\par
+			\vspace{\baselineskip}
+			in\par
+			\vspace{\baselineskip}
+			\thesis@program\par
+		\par}
+		\vspace{2\baselineskip}
+		\noindent Approved:\par
+		\vspace{2.5\baselineskip}
+		\begingroup
+		% \parindent=0pt, not a leading \noindent: each row after the first
+		% starts a new paragraph (the grid breaks rows with \par), so a single
+		% \noindent only straightens the first one and every later left-hand
+		% signature line sits indented by \parindent.
+		\parindent=0pt\relax
+		\renewcommand{\thesis@memberline}[2]{\thesis@usu@signatory{##1}{##2}}%
+		% The major professor signs first, then the committee in the order
+		% \committeemember was called, then the Vice Provost last.
+		\thesis@usu@signatory{\thesis@advisor}{Major Professor}%
+		\thesis@committee
+		% "If you have an odd number of signatories, center the odd-numbered
+		% one." An EVEN count here means every row so far is full, so the Vice
+		% Provost would start a row alone and is centred; an ODD count means the
+		% current row has room and they simply fill it.
+		\ifodd\value{thesis@usu@sig}%
+			\thesis@usu@sigbox{\thesis@usu@viceprovost}%
+				{Vice Provost of Graduate Studies}%
+			\par
+		\else
+			% \centering, and neither of the two obvious alternatives:
+			%   * \hspace*{\fill} either side puts the box flush RIGHT, because
+			%     a trailing \fill merges with \parfillskip;
+			%   * \centerline is worse than wrong-looking — it is \hb@xt@\hsize
+			%     around the box, and under tagging that nests structure
+			%     elements illegally. veraPDF caught it: 17 failed checks,
+			%     "P shall not contain P", "P shall not contain Part",
+			%     "StructTreeRoot shall not contain Div". \centering is
+			%     ordinary paragraph material and stays conformant.
+			{\centering
+				\thesis@usu@sigboxc{\thesis@usu@viceprovost}%
+					{Vice Provost of Graduate Studies}%
+			\par}%
+		\fi
+		\endgroup
+		\vspace{3\baselineskip}
+		{\centering
+			UTAH STATE UNIVERSITY\par
+			Logan, Utah\par
+			\vspace{\baselineskip}
+			\thesis@usu@year\par
+		\par}
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% There is no separate one, and unusually this is not an inference from silence:
+% the approvals are demonstrably ON the title page above, over real signature
+% lines. USU's ordered contents list confirms there is nowhere else for them —
+% "Divisions of the paper are arranged in the following order: 1. Title page;
+% 2. Copyright notice; 3. Abstract; 4. Public abstract; 5. Dedication
+% (optional); 6. Frontispiece (optional); 7. Acknowledgments ...; 8. Preface or
+% foreword (optional); 9. Contents; 10. List of tables; 11. List of figures;
+% 12. List of symbols ... (optional); 13. Body of paper; ..." — with no
+% approval or signature page in it.
+%
+% So \thesisnoapprovalpage here means "the approvals live on the title page",
+% NOT "this school collects no signatures". USU very much does: the filed
+% document carries signature lines, and the guide talks about printing pages
+% single-sided for signature purposes.
+\thesisnoapprovalpage
