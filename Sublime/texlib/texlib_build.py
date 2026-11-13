@@ -499,17 +499,29 @@ class TexlibBuildCore:
     contract: the native TexlibBuild (below, via __init__) and the LaTeXTools
     TexlibBuilder (texlib_builder.py, via PdfBuilder). One core -> no drift.
 
-    One signal travels the other way. When the core sets self._forget_last_pass
+    Two signals travel the other way. When the core sets self._forget_last_pass
     on resuming, the pass just run was a probe whose failure the core has
     already handled, and the host must roll its error state back to what it was
     before that pass -- otherwise a deliberate, recovered-from abort (the
     mathml-SE retry in _build_accessible) leaves the whole build reported as
     failed. A host that ignores the flag still builds correctly; it just
     misreports that one case, so the flag is read with getattr.
+
+    And self.build_errors is the list of failures the core found for ITSELF,
+    after a compile, that no engine output reports -- a lane whose PDF has no
+    bibliography, for one (see _check_lane_bibliography). The hosts classify a
+    build from the engine's output stream, which the core's own findings never
+    pass through, so when commands() ends each host folds this list into its
+    verdict. A host that ignores it reports such a build as clean, which is
+    the failure the list exists to prevent; both native hosts read it.
     """
 
     # Set by the core, cleared by the host. See the class docstring.
     _forget_last_pass = False
+
+    # Reset per build in commands(); appended to by _build_error. See the
+    # class docstring.
+    build_errors = ()
 
     # Whether mathml-SE survives THIS document: None until a tagged pass has
     # answered it, then True/False for the rest of the build. The verdict is a
@@ -557,6 +569,8 @@ class TexlibBuildCore:
         # summary rows made of them, which a host may repeat where it is seen.
         self._keyfit = []
         self.keyfit_summary = []
+        # Failures the core finds for itself; see the class docstring.
+        self.build_errors = []
 
         # Convergence state (see _record_state_baseline / _needs_another_run):
         # the aux fingerprint the current pass started from, and every
@@ -1220,8 +1234,11 @@ class TexlibBuildCore:
 
         Two passes settle cross-references and the "page X of Y" footer, and
         further passes follow while the kernel reports its last-page guess wrong
-        (see _settle_tagged). No biber loop on the tagged half yet, so a
-        bibliography-bearing class may need one when the rollout reaches it.
+        (see _settle_tagged). The tagged half runs no Biber of its own: its
+        output directory is seeded with the .bbl the normal half just settled,
+        which is exactly the file Biber would produce for it (see
+        _seed_lane_bibliography), and _copy_back_accessible fails the build if
+        that seed is not there.
 
         Run 1 asks for both MathML methods. A document that trips the luamml
         mathml-SE bug (see ACCESSIBLE_DOCMETA) aborts there without a PDF, and
@@ -1246,6 +1263,7 @@ class TexlibBuildCore:
             ACCESSIBLE_ENGINE, self._aux_target, tex_dir, engine_options
         )
         out_dir = self._accessible_out_dir()
+        self._seed_lane_bibliography(out_dir)
         head = [c for c in tagged_base
                 if not str(c).startswith("-output-directory=")]
         head += [f"-output-directory={out_dir}", f"--jobname={self.base_name}"]
@@ -1606,6 +1624,157 @@ class TexlibBuildCore:
             return parent
         return out_dir
 
+    def _lane_bbl_paths(self, out_dir):
+        """(base .bbl, this lane's .bbl), or None when they are the same file
+        -- a lane whose output directory fell back to the base aux dir."""
+        src = self._aux_path(self.base_name + ".bbl")
+        dst = os.path.join(out_dir, self.base_name + ".bbl")
+        if os.path.normcase(os.path.abspath(src)) == os.path.normcase(
+                os.path.abspath(dst)):
+            return None
+        return src, dst
+
+    def _seed_lane_bibliography(self, out_dir):
+        """Give one lane the base build's .bbl before its first pass.
+
+        Every variant and tagged compile is redirected to its own output
+        directory (_variant_out_dir, _accessible_out_dir), and that is where
+        the engine looks for <jobname>.bbl -- there and in the source
+        directory, never in the base build's aux dir. So a biblatex document's
+        twins found no .bbl at all: biblatex logged `No file <base>.bbl.',
+        asked for Biber, typeset every citation as undefined and the
+        bibliography as nothing, and the PDF/UA gate passed, because an absent
+        bibliography is perfectly well-formed. The base build's .bbl is the
+        right one for every lane. A hidden solution is still typeset (into a
+        discarded box), so its \\cite reaches the .bcf of every variant, and a
+        tagged twin is the same source -- the .bcf Biber consumed is
+        byte-identical across the fan-out (checked on a 247-page biblatex
+        document). Copying it costs nothing and spares each lane a Biber run
+        plus the third pass that would force.
+
+        With no base .bbl, a lane's own is removed: it can only be left over
+        from a build whose document still had a bibliography, and biblatex
+        would read it back as though it were current.
+
+        Called from _variant_plan -- the one place every lane's directory is
+        decided, in the serial and the parallel path alike -- and from
+        _build_accessible, which has a directory of its own.
+        """
+        if not out_dir:
+            return
+        paths = self._lane_bbl_paths(out_dir)
+        if paths is None:
+            return
+        src, dst = paths
+        if not os.path.exists(src):
+            self._force_remove(dst)
+            return
+        try:
+            shutil.copy2(src, dst)
+        except OSError as exc:
+            self.display(
+                f"TeXLib: could not copy {os.path.basename(src)} into "
+                f"{out_dir}: {exc}\n")
+            return
+        self._strip_bbl_rerun_flag(
+            os.path.join(out_dir, self.base_name + ".aux"))
+
+    def _strip_bbl_rerun_flag(self, aux_path):
+        """Drop biblatex's rerun-request bookkeeping from a lane's .aux.
+
+        When biblatex asks for Biber it writes \\abx@aux@read@bblrerun and the
+        checksum of the .bbl it saw into the .aux, and on the next run it
+        re-requests unless that checksum has changed (biblatex.sty, the
+        bbl@rerun machinery). A lane never runs Biber: it is seeded with the
+        base .bbl, which Biber regenerates byte-identical while the .bib and
+        the citations stand still. So once the flag lands in a lane's .aux --
+        the first build after the citation set changed puts it there -- it
+        never clears, and every later build of that lane ends with `Please
+        (re)run Biber' and a build error, although its .bbl is complete (seen
+        on a 213-page biblatex document on 2026-09-24; deleting the lane's
+        directory was the only way out). The lines are not document state
+        (STATE_NOISE_RE already drops them when fingerprinting), so they are
+        removed beside the seeded .bbl; a genuine request still reaches the
+        builder through the log.
+        """
+        try:
+            with open(aux_path, encoding="utf-8", errors="replace") as fh:
+                lines = fh.read().split("\n")
+        except OSError:
+            return
+        keep = [ln for ln in lines if not STATE_NOISE_RE.match(ln)]
+        if len(keep) == len(lines):
+            return
+        try:
+            with open(aux_path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write("\n".join(keep))
+        except OSError as exc:
+            self.display(
+                f"TeXLib: could not clean {os.path.basename(aux_path)} in "
+                f"{os.path.dirname(aux_path)}: {exc}\n")
+
+    def _check_lane_bibliography(self, out_dir, what):
+        """Fail the build when a lane that produced a PDF has no .bbl while
+        the base build does.
+
+        The seeding above is the fix; this is what catches its absence. The
+        symptom is silent by construction -- the engine exits 0, biblatex only
+        warns, and veraPDF conforms a document with no bibliography -- and it
+        went unnoticed across releases for exactly that reason: the committed
+        accessible copy of a 199-page biblatex paper was four pages short of
+        its base and nothing said so. Read from disk, not from pass output,
+        because a parallel lane's output never reaches the core.
+
+        Two states of the lane's own log count as the same failure: it says
+        `No file <base>.bbl.' (the engine did not read the copy it was given),
+        or it still asks for Biber after its last pass (the .bbl it read does
+        not cover what it cites). Both leave undefined citations and the
+        bibliography incomplete or absent, which is the defect, not a warning
+        about one. The log is the FINAL pass's -- run 1 of a seeded lane asks
+        for Biber too, its fresh .aux having no citation record to compare
+        against, and settles on run 2.
+        """
+        if not out_dir:
+            return
+        paths = self._lane_bbl_paths(out_dir)
+        if paths is None:
+            return
+        base_bbl, lane_bbl = paths
+        if not os.path.exists(base_bbl):
+            return
+        bbl = self.base_name + ".bbl"
+        if not os.path.exists(lane_bbl):
+            self._build_error(
+                f"{what} has no {bbl} in {out_dir} although the base build "
+                f"produced one; its PDF has no bibliography.")
+            return
+        try:
+            with open(os.path.join(out_dir, self.base_name + ".log"),
+                      encoding="utf-8", errors="replace") as fh:
+                log = fh.read()
+        except OSError:
+            return
+        # The engine hard-wraps log lines at 79 columns and the break lands
+        # wherever the jobname puts it, so compare with the whitespace removed
+        # (as luamml_se_aborted does).
+        if _spec._FLATTEN(f"No file {bbl}.") in _spec._FLATTEN(log):
+            self._build_error(
+                f"{what} did not read {bbl} (its log says `No file {bbl}.'); "
+                f"its PDF has no bibliography.")
+        elif BIBER_RERUN_RE.search(log):
+            self._build_error(
+                f"{what} still asks for Biber after its last pass: it cites "
+                f"something the base build did not, so the {bbl} it was given "
+                f"does not cover it and its citations are undefined.")
+
+    def _build_error(self, message):
+        """Record a failure the engine did not report, and say so. See the
+        class docstring for how the hosts read build_errors."""
+        if not isinstance(getattr(self, "build_errors", None), list):
+            self.build_errors = []
+        self.build_errors.append(message)
+        self.display(f"TeXLib: ERROR -- {message}\n")
+
     @staticmethod
     def _variant_pdf_name(base_name, variant, tagged):
         """<base>_<variant>[_accessible].pdf, with the BASE variant keeping the
@@ -1812,6 +1981,11 @@ class TexlibBuildCore:
         """
         tag = variant + ("-a11y" if tagged else "")
         out_dir = self._variant_out_dir(tag)
+        # The base build's .bbl goes in before the lane's first pass -- here,
+        # where every lane's directory is decided, so the serial and parallel
+        # paths cannot drift on it either. Re-seeding on the mathml-SE retry
+        # copies the same bytes again, which is harmless.
+        self._seed_lane_bibliography(out_dir)
         engine_for = ACCESSIBLE_ENGINE if tagged else engine
         cmd_base = self._base_engine_cmd(
             engine_for, self._aux_target, tex_dir, engine_options)
@@ -1853,11 +2027,13 @@ class TexlibBuildCore:
     def _copy_back_variant(self, tex_dir, variant, tagged, out_dir):
         """Copy one finished variant out as <base>_<variant>[_accessible].pdf."""
         src = os.path.join(out_dir, self.base_name + ".pdf")
+        what = f"variant {variant!r}{' (tagged)' if tagged else ''}"
         if not os.path.exists(src):
-            self.display(
-                f"TeXLib: variant {variant!r}"
-                f"{' (tagged)' if tagged else ''} produced no PDF; skipped.\n")
+            self.display(f"TeXLib: {what} produced no PDF; skipped.\n")
             return
+        # A lane that produced a PDF is judged on its bibliography; one that
+        # produced nothing has already failed louder than this would.
+        self._check_lane_bibliography(out_dir, what)
         dest = os.path.join(
             tex_dir, self._variant_pdf_name(self.base_name, variant, tagged))
         self._force_remove(dest)
@@ -2003,12 +2179,15 @@ class TexlibBuildCore:
         preferred_pdf preference) by supplying `preview_ready`; a host without
         one -- the LaTeXTools adapter, the CLI -- is unaffected.
 
-        Only the PDF is copied back, not the .synctex.gz: the final
-        _finalize_synctex swaps that for an uncompressed .synctex specifically so
-        SumatraPDF does not build its own decompression cache beside it, and
-        handing it the .gz early would provoke exactly that file. SyncTeX starts
-        working when the build finishes, a few seconds after you are already
-        reading the page.
+        The SyncTeX map goes out with it, already decompressed to the plain
+        <base>.synctex that _finalize_synctex leaves (handing Sumatra the .gz
+        would make it build its own decompression cache beside it). It used to
+        wait for _postprocess, and "a few seconds" was 46 on a quiz with two
+        tagged lanes: every double-click on the freshly raised page in that
+        window hit the previous build's map, or no map at all. The base compile
+        wrote this map with the PDF, so it is just as final; _finalize_synctex
+        overwrites it with the same bytes at the end (plus the schedule remap,
+        the one rewrite that happens later).
 
         Skipped for a .spl build: _postprocess replaces <base>.pdf with its two
         halves there, so previewing it would put up a file about to vanish. The
@@ -2047,10 +2226,29 @@ class TexlibBuildCore:
                 return
         if not os.path.exists(dst):
             return
+        self._stage_preview_synctex(aux, tex_dir)
         try:
             hook(dst)
         except Exception:  # noqa: BLE001 - a viewer must not fail a build
             pass
+
+    def _stage_preview_synctex(self, aux, tex_dir):
+        """Put the base compile's map beside the previewed PDF as <base>.synctex.
+
+        Best-effort: a missing or unreadable map leaves inverse search waiting
+        for _finalize_synctex, as it always did."""
+        gz = os.path.join(aux, self.base_name + ".synctex.gz")
+        if not os.path.exists(gz):
+            return
+        plain = os.path.join(tex_dir, self.base_name + ".synctex")
+        self._force_remove(plain)
+        try:
+            with gzip.open(gz, "rb") as fin, open(plain, "wb") as fout:
+                shutil.copyfileobj(fin, fout)
+        except Exception:  # noqa: BLE001 - a map must not fail a build
+            self._force_remove(plain)
+            return
+        self._set_hidden(plain)
 
     def _sweep_stale_version_slices(self, tex_dir, built):
         """Delete per-version slices belonging to variants this build dropped.
@@ -2125,6 +2323,7 @@ class TexlibBuildCore:
         src = os.path.join(out_dir, self.base_name + ".pdf")
         if not os.path.exists(src):
             return
+        self._check_lane_bibliography(out_dir, "the tagged half")
         dest = os.path.join(tex_dir, self.base_name + ACCESSIBLE_SUFFIX + ".pdf")
         try:
             shutil.copy2(src, dest)

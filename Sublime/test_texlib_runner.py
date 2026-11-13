@@ -360,7 +360,10 @@ ok &= check(_post_build(_FakeView(os.path.join(HERE, "other.tex")), built) == []
 _sublime.load_settings = _saved_load
 
 # 6. Outcome classification + error collection (drives on_finish).
-def _drive_finish(script_lines):
+def _drive_finish(script_lines, core_errors=None):
+    """`core_errors`, when given, are appended to the brain's build_errors as
+    its coroutine ends -- what _check_lane_bibliography does after a compile,
+    from the disk, with nothing in the engine stream to show for it."""
     captured = {}
     texlib.subprocess.Popen = PopenFactory([script_lines])
     with tempfile.TemporaryDirectory() as tmp:
@@ -371,6 +374,13 @@ def _drive_finish(script_lines):
             tex_root=root, engine="pdflatex",
             options=["--texlib-mode=base"], display=lambda t: None,
             aux_directory="<<root>>")
+        if core_errors:
+            _inner = host.commands
+
+            def commands():
+                yield from _inner()
+                host.build_errors.extend(core_errors)
+            host.commands = commands
 
         def on_finish(state, errs, warns):
             captured["state"] = state
@@ -396,12 +406,35 @@ ok &= check(r["state"] == "ok" and r["errs"] == [],
 
 r = _drive_finish(["/tmp/aux/doc.aux:12: Undefined control sequence.\n"])
 ok &= check(r["state"] == "error", "classify: an .aux error still marks failure")
-ok &= check(r["errs"] == [], "classify: .aux errors excluded from the summary")
+# Excluded only while a source error explains the build. Alone, an .aux error
+# IS the explanation -- a stale or corrupt aux read on the first pass -- and
+# suppressing it left the summary empty behind a failed build.
+ok &= check(any("doc.aux:12" in e for e in r["errs"]),
+            "classify: an .aux error alone reaches the summary")
+ok &= check(any("not in the source" in e for e in r["errs"]),
+            "classify: the summary says the fault is in a generated file")
+
+r = _drive_finish(["./doc.tex:14: Undefined control sequence.\n",
+                   "/tmp/aux/doc.aux:12: Undefined control sequence.\n"])
+ok &= check(r["errs"] == ["./doc.tex:14: Undefined control sequence."],
+            "classify: .aux errors excluded when a source error explains it")
 
 r = _drive_finish(["LaTeX Warning: Reference `x' undefined on input line 5.\n",
                    "Output written on doc.pdf\n"])
 ok &= check(r["state"] == "ok", "classify: warnings alone do NOT fail the build")
 ok &= check(len(r["warns"]) == 1, "classify: the warning is collected")
+
+# 6b. A failure the CORE records after a compile (build_errors -- a lane whose
+#     PDF has no bibliography) is not in the engine stream collect() reads, so
+#     the driver has to fold it in when the coroutine ends; otherwise the build
+#     is reported clean, the viewer opens, and the broken PDF ships.
+r = _drive_finish(["Output written on doc.pdf (1 page)\n"],
+                  core_errors=["variant 'student' has no doc.bbl in x although "
+                               "the base build produced one"])
+ok &= check(r["state"] == "error",
+            "classify: a core-recorded build error -> state 'error'")
+ok &= check(any("doc.bbl" in e for e in r["errs"]),
+            "classify: the core's message reaches the error summary")
 
 # 7. _aux_log_path reproduces the build's md5[:12] key; _build_report formats a
 #    clickable full-log link and keeps error lines unprefixed.

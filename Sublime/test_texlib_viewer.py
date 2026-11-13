@@ -24,7 +24,9 @@ leaves no log behind.
 
 No Sublime, no TeX. Run:  python Sublime/test_texlib_viewer.py
 """
+import gzip
 import os
+import shutil
 import sys
 import tempfile
 import threading
@@ -440,6 +442,29 @@ with tempfile.TemporaryDirectory() as tmp:
     del seen[:]
     host._offer_preview(tmp)
     ok &= check(seen == [], "preview: declined when there is no PDF at all")
+
+    # The map rides out with the PDF: a double-click on the page the preview
+    # just raised must not wait for the tagged and variant lanes to finish.
+    aux = os.path.join(tmp, "aux")
+    os.makedirs(aux)
+    with open(os.path.join(aux, "doc.pdf"), "wb") as fh:
+        fh.write(b"%PDF-1.7\nthis build\n")
+    with gzip.open(os.path.join(aux, "doc.synctex.gz"), "wb") as fh:
+        fh.write(b"SyncTeX Version:1\nthis build's map\n")
+    with open(os.path.join(tmp, "doc.synctex"), "wb") as fh:
+        fh.write(b"SyncTeX Version:1\nthe previous build's map\n")
+    host._aux_target = aux
+    del seen[:]
+    host._offer_preview(tmp)
+    with open(os.path.join(tmp, "doc.synctex"), "rb") as fh:
+        staged = fh.read()
+    ok &= check(seen and staged == b"SyncTeX Version:1\nthis build's map\n",
+                "preview: <base>.synctex is this build's map when the PDF is raised")
+    ok &= check(not os.path.exists(os.path.join(tmp, "doc.synctex.gz")),
+                "preview: no .synctex.gz beside the PDF (Sumatra would cache it)")
+    host._aux_target = None
+    shutil.rmtree(aux)
+    texlib_build.TexlibBuild._force_remove(os.path.join(tmp, "doc.synctex"))
 
     # A viewer must never be able to fail a build.
     _seed(tmp)

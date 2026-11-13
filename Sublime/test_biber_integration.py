@@ -80,15 +80,15 @@ UNDEFINED_MARKERS = (
 )
 
 
-def pdf_text(tex_dir):
-    """The built PDF's text, or None if pdftotext isn't installed (soft-skip,
+def pdf_text(tex_dir, name="doc.pdf"):
+    """A built PDF's text, or None if pdftotext isn't installed (soft-skip,
     per this file's degrade-don't-fail rule)."""
     if not shutil.which("pdftotext"):
         return None
     out = os.path.join(tex_dir, "doc.txt")
     try:
         subprocess.run(
-            ["pdftotext", "-layout", os.path.join(tex_dir, "doc.pdf"), out],
+            ["pdftotext", "-layout", os.path.join(tex_dir, name), out],
             capture_output=True, timeout=60,
         )
         with open(out, "r", encoding="utf-8", errors="replace") as fh:
@@ -97,11 +97,16 @@ def pdf_text(tex_dir):
         return None
 
 
-def run_build(tex_dir, engine):
+def run_build(tex_dir, engine, aux_dir=None):
     """Drive the real builder coroutine, executing each yielded command.
 
     Returns dict with: heads (first token per command), passes (list of engine
-    outputs in order), final (last engine output), and the raw command list.
+    outputs in order), final (last engine output), the raw command list, and
+    errors (the failures the core recorded for itself, build_errors).
+
+    `aux_dir` routes the build's aux files there, as a real build does (the
+    default is <<temp>>); None builds in place, with .bcf/.bbl/.texlibhash
+    beside the source.
     """
     b = TexlibBuilder()
     b.tex_root = os.path.join(tex_dir, "doc.tex")
@@ -110,7 +115,8 @@ def run_build(tex_dir, engine):
     b.tex_dir = tex_dir
     b.engine = engine
     b.options = []
-    b.aux_directory = ""  # build in place; .bcf/.bbl/.texlibhash live in tex_dir
+    b.aux_directory = aux_dir or ""
+    b.builder_settings = {"accessible_report": False}  # no veraPDF JVM here
     b.out = ""
 
     heads, passes, raw = [], [], []
@@ -137,6 +143,7 @@ def run_build(tex_dir, engine):
         "passes": passes,
         "final": passes[-1] if passes else "",
         "raw": raw,
+        "errors": list(getattr(b, "build_errors", None) or ()),
     }
 
 
@@ -206,6 +213,47 @@ def main():
         else:
             check("build 3: the PDF bibliography reflects the edited .bib",
                   "Revised" in body, body[-400:])
+
+        # --- Build 4: aux routed away -> the tagged twin keeps its bibliography
+        # Every lane of the fan-out (here: the base's tagged twin) compiles
+        # into its own output directory, and that is where the engine looks
+        # for doc.bbl -- there and beside the source, never in the base aux
+        # dir. With the aux dir routed away from the source, as every real
+        # build routes it, the twin found no .bbl: `No file doc.bbl.', every
+        # citation undefined, no bibliography, and a passing PDF/UA gate. The
+        # three builds above build in place, where the source directory's own
+        # doc.bbl hid exactly that. The base .bbl is now copied into each lane
+        # before its first pass, and a lane without one fails the build.
+        aux_dir = tempfile.mkdtemp(prefix="texlib_biber_aux_")
+        try:
+            t0 = time.monotonic()
+            r4 = run_build(tex_dir, engine, aux_dir=aux_dir)
+            print(f"  build 4 ({time.monotonic() - t0:.1f}s, routed aux): "
+                  f"{r4['heads']}")
+            twin = os.path.join(tex_dir, "doc_accessible.pdf")
+            check("build 4: the base's tagged twin was built",
+                  os.path.exists(twin), sorted(os.listdir(tex_dir)))
+            check("build 4: the twin's lane was seeded with the base .bbl",
+                  os.path.exists(os.path.join(
+                      aux_dir, "variants", "base-a11y", "doc.bbl")),
+                  sorted(os.listdir(os.path.join(aux_dir, "variants",
+                                                 "base-a11y")))
+                  if os.path.isdir(os.path.join(aux_dir, "variants",
+                                                "base-a11y")) else "no lane dir")
+            check("build 4: the core recorded no build error",
+                  r4["errors"] == [], r4["errors"])
+            twin_text = pdf_text(tex_dir, "doc_accessible.pdf") \
+                if os.path.exists(twin) else None
+            if twin_text is None:
+                print("  skip: pdftotext absent or no twin -> twin's "
+                      "bibliography content unchecked")
+            else:
+                check("build 4: the tagged twin carries the bibliography",
+                      "Literate Programming" in twin_text, twin_text[-400:])
+                check("build 4: the twin's citation is resolved, not [knuth1984]",
+                      "knuth1984" not in twin_text, twin_text[:400])
+        finally:
+            shutil.rmtree(aux_dir, ignore_errors=True)
 
         if dt2 and dt1:
             print(f"\n  note: unchanged rebuild {dt1/dt2:.1f}x faster "
