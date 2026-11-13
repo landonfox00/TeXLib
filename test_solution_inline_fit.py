@@ -49,6 +49,18 @@ Five pages, five behaviours:
                has a line for it. SHORT is the same for a whole-problem
                solution, and NOROOM and BETWEEN name theirs too.
 
+One more page, in a document of its own (split.tex):
+
+  * SPLIT   -- SHORT's two problems below a \splitpage problem whose part
+               answer ends above the bottom of its taller column. That answer
+               needs no room, so the fit pass never measures the space after
+               its row, and the warning loop used to do arithmetic on that
+               missing measure: a Lua error on exactly the pages that are
+               short, the key left as the overlay drew it, and nothing in the
+               build summary. The page must build, its warning must name
+               problem 2 (and not the split part), and the summary must have
+               a line for it. Found building Math 126's Exam 3 keys.
+
 Asserted on word positions from poppler's `pdftotext -bbox`, since the point is
 where things are printed and the text is the same in every case. Soft-skips
 (exit 0) without lualatex or a poppler pdftotext, like the other real-build
@@ -220,6 +232,19 @@ BANK_TEX = r"""\begin{problem}{fits}[topic=fits]
 			\workbox{4}
 	\end{parts}
 \end{problem}
+
+\begin{problem}{split}[topic=split]
+	SPLITSTEM Answer each.
+	\splitpage{
+		\ppart SPLITA Evaluate $1 + 1$.
+			\begin{partsolution}
+				SPLITANSWER $2$.
+			\end{partsolution}
+	}{
+		\ppart SPLITB Sketch it.
+			\vspace{2in}
+	}
+\end{problem}
 """
 
 # The second optional argument of \problem is the stretch of the answer space
@@ -256,6 +281,21 @@ INLINE_TEX = r"""\documentclass[exam-number=1, points=50]{autoexam}
 # The same exam with a student copy that makes no room for its answers.
 EXAM_TEX = INLINE_TEX.replace(r"\loadbank{bank.tex}",
                               "\\keylayout{compact}\n\\loadbank{bank.tex}")
+
+# SPLIT: a \splitpage answer that reaches no lower than its row, on a page
+# made short by the problem after it.
+SPLIT_TEX = r"""\documentclass[exam-number=1, points=22]{autoexam}
+\keylayout{compact}
+\loadbank{bank.tex}
+\begin{document}
+\maketitle
+\begin{problems}
+	\problem[1,1]{topic=split}
+	\problem[10][0.02]{topic=short}
+	\problem[10][4]{topic=shortafter}
+\end{problems}
+\end{document}
+"""
 
 WORD_RE = re.compile(
     r'<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)</word>')
@@ -332,7 +372,8 @@ def main() -> int:
     try:
         for name, content in (("coursemeta.tex", COURSEMETA_TEX),
                               ("bank.tex", BANK_TEX), ("doc.tex", EXAM_TEX),
-                              ("inline.tex", INLINE_TEX)):
+                              ("inline.tex", INLINE_TEX),
+                              ("split.tex", SPLIT_TEX)):
             with open(os.path.join(tmp, name), "w", encoding="utf-8") as fh:
                 fh.write(content)
         _copy_build_inputs(tmp)
@@ -495,6 +536,50 @@ def main() -> int:
               block)
         check("summary: one line per page the warnings name",
               len(core.keyfit_summary) == 4, str(core.keyfit_summary))
+
+        # SPLIT. A Lua error in the fit pass stops the build (-halt-on-error),
+        # so it is a check here, not a build-environment failure.
+        try:
+            sp = words(build(tmp, "splitkey", r"\def\ShowKeyInline{}",
+                             doc="split.tex"))
+        except RuntimeError as exc:
+            sp = None
+            check("SPLIT: the key builds", False, str(exc))
+        if sp is not None:
+            check("SPLIT: the key builds", True)
+            with open(os.path.join(tmp, "splitkey.log"), encoding="utf-8",
+                      errors="replace") as fh:
+                splitlog = fh.read()
+            sm = re.search(r"Package texlib-solutions Warning: Page (\d+): a "
+                           r"solution is too tall\.\n\(texlib-solutions\) +2: "
+                           r"(\d+)pt too tall; what follows moved (\d+)pt\n",
+                           splitlog)
+            check("SPLIT: the log names problem 2, by how much, and what moved",
+                  sm is not None, "no warning naming 2")
+            check("SPLIT: the split part is not named",
+                  not re.search(r"^\(texlib-solutions\) +1a: ", splitlog, re.M))
+            pg = sp[1] if len(sp) > 1 else {}
+            if all(t in pg for t in ("SPLITANSWER", "TALLEND", "SHORTAFTERSTEM")):
+                check("SPLIT: problem 2's solution ends above problem 3",
+                      pg["TALLEND"][1] < pg["SHORTAFTERSTEM"][0],
+                      f"solution ends at y={pg['TALLEND'][1]:.1f}, problem 3 "
+                      f"starts at y={pg['SHORTAFTERSTEM'][0]:.1f}")
+            else:
+                check("SPLIT: both answers and problem 3 are on the page", False)
+            shown = []
+            core = texlib_build.TexlibBuild(
+                tex_root=os.path.join(tmp, "split.tex"), engine="lualatex",
+                options=[], display=shown.append)
+            core._keyfit = []
+            core._note_keyfit("split_solutions.pdf",
+                              os.path.join(tmp, "splitkey.log"))
+            core._display_keyfit_summary()
+            check("SPLIT: the build summary has a line for the page",
+                  sm is not None and core.keyfit_summary == [
+                      f"split_solutions.pdf  page {sm.group(1)}: problem 2 is "
+                      f"{sm.group(2)}pt too tall (what follows moved "
+                      f"{sm.group(3)}pt)"],
+                  str(core.keyfit_summary))
 
         # The same exam with inline keys, autoexam's default: the student copy
         # sizes SHORT's and WORKBOX's blanks to their answers, so the key draws

@@ -70,6 +70,10 @@ jobs:
             # toolchain. Reads the raster as PGM via poppler's pdftoppm
             # (installed above), so it needs no image package.
             python3 test_solution_inline_parity.py
+            # The instructor's copy, rubric and all, built a second time with
+            # its ink suppressed (\TeXLibGhostInk) must be the student copy to
+            # the pixel, cover included; \award sums are checked too.
+            python3 test_rubric_inline_parity.py
             # The other half of the inline key: where a solution is taller than
             # its answer space, the page makes room and nothing is printed over.
             # Asserted on word positions from `pdftotext -bbox`, also from

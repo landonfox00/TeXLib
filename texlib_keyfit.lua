@@ -526,9 +526,17 @@ function M.fit(boxnumber, attr, sepattr, whichattr, floorattr)
 
 	-- The solutions that ran over, by name and in page order. An owner holding
 	-- several (the parts of a {cols} problem) lists only those that did.
+	--
+	-- An owner none of whose solutions reaches below it -- a \splitpage row
+	-- whose answers end above its taller column -- is not in `reach`, so room()
+	-- never measured the space after it. Its solutions are skipped: none of
+	-- their ink is below the owner, so none can have run over. Counting such an
+	-- owner in reach_of instead would also give it a floor and, after a
+	-- negative \vspace, a lack of room it does not have.
 	local short, version = {}, nil
 	for _, m in ipairs(markers) do
-		local over = m.bottom + m.need - items[m.owner].bottom - avail_of[m.owner]
+		local avail = avail_of[m.owner]
+		local over = avail and m.bottom + m.need - items[m.owner].bottom - avail or 0
 		if over > 0 then
 			local which = whichattr and node.get_attribute(m.node, whichattr)
 			local named = which and M.labels[which]
@@ -645,15 +653,115 @@ end
 
 -- The natural height plus depth of the vertical list being built, for the
 -- floor of a {solution} whose footer only the instructor's copy draws.
-function M.list_total()
-	local head = tex.nest.top.head
+local function total_of(head)
 	local total = 0
 	if head and head.next then
 		local b = node.vpack(node.copy_list(head.next))
 		total = b.height + b.depth
 		node.flush_node(b)
 	end
-	tex.sprint(tostring(total))
+	return total
+end
+
+function M.list_total()
+	tex.sprint(tostring(total_of(tex.nest.top.head)))
+end
+
+-- How far right the ink of the current vertical list reaches, in sp from its
+-- left edge (texlib-solutions.sty, \@emit@sol@footer: the grading footer goes
+-- beside the work when the work leaves room for it). Lines and alignment rows
+-- are read node by node with their glue as set, so a short line's \hfill and
+-- \parfillskip count for nothing; a box is taken whole. A box of no width is
+-- passed over: that is an \award mark, whose ink sits in the margin by design.
+local HSUB = node.subtypes("hlist")
+local function hsub(name)
+	for k, v in pairs(HSUB) do if v == name then return k end end
+	return -1
+end
+local LINE_SUB, ROW_SUB = hsub("line"), hsub("alignment")
+local GLYPH, MATH = node.id("glyph"), node.id("math")
+local vext
+
+local function hext(h, x0)
+	local x, r = x0, 0
+	for n in node.traverse(h.head) do
+		local id = n.id
+		if id == GLUE then
+			x = x + node.effective_glue(n, h)
+		elseif id == KERN then
+			x = x + n.kern
+		elseif id == HLIST then
+			if n.subtype == LINE_SUB or n.subtype == ROW_SUB then
+				r = math.max(r, hext(n, x))
+			elseif n.width > 0 then
+				r = math.max(r, x + n.width)
+			end
+			x = x + n.width
+		elseif id == VLIST then
+			if n.width > 0 then r = math.max(r, vext(n, x)) end
+			x = x + n.width
+		elseif id == GLYPH or id == RULE then
+			if n.width > 0 then r = math.max(r, x + n.width) end
+			x = x + n.width
+		elseif id == MATH then
+			x = x + (n.surround or 0)
+		end
+	end
+	return r
+end
+
+vext = function(v, x0)
+	local r = 0
+	for n in node.traverse(v.head) do
+		if n.id == HLIST then
+			if n.subtype == LINE_SUB or n.subtype == ROW_SUB then
+				r = math.max(r, hext(n, x0 + n.shift))
+			elseif n.width > 0 then
+				r = math.max(r, x0 + n.shift + n.width)
+			end
+		elseif n.id == VLIST then
+			r = math.max(r, vext(n, x0 + n.shift))
+		end
+	end
+	return r
+end
+
+function M.work_right()
+	local head = tex.nest.top.head
+	local r = 0
+	if head and head.next then
+		local b = node.vpack(node.copy_list(head.next))
+		r = vext(b, 0)
+		node.flush_node(b)
+	end
+	tex.sprint(tostring(r))
+end
+
+-- Room for what only an instructor's copy draws (texlib-solutions.sty,
+-- \@sol@footerroom). mark_tail() remembers where the current vertical list
+-- ends; cut_tail() measures what was added since, removes it, and puts the
+-- list's end and \prevdepth back as they were, so the list continues as if
+-- nothing had been set. It prints the growth in sp.
+local mark
+
+function M.mark_tail()
+	local top = tex.nest.top
+	mark = { tail = top.tail, prevdepth = top.prevdepth,
+		total = total_of(top.head) }
+end
+
+function M.cut_tail()
+	local top = tex.nest.top
+	local grown = total_of(top.head) - mark.total
+	local rest = mark.tail.next
+	if rest then
+		mark.tail.next = nil
+		node.flush_list(rest)
+	end
+	top.tail = mark.tail
+	top.prevdepth = mark.prevdepth
+	mark = nil
+	tex.sprint(tostring(grown))
 end
 
 -- Line-edge nodes that a paragraph supplies and a run-in line must not keep:

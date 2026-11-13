@@ -373,7 +373,11 @@
 %   All token output (\question, problem content, stretch) is generated inside
 %   Lua via tex.print, avoiding pre-tokenized-token interactions with the
 %   comment package's \excludecomment catcode scanner.
+% \pbank@problembegin -- run as each problem starts, before its \question.
+% texlib-solutions.sty restarts the problem's point total there (\award).
+\providecommand{\pbank@problembegin}{}
 \NewDocumentCommand{\@problem@item}{O{} O{1} m O{}}{%
+	\pbank@problembegin
 	\pbank@lua{pbank_problem_item(
 		'\luaescapestring{#1}',
 		'\luaescapestring{#2}',
@@ -627,8 +631,15 @@
 				\fi}
 			% \@firstofone / \@gobble, not \ifsolutions #7\fi: a skipped branch is
 			% still scanned for conditionals, and the body is the author's.
+			% A \TeXLibGhostInk build (texlib-solutions.sty) draws the answer
+			% with no ink: still drawn, so the picture's bounding box is the
+			% key's, but at zero opacity.
 			\ifsolutions \expandafter\@firstofone \else \expandafter\@gobble \fi
-				{#7}%
+				{\ifdefined\TeXLibGhostInk
+					\begin{scope}[opacity=0]#7\end{scope}%
+				\else
+					#7%
+				\fi}%
 		\end{tikzpicture}
 	\end{center}%
 }{}

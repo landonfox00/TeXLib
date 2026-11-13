@@ -6,6 +6,38 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Added
 
+- **An instructor's copy is the student copy with ink added.** In an
+  inline-key document (`\keylayout{inline}`, the default) the grading footer,
+  the rubric and common errors under an answer, now has its room in every
+  copy: the student copy and the `solutions` key keep it blank, and the
+  instructor's copy draws into it. It used to be left out of the student copy,
+  so the instructor's copy made room for it and moved what followed. The
+  cover keeps the name line and the postscript in a key, and writes the copy's
+  label ("Instructor Version") on the name line, so the cover is the student's
+  too. A `{partsolution}` gets the same footer as a `{solution}`, its common
+  errors beside its rubric, where it used to print a bare rubric box and set
+  `{commonerrors}` wherever it was written. The footer goes beside the
+  worked answer, at the right of the solution's box, when the answer's lines
+  leave room for it (`texlib_keyfit.work_right` reads how far right their ink
+  reaches), and under it otherwise: a worked answer written line by line
+  leaves most of the box empty, and set beside it the footer usually costs no
+  height.
+
+- **`\award{n}`: the points a line of the answer earns.** Written at the end
+  of a line of a worked solution, it prints "+n" in the right margin of an
+  instructor's copy, beside that line, and nothing elsewhere. In a display it
+  is the equation's tag, and in an `{align*}` it is counted once although
+  amsmath sets each row twice. The awards of a solution must add up to the
+  points of the problem or part it answers; a build that shows rubrics stops
+  with an error naming it when they do not.
+
+- **`\TeXLibGhostInk`, a parity check.** Defined ahead of an instructor or key
+  build, it typesets every answer, footer, mark and `{sketchaxes}` answer and
+  draws none of them, nor the header's page points or the cover's label. The
+  result must be the student copy pixel for pixel.
+  `test_rubric_inline_parity.py` (run by `smoke.yml`) holds an instructor copy
+  and a key to that, cover included.
+
 - **`\shuffle[pages]` — permute whole PAGES between versions, not individual
   problems.** Plain `\shuffle` preserves the authored per-page *counts* and
   refills them from a permutation of every problem in the section, so a page
@@ -411,6 +443,16 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   student copy line for line.
 
 ### Fixed
+
+- **An inline key page with a `\splitpage` answer stopped the fit pass.** When
+  a page could not hold one of its solutions and also carried an answer whose
+  ink ends inside its own row (a `\splitpage` part beside a taller column),
+  the warning in `texlib_keyfit.lua` read the room after that row, which the
+  fit pass never measures for an answer that needs none, and stopped on a Lua
+  error. The key was left as the overlay drew it, and the build summary did
+  not name the page. Such answers are now passed over, since none of their ink
+  is below their row. `test_solution_inline_fit.py` builds that page (SPLIT).
+  Found building Math 126's Exam 3 instructor keys.
 
 - **Six switches and fields that a document set and the page ignored.** Found
   by an audit of `main`, each reproduced with a one-page document and now

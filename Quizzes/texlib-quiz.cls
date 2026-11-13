@@ -164,6 +164,10 @@
 % first-page header rule on top (its title page carries a name field).
 \RequirePackage{texlib-pagestyle}
 % \title is auto-derived from metadata.
+\newcommand{\@quiz@keymark}{%
+	\ifsolinline\ifdefined\TeXLibGhostInk\else
+		\ \textmd{--- \textit{Solutions}}%
+	\fi\fi}
 \AtBeginDocument{%
 	\title{\LARGE \GetQuizTitle}%
 	\SetTeXLibExamRules
@@ -176,12 +180,12 @@
 	% defeats the whole point of the inline layout, which is a key page whose
 	% geometry matches the student copy exactly. The header costs no body space
 	% and shows on both leaves. Same word as the title block uses, deliberately.
-	\firstpageheader{\bfseries Section~\GetCourseSection\ifsolinline\ \textmd{---
-		\textit{Solutions}}\fi}{}{Name:\ \underline{\hspace{2.5in}}}%
+	% \@quiz@keymark is empty under \TeXLibGhostInk (texlib-solutions.sty), the
+	% parity check that draws none of a key's ink.
+	\firstpageheader{\bfseries Section~\GetCourseSection\@quiz@keymark}{}{Name:\ \underline{\hspace{2.5in}}}%
 	% Footer L: full course name via the shared \GetCourse ("Math 181 Calculus I").
 	\firstpagefooter{\GetCourse}{\thepage\ of \pageref{LastPage}}{\GetInstitution}%
-	\runningheader{\bfseries\GetQuizTitle\ifsolinline\ \textmd{---
-		\textit{Solutions}}\fi}{}{Name:\ \underline{\hspace{2.5in}}}%
+	\runningheader{\bfseries\GetQuizTitle\@quiz@keymark}{}{Name:\ \underline{\hspace{2.5in}}}%
 	\runningfooter{\GetCourse}{\thepage\ of \pageref{LastPage}}{\GetInstitution}%
 }
 
