@@ -589,10 +589,37 @@
 \setlength{\@sol@outervsep}{10pt}
 % How far right of the text margin a {solution} box starts; it still ends at the
 % right margin. \texlib@sol@setinset sets it at \begin{solution}. The default is
-% zero, the full-bleed box; autoexam indents a problem that has no parts to its
-% body, where a part's solution would start (texlib-autoexam.cls).
+% zero, the full-bleed box, which bank keeps. Quiz and autoexam set
+% \texlib@sol@setinset to \texlib@sol@partlessinset below.
 \newdimen\texlib@sol@inset
 \providecommand{\texlib@sol@setinset}{\texlib@sol@inset\z@}
+% \texlib@sol@partlessinset: a {solution} in a problem with no parts starts where
+% a part's solution would. That is the problem's body indent plus the left margin
+% exam.cls gives {parts}, worked out the same way: the width of "(m)" and
+% \labelsep, then \partshook. Each {parts} records the problem it opened in, as
+% \texlib@sol@problemkey names it. The default name is the question number, which
+% runs on across a document's {problems} sections. autoexam adds the copy, since
+% every version of a multi-version exam numbers its questions from 1 again.
+% A problem-level {solution} after its problem's {parts} keeps the full measure,
+% as does a solution outside the problems list (\@totalleftmargin zero, as in
+% the MC key's minipage).
+\providecommand{\texlib@sol@problemkey}{\the\c@question}
+\gdef\texlib@sol@partsq{}
+\AddToHook{env/parts/begin}{\xdef\texlib@sol@partsq{\texlib@sol@problemkey}}
+\newcommand{\texlib@sol@partlessinset}{%
+	\edef\@tempa{\texlib@sol@problemkey}%
+	\texlib@sol@inset\z@
+	\ifx\@tempa\texlib@sol@partsq\else
+		\ifdim\@totalleftmargin>\z@
+			\begingroup
+				\settowidth{\leftmargin}{(m)\hskip\labelsep}%
+				\partshook
+				\edef\@tempa{\endgroup
+					\texlib@sol@inset\the\dimexpr\@totalleftmargin+\leftmargin\relax}%
+			\@tempa
+		\fi
+	\fi
+}
 \let\solution\relax
 \let\endsolution\relax
 \newenvironment{solution}{%

@@ -118,6 +118,10 @@
 % texlib-problembank so it can override that package's \@mcframe@* / \workbox
 % defaults.
 \RequirePackage{texlib-solutions}
+% A {solution} in a problem with no parts starts where a part's solution would,
+% under the problem's text, as on an autoexam key. Its question number names the
+% problem: a quiz has one copy, and its numbers run on across {problems}.
+\let\texlib@sol@setinset\texlib@sol@partlessinset
 
 % \loadbank is provided by texlib-problembank.sty. A coursemeta bank-path and a
 % sibling bank.tex are auto-loaded below (shared resolution, see

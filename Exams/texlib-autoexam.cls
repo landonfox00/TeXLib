@@ -711,31 +711,14 @@
 \let\oldparts\parts
 \let\endoldparts\endparts
 
-% A {solution} in a problem with no parts starts where a part's solution would:
-% the problem's body indent plus the left margin exam.cls gives {parts}, worked
-% out the same way (the width of "(m)" and \labelsep, then \partshook). {parts}
-% records the copy and question it opened in; the key is per copy because every
-% version of a multi-version exam numbers its questions from 1 again. Outside
-% the problems list (\@totalleftmargin zero, as in the MC key's minipage) the
-% box keeps its full measure.
-\gdef\@autoexam@partsq{}
-\RenewDocumentCommand{\texlib@sol@setinset}{}{%
-	\edef\@tempa{\the\c@autoexamcopyno:\the\c@question}%
-	\texlib@sol@inset\z@
-	\ifx\@tempa\@autoexam@partsq\else
-		\ifdim\@totalleftmargin>\z@
-			\begingroup
-				\settowidth{\leftmargin}{(m)\hskip\labelsep}%
-				\partshook
-				\edef\@tempa{\endgroup
-					\texlib@sol@inset\the\dimexpr\@totalleftmargin+\leftmargin\relax}%
-			\@tempa
-		\fi
-	\fi
-}
+% A {solution} in a problem with no parts starts where a part's solution would
+% (\texlib@sol@partlessinset, texlib-solutions.sty). The problem's name carries
+% the copy, because every version of a multi-version exam numbers its questions
+% from 1 again.
+\def\texlib@sol@problemkey{\the\c@autoexamcopyno:\the\c@question}
+\let\texlib@sol@setinset\texlib@sol@partlessinset
 
 \RenewDocumentEnvironment{parts}{}{%
-	\xdef\@autoexam@partsq{\the\c@autoexamcopyno:\the\c@question}%
 	\oldparts\inpartstrue
 	\ifnum\value{question}=\value{tracker_question_no}
 		\ifnum\value{global_partno_storage}>0
