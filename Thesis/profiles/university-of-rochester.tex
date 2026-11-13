@@ -1,0 +1,170 @@
+% profiles/university-of-rochester.tex — University of Rochester
+% ============================================================================
+% source: https://www.rochester.edu/graduate-education/academic-resources/dissertation-manual/
+%         (University Graduate Education, "Dissertation Manual" — the web
+%         edition)
+% source: https://www.rochester.edu/graduate-education/wp-content/uploads/2026/08/Manual-for-PhD-Students_7.26.V2.pdf
+%         (the same manual as a PDF, linked from that page as "a downloadable
+%         PDF version of this". Its running footer says "Updated June 2026" and
+%         the file was produced 2026-07-28, so it is CURRENT — and it is the
+%         fuller of the two: the accessibility section and the annotated
+%         "Format of Title Page" specimen appear only here.)
+% accessed: 2026-09-12
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set: geometry, spacing, the title page, the absence of an
+% approval page, and the accessibility rules — as RECOMMENDATIONS, which is the
+% whole point of this file's accessibility block. Nothing is left to the neutral
+% fallback.
+%
+% TWO OLDER EDITIONS ARE STILL REACHABLE and neither is what to quote:
+%   .../wp-content/uploads/2022/03/Thesis-Manual-March-2022.pdf — the 2022
+%     manual, still linked from the same page as "Get the PDF".
+%   rochester.edu/college/gradstudies/assets/pdf/theses-manual.pdf — an even
+%     older College of Arts & Sciences manual, which search engines rank highly.
+% The June 2026 PDF above supersedes both.
+%
+% NOT set, for want of a hook: "Font size must be at least as large as 10-point
+% Arial or 12-point Times New Roman", and "Fonts in figures and tables may be
+% smaller than 11-point, but all must remain legible when reduced to 50% size."
+
+\thesisinstitution{University of Rochester}
+
+% "All margins must be at least 1.25" (one and one-quarter inches), including
+% those on tables, figures, and appendices." Note the modal: it is a MINIMUM,
+% not a fixed figure, and it is the same on all four sides — no binding
+% allowance and no inner/outer distinction.
+%
+% One consequence the class cannot express: "Page numbers must be placed in the
+% top margin of each page, preferably at the top right. They may be placed
+% outside of the required margins", which is the one thing Rochester lets into
+% the margin.
+\thesissetgeometry{left=1.25in, right=1.25in, top=1.25in, bottom=1.25in}
+
+% "The front matter (abstract, biographical sketch, dedication, contributors and
+% funding sources, table of contents, etc.) and body of the text must be
+% double-spaced." Note that unlike most schools Rochester doubles the FRONT
+% MATTER too; the exception it grants is the bibliography ("Bibliographies may
+% be single-spaced"). \thesissetchapteropening is NOT called: the manual states
+% no chapter-opening exception.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% RECOMMENDED, NOT REQUIRED, and that distinction is why none of the checkable
+% declarations is set here. Rochester's own words:
+%
+%   "In accordance with the Americans with Disabilities Act (ADA), it is
+%    important to prepare your thesis so that it is accessible to a wide range
+%    of readers ... The University of Rochester RECOMMENDS creating digital
+%    content that conforms to the Web Content Accessibility Guidelines (WCAG)
+%    2.1 Level AA."  [emphasis added]
+%
+% "recommends" is not "requires", and no page anywhere in the manual makes an
+% accessible or tagged PDF a condition of acceptance. So \thesisrequiretagging,
+% \thesisrequiredocumentlanguage and \thesisrequirepdfstandard are all
+% deliberately NOT called — this class emits a tagged PDF regardless, and
+% declaring a requirement Rochester never published would put words in the
+% Graduate Education office's mouth.
+%
+% Rochester cites the ADA with NO compliance date. Nothing to reconcile against
+% another profile's date.
+\thesisaccessibilityrequirement{Standard (recommended)}
+	{"The University of Rochester recommends creating digital content that
+	 conforms to the Web Content Accessibility Guidelines (WCAG) 2.1 Level AA."
+	 Recommended, not required: no source makes an accessible PDF a condition of
+	 acceptance.}
+\thesisaccessibilityrequirement{Practices (recommended)}
+	{"use accessibility best practices such as applying proper heading
+	 structures, creating accessible tables, using meaningful link text,
+	 providing sufficient color contrast, and including alternative text ('alt
+	 text') for images and other non-text content."}
+\thesisaccessibilityrequirement{Checking (requested)}
+	{"Before finalizing your dissertation draft, please use the Accessibility
+	 Checker in Microsoft Word to ensure you document is fully compliant and
+	 requires no further changes." [sic] No LaTeX equivalent is named; veraPDF,
+	 which this repository's build gate runs, is the closest substitute.}
+
+% --- Title page --------------------------------------------------------------
+% The manual prints an annotated "Format of Title Page" specimen, and the block
+% below is that page. Its rules, quoted:
+%
+%   * "The title of the thesis is typed in upper-and lower-case letters" —
+%     the specimen's own placeholder spells the constraint out: "Not all Caps or
+%     all Lower-Case Letters". So the title is printed exactly as \title gives
+%     it, and is NOT case-folded here.
+%   * "Do not include degrees or credentials of your advisor(s) and do not list
+%     other members of your committee." / "Primary advisor or co-advisors are
+%     listed, not the entire committee."
+%   * "Include the word 'Professor' in front of the name of each advisor on the
+%     title page." — so the profile adds it; put a bare name in \gradadvisor.
+%   * "The name of your department and school appear on the title page. If you
+%     are in an interdisciplinary program, list the program name rather than a
+%     department, followed by the school(s)." The specimen shows this as a two-
+%     or three-line block, e.g. "Department of Chemistry / Arts, Sciences and
+%     Engineering / School of Arts and Sciences".
+%   * "Provide the year (but not the month or day) of your expected degree
+%     conferral. The degree conferral may, or may not, be the same year as the
+%     defense."
+%   * "No page number is printed on the title page, but it is counted as page
+%     'i'."
+%
+% A FILER MUST SET \urunit{...}: the department/program and school block, one
+% line per entry separated by \\, because Rochester's block runs to two or three
+% lines and which lines appear depends on the program. It defaults to
+% \thesis@program, which gives one line and is usually not enough.
+%
+% And \graddate must be a bare YEAR — the conferral year, not the defence date
+% and not a month.
+\newcommand{\thesis@ur@unit}{\thesis@program}
+\newcommand{\urunit}[1]{\renewcommand{\thesis@ur@unit}{#1}}
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		% Printed as given: Rochester forbids all caps AND all lower case here.
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{2\baselineskip}
+		Submitted in Partial Fulfillment of the\\
+		Requirements for the Degree\\
+		\thesis@degree\par
+		\vspace{2\baselineskip}
+		Supervised by Professor \thesis@advisor\par
+		\vspace{2\baselineskip}
+		\thesis@ur@unit\par
+		\vspace{2\baselineskip}
+		University of Rochester\\
+		Rochester, New York\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Rochester prescribes none, and the manual is emphatic that the committee does
+% not belong on the title page either: "Do not include degrees or credentials of
+% your advisor(s) and do not list other members of your committee. Committee
+% members are listed in the Contributors and Funding Sources page."
+%
+% That page is where the committee goes — "In this section, name all members of
+% the dissertation committee" — and it is a narrative section about
+% collaboration and funding, not an approval leaf. The manual's "Order of
+% Dissertation Contents" table runs Title page, Dedication (optional), Table of
+% Contents, Biographical Sketch, Acknowledgements (optional), Abstract,
+% Contributors and Funding Sources, ... with no approval or signature page, and
+% the word "signature" does not appear in the manual at all.
+%
+% Approval runs through the defence instead: "The committee chair will certify
+% the outcome and submit that information [to] the University Graduate Education
+% and Postdoctoral Affairs office."
+%
+% This rests on an absence rather than a sentence; deleting this line restores
+% the class's neutral page.
+\thesisnoapprovalpage
