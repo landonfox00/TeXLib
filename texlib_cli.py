@@ -674,6 +674,7 @@ class CliHost:
         self.quiet = quiet
         self.tex_dir = os.path.dirname(root) or "."
         self.errors = []
+        self.aux_errors = []
         self.warnings = []
         self.fatal = False
 
@@ -705,9 +706,15 @@ class CliHost:
         m = RESULT_RE.match(s)
         if m:
             self.fatal = True
-            # Source errors are the actionable ones; a generated .aux is noise.
+            # Source errors are the actionable ones; a generated .aux is noise
+            # NEXT to one. Kept apart rather than dropped: when an .aux error is
+            # all there is, it is the only thing the build can be explained by,
+            # and reporting nothing sent a reader to a 2000-line log to find a
+            # stale aux by hand.
             if not m.group(1).lower().endswith(".aux"):
                 self.errors.append(s)
+            else:
+                self.aux_errors.append(s)
         elif FATAL_RE.search(s):
             self.fatal = True
         elif WARNING_RE.search(s) and len(self.warnings) < MAX_WARNINGS:
@@ -827,7 +834,8 @@ class CliHost:
                 self.emit(msg + "\n")
                 # Undo point for a pass the brain may declare a probe -- see
                 # TexlibBuildCore's _forget_last_pass contract.
-                mark = (len(self.errors), len(self.warnings), self.fatal)
+                mark = (len(self.errors), len(self.warnings), self.fatal,
+                        len(self.aux_errors))
                 self.host.out = self.run_argv(cmd)
                 item = next(gen)
                 if getattr(self.host, "_forget_last_pass", False):
@@ -835,11 +843,18 @@ class CliHost:
                     del self.errors[mark[0]:]
                     del self.warnings[mark[1]:]
                     self.fatal = mark[2]
+                    del self.aux_errors[mark[3]:]
         except StopIteration:
             pass
         except KeyboardInterrupt:
             self.emit("\ntexlib: build interrupted.\n")
             return 130
+        # Failures the core found for itself after a compile (a lane whose PDF
+        # has no bibliography) never pass through collect(), which only sees
+        # engine output. See TexlibBuildCore.build_errors.
+        for message in getattr(self.host, "build_errors", None) or ():
+            self.errors.append("TeXLib: " + message)
+            self.fatal = True
         return 1 if self.fatal else 0
 
     def report(self):
@@ -858,6 +873,16 @@ class CliHost:
                 sys.stderr.write("  %s\n" % e)
             if len(errors) > 20:
                 sys.stderr.write("  ... and %d more\n" % (len(errors) - 20))
+        elif self.fatal and self.aux_errors:
+            aux = list(dict.fromkeys(self.aux_errors))
+            sys.stderr.write("\ntexlib: build failed in a generated .aux file, "
+                             "not in the source (%d error(s))\n" % len(aux))
+            for e in aux[:20]:
+                sys.stderr.write("  %s\n" % e)
+            if len(aux) > 20:
+                sys.stderr.write("  ... and %d more\n" % (len(aux) - 20))
+            sys.stderr.write("  Delete that file and build again; an .aux is "
+                             "regenerated.\n")
         elif self.fatal:
             sys.stderr.write("\ntexlib: build failed (no file:line error "
                              "reported -- see the log above)\n")

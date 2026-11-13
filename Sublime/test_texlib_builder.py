@@ -118,7 +118,7 @@ def run_builder(doc_src, options=None, engine="pdflatex", aux_files=None):
 
 
 def drive_builder(doc_src, options=None, engine="pdflatex",
-                  seed_files=None, steps=None):
+                  seed_files=None, steps=None, settings=None):
     """Drive commands() with a scripted side-effect timeline -> (cmds, disp, tmp).
 
     run_builder feeds empty output, so the biber/rerun branches never fire. This
@@ -128,6 +128,11 @@ def drive_builder(doc_src, options=None, engine="pdflatex",
       seed_files : {name: contents} written to the tex dir BEFORE the build,
                    to mimic artifacts a previous build left behind
                    (e.g. a doc.bbl + doc.bcf.texlibhash that lets biber skip).
+                   A name may carry directories (variants/student/doc.bbl);
+                   they are created.
+      settings   : builder_settings for the build, when a case needs one
+                   (e.g. accessible_report off, so no veraPDF runs over a
+                   fake PDF).
       steps      : list aligned to the yielded commands. steps[i] is applied
                    AFTER the i-th command is yielded and BEFORE the next send(),
                    so it models what that command "did":
@@ -146,6 +151,7 @@ def drive_builder(doc_src, options=None, engine="pdflatex",
     with open(tex_path, "w", encoding="utf-8") as fh:
         fh.write(doc_src)
     for name, contents in (seed_files or {}).items():
+        os.makedirs(os.path.dirname(os.path.join(tmp, name)), exist_ok=True)
         with open(os.path.join(tmp, name), "w", encoding="utf-8") as fh:
             fh.write(contents)
 
@@ -159,6 +165,8 @@ def drive_builder(doc_src, options=None, engine="pdflatex",
     # and `default' now fans out into a variant set. See run_builder's docstring.
     b.options = list(options if options is not None
                      else ["--texlib-mode=base"])
+    if settings is not None:
+        b.builder_settings = settings
     b.out = ""
     _LAST_BUILDER[0] = b
 
@@ -172,6 +180,10 @@ def drive_builder(doc_src, options=None, engine="pdflatex",
             except OSError:
                 pass
         for name, contents in step.get("write", {}).items():
+            # A lane's file (variants/student/doc.pdf): the lane directory
+            # exists by the time its step lands, but create it regardless so a
+            # mis-timed step fails an assertion rather than the harness.
+            os.makedirs(os.path.dirname(os.path.join(tmp, name)), exist_ok=True)
             with open(os.path.join(tmp, name), "w", encoding="utf-8") as fh:
                 fh.write(contents)
         b.out = step.get("out", "")
@@ -331,6 +343,130 @@ def main():
                  and str(c).endswith("-a11y")}
     check("fan-out -> tagged twin for the base and each variant",
           len(a11y_dirs) == 4, sorted(a11y_dirs))
+
+    # (j1c) THE BIBLIOGRAPHY IN A LANE. Every lane compiles into its own
+    # directory, and that is where the engine looks for doc.bbl -- so a
+    # biblatex document's variants and tagged twins had no bibliography at
+    # all, and nothing said so (the tagged twin of a 247-page paper shipped
+    # six pages short, with a passing PDF/UA gate). The base build's .bbl is
+    # copied into every lane before its first pass; a lane that produced a
+    # PDF without one -- or whose log shows it was not read, or that still
+    # asks for Biber -- fails the build through build_errors.
+    def _read(path):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                return fh.read()
+        except OSError:
+            return None
+
+    NO_REPORT = {"accessible_report": False}   # no veraPDF over a fake PDF
+    _, disp, tmp = drive_builder(
+        PSET, options=["--texlib-mode=default"], settings=NO_REPORT,
+        seed_files={"doc.buildmeta": FULL_META, "doc.bbl": "base-bbl",
+                    # left by an earlier build; the seed must overwrite it
+                    "variants/student/doc.bbl": "stale"})
+    lane_dirs = sorted(os.listdir(os.path.join(tmp, "variants")))
+    check("lane bbl: seven lanes -- base twin, three variants, each twice",
+          len(lane_dirs) == 7, lane_dirs)
+    check("lane bbl: every lane was seeded with the base .bbl before it ran",
+          bool(lane_dirs) and all(
+              _read(os.path.join(tmp, "variants", d, "doc.bbl")) == "base-bbl"
+              for d in lane_dirs),
+          [(d, _read(os.path.join(tmp, "variants", d, "doc.bbl")))
+           for d in lane_dirs])
+    check("lane bbl: no lane produced a PDF, so none was judged",
+          _LAST_BUILDER[0].build_errors == [] and "ERROR" not in disp,
+          _LAST_BUILDER[0].build_errors)
+
+    # (j1d) THE RERUN FLAG IN A LANE. When biblatex asks for Biber it writes
+    # \abx@aux@read@bblrerun and the .bbl checksum into the .aux, and it
+    # re-requests on the next run unless that checksum changed. A lane never
+    # runs Biber -- it is seeded with the base .bbl, regenerated byte-identical
+    # -- so a flag left in a lane's .aux by one build (the first after the
+    # citation set changed) re-requested on every later build, failing it
+    # through _check_lane_bibliography with a complete .bbl in hand. Seeding
+    # now strips the two lines and leaves everything else in the .aux alone.
+    _, disp, tmp = drive_builder(
+        PSET, options=["--texlib-mode=default"], settings=NO_REPORT,
+        seed_files={"doc.buildmeta": FULL_META, "doc.bbl": "base-bbl",
+                    "variants/student/doc.aux":
+                        "\\relax\n\\abx@aux@read@bblrerun\n"
+                        "\\abx@aux@read@bbl@mdfivesum{5EC996038C25}\n"
+                        "\\newlabel{x}{{1}{1}}\n"})
+    aux = _read(os.path.join(tmp, "variants", "student", "doc.aux")) or ""
+    check("lane aux: seeding strips biblatex's rerun request, keeps the rest",
+          "bblrerun" not in aux and "mdfivesum" not in aux
+          and "\\newlabel{x}" in aux and "\\relax" in aux,
+          aux)
+
+    # No base .bbl (no bibliography): nothing is seeded, and a lane's leftover
+    # from a build whose document still had one is removed rather than read
+    # back by biblatex as current.
+    _, disp, tmp = drive_builder(
+        PSET, options=["--texlib-mode=default"], settings=NO_REPORT,
+        seed_files={"doc.buildmeta": FULL_META,
+                    "variants/base-a11y/doc.bbl": "stale"})
+    check("lane bbl: no base .bbl -> no lane has one (a stale one is removed)",
+          not any(os.path.exists(os.path.join(tmp, "variants", d, "doc.bbl"))
+                  for d in os.listdir(os.path.join(tmp, "variants"))),
+          os.listdir(os.path.join(tmp, "variants", "base-a11y")))
+    check("lane bbl: no base .bbl -> no error either",
+          _LAST_BUILDER[0].build_errors == [], _LAST_BUILDER[0].build_errors)
+
+    # The check. The serial fan-out yields: base (0); base-a11y (1, 2); then
+    # student (3, 4), solutions (5, 6), instructor (7, 8); then their tagged
+    # twins from 9. A step lands after its command is yielded and before the
+    # core resumes into _copy_back_variant, so step N stages what lane pass N
+    # left on disk. Four lanes produce a PDF: three are wrong in the three
+    # recognised ways, the fourth is fine.
+    BIBER_ASK = ("Package biblatex Warning: Please (re)run Biber on the file:"
+                 "\n(biblatex)                doc\n")
+    steps = [{} for _ in range(15)]
+    steps[4] = {"write": {"variants/student/doc.pdf": "%PDF-fake"},
+                "remove": ["variants/student/doc.bbl"]}
+    steps[6] = {"write": {"variants/solutions/doc.pdf": "%PDF-fake",
+                          "variants/solutions/doc.log":
+                              "(./doc.tex\nNo file doc.bbl.\n)"}}
+    steps[8] = {"write": {"variants/instructor/doc.pdf": "%PDF-fake",
+                          "variants/instructor/doc.log": BIBER_ASK}}
+    steps[10] = {"write": {"variants/student-a11y/doc.pdf": "%PDF-fake",
+                           "variants/student-a11y/doc.log": "(./doc.tex\n)"}}
+    cmds, disp, tmp = drive_builder(
+        PSET, options=["--texlib-mode=default"], settings=NO_REPORT,
+        seed_files={"doc.buildmeta": FULL_META, "doc.bbl": "base-bbl"},
+        steps=steps)
+    errs = _LAST_BUILDER[0].build_errors
+    check("lane bbl: 15 commands as laid out above (else the steps miss)",
+          len(cmds) == 15, [c[1] for c in cmds])
+    check("lane bbl: a lane whose .bbl is gone fails the build",
+          any("variant 'student' has no doc.bbl" in e for e in errs), errs)
+    check("lane bbl: a lane whose log says `No file doc.bbl.' fails the build",
+          any("variant 'solutions' did not read doc.bbl" in e for e in errs),
+          errs)
+    check("lane bbl: a lane still asking for Biber fails the build",
+          any("variant 'instructor' still asks for Biber" in e for e in errs),
+          errs)
+    check("lane bbl: exactly those three -- the clean lane passes",
+          len(errs) == 3 and not any("(tagged)" in e for e in errs), errs)
+    check("lane bbl: each failure is displayed as a TeXLib ERROR line",
+          disp.count("TeXLib: ERROR --") == 3, disp)
+
+    # The `accessible' mode's tagged half has a directory of its own (a11y/),
+    # seeded and judged the same way: normal half (0), tagged (1, 2).
+    _, disp, tmp = drive_builder(
+        PSET, options=["--texlib-mode=accessible"], settings=NO_REPORT,
+        seed_files={"doc.bbl": "base-bbl"})
+    check("lane bbl: the accessible tagged half is seeded too",
+          _read(os.path.join(tmp, "a11y", "doc.bbl")) == "base-bbl",
+          os.listdir(tmp))
+    _, disp, tmp = drive_builder(
+        PSET, options=["--texlib-mode=accessible"], settings=NO_REPORT,
+        seed_files={"doc.bbl": "base-bbl"},
+        steps=[{}, {}, {"write": {"a11y/doc.pdf": "%PDF-fake"},
+                        "remove": ["a11y/doc.bbl"]}])
+    errs = _LAST_BUILDER[0].build_errors
+    check("lane bbl: an accessible half without its .bbl fails the build",
+          len(errs) == 1 and "the tagged half has no doc.bbl" in errs[0], errs)
 
     # (k1p) PARALLEL LANES. A host may offer run_parallel; the core then hands
     # it the independent variant compiles instead of yielding them one pass at
@@ -920,9 +1056,12 @@ def main():
         return script
 
     seen = []
+    # The base build's doc.bbl too: a lane's .bbl is seeded from the base one
+    # before its first pass (_seed_lane_bibliography), and a lane .bbl with no
+    # base .bbl beside it is removed as a leftover.
     drive_lanes(_ACC_OPT, aborting_probe(seen),
                 seed={"a11y/doc.aux": _AUX, "a11y/doc.toc": _TOC,
-                      "a11y/doc.bbl": "bbl"})
+                      "a11y/doc.bbl": "bbl", "doc.bbl": "bbl"})
     probe = seen[0] if seen else {}
     retry = seen[1] if len(seen) > 1 else {}
     check("lane state: the probe reads what the last build left",

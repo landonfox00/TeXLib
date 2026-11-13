@@ -937,6 +937,7 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
         inside commands(), so reaching StopIteration means the build is done."""
         gen = host.commands()
         error_lines = []
+        aux_error_lines = []
         warning_lines = []
         fatal = [False]
 
@@ -946,9 +947,14 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
             m = RESULT_RE.match(s)
             if m:
                 fatal[0] = True
-                # Source-file errors are the actionable ones; skip generated .aux.
+                # Source-file errors are the actionable ones; a generated .aux
+                # is noise NEXT to one. Held aside rather than dropped -- when
+                # an .aux error is all there is, it is the only account of the
+                # failure, and the build otherwise reported none at all.
                 if not m.group(1).lower().endswith(".aux"):
                     error_lines.append(s)
+                else:
+                    aux_error_lines.append(s)
             elif FATAL_RE.search(s):
                 fatal[0] = True
             elif WARNING_RE.search(s) and len(warning_lines) < 500:
@@ -971,7 +977,8 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                 emit(msg + "\n")
                 # Undo point for a pass the brain may declare a probe -- see
                 # TexlibBuildCore's _forget_last_pass contract.
-                mark = (len(error_lines), len(warning_lines), fatal[0])
+                mark = (len(error_lines), len(warning_lines), fatal[0],
+                        len(aux_error_lines))
                 host.out = _run_argv(cmd, tex_dir, collect, cancel, texinputs,
                                      getattr(host, "_aux_target", None), entry)
                 if cancel.is_set():
@@ -984,7 +991,19 @@ class TexlibBuildCommand(sublime_plugin.WindowCommand):
                     del error_lines[mark[0]:]
                     del warning_lines[mark[1]:]
                     fatal[0] = mark[2]
+                    del aux_error_lines[mark[3]:]
         except StopIteration:
+            # Failures the core found for itself after a compile (a lane whose
+            # PDF has no bibliography) never pass through collect(), which only
+            # sees engine output. See TexlibBuildCore.build_errors.
+            for message in getattr(host, "build_errors", None) or ():
+                error_lines.append("TeXLib: " + message)
+                fatal[0] = True
+            if fatal[0] and not error_lines and aux_error_lines:
+                error_lines.append("TeXLib: the failure is in a generated .aux "
+                                   "file, not in the source. Delete it and "
+                                   "build again; an .aux is regenerated.")
+                error_lines.extend(aux_error_lines)
             state = "error" if fatal[0] else "ok"
         except Exception as exc:  # noqa: BLE001 - never let the worker die silently
             emit("TeXLib: build driver error: %s\n" % exc)

@@ -7,6 +7,7 @@ The build path itself is not re-tested here -- it is TexlibBuildCore, which
 Sublime/test_texlib_builder.py already covers, and the whole point of the CLI
 is that it adds no second implementation to test.
 """
+import io
 import os
 import shutil
 import sys
@@ -317,6 +318,71 @@ for quiet in (False, True):
                 % (" under --quiet" if quiet else ""))
 ok &= check("inline key" not in _tail([], False),
             "report: a key whose solutions fit adds nothing")
+
+# --- Core-recorded failures reach the exit code ------------------------------
+# A lane whose PDF has no bibliography is found by the core AFTER the compile,
+# from the disk, and never appears in the engine output that collect()
+# classifies. The host has to read build_errors when commands() ends, or such
+# a build exits 0 with a broken PDF -- which is how the defect stayed invisible.
+with tempfile.TemporaryDirectory() as _tmp:
+    _root = os.path.join(_tmp, "doc.tex")
+    with open(_root, "w", encoding="utf-8") as _fh:
+        _fh.write("\\documentclass{article}\\begin{document}x\\end{document}\n")
+    _host = C.CliHost(core, _root, "base", "", {}, True)
+
+    def _commands_with_core_error():
+        _host.host.build_errors = ["variant 'student' has no doc.bbl in x "
+                                   "although the base build produced one"]
+        return iter(())
+    _host.host.commands = _commands_with_core_error
+    _rc = _host.build()
+    ok &= check(_rc == 1, "build_errors: a core-recorded failure exits 1")
+    ok &= check(any("doc.bbl" in e for e in _host.errors) and _host.fatal,
+                "build_errors: the failure is in the condensed error report")
+
+    _host = C.CliHost(core, _root, "base", "", {}, True)
+    _host.host.commands = lambda: iter(())
+    ok &= check(_host.build() == 0 and _host.errors == [],
+                "build_errors: none recorded -> exit 0, as before")
+
+
+# --- An .aux error is the report when it is the only error -------------------
+# collect() keeps .aux errors out of self.errors because next to a source error
+# they are downstream noise. When one is all there is -- a stale or corrupt aux
+# read on the first pass -- suppressing it left the run saying only "no
+# file:line error reported", and the file that has to be deleted was findable
+# only by reading the whole engine log.
+def _reported(lines):
+    host = C.CliHost.__new__(C.CliHost)
+    host.errors, host.aux_errors, host.warnings = [], [], []
+    host.fatal, host.quiet, host.root = False, True, "doc.tex"
+    host.host = types.SimpleNamespace(keyfit_summary=[])
+    for line in lines:
+        host.collect(line + "\n")
+    buf = io.StringIO()
+    saved, sys.stderr = sys.stderr, buf
+    try:
+        host.report()
+    finally:
+        sys.stderr = saved
+    return host, buf.getvalue()
+
+_AUX = "c:/tmp/texlib-aux/ab/doc.aux:3: Undefined control sequence."
+_SRC = "./section.tex:12: Undefined control sequence."
+
+_h, _out = _reported([_AUX])
+ok &= check(_h.fatal and "doc.aux:3" in _out,
+            "aux error alone: the file and line are named")
+ok &= check("no file:line error reported" not in _out,
+            "aux error alone: not reported as having no error")
+
+_h, _out = _reported([_SRC, _AUX])
+ok &= check("section.tex:12" in _out and "doc.aux:3" not in _out,
+            "aux error beside a source error: still noise")
+
+_h, _out = _reported([])
+ok &= check(not _h.fatal and _out == "",
+            "no errors: report stays silent")
 
 print("\nALL PASS" if ok else "\nFAILURES ABOVE")
 sys.exit(0 if ok else 1)

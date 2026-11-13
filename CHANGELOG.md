@@ -202,10 +202,11 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   `preview_ready` hook and the host decides whether to act, so the LaTeXTools
   adapter and the CLI are unaffected; the Sublime host declines when
   `preferred_pdf` points at a different copy, rather than swapping the viewer
-  out from under you mid-build. Only the PDF is copied back early — the
-  `.synctex.gz` is deliberately left until `_finalize_synctex` has replaced it
-  with the uncompressed map SumatraPDF prefers — and a `.spl` split build is
-  skipped, since `<base>.pdf` does not survive that one. New setting:
+  out from under you mid-build. The SyncTeX map goes out with the PDF, already
+  decompressed to the plain `<base>.synctex` SumatraPDF prefers; holding it
+  back until `_finalize_synctex` left inverse search on the previous build's
+  map for the rest of the fan-out (46s on a quiz with two tagged lanes). A
+  `.spl` split build is skipped, since `<base>.pdf` does not survive that one. New setting:
   `open_pdf_early` (default on).
 
 - **The accessible gate builds a tagged `{cols}` and asserts its two columns.**
@@ -440,6 +441,45 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   `pdf-A4f.txt`, as the tree's one entry, as a document without mathematics
   already did. `test_texlib_builder.py` asserts the key in both prefixes and
   both templates.
+
+- **Every variant and tagged twin of a biblatex document had no
+  bibliography.** Each lane of the fan-out — every variant, every tagged twin,
+  and the `accessible` mode's tagged half — compiles into its own output
+  directory, and that is where the engine looks for `<base>.bbl`: there and
+  beside the source, never in the base build's aux dir. So the lane found
+  none. biblatex logged `No file <base>.bbl.`, asked for Biber, set every
+  citation as undefined and the bibliography as nothing — and the PDF/UA-2
+  gate passed, because an absent bibliography is perfectly well-formed. The
+  tagged twin of a 247-page paper with 61 references came out at 241 pages,
+  the copy committed with it a week earlier was short the same way, and only
+  the base PDF was ever right. Each lane is now seeded with the base build's
+  `.bbl` before its first pass. That file is the right one for every lane: a
+  hidden solution is still typeset into a discarded box, so its `\cite`
+  reaches every variant's `.bcf`, and a tagged twin is the same source — the
+  `.bcf` Biber consumed is byte-identical across the fan-out — so the copy
+  costs nothing and spares each lane a Biber run and the third pass that
+  would force. The build now **fails** when a lane that produced a PDF has no
+  `.bbl` while the base build does, when its log says the engine did not read
+  it, or when its last pass still asks for Biber (the lane cites something the
+  base did not). Those are the core's own findings rather than engine output,
+  so both hosts read a new `build_errors` list when the coroutine ends: the
+  CLI exits 1 and lists them, and the Sublime panel reports them as errors. A
+  document with no bibliography is untouched.
+
+- **A lane kept asking for Biber forever after the citations changed.** When
+  biblatex requests Biber it records the request and the `.bbl` checksum in the
+  `.aux`, and re-requests on the next run unless that checksum has changed. A
+  lane never runs Biber: it is seeded with the base `.bbl`, which Biber
+  regenerates byte-identical while the `.bib` and the citations stand still. So
+  the first build after a citation change left the flag in every lane's
+  `.aux`, and every later build ended with "still asks for Biber after its
+  last pass" and a build error, with a complete bibliography in hand; deleting
+  the lane's directory was the only way out (a 213-page biblatex paper,
+  2026-09-24). Seeding now strips the two bookkeeping lines beside the
+  seeded `.bbl`; they were never document state (`STATE_NOISE_RE` already
+  ignores them when fingerprinting), and a genuine request still reaches the
+  builder through the log. Test: `lane aux: seeding strips biblatex's rerun
+  request, keeps the rest`.
 
 - **A failed build stamped itself as current, so the NEXT build did nothing.**
   The freshness stamp is written only after a clean pass, and "clean" was
