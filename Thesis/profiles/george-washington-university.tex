@@ -1,0 +1,326 @@
+% profiles/george-washington-university.tex — The George Washington University
+% ============================================================================
+% source: https://gradpostdoc.gwu.edu/gw-etd-formatting
+%         ("University Formatting Requirements", Office of Graduate and
+%          Postdoctoral Affairs — the whole rule set, front pages included)
+% source: https://gradpostdoc.gwu.edu/accessible-etds
+%         ("Digital Accessibility", same office)
+% accessed: 2026-09-14
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, title page, certification page, and
+% the accessibility requirements including two of the three checkable
+% declarations.
+% NOT set: \thesissetchapteropening. GW's deeper top margin belongs to the title
+% page alone ("Start 2 inches from top edge of page or 1 inch below the top page
+% margin"); every other front page takes a header "One inch from the top edge of
+% the page".
+%
+% SCHOOL OF LAW IS OUT OF SCOPE. "The School of Law follows different formatting
+% guidelines." This profile encodes the university requirements that apply to
+% every other school; a law thesis must not be filed against it.
+%
+% GW REQUIRES THINGS THE CLASS HAS NO FIELD FOR, so this profile adds three
+% setters, prefixed \gwu... because they are this profile's:
+%
+%   \gwuschool{...}        the School or College, which appears in the title
+%                          page's central paragraph and again in the
+%                          certification paragraph
+%   \gwupriordegrees{...}  the prior-degree lines on the title page
+%   \gwudefensedate{...}   the date of the dissertation defence, for the
+%                          certification paragraph — NOT the conferral date
+%
+% \gwuschool and \gwudefensedate warn when a document needs them and has not set
+% them, rather than printing a placeholder.
+%
+% THREE DOCUMENT-WIDE PROHIBITIONS the class cannot enforce, recorded because
+% each is a filing rejection. "Do not include the following content in a
+% dissertation or master's thesis: Biography; CV; lists of published articles,
+% conference proceedings, presentations or awards / Blank pages anywhere in the
+% document / Running headers anywhere in the document / Horizontal or vertical
+% lines or page borders." The blank-page rule in particular argues against a
+% twoside build, whose \cleardoublepage inserts them.
+
+\thesisinstitution{The George Washington University}
+
+% "Page Margins — Portrait Pages: Left and Right margins: 1.25 inches; Top and
+% Bottom margins: 1 inch." Not the usual 1in square, and the wider measure is
+% the horizontal one.
+%
+% NOT EXPRESSIBLE, and noted rather than silently dropped: "Landscape Pages:
+% Right and Left margins: 1 inch; Top and Bottom margins: 1.25 inches" — the
+% same frame rotated. geometry is set once for the document here, so a landscape
+% page has to be given those margins locally by the author. Also "Individual
+% Figures, Tables, or Equations: Right and left margins: at least 1 inch",
+% i.e. a figure may reach 0.25in further out than the text.
+%
+% NOT IMPLEMENTED: "All page numbers: located in the footer section, centered,
+% .75 inch from the bottom of the page" with "Footer from Bottom: setting should
+% be .5 inch". The class centres the folio in the foot without pinning it to
+% 0.75in from the paper edge.
+\thesissetgeometry{left=1.25in, right=1.25in, top=1in, bottom=1in}
+
+% "Line Spacing — Single line space (1.0); Double line spacing (2.0) … Body of
+% manuscript: double-space the text. Footnotes, table and figure titles &
+% captions, and long quotes: single-space the text." Double is the body rule,
+% not a choice; the single-spaced items are named exceptions and the front pages
+% carry their own per-page spacing, which the two page macros below apply.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% GW names a standard, a level, and the tagged-PDF requirement outright, and it
+% names the document language as its own required item — which is why both
+% \thesisrequiretagging and \thesisrequiredocumentlanguage are set. The modal is
+% not hedged: "In order for an Adobe PDF document to be accessible, it must be a
+% 'tagged' PDF", and "The primary language of a document must be identified".
+%
+% \thesisrequirepdfstandard is NOT set: WCAG 2.1 is a web-content standard, and
+% GW names no PDF/A or PDF/UA level.
+\thesisrequiretagging
+\thesisrequiredocumentlanguage
+\thesisaccessibilityrequirement{Standard}
+	{"The George Washington University is committed to making all web properties
+	 and web content accessible and usable for everyone, including people with
+	 disabilities, by employing principles of universal design and striving to
+	 conform to Web Content Accessibility Guidelines (WCAG) 2.1, Level AA or
+	 better. Our commitment includes electronic theses and dissertations (ETDs)
+	 that are published in GW's institutional repository, GW ScholarSpace." No
+	 compliance date is named.}
+\thesisaccessibilityrequirement{The author shares the duty}
+	{"As the author of an ETD, you share this responsibility for ensuring that
+	 your work meets accessibility standards so it is available to all
+	 interested researchers."}
+\thesisaccessibilityrequirement{Tagged PDF}
+	{"In order for an Adobe PDF document to be accessible, it must be a 'tagged'
+	 PDF, with an underlying tagged structure that includes all of the features
+	 already described on this page." GW then names three checks to run before
+	 submission: that the PDF is not a single graphic (its text must be
+	 selectable), that File > Properties reports "Tagged PDF: Yes", and that
+	 Acrobat Pro's Full Check has been run — "If it says, 'Tagged PDF: No' the
+	 document is not accessible and needs to have tags added."}
+\thesisaccessibilityrequirement{Document language}
+	{"The primary language of a document must be identified so that
+	 multi-lingual screen reader software knows to read the page in that
+	 language. You should also identify the language of any content written in a
+	 language other than the document's primary language so that screen readers
+	 can switch languages as needed."}
+\thesisaccessibilityrequirement{Headings}
+	{Built-in heading structure, in order: "assigning Heading 1 to the title or
+	 main heading, Heading 2 to the first level of sub-headings, Heading 3 to the
+	 next lower level of sub-headings, and so on". "While a fully sighted person
+	 can identify differences in larger and bold fonts, those aren't apparent to
+	 a screen reader."}
+\thesisaccessibilityrequirement{Alt text}
+	{"Alternative text (often called alt text) describes an image for people who
+	 use a screen reader … Alt text serves the same purpose and conveys the same
+	 essential information as the image." GW notes that "Particularly complex or
+	 information-rich graphics, such as charts and graphs, may require additional
+	 steps beyond adding alt text."}
+\thesisaccessibilityrequirement{Link text}
+	{"Links in a digital document should inform the user where they are going
+	 when they click it. … Do not use the word 'here' when linking to other
+	 content." A bare URL is also rejected: "If a URL is used as the text, the
+	 screen reader will read every letter, which is also frustrating for the
+	 user."}
+\thesisaccessibilityrequirement{Lists}
+	{"Any content that you want to organize as items in a list should be created
+	 using the list controls that are provided in your authoring software."}
+\thesisaccessibilityrequirement{Tables}
+	{"Organizing content into multiple columns solely for visual impact, when it
+	 is not meant to convey data in a table, should never be done with the Table
+	 function." "When creating a table, clearly identify column and row
+	 headers."}
+
+% --- Profile-local metadata ---------------------------------------------------
+\newcommand{\thesis@gwu@school}{}
+\newcommand{\gwuschool}[1]{\renewcommand{\thesis@gwu@school}{#1}}
+\newcommand{\thesis@gwu@prior}{}
+\newcommand{\gwupriordegrees}[1]{\renewcommand{\thesis@gwu@prior}{#1}}
+\newcommand{\thesis@gwu@defense}{}
+\newcommand{\gwudefensedate}[1]{\renewcommand{\thesis@gwu@defense}{#1}}
+% Made with \newcommand, not \def: the certification page's \ifx compares
+% against \thesis@docnoun, and \newcommand builds a \long macro where \def does
+% not, so a \def'd twin would never compare equal.
+\newcommand{\thesis@gwu@diss}{dissertation}
+\newcommand{\thesis@gwu@needschool}{%
+	\ifx\thesis@gwu@school\@empty
+		\ClassWarningNoLine{texlib-thesis}{GW names the School or College on the
+			title page^^J%
+			and again on the certification page. Set \string\gwuschool{} or^^J%
+			those lines will be filed incomplete}%
+	\fi
+}
+
+% --- Title page --------------------------------------------------------------
+% GW specifies this page as a sequence of blocks separated by counted blank
+% single-spaced lines, so the code below is that sequence and the \vspace values
+% are those counts. "3 single (1.0) blank line spaces" means three blank lines at
+% single spacing, which is 3\baselineskip with \singlespacing in force.
+%
+%   Title        "Start 2 inches from top edge of page or 1 inch below the top
+%                 page margin." / "Capitalize the significant words in the
+%                 title." / "Center the title on the line and single space if
+%                 the title is more than one line."
+%   (3 blank)
+%   by <name>    "text is on the same line as 'by' and centered"
+%   (3 blank)
+%   prior degrees "List your lower degrees first and do not include certificates
+%                 earned. Format your previous degrees as follows: B.A.
+%                 [Initials of degree] in [field of study], Month Year, name of
+%                 institution conferring the degree."
+%   (2 blank)
+%   "A Dissertation submitted to:"
+%   (3 blank)
+%   central paragraph, centred, single spaced, with GW's own line breaks:
+%                 "The Faculty of / The [name of School or College] / of The
+%                 George Washington University / in partial fulfillment of the
+%                 requirements / for the degree of [Doctor or Master] of ..."
+%                 "DO NOT include department names in the degree title."
+%   (3 blank)
+%   conferral date "Month, Day, Year degree conferred (spell out the month)" —
+%                 note this is the CONFERRAL date, and GW fixes it by term:
+%                 August 31 for summer, January for fall, University
+%                 Commencement in May for spring.
+%   (3 blank)
+%   "Dissertation directed by"
+%   (1 blank)
+%   advisor name, then the advisor's full professorial title on the next line.
+%                 "Do not include administrative titles."
+%
+% \thesis@advisor carries the name; the professorial title is expected as a
+% second line inside it, e.g. \gradadvisor{Joseph Smith\\Associate Professor of
+% History} — GW prints them on consecutive lines with no separator, and the
+% class has no second field for it.
+%
+% Page i, folio suppressed: "The title page is counted as page i, but the page
+% number is NOT displayed."
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\thesis@gwu@needschool
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{1in}%
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{3\baselineskip}
+		by \@author\par
+		\vspace{3\baselineskip}
+		\ifx\thesis@gwu@prior\@empty
+			\ClassWarningNoLine{texlib-thesis}{GW's title page lists the author's
+				previous degrees^^J%
+				("B.A. in <field>, <Month Year>, <institution>", lowest^^J%
+				first). Set \string\gwupriordegrees{} or the page will be^^J%
+				filed incomplete}%
+		\else
+			\thesis@gwu@prior\par
+		\fi
+		\vspace{2\baselineskip}
+		A \thesis@DocNoun{} submitted to:\par
+		\vspace{3\baselineskip}
+		The Faculty of\\
+		The \thesis@gwu@school\\
+		of The George Washington University\\
+		in partial fulfillment of the requirements\\
+		for the degree of \thesis@degree\par
+		\vspace{3\baselineskip}
+		\thesis@date\par
+		\vspace{3\baselineskip}
+		\thesis@DocNoun{} directed by\par
+		\vspace{\baselineskip}
+		\thesis@advisor\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Certification page ---------------------------------------------------------
+% GW's approval page, and it is conditional in BOTH directions: "The
+% Certification Page is required for dissertations; DO NOT include in a thesis."
+% So this macro prints the page for a dissertation and, for a thesis, warns and
+% prints nothing — the same behaviour \thesisnoapprovalpage gives, applied to
+% half the documents instead of all of them. Set \doctype correctly and this is
+% automatic; get it wrong and the document is out of spec in one direction or
+% the other.
+%
+% Layout:
+%   first paragraph  "left aligned and double-spaced", and its date "is the date
+%                     of your dissertation defense", not the conferral date on
+%                     the title page. Text, verbatim: "The [School or College] of
+%                     The George Washington University certifies that [student's
+%                     full name] has passed the Final Examination for the degree
+%                     of Doctor of Philosophy as of [date of dissertation
+%                     defense]. This is the final and approved form of the
+%                     dissertation."
+%   (3 blank)
+%   title             "single-spaced and centered on the line; capitalize the
+%                     significant words in the title"
+%   (3 blank)
+%   author's full name
+%   (3 blank)
+%   "Dissertation Research Committee": "list only the Dissertation Director (or
+%                     Dissertation Co-directors) and the two readers who are
+%                     members of the core research proposal committee", the
+%                     director(s) first. SEAS may list up to six and the School
+%                     of Business up to five.
+%   (1 blank)
+%   each member       "Each entry is indented .5 inch", single-spaced within an
+%                     entry, "Use 1 single line space between each committee
+%                     member's information".
+%
+% NO SIGNATURES: the page certifies in prose that the examination was passed and
+% prescribes no rule, date line or seal, so the class's signature rule is
+% replaced here.
+%
+% "This page is numbered ii", and the title page before it is an unnumbered i, so
+% this page sets roman numbering with the counter at 2 — as at Washington State
+% and Wichita. Note that GW's copyright page, where used, comes AFTER the
+% certification page, not before it.
+\renewcommand{\thesisapprovalpage}{%
+	\ifx\thesis@docnoun\thesis@gwu@diss
+		\thesis@gwu@needschool
+		\ifx\thesis@gwu@defense\@empty
+			\ClassWarningNoLine{texlib-thesis}{GW's certification page states the
+				date of the^^J%
+				DISSERTATION DEFENCE, which is not the conferral date on the^^J%
+				title page. Set \string\gwudefensedate{}}%
+		\fi
+		\clearpage
+		\loadgeometry{normal}%
+		\pagenumbering{roman}\setcounter{page}{2}\thispagestyle{plain}%
+		% The \par is load-bearing: without it the hidden heading and the first
+		% paragraph are one paragraph, and GW's "left aligned" opening line
+		% comes out indented.
+		\thesis@tagtitle{H1}{{\color{white}\tiny Certification Page}}\par
+		\begin{doublespace}
+			\noindent The \thesis@gwu@school{} of The George Washington University
+			certifies that \@author{} has passed the Final Examination for the
+			degree of \thesis@degree{} as of \thesis@gwu@defense. This is the
+			final and approved form of the \thesis@docnoun.\par
+		\end{doublespace}
+		\vspace{3\baselineskip}
+		{\singlespacing\centering\@title\par}%
+		\vspace{3\baselineskip}
+		{\centering\@author\par}%
+		\vspace{3\baselineskip}
+		% No colon. GW's page writes "Dissertation Research Committee:" the same
+		% way it writes "Dissertation title:" and "Text:" — as the spec page's
+		% own punctuation introducing an instruction, not as part of the label.
+		\noindent \thesis@DocNoun{} Research Committee\par
+		\vspace{\baselineskip}
+		\begingroup\singlespacing
+		\renewcommand{\thesis@memberline}[2]{%
+			\hspace*{0.5in}\begin{minipage}{\dimexpr\textwidth-0.5in\relax}
+				\raggedright ##1\ifx\relax##2\relax\else, ##2\fi
+			\end{minipage}\par
+			\vspace{\baselineskip}
+		}%
+		\thesis@committee
+		\endgroup
+		\vfill
+		\clearpage
+	\else
+		\ClassWarningNoLine{texlib-thesis}{\thesis@whose\space requires the
+			certification page^^J%
+			for a DISSERTATION only -- "DO NOT include in a thesis".^^J%
+			\string\thesisapprovalpage{} printed nothing}%
+	\fi
+}
