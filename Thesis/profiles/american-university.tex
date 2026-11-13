@@ -1,0 +1,248 @@
+% profiles/american-university.tex — American University
+% ============================================================================
+% source: https://www.american.edu/provost/ogps/graduate-studies/etd/etd-style-guide.cfm
+%         (Office of Graduate Studies, "Electronic Theses and Dissertations
+%          Style Guide" — the filing requirements)
+% source: https://www.american.edu/provost/ogps/graduate-studies/etd/guide.cfm
+%         (the same guide's submission half: the step-by-step ETD process)
+% source: https://www.american.edu/provost/ogps/graduate-studies/etd/upload/etd-appendix-a-11-23.pdf
+%         ("APPENDIX A: SAMPLE PAGES" — the annotated specimen title page the
+%          style guide points at for the degree-statement wording. Used here as
+%          EVIDENCE OF LAYOUT, which is what RESEARCHING.md allows an official
+%          specimen to be. Read as text AND rendered at 130dpi, because the
+%          signature rules are drawn lines that no text extractor reports.)
+% source: https://www.american.edu/provost/ogps/graduate-studies/etd/
+%         (the ETD hub, for the template and appendix links)
+% source: https://www.american.edu/digitalaccessibility/
+%         (checked for an accessibility requirement; see the note below)
+% accessed: 2026-09-22
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page, and the absence of
+% a separate approval page.
+% NOT set, and deliberately:
+%   * \thesissetchapteropening — the deeper chapter opening is OPTIONAL at AU,
+%     not required. See the margin note below.
+%   * \thesisrequiretagging / \thesisrequiredocumentlanguage /
+%     \thesisrequirepdfstandard — AU's ETD requirements name none of them.
+%
+% CURRENCY. Neither the style guide nor its appendices carries a revision date
+% in the page body. The specimen's filename (`etd-appendix-a-11-23.pdf') reads
+% as November 2023, which is the only date evidence either document offers.
+% Treat the wording as current-but-undated rather than freshly dated.
+%
+% ONE REQUIREMENT THIS PROFILE CANNOT EXPRESS, and it is met anyway. AU: "A
+% single font should be used throughout the entire thesis or dissertation,
+% including text, captions, references, labels and headings", and "Fonts must
+% be embedded in the document" (TrueType). texlib-thesis sets Latin Modern
+% through fontspec for the whole document and embeds every face, so a document
+% built with this class satisfies both. AU *recommends* 10-point Arial or
+% 12-point Times New Roman; a recommendation is not a requirement, so nothing
+% here changes the face. Anyone who wants the literal recommendation can add
+% \setmainfont{TeX Gyre Termes} after \documentclass.
+%
+% SIGNATURES ARE STILL PHYSICAL, and that is the single most consequential fact
+% in this file. The ETD process is: "Student collects committee members'
+% signatures on a printed copy of the thesis title page", then "Student scans
+% signed title page and merges the page into thesis or dissertation PDF
+% document", and the submission "must ... contain[] the title page signed by
+% the student's committee members and the Dean of the school or college." So
+% the page this profile typesets is printed, signed by hand, scanned, and put
+% back in place of the typeset one. A scanned page is an image, and an image of
+% text is the least accessible thing a PDF can contain — this class's tagging
+% cannot follow the document through that step. Nothing can be done about it
+% from here; it is written down so nobody is surprised by it.
+
+\thesisinstitution{American University}
+
+% "All pages must have margins of no less than one inch on all sides (left,
+% right, top and bottom)."
+%
+% That is a FLOOR with no stated ceiling: margins "may be wider, but not
+% narrower than one inch", and must stay consistent throughout. The profile
+% takes the one-inch minimum.
+%
+% THE CHAPTER-OPENING RULE IS A CHOICE, NOT A REQUIREMENT, and that is why
+% \thesissetchapteropening is absent. AU permits a wider top margin on chapter
+% title pages -- up to two inches if desired -- provided the variation is
+% uniform across all major heading pages. Michigan, UNC and Georgia Tech
+% *require* two inches there; AU only allows it. A flat 1in is in spec, so the
+% class's default stands. A student who wants the deeper opening adds
+%     \thesissetchapteropening{2in}
+% to their own preamble, which is equally in spec as long as they leave it on
+% for every chapter and major heading.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "All text must be double-spaced, with the following exceptions (these are
+% optional, but may enhance the readability of your document)" -- block
+% quotations over four lines, reference/footnote/endnote entries, table-of-
+% contents titles, and multi-line headings, captions and titles may each be
+% single-spaced, and triple-spacing before a subheading is allowed. Every
+% exception is permissive, so there is nothing to encode but the rule itself.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% AU's ETD requirements say NOTHING about accessibility. The style guide, its
+% submission half and its appendices were read end to end on the access date
+% and contain no mention of a tagged PDF, alt text, a document language, a
+% screen reader, WCAG or a PDF standard. The only file-format rules are
+% ProQuest's: a single PDF, no password protection, no digital signature, no
+% security settings that prevent printing, and embedded fonts.
+%
+% AU does publish a general "Creating Accessible PDFs" guide under
+% /digitalaccessibility/, and it is genuinely about tagging, reading order and
+% alt text -- but it is a how-to for staff and faculty authoring documents, it
+% states no standard (no WCAG level, no Title II date), and nothing in the ETD
+% requirements points at it or makes it binding on a filed thesis. Declaring
+% \thesisrequiretagging on the strength of a separate how-to page would be
+% putting words in the Office of Graduate Studies' mouth.
+%
+% So this is recorded as an absence, in the sense RESEARCHING.md distinguishes:
+% the section WAS read, and it asks for nothing.
+\thesisaccessibilityrequirement{Not published}
+	{American University's ETD Style Guide states no accessibility requirement
+	 for a filed thesis or dissertation: no tagged PDF, no alt text, no
+	 document language, no WCAG level, no PDF standard. The university
+	 publishes a general "Creating Accessible PDFs" guide elsewhere, but the
+	 filing requirements neither cite it nor make it binding. Note also that AU
+	 requires the signed title page to be scanned and merged into the submitted
+	 PDF, which puts an image of text into every filed document.}
+
+% --- Title page --------------------------------------------------------------
+% AU's title page IS the approval page: the committee's and the Dean's
+% signature lines are on it. The style guide fixes the content and the order --
+%
+%   1. "The full title of the thesis / dissertation, typed in all capital
+%      letters and centered on the page."
+%   2. "The word 'By' and the student's name as it appears in university
+%      records, centered on the page below the title."
+%   3. "A standard degree statement centered on the page, below the student's
+%      name (see sample page in Appendix A for proper wording). Master's degree
+%      candidates should use the word 'thesis' and doctoral candidates should
+%      use the word 'dissertation.'"
+%   4. "An alphabetical list of all members of the thesis/dissertation
+%      committee, but with the Chair first", on the right, each name beneath a
+%      signature line.
+%   5. On the left, "the words 'Dean of' [student's school or college], typed
+%      below a signature line and above a line for the date the page was
+%      signed."
+%   6. "The year (not month or day) the student's degree will be granted, and
+%      the words American University, Washington D.C. 20016, centered at the
+%      bottom of the page."
+%
+% -- and the specimen supplies the wording the guide defers on. The eleven
+% centred lines below are that specimen, transcribed:
+%
+%       TITLE ... IN ALL CAPITAL LETTERS / DOUBLE-SPACED AND CENTERED ON PAGE
+%       By
+%       [Your Name]
+%       Submitted to the
+%       Faculty of the [Your School or College]
+%       of American University
+%       in Partial Fulfillment of
+%       the Requirements for the Degree of
+%       [Your Degree (ex. Master of Arts)]
+%       In
+%       [Your Discipline (as it will appear on your diploma)]
+%
+% The page is DOUBLE-spaced -- the specimen's own title text says so in as many
+% words -- which is unusual; most schools in this directory single-space the
+% title page. The signature blocks are single-spaced so each name sits directly
+% under its rule, as in the specimen.
+%
+% TWO SMALL DISCREPANCIES, neither resolved silently:
+%   * The prose says "American University, Washington D.C. 20016" on one line
+%     with no comma after Washington; the specimen prints two lines, "American
+%     University" then "Washington, D.C. 20016", with the comma. The specimen
+%     is what is reproduced here, on the RESEARCHING.md rule that a specimen is
+%     evidence of layout.
+%   * The specimen places the label "Chair:" slightly to the LEFT of the
+%     committee block's signature rules, an offset neither source states in
+%     prose. Here it is the first line of that block. If a reviewer wants the
+%     specimen's exact inset, it is a \hspace* on that one line.
+%
+% SO AN AMERICAN UNIVERSITY DOCUMENT DECLARES ITS COMMITTEE LIKE THIS:
+%     \committeemember{Chair Name, Ph.D.}{Chair}
+%     \committeemember{Second Name, Ph.D.}{}
+%     \committeemember{Third Name, Ph.D.}{}
+% -- chair first, the rest alphabetical, the role left empty for everyone but
+% the chair, because AU labels only the chair.
+%
+% TWO FIELDS AU NEEDS THAT THE CLASS HAS NO SLOT FOR:
+%   * the school or college, supplied here as \thesisschool. Left unset it
+%     prints AU's own specimen placeholder, so an unfilled page is obviously
+%     unfilled rather than quietly wrong.
+%   * the year alone. AU says "The year (not month or day)", and the class's
+%     \graddate is a free string whose default is "May, 20XX". At AU, set it to
+%     the bare year: \graddate{2027}.
+\providecommand{\thesis@school}{[Your School or College]}
+\providecommand{\thesisschool}[1]{\renewcommand{\thesis@school}{#1}}
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\doublespacing\centering
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		By\par
+		\@author\par
+		Submitted to the\par
+		Faculty of the \thesis@school\par
+		of American University\par
+		in Partial Fulfillment of\par
+		the Requirements for the Degree of\par
+		\thesis@degree\par
+		In\par
+		\thesis@program\par
+		% Committee block: right-hand column, each name under its own signature
+		% rule, the chair's role label above the first rule.
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			\ifx\relax##2\relax\else ##2:\par\fi
+			\rule{3in}{0.4pt}\par
+			##1\par
+			\vspace{1.2\baselineskip}%
+		}%
+		\hfill\begin{minipage}{3.2in}%
+			\singlespacing\raggedright
+			\thesis@committee
+		\end{minipage}\par
+		\endgroup
+		% Dean's signature line, then the date line, both at the left margin.
+		\begin{minipage}{\textwidth}%
+			\singlespacing\raggedright
+			\rule{3in}{0.4pt}\par
+			Dean of the \thesis@school\par
+			\vspace{2.4\baselineskip}%
+			\rule{3in}{0.4pt}\par
+			Date\par
+		\end{minipage}\par
+		\vspace{\baselineskip}
+		{\centering
+		\thesis@date\par
+		American University\par
+		Washington, D.C. 20016\par
+		}%
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% The filed document contains no separate one, because the approval is on the
+% title page above. This is a stronger case for \thesisnoapprovalpage than the
+% others in this directory: at Johns Hopkins and Texas A&M the neutral fallback
+% would merely add a page the school does not ask for, whereas here it would
+% print a SECOND set of committee signature rules in a document whose actual
+% signature page is the title page. A student could sign the wrong leaf and
+% have the filing rejected for it.
+%
+% AU also does not list an approval page anywhere in its front matter: Appendix
+% A's sample pages run title page, copyright page, abstract, table of contents,
+% and the sample table of contents itself lists ABSTRACT, ACKNOWLEDGMENTS, LIST
+% OF TABLES, LIST OF ILLUSTRATIONS and then the chapters.
+%
+% As with Texas A&M, note what this does NOT rest on: AU nowhere writes the
+% sentence "do not include an approval page" the way Washington does. It rests
+% on where the signatures go. A reviewer who wants that exact sentence before
+% accepting \thesisnoapprovalpage should downgrade this to unset -- the neutral
+% page is the conservative failure.
+\thesisnoapprovalpage
