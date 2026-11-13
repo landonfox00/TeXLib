@@ -399,6 +399,16 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   parts a margin 1pt wider than every other `{parts}`, so it now keeps
   exam.cls's; on a student copy only a `\splitpage` problem moves, 1pt left.
 
+- **A quiz problem with no parts lines its solution up as an exam's does.** A
+  quiz key still drew a part-less problem's `{solution}` from the text margin,
+  left of its "Problem 1." label, while the part solutions below it started
+  under the part text. The quiz now places it the way autoexam does: where a
+  part's solution would start, still ending at the right margin. The rule moved
+  from `texlib-autoexam.cls` into `texlib-solutions.sty`
+  (`\texlib@sol@partlessinset`), which both classes now use; bank keeps the
+  full-width box. Nothing moves vertically, so an inline key still matches the
+  student copy line for line.
+
 ### Fixed
 
 - **Six switches and fields that a document set and the page ignored.** Found
