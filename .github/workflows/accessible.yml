@@ -126,3 +126,13 @@ jobs:
             command -v pdftotext >/dev/null 2>&1 && command -v pdfinfo >/dev/null 2>&1 \
               || { echo "pdftotext or pdfinfo missing; the {cols} layout test would soft-skip"; exit 1; }
             python3 test_cols_tagged_layout.py
+
+            # A \section* inside {problems}, as a review sheet heads its runs
+            # of problems. No template or fixture here has one, so the suite
+            # above never built one tagged, and the Math 182 reviews' tagged
+            # copies logged four TeX errors and failed veraPDF while this gate
+            # was green. This builds one exam normal and tagged and asserts no
+            # error, no failed check, no heading or item nested in a list, and
+            # each heading at the same place in both copies. The poppler and
+            # veraPDF guards above cover its soft-skips.
+            python3 test_problems_heading_tagged.py

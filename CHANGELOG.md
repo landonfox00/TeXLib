@@ -479,6 +479,37 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Fixed
 
+- **A tagged exam with a `\section*` inside `{problems}` logged four TeX
+  errors and failed PDF/UA-2.** A review sheet heads its runs of problems with
+  its own headings (`\begin{problems}*` then `\section*{Chapter 5: ...}`), and
+  `pbank_emit_section` replays each one inside the exam-class `{questions}`
+  list. In a tagged copy a heading before the section's first problem logged
+  "Something's wrong--perhaps a missing \item", "Missing number", "Illegal
+  unit of measure" and tagpdf's "automatic begin (80) and end (81) text para
+  hooks differ" at `\end{problems}`, and a heading between problems nested its
+  `<Sect>` in the list's `<L>` and every later item in an `<LI>`: veraPDF
+  failed Table 5 L-Sect and LI-LI, 25 checks per tagged copy of Math 182's
+  Summer 26 Exam 1 review and 2 per copy of Winter 27's Exam 2 review. The
+  untagged copy was never affected. A tagged build now opens the list at the
+  first problem after the section's start or a heading and closes it ahead of
+  each heading (`\pbank@qlist@open` and `\pbank@qlist@close` in
+  `texlib-problembank.sty`), and sets the heading, the rule under it and the
+  problem after it with the margin and spacing the list gives them untagged:
+  an `\hspace*` of the list's margin, the list's `\parsep` as `\parskip`, and
+  `\itemsep` in place of the reopened list's `\topsep`. Both reviews now build
+  with no error and no failed check. Their untagged copies (student, key and
+  instructor) are pixel-identical to `main`'s at 100 dpi, and every page of
+  the tagged Exam 1 review with a heading on it is now pixel-identical to the
+  untagged page. The bisect found no commit to blame: the tagged copy fails
+  the same way back to `665d968`, before accessible mode was merged. Since
+  v0.8.0's build variants (#107) a default build makes a tagged twin of every
+  copy, so the errors now reach every build of such a document, and no
+  template or fixture had such a heading, so no gate built one tagged. `test_problems_heading_tagged.py`, run by `accessible.yml`,
+  builds an exam with five headings normal and tagged and asserts no TeX
+  error, no failed veraPDF check, no `<Sect>` child of an `<L>` and no `<LI>`
+  child of an `<LI>`, and each heading, problem label and the bonus at the
+  same page, x and y in both copies.
+
 - **An inline key page with a `\splitpage` answer stopped the fit pass.** When
   a page could not hold one of its solutions and also carried an answer whose
   ink ends inside its own row (a `\splitpage` part beside a taller column),
