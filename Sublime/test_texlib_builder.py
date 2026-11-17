@@ -421,16 +421,20 @@ def main():
     # recognised ways, the fourth is fine.
     BIBER_ASK = ("Package biblatex Warning: Please (re)run Biber on the file:"
                  "\n(biblatex)                doc\n")
+    # A lane that wrote its PDF says so last in its log; a log without the
+    # line is a pass that died (see LOG_OUTPUT_WRITTEN).
+    _WROTE = "Output written on doc.pdf (1 page, 1234 bytes).\n"
     steps = [{} for _ in range(15)]
-    steps[4] = {"write": {"variants/student/doc.pdf": "%PDF-fake"},
+    steps[4] = {"write": {"variants/student/doc.pdf": "%PDF-fake\n%%EOF\n"},
                 "remove": ["variants/student/doc.bbl"]}
-    steps[6] = {"write": {"variants/solutions/doc.pdf": "%PDF-fake",
+    steps[6] = {"write": {"variants/solutions/doc.pdf": "%PDF-fake\n%%EOF\n",
                           "variants/solutions/doc.log":
-                              "(./doc.tex\nNo file doc.bbl.\n)"}}
-    steps[8] = {"write": {"variants/instructor/doc.pdf": "%PDF-fake",
-                          "variants/instructor/doc.log": BIBER_ASK}}
-    steps[10] = {"write": {"variants/student-a11y/doc.pdf": "%PDF-fake",
-                           "variants/student-a11y/doc.log": "(./doc.tex\n)"}}
+                              "(./doc.tex\nNo file doc.bbl.\n)\n" + _WROTE}}
+    steps[8] = {"write": {"variants/instructor/doc.pdf": "%PDF-fake\n%%EOF\n",
+                          "variants/instructor/doc.log": BIBER_ASK + _WROTE}}
+    steps[10] = {"write": {"variants/student-a11y/doc.pdf": "%PDF-fake\n%%EOF\n",
+                           "variants/student-a11y/doc.log":
+                               "(./doc.tex\n)\n" + _WROTE}}
     cmds, disp, tmp = drive_builder(
         PSET, options=["--texlib-mode=default"], settings=NO_REPORT,
         seed_files={"doc.buildmeta": FULL_META, "doc.bbl": "base-bbl"},
@@ -462,7 +466,7 @@ def main():
     _, disp, tmp = drive_builder(
         PSET, options=["--texlib-mode=accessible"], settings=NO_REPORT,
         seed_files={"doc.bbl": "base-bbl"},
-        steps=[{}, {}, {"write": {"a11y/doc.pdf": "%PDF-fake"},
+        steps=[{}, {}, {"write": {"a11y/doc.pdf": "%PDF-fake\n%%EOF\n"},
                         "remove": ["a11y/doc.bbl"]}])
     errs = _LAST_BUILDER[0].build_errors
     check("lane bbl: an accessible half without its .bbl fails the build",
@@ -1150,6 +1154,277 @@ def main():
                                  "sibling.aux": "another document's"},
           lane_files(shared))
     shutil.rmtree(shared, ignore_errors=True)
+
+    # (k1d2) CRASH DEBRIS FROM A TAGGED PASS. A lualatex fatal leaves two
+    # things behind that a folder listing cannot tell from a good build:
+    #
+    #   1. the partial <jobname>.pdf of the shipout it died inside: a %PDF-2.0
+    #      header and no %%EOF. Copied out it lands beside the source with a
+    #      fresh mtime, and a publishable class clones the TAGGED half to the
+    #      shareable names, so a corrupt one is what would reach the LMS.
+    #   2. a truncated luamml MathML sidecar, which then kills every LATER
+    #      build at \begin{document} with a runaway-argument cascade that
+    #      points nowhere near the sidecar.
+    _GOOD_PDF = b"%PDF-2.0\n1 0 obj\n<<>>\nendobj\ntrailer\n%%EOF\n"
+    _PART_PDF = b"%PDF-2.0\n1 0 obj\n<<>>\nendobj\n"   # header, no trailer
+    _EARLIER_PDF = b"%PDF-1.5 an earlier build's\n%%EOF\n"
+    _CLEAN_LOG = ("This is LuaHBTeX\n"
+                  "Output written on doc.pdf (6 pages, 91234 bytes).\n")
+    # Shapes taken from real tagged-lane logs. -file-line-error replaces the
+    # fatal's bang with the source position, and the wrap falls mid-phrase.
+    _FATAL_LOG = ("[6]\n./doc.tex:135:  ==> Fatal error occurred, no output "
+                  "PDF\n file produced!\n")
+    # A hard abort: the log simply stops, with no fatal line at all.
+    _CUT_LOG = "WARNING: mathml missing for hash 6E155A910FCA36F8\nWARN"
+    # A recoverable error in nonstopmode: the PDF is complete and this run's.
+    _ERR_LOG = ("./doc.tex:22: Missing number, treated as zero.\n"
+                "Output written on doc.pdf (6 pages, 91234 bytes).\n")
+
+    def _a11y_case(pdf_bytes, log_text, earlier=None):
+        """Drive _copy_back_accessible over a synthetic tagged half.
+
+        pdf_bytes / log_text None: the half left no PDF / no log. `earlier`
+        is the <base>_accessible.pdf an EARLIER build left beside the source.
+        Returns (bytes now at doc_accessible.pdf or None, displayed text).
+        """
+        d = tempfile.mkdtemp(prefix="texlib_a11y_")
+        aux = os.path.join(d, "aux")
+        os.makedirs(os.path.join(aux, "a11y"))
+        if pdf_bytes is not None:
+            with open(os.path.join(aux, "a11y", "doc.pdf"), "wb") as fh:
+                fh.write(pdf_bytes)
+        if log_text is not None:
+            with open(os.path.join(aux, "a11y", "doc.log"), "w",
+                      encoding="utf-8") as fh:
+                fh.write(log_text)
+        if earlier is not None:
+            with open(os.path.join(d, "doc_accessible.pdf"), "wb") as fh:
+                fh.write(earlier)
+        b = TexlibBuilder()
+        b.base_name = "doc"
+        b.tex_dir = d
+        b._aux_target = aux
+        b._copy_back_accessible(d)
+        dest = os.path.join(d, "doc_accessible.pdf")
+        landed = _read_bytes(dest) if os.path.exists(dest) else None
+        shutil.rmtree(d, ignore_errors=True)
+        return landed, b._displayed
+
+    def _read_bytes(path):
+        with open(path, "rb") as fh:
+            return fh.read()
+
+    _out, _disp = _a11y_case(_GOOD_PDF, _CLEAN_LOG)
+    check("a11y copy-back: a finished tagged PDF is copied out",
+          _out == _GOOD_PDF, repr(_out))
+    check("a11y copy-back: says which file it wrote",
+          "accessible copy ->" in _disp, repr(_disp))
+
+    _out, _disp = _a11y_case(_PART_PDF, _CLEAN_LOG)
+    check("a11y copy-back: a truncated PDF is NOT copied out",
+          _out is None, repr(_out))
+    check("a11y copy-back: names truncation as the reason",
+          "truncated" in _disp, repr(_disp))
+
+    _out, _disp = _a11y_case(_PART_PDF, _CUT_LOG, earlier=_EARLIER_PDF)
+    check("a11y copy-back: an earlier build's copy is not overwritten by "
+          "the debris",
+          _out == _EARLIER_PDF, repr(_out))
+    check("a11y copy-back: says the copy beside the source is an earlier "
+          "build's",
+          "is an earlier build's" in _disp, repr(_disp))
+
+    # The log outranks the file: a pass that died before its first shipout
+    # leaves the PREVIOUS pass's PDF, complete, in the lane.
+    _out, _disp = _a11y_case(_GOOD_PDF, _FATAL_LOG)
+    check("a11y copy-back: a line-wrapped fatal under -file-line-error is seen",
+          _out is None, repr(_disp))
+    check("a11y copy-back: names the log as the reason",
+          "Output written on" in _disp, repr(_disp))
+    _out, _ = _a11y_case(_GOOD_PDF, _CUT_LOG)
+    check("a11y copy-back: a log cut off by a hard abort is seen too",
+          _out is None, repr(_out))
+
+    _out, _ = _a11y_case(_GOOD_PDF, _ERR_LOG)
+    check("a11y copy-back: a recoverable error does not withhold a finished "
+          "PDF",
+          _out == _GOOD_PDF, repr(_out))
+    _out, _ = _a11y_case(_GOOD_PDF, None)
+    check("a11y copy-back: no log is no evidence; a whole PDF is copied",
+          _out == _GOOD_PDF, repr(_out))
+    _out, _ = _a11y_case(_GOOD_PDF, _CLEAN_LOG, earlier=_EARLIER_PDF)
+    check("a11y copy-back: a good run overwrites the previous copy",
+          _out == _GOOD_PDF, repr(_out))
+
+    _pd = tempfile.mkdtemp(prefix="texlib_pdfok_")
+    _whole = os.path.join(_pd, "whole.pdf")
+    _cut = os.path.join(_pd, "cut.pdf")
+    _notpdf = os.path.join(_pd, "notpdf.pdf")
+    for _p, _bytes in ((_whole, _GOOD_PDF), (_cut, _PART_PDF),
+                       (_notpdf, b"not a pdf at all\n%%EOF\n")):
+        with open(_p, "wb") as fh:
+            fh.write(_bytes)
+    check("pdf-complete: header + %%EOF trailer -> complete",
+          _tb.pdf_is_complete(_whole) is True)
+    check("pdf-complete: header but no trailer -> incomplete",
+          _tb.pdf_is_complete(_cut) is False)
+    check("pdf-complete: trailer without a %PDF- header -> incomplete",
+          _tb.pdf_is_complete(_notpdf) is False)
+    check("pdf-complete: missing file -> incomplete",
+          _tb.pdf_is_complete(os.path.join(_pd, "gone.pdf")) is False)
+    shutil.rmtree(_pd, ignore_errors=True)
+
+    # The fan-out reaches its twins through _copy_back_variant, and real
+    # fan-out builds left truncated PDFs in base-a11y, student-a11y and
+    # solutions-a11y lanes. An unfinished lane is skipped like one that
+    # produced nothing: the earlier pair stays as it was.
+    def _lane_case(variant, tagged, pdf_bytes, log_text):
+        d = tempfile.mkdtemp(prefix="texlib_debris_")
+        out = os.path.join(d, "out"); os.makedirs(out)
+        with open(os.path.join(out, "doc.pdf"), "wb") as fh:
+            fh.write(pdf_bytes)
+        with open(os.path.join(out, "doc.log"), "w", encoding="utf-8") as fh:
+            fh.write(log_text)
+        b = TexlibBuilder(); b.tex_dir = d; b.base_name = "doc"
+        b._variant_pdfs = []
+        pdf = b._variant_pdf_name("doc", variant, tagged)
+        rep = b._variant_report_name("doc", variant)
+        for name in (pdf, rep):
+            with open(os.path.join(d, name), "wb") as fh:
+                fh.write(_EARLIER_PDF)
+        b._copy_back_variant(d, variant, tagged, out)
+        kept = tuple(_read_bytes(p) if os.path.exists(p) else None
+                     for p in (os.path.join(d, pdf), os.path.join(d, rep)))
+        shutil.rmtree(d, ignore_errors=True)
+        return kept, b._displayed, b._variant_pdfs
+
+    _kept, _disp, _listed = _lane_case("solutions", True, _PART_PDF, _CUT_LOG)
+    check("variant copy-back: a truncated tagged twin is not copied out",
+          _kept == (_EARLIER_PDF, _EARLIER_PDF) and not _listed,
+          (_kept, _listed))
+    check("variant copy-back: says the lane did not finish and was skipped",
+          "did not finish" in _disp and "skipped" in _disp, repr(_disp))
+    _kept, _disp, _ = _lane_case("student", False, _PART_PDF, _CLEAN_LOG)
+    check("variant copy-back: an untagged lane's truncated PDF is skipped too",
+          _kept[0] == _EARLIER_PDF and "truncated" in _disp, repr(_disp))
+
+    # The WebCampus guarantee, end to end, on both paths: an accessible build
+    # whose tagged half crashed must publish the NORMAL PDF, never the tagged
+    # PDF from whenever the last good build happened.
+    def _crash_publish_case(fan_out):
+        d = tempfile.mkdtemp(prefix="texlib_a11ypub_")
+        lane = os.path.join(d, "aux", "variants" if fan_out else "",
+                            "base-a11y" if fan_out else "a11y")
+        os.makedirs(lane)
+        with open(os.path.join(lane, "doc.pdf"), "wb") as fh:
+            fh.write(_PART_PDF)
+        with open(os.path.join(lane, "doc.log"), "w", encoding="utf-8") as fh:
+            fh.write(_FATAL_LOG)
+        with open(os.path.join(d, "doc.pdf"), "wb") as fh:
+            fh.write(b"%PDF-1.5 normal\n%%EOF\n")
+        with open(os.path.join(d, "doc_accessible.pdf"), "wb") as fh:
+            fh.write(b"%PDF-1.5 tagged from LAST WEEK\n%%EOF\n")
+        with open(os.path.join(d, "aux", "doc.pubmeta"), "w",
+                  encoding="utf-8") as fh:
+            fh.write("kind=syllabus\ngeneric=Syllabus\nnoun=Syllabus\n"
+                     "course=Math 181\nsection=1001\nterm=Fall 2026\n"
+                     "instructor=Landon Fox\npublish-name=\n")
+        b = TexlibBuilder()
+        b.base_name = "doc"
+        b.tex_dir = d
+        b._aux_target = os.path.join(d, "aux")
+        b._accessible_build = True
+        b._variant_pdfs = []
+        b._make_desktop_shortcut = lambda label, target: False
+        b._copy_to_clipboard = lambda text: None
+        if fan_out:
+            b._copy_back_variant(d, "base", True, lane)
+        else:
+            b._copy_back_accessible(d)
+        b._publish_shareable_copies(d, os.path.join(d, "doc"))
+        published = _read_bytes(os.path.join(d, "Syllabus.pdf"))
+        shutil.rmtree(d, ignore_errors=True)
+        return published
+
+    check("a11y publish: a crashed tagged half publishes the NORMAL bytes, "
+          "not last week's tagged ones",
+          _crash_publish_case(False) == b"%PDF-1.5 normal\n%%EOF\n")
+    check("a11y publish: the same through the fan-out's base twin",
+          _crash_publish_case(True) == b"%PDF-1.5 normal\n%%EOF\n")
+
+    # luamml sidecar hygiene, through the real commands() coroutine so the
+    # sweeps run where the build puts them: before every tagged pass, and
+    # only a TRUNCATED sidecar -- a complete one is the previous pass's
+    # MathML, which the next pass is meant to read.
+    _TRUNC_SIDECAR = "<html><body><math"          # cut mid-element, as observed
+    _WHOLE_SIDECAR = "<html><body></body></html>\n"
+
+    _cmds, _disp, _tmp = drive_builder(
+        r"\documentclass{didactic}\begin{document}x\end{document}",
+        options=["--texlib-mode=accessible"],
+        seed_files={"doc-luamml-mathml.html": _TRUNC_SIDECAR,
+                    "doc-mathml.html": _TRUNC_SIDECAR},
+        # After the FIRST tagged pass (cmds[1]): one sidecar it left
+        # truncated, one it finished. Only the truncated one may go.
+        steps=[{}, {"write": {os.path.join("a11y", "doc-luamml-mathml.html"):
+                              _TRUNC_SIDECAR,
+                              os.path.join("a11y", "doc-mathml.html"):
+                              _WHOLE_SIDECAR}}],
+    )
+    check("luamml sweep: three passes as before (normal + two tagged)",
+          heads(_cmds) == ["pdflatex", "lualatex", "lualatex"], heads(_cmds))
+    check("luamml sweep: a poisoned sidecar beside the source is gone before "
+          "the tagged run",
+          not os.path.exists(os.path.join(_tmp, "doc-luamml-mathml.html")),
+          sorted(os.listdir(_tmp)))
+    check("luamml sweep: the legacy sidecar name is swept too",
+          not os.path.exists(os.path.join(_tmp, "doc-mathml.html")),
+          sorted(os.listdir(_tmp)))
+    check("luamml sweep: a sidecar pass 1 left truncated is discarded before "
+          "pass 2",
+          not os.path.exists(
+              os.path.join(_tmp, "a11y", "doc-luamml-mathml.html")),
+          sorted(os.listdir(os.path.join(_tmp, "a11y"))))
+    check("luamml sweep: a sidecar pass 1 FINISHED survives for pass 2 to read",
+          os.path.exists(os.path.join(_tmp, "a11y", "doc-mathml.html")),
+          sorted(os.listdir(os.path.join(_tmp, "a11y"))))
+
+    _cmds, _disp, _tmp = drive_builder(
+        r"\documentclass{didactic}\begin{document}x\end{document}",
+        seed_files={"doc-luamml-mathml.html": _TRUNC_SIDECAR})
+    check("luamml sweep: a build with no tagged pass leaves the sidecar alone",
+          os.path.exists(os.path.join(_tmp, "doc-luamml-mathml.html")),
+          sorted(os.listdir(_tmp)))
+
+    _cmds, _disp, _tmp = drive_builder(
+        _FAN_DOC, options=["--texlib-mode=default"],
+        seed_files={"variants/base-a11y/doc-luamml-mathml.html":
+                    _TRUNC_SIDECAR})
+    check("luamml sweep: the fan-out's serial base twin is swept too",
+          not os.path.exists(os.path.join(
+              _tmp, "variants", "base-a11y", "doc-luamml-mathml.html")),
+          sorted(os.listdir(os.path.join(_tmp, "variants", "base-a11y"))))
+
+    # A parallel lane runs both of its passes inside the host, so its sweep
+    # happens before the wave is handed over.
+    _at_wave = {}
+
+    def _wave_runner(lanes, n):
+        for _label, _lcmds, out_dir in lanes:
+            _at_wave.setdefault(os.path.basename(out_dir), lane_files(out_dir))
+
+    drive_lanes(["--texlib-mode=default"], lambda item, out_dir: "",
+                doc=PSET, meta=FULL_META, runner=_wave_runner,
+                seed={"variants/student-a11y/doc-luamml-mathml.html":
+                      _TRUNC_SIDECAR,
+                      "variants/solutions-a11y/doc-luamml-mathml.html":
+                      _WHOLE_SIDECAR})
+    check("luamml sweep: a parallel tagged lane is swept before its wave",
+          "doc-luamml-mathml.html" not in _at_wave.get("student-a11y", {"x": 1})
+          and "student-a11y" in _at_wave, sorted(_at_wave))
+    check("luamml sweep: a parallel lane keeps a complete sidecar",
+          _at_wave.get("solutions-a11y", {}).get("doc-luamml-mathml.html")
+          == _WHOLE_SIDECAR, sorted(_at_wave.get("solutions-a11y", {})))
 
     # (k1e) THE SETTLE RULE. tagpdf numbers the parent tree from the page count
     # the previous pass recorded, so a tagged pass that ships a page more than
@@ -2505,7 +2780,8 @@ def main():
     def _publish_case(base, kind, generic, noun, course, section, term,
                       settings=None, publish_name="",
                       accessible_build=False, tagged_present=False,
-                      instructor="Landon Fox", coded_suffix=""):
+                      instructor="Landon Fox", coded_suffix="",
+                      tagged_copied=None):
         d = tempfile.mkdtemp(prefix="texlib_pub_")
         with open(os.path.join(d, base + ".pdf"), "wb") as fh:
             fh.write(b"%PDF-1.5 normal")
@@ -2524,6 +2800,10 @@ def main():
         b = TexlibBuilder(); b.tex_dir = d; b.base_name = base
         b._aux_target = None
         b._accessible_build = accessible_build
+        # Whether THIS build copied the tagged file out; by default it did
+        # whenever it is an accessible build and the file is there.
+        b._tagged_base_copied = (accessible_build and tagged_present
+                                 if tagged_copied is None else tagged_copied)
         if settings is not None:
             b.builder_settings = settings
         shortcuts, clips = [], []
@@ -2653,6 +2933,21 @@ def main():
     check("publish (accessible, tagged missing): falls back to the normal PDF",
           _published_bytes(d, "Tentative Schedule.pdf") == b"%PDF-1.5 normal",
           _published_bytes(d, "Tentative Schedule.pdf"))
+
+    # Accessible build whose tagged half did not finish, beside the tagged PDF
+    # an EARLIER build copied out. The copy-back leaves that file alone, so its
+    # presence proves nothing; it went to WebCampus as this build's output.
+    d, pdfs, _, _, disp = _publish_case(
+        "schedule", "schedule", "Tentative Schedule", "Schedule",
+        "Math 181", "1001", "Fall 2026",
+        accessible_build=True, tagged_present=True, tagged_copied=False)
+    check("publish (accessible, tagged half unfinished): an earlier build's "
+          "tagged PDF is not published",
+          _published_bytes(d, "Tentative Schedule.pdf") == b"%PDF-1.5 normal",
+          _published_bytes(d, "Tentative Schedule.pdf"))
+    check("publish (accessible, tagged half unfinished): says the copies are "
+          "untagged",
+          "publishing the untagged PDF" in disp, repr(disp))
 
     # _setting_on precedence: builder_settings > env > default.
     so = TexlibBuilder()
@@ -3286,7 +3581,7 @@ def main():
         d = tempfile.mkdtemp(prefix="texlib_var_")
         out = os.path.join(d, "out"); os.makedirs(out)
         with open(os.path.join(out, "doc.pdf"), "wb") as fh:
-            fh.write(b"%PDF-1.7 tagged")
+            fh.write(b"%PDF-1.7 tagged\n%%EOF\n")
         b = TexlibBuilder(); b.tex_dir = d; b.base_name = "doc"
         b._variant_pdfs = []
         b._copy_back_variant(d, variant, tagged, out)
@@ -3569,7 +3864,7 @@ def main():
         out = os.path.join(d, "out"); os.makedirs(out)
         if produced:
             with open(os.path.join(out, "doc.pdf"), "wb") as fh:
-                fh.write(b"%PDF-1.7 rebuilt")
+                fh.write(b"%PDF-1.7 rebuilt\n%%EOF\n")
         b = TexlibBuilder(); b.tex_dir = d; b.base_name = "doc"
         b._variant_pdfs = []
         for name in (b._variant_pdf_name("doc", variant, True),
@@ -3585,7 +3880,7 @@ def main():
         files, disp = _copied_case(_v, True)
         check(f"a11y report: copying the tagged {_v} PDF out removes its "
               "earlier report at once",
-              files.get(_pdf) == b"%PDF-1.7 rebuilt" and _rep not in files
+              files.get(_pdf) == b"%PDF-1.7 rebuilt\n%%EOF\n" and _rep not in files
               and disp == "", (sorted(files), disp))
         files, disp = _copied_case(_v, False)
         check(f"a11y report: copying the untagged {_v} PDF out leaves the "
@@ -3661,7 +3956,10 @@ def main():
 
     # End to end through commands(), with stand-in engines that leave a PDF
     # wherever a pass was told to write: the serial base twin, the parallel
-    # lanes, and the accessible pair's a11y/ directory.
+    # lanes, and the accessible pair's a11y/ directory. A whole PDF: a lane's
+    # copy-back skips one with no %%EOF trailer as crash debris.
+    _TYPESET = b"%PDF-1.7\n%%EOF\n"
+
     def _built_case(options, parallel=True, settings=None, seed=(),
                     results=None, exe="VP", cancel=None):
         """`cancel`, if given, is asked before each command after the first,
@@ -3688,7 +3986,7 @@ def main():
                 if str(arg).startswith("-output-directory="):
                     out_dir = str(arg).split("=", 1)[1]
             with open(os.path.join(out_dir, "doc.pdf"), "wb") as fh:
-                fh.write(b"%PDF-1.7\n")
+                fh.write(_TYPESET)
 
         if parallel:
             b.run_parallel = lambda lanes, n: [
@@ -3783,7 +4081,7 @@ def main():
                 seed=_ALL + _REPORTS, **_kw)
             check(f"fan-out ({_host}), {_why}: every twin is rebuilt and none "
                   "keeps the earlier report",
-                  all(files.get(n) == b"%PDF-1.7\n" for n in _ALL)
+                  all(files.get(n) == _TYPESET for n in _ALL)
                   and not [n for n in files if n.endswith("-report.html")]
                   and not calls, (sorted(files), calls))
             check(f"fan-out ({_host}), {_why}: one line names the four "
@@ -3816,7 +4114,7 @@ def main():
         seed=["doc_accessible.pdf", "doc_accessible-report.html"])
     check("accessible pair, accessible_report off: the rebuilt PDF keeps no "
           "earlier report, and the build says so",
-          files.get("doc_accessible.pdf") == b"%PDF-1.7\n"
+          files.get("doc_accessible.pdf") == _TYPESET
           and "doc_accessible-report.html" not in files and not calls
           and _removal_lines(disp) == [
               "TeXLib: removed a stale accessibility report (its PDF was "
@@ -3835,7 +4133,7 @@ def main():
         cancel=_base_twin_rebuilt)
     check("fan-out (serial host), cancelled after the base twin: its earlier "
           "report is gone with no check run",
-          files.get("doc_accessible.pdf") == b"%PDF-1.7\n"
+          files.get("doc_accessible.pdf") == _TYPESET
           and "doc_accessible-report.html" not in files and not calls,
           (sorted(files), calls))
     check("fan-out (serial host), cancelled after the base twin: the twins "
@@ -3931,10 +4229,11 @@ def main():
     def _keyfit_variant(variant, tagged, log):
         d = tempfile.mkdtemp(prefix="texlib_kf_")
         out = os.path.join(d, "out"); os.makedirs(out)
+        # A finished lane: a whole PDF, and a log that says it wrote one.
         with open(os.path.join(out, "doc.pdf"), "wb") as fh:
-            fh.write(b"%PDF-1.7")
+            fh.write(b"%PDF-1.7\n%%EOF\n")
         with open(os.path.join(out, "doc.log"), "w", encoding="utf-8") as fh:
-            fh.write(log)
+            fh.write(log + "\nOutput written on doc.pdf (2 pages, 1234 bytes).\n")
         b = TexlibBuilder(); b.tex_dir = d; b.base_name = "doc"
         b._variant_pdfs = []; b._keyfit = []
         b._write_accessible_report = lambda td, p: None

@@ -334,8 +334,12 @@ luamml_se_aborted = _spec.luamml_se_aborted
 lastpage_unsettled = _spec.lastpage_unsettled
 
 # The luamml sidecars a crashed tagged run can leave truncated; removed before
-# the AF-only retry so it does not read back a half-written file.
+# the AF-only retry so it does not read back a half-written file, and, when
+# truncated, before every tagged pass (see _clear_luamml_sidecars). A complete
+# one ends in </html>; a crash leaves it cut inside an element.
 LUAMML_SIDECARS = ("-luamml-mathml.html", "-mathml.html")
+LUAMML_TRAILER = b"</html>"
+LUAMML_TRAILER_WINDOW = 512
 
 # veraPDF conformance reporting for the accessible build. Located via the shared
 # finder rather than shutil.which: the installer does not put veraPDF on PATH.
@@ -488,6 +492,62 @@ def log_reports_error(log_path):
         return False
 
 
+# How a lane's PDF is told from the debris of a pass that died writing it.
+#
+# A lualatex fatal aborts inside \shipout and leaves the <jobname>.pdf it was
+# writing: a %PDF-2.0 header, no %%EOF trailer, unreadable. LuaTeX does not
+# delete it. A pass that dies before its first shipout leaves the
+# PREVIOUS pass's PDF instead, which is complete and is not this pass's output.
+# Only the log tells that one apart: LuaTeX and pdfTeX both end a run that
+# wrote a PDF with "Output written on <file> (N pages, M bytes).", printed at
+# the start of a line so the log's wrapping cannot split it. A fatal or an
+# abort never prints it. The fatal's own line is no use here: -file-line-error
+# replaces its bang with the source position and the wrap falls anywhere
+# ("no output PDF\n file produced!").
+#
+# Not log_reports_error: a tagged pass in nonstopmode that records a
+# recoverable error still writes a complete PDF. 30 of 136 tagged logs in one
+# machine's aux dirs did so, and all 30 PDFs were good.
+LOG_OUTPUT_WRITTEN = "Output written on"
+PDF_TRAILER = b"%%EOF"
+PDF_TRAILER_WINDOW = 2048
+
+
+def file_tail_has(path, marker, window):
+    """True when `marker` occurs in the last `window` bytes of `path`; False
+    for an unreadable or absent file."""
+    try:
+        size = os.path.getsize(path)
+        with open(path, "rb") as fh:
+            fh.seek(max(0, size - window))
+            return marker in fh.read()
+    except OSError:
+        return False
+
+
+def pdf_is_complete(path):
+    """True when `path` opens with %PDF- AND ends in a %%EOF trailer."""
+    try:
+        with open(path, "rb") as fh:
+            if fh.read(5) != b"%PDF-":
+                return False
+    except OSError:
+        return False
+    return file_tail_has(path, PDF_TRAILER, PDF_TRAILER_WINDOW)
+
+
+def log_denies_output(log_path):
+    """True when `log_path` is readable AND never says "Output written on".
+
+    False for an unreadable or absent log, as log_reports_error is: no log is
+    no evidence either way, and the PDF is then judged on its own bytes."""
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as fh:
+            return not any(line.startswith(LOG_OUTPUT_WRITTEN) for line in fh)
+    except OSError:
+        return False
+
+
 class TexlibBuildCore:
     """The single source of TeXLib build LOGIC -- host-agnostic.
 
@@ -556,6 +616,10 @@ class TexlibBuildCore:
         self._tagged_copies = []
         self._conformance = []
         self._earlier_reports = []
+        # Whether this build copied the BASE tagged PDF out, which is what
+        # entitles the publish step to clone it (_publish_source_pdf).
+        # _tagged_copies cannot answer that: the check empties it first.
+        self._tagged_base_copied = False
 
         # Variant fan-out state, reset per build so a single-variant build
         # after a Ctrl+B cannot inherit the previous plan and sweep away PDFs
@@ -1276,6 +1340,7 @@ class TexlibBuildCore:
         cmd = tagged_cmd(self._mathml_se_ok is not False)
         label = f"{ACCESSIBLE_ENGINE} [accessible]"
         state = self._lane_state(out_dir)
+        self._sweep_luamml_sidecars(out_dir)
         yield (cmd, f"{label} run 1...")
         if luamml_se_aborted(self.out):
             self._mathml_se_ok = False
@@ -1291,8 +1356,9 @@ class TexlibBuildCore:
             self._forget_last_pass = True
             cmd = tagged_cmd(False)
             yield (cmd, f"{label} run 1 (MathML-AF)...")
+        self._sweep_luamml_sidecars(out_dir)
         yield (cmd, f"{label} run 2 (settle)...")
-        yield from self._settle_tagged(cmd, label)
+        yield from self._settle_tagged(cmd, label, out_dir)
 
     def _lane_state(self, out_dir):
         """A lane's cross-pass state files, as {name: bytes}.
@@ -1373,7 +1439,7 @@ class TexlibBuildCore:
             except OSError:
                 pass
 
-    def _settle_tagged(self, cmd, label, run=2):
+    def _settle_tagged(self, cmd, label, out_dir, run=2):
         """Run a tagged lane again while the kernel reports its last-page guess
         wrong (see lastpage_unsettled), to a ceiling of MAX_RERUNS passes.
 
@@ -1390,6 +1456,7 @@ class TexlibBuildCore:
         """
         while run < MAX_RERUNS and lastpage_unsettled(self.out):
             run += 1
+            self._sweep_luamml_sidecars(out_dir)
             yield (cmd, f"{label} run {run} (settle)...")
         if lastpage_unsettled(self.out):
             self._warn_tagged_unsettled(label, run)
@@ -1415,7 +1482,17 @@ class TexlibBuildCore:
             f"tagged PDF may fail PDF/UA on its last page.\n"
         )
 
-    def _clear_luamml_sidecars(self, *dirs):
+    def _sweep_luamml_sidecars(self, out_dir):
+        """Discard any truncated luamml sidecar a tagged pass in `out_dir`
+        could read: the lane's own, the aux dir's and the source's. Which of
+        them holds one depends on -output-directory routing and on whether the
+        crash came from the builder or from a bare engine run, and the engine
+        reads the source directory's when the lane has none."""
+        self._clear_luamml_sidecars(
+            out_dir, getattr(self, "_aux_target", None), self._tex_dir(),
+            truncated_only=True)
+
+    def _clear_luamml_sidecars(self, *dirs, truncated_only=False):
         """Remove the luamml MathML sidecars from each directory.
 
         luamml writes <jobname>-luamml-mathml.html as it typesets and reads the
@@ -1423,12 +1500,26 @@ class TexlibBuildCore:
         leaves it cut inside an element, and the next run fails at
         \\begin{document} on a runaway argument -- which would make the AF-only
         retry look like a second, unrelated failure.
+
+        `truncated_only` keeps a sidecar that ends in </html>, and is how every
+        tagged pass starts (_sweep_luamml_sidecars). A truncated one outlives
+        the crash that wrote it -- observed at exactly 40960 bytes, one buffer,
+        ending in a bare "<math" -- and fails every LATER build at
+        \\begin{document} ("File ended while scanning use of
+        \\__math_AF_html_reader_verb:w"), cascading to the 100-error limit with
+        nothing in the trace pointing at the sidecar. A complete one is the
+        previous pass's MathML, which is what the next pass is meant to read.
         """
         for d in dirs:
             if not d:
                 continue
             for suffix in LUAMML_SIDECARS:
                 path = os.path.join(d, self.base_name + suffix)
+                if truncated_only and (
+                        not os.path.isfile(path)
+                        or file_tail_has(path, LUAMML_TRAILER,
+                                         LUAMML_TRAILER_WINDOW)):
+                    continue
                 try:
                     os.remove(path)
                 except OSError:
@@ -1889,7 +1980,12 @@ class TexlibBuildCore:
                 f"TeXLib: building {len(plans)} variants, {jobs} at a time.\n")
             # Two passes per lane, run in order within the lane; the lanes
             # themselves are concurrent. The host owns the pool, so it also
-            # owns cancellation and output ordering.
+            # owns cancellation and output ordering. A lane's passes run inside
+            # the host, so its sidecars are swept before each wave and not
+            # between a lane's two passes, as the serial path does.
+            for _v, tagged, _tag, out_dir, _cmd, _label in plans:
+                if tagged:
+                    self._sweep_luamml_sidecars(out_dir)
             runner([(label, [cmd, cmd], out_dir)
                     for _v, _t, _tag, out_dir, cmd, label in plans], jobs)
             # The serial path's settle rule (see _settle_tagged), applied to
@@ -1899,6 +1995,8 @@ class TexlibBuildCore:
             run = 2
             while late and run < MAX_RERUNS:
                 run += 1
+                for p in late:
+                    self._sweep_luamml_sidecars(p[3])
                 runner([(f"{label} run {run} (settle)", [cmd], out_dir)
                         for _v, _t, _tag, out_dir, cmd, label in late],
                        min(jobs, len(late)))
@@ -1943,6 +2041,8 @@ class TexlibBuildCore:
         # The probe may abort after truncating the lane's .aux and .toc; see
         # _restore_lane_state.
         state = self._lane_state(out_dir) if probe else None
+        if tagged:
+            self._sweep_luamml_sidecars(out_dir)
         yield (cmd, f"{label} run 1...")
         if probe:
             if luamml_se_aborted(self.out):
@@ -1959,9 +2059,11 @@ class TexlibBuildCore:
                 yield (cmd, f"{label} run 1 (MathML-AF)...")
             else:
                 self._mathml_se_ok = True
+        if tagged:
+            self._sweep_luamml_sidecars(out_dir)
         yield (cmd, f"{label} run 2 (settle)...")
         if tagged:
-            yield from self._settle_tagged(cmd, label)
+            yield from self._settle_tagged(cmd, label, out_dir)
         self._copy_back_variant(tex_dir, variant, tagged, out_dir)
 
     def _variant_plan(self, variant, macro, engine, tex_dir, engine_options,
@@ -2025,11 +2127,16 @@ class TexlibBuildCore:
         return max(1, n)
 
     def _copy_back_variant(self, tex_dir, variant, tagged, out_dir):
-        """Copy one finished variant out as <base>_<variant>[_accessible].pdf."""
+        """Copy one finished variant out as <base>_<variant>[_accessible].pdf.
+
+        A lane that did not finish (see _lane_unfinished) is skipped like one
+        that produced nothing, and the earlier build's copy and its report stay
+        as they were."""
         src = os.path.join(out_dir, self.base_name + ".pdf")
         what = f"variant {variant!r}{' (tagged)' if tagged else ''}"
-        if not os.path.exists(src):
-            self.display(f"TeXLib: {what} produced no PDF; skipped.\n")
+        problem = self._lane_unfinished(out_dir)
+        if problem:
+            self.display(f"TeXLib: {what} {problem}; skipped.\n")
             return
         # A lane that produced a PDF is judged on its bibliography; one that
         # produced nothing has already failed louder than this would.
@@ -2317,14 +2424,48 @@ class TexlibBuildCore:
             return parent
         return out_dir
 
+    def _lane_unfinished(self, out_dir):
+        """Why the PDF in a lane's output directory is not this build's
+        finished output, as a phrase that follows the lane's name; "" when it
+        is (see LOG_OUTPUT_WRITTEN).
+
+        A lualatex fatal leaves the partial <jobname>.pdf of the shipout it
+        died inside. Copied out it is indistinguishable from a good build in a
+        folder listing -- same name, fresh mtime, a %PDF-2.0 header -- and no
+        reader can open it. Real fan-out builds left them in base-a11y,
+        student-a11y and solutions-a11y lanes and copied all three out.
+        """
+        src = os.path.join(out_dir, self.base_name + ".pdf")
+        if log_denies_output(os.path.join(out_dir, self.base_name + ".log")):
+            return (f'did not finish (its log has no "{LOG_OUTPUT_WRITTEN}" '
+                    f'line)')
+        if not os.path.exists(src):
+            return "produced no PDF"
+        if not pdf_is_complete(src):
+            return "left a truncated PDF (no %%EOF trailer)"
+        return ""
+
     def _copy_back_accessible(self, tex_dir):
-        """Copy the tagged build out as <base>_accessible.pdf beside the source."""
+        """Copy the tagged build out as <base>_accessible.pdf beside the source.
+
+        Only a PDF the tagged half finished (_lane_unfinished). An earlier
+        build's <base>_accessible.pdf is then left as it was, as
+        _copy_back_variant leaves one, and _publish_source_pdf does not
+        publish it, since this build did not copy it out.
+        """
         out_dir = self._accessible_out_dir()
         src = os.path.join(out_dir, self.base_name + ".pdf")
-        if not os.path.exists(src):
+        dest = os.path.join(tex_dir, self.base_name + ACCESSIBLE_SUFFIX + ".pdf")
+        problem = self._lane_unfinished(out_dir)
+        if problem:
+            # Silent only when the half left nothing at all, as before.
+            if problem != "produced no PDF" or os.path.exists(dest):
+                self.display(
+                    f"TeXLib: no accessible copy -- the tagged half {problem}."
+                    + (f" {os.path.basename(dest)} is an earlier build's."
+                       if os.path.exists(dest) else "") + "\n")
             return
         self._check_lane_bibliography(out_dir, "the tagged half")
-        dest = os.path.join(tex_dir, self.base_name + ACCESSIBLE_SUFFIX + ".pdf")
         try:
             shutil.copy2(src, dest)
             self.display(
@@ -2361,6 +2502,8 @@ class TexlibBuildCore:
         if not isinstance(getattr(self, "_tagged_copies", None), list):
             self._tagged_copies = []
         self._tagged_copies.append((variant, pdf_path))
+        if variant == "base":
+            self._tagged_base_copied = True
         report = os.path.join(
             os.path.dirname(pdf_path),
             self._variant_report_name(self.base_name, variant))
@@ -3742,20 +3885,28 @@ class TexlibBuildCore:
         precisely the files that go up to WebCampus, where an untagged PDF is
         what the LMS accessibility checker flags.
 
-        Gated on THIS build having produced the tagged file. A stale
+        Gated on THIS build having copied the tagged file out
+        (_tagged_base_copied), not on the file being there. A stale
         <base>_accessible.pdf left behind by an earlier accessible run must never
         be published behind a normal build's back -- it would ship content from
-        whenever that run happened.
+        whenever that run happened -- and an accessible build whose tagged half
+        did not finish leaves the earlier one in place (_copy_back_accessible,
+        _copy_back_variant), so its presence proves nothing.
         """
         normal = base_path + ".pdf"
         if getattr(self, "_accessible_build", False):
             tagged = base_path + ACCESSIBLE_SUFFIX + ".pdf"
-            if os.path.exists(tagged):
+            if getattr(self, "_tagged_base_copied", False) \
+                    and os.path.exists(tagged):
                 self.display(
                     "TeXLib: publishing the tagged PDF -- shareable copies are "
                     "screen-reader ready.\n"
                 )
                 return tagged
+            if os.path.exists(normal):
+                self.display(
+                    "TeXLib: publishing the untagged PDF -- this build made no "
+                    "tagged copy.\n")
         return normal if os.path.exists(normal) else None
 
     def _read_pubmeta(self, tex_dir):
