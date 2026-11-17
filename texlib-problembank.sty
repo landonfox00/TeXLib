@@ -439,6 +439,109 @@
 	\pbank@lua{pbank_collect_section(\arabic{pbank@seccnt})}%
 }
 
+% ---- ACCESSIBLE: a heading inside {problems} is set outside the list -------
+% A review sheet heads its runs of problems with its own \section* ("Chapter 5:
+% Review of Integration") inside \begin{problems}*, and pbank_emit_section
+% replays each heading where it stood: inside the exam-class {questions} list.
+% Untagged, that is harmless. Tagged, a heading before the section's first
+% problem ends the list with "Something's wrong--perhaps a missing \item", then
+% "Missing number" and "Illegal unit of measure" before a \global, and leaves
+% tagpdf's paragraph hooks one short ("The number of automatic begin (80) and
+% end (81) text para hooks differ"). A heading between problems builds without
+% an error, but its <Sect> is a child of the list's <L> and every item after it
+% a child of an <LI> (PDF/UA-2, ISO 32005 Table 5 L-Sect and LI-LI). So a
+% tagged build opens the list at the first problem after the section's start or
+% after a heading, and closes it ahead of each heading; the question number
+% carries across through @texlib@qcarry, as it does from one section to the
+% next.
+%
+% Inside the list the untagged heading is moved right by the list's left
+% margin. Outside it, the tagged heading's title starts with an \hspace* of that
+% margin to sit where it does in the base copy, the way \texlib@partheading
+% starts with \hspace*{-\@totalleftmargin} to undo it. A \leftskip or \parshape
+% set in the title would not do: the kernel's heading code typesets the title
+% in a group of its own, and neither reaches the line. exam.cls sets the margin
+% to the width of "10." and \labelsep in the font current at the list's start,
+% which is measured here at the same point, before the heading's font is
+% selected. Only the first line moves, so a heading long enough to wrap sets
+% its later lines at the margin, where the base copy indents them.
+%
+% The \newif is declared outside the \ifdefined guard: an untagged build skips
+% the guarded block, and in skipping it TeX would count the \fi that closes
+% \if@pbank@qopen below but not an undefined \if@pbank@qopen.
+\newif\if@pbank@qopen
+\newif\if@pbank@afterhead
+\ifdefined\TeXLibAccessibleMode
+	% The vertical space around a heading follows the untagged copy too, where
+	% the heading, the rule under it and the problem after it are paragraphs
+	% of the list. Each paragraph there is preceded by the list's \parsep as
+	% \parskip (\@texlib@psection@begin reads it from \@listi): the heading
+	% takes it as \parskip and so does the rule. The problem after a rule is the
+	% list's next item there,
+	% spaced by \itemsep, where the reopened list would add its \topsep, so
+	% \questionshook sets \topsep to \itemsep plus the \parsep that the first
+	% item takes back out. A problem straight after a heading is spaced by
+	% \@outerparskip minus \parskip (\@nbitem), which needs the \parskip outside
+	% the list back at its own value when the list opens. Measured on Math 182's
+	% Exam 1 review, every page with a heading on it is pixel-identical to the
+	% untagged page; test_problems_heading_tagged.py checks the positions.
+	\newlength{\pbank@qindent}
+	\newlength{\pbank@listparsep}
+	\newlength{\pbank@outerparskip}
+	% The rule between problems is drawn ahead of the problem, and inside a list
+	% that has no item yet it would be text before the first \item, so the list
+	% opens after it. Resetting the first-on-page flag keeps the problem from
+	% drawing it again.
+	\newcommand{\pbank@qlist@open}{%
+		\if@pbank@qopen\else
+			\global\@pbank@qopentrue
+			\begingroup
+				\parskip\pbank@listparsep
+				\pbank@lua{pbank_emit_sep() pbank_first_on_page = true}%
+			\endgroup
+			\parskip\pbank@outerparskip
+			\begin{questions}%
+			\global\@pbank@afterheadfalse
+			\setcounter{question}{\value{@texlib@qcarry}}%
+		\fi
+	}
+	\providecommand{\questionshook}{}%
+	\g@addto@macro\questionshook{%
+		\if@pbank@afterhead\topsep\itemsep\advance\topsep\parsep\fi}
+	\newcommand{\pbank@qlist@close}{%
+		\if@pbank@qopen
+			\global\@pbank@qopenfalse
+			\setcounter{@texlib@qcarry}{\value{question}}%
+			\end{questions}%
+		\fi
+	}
+	\newcommand{\pbank@sec@indent}{%
+		\pbank@qlist@close
+		\global\@pbank@afterheadtrue
+		\settowidth{\pbank@qindent}{10.\hskip\labelsep}%
+		\parskip\pbank@listparsep
+	}
+	\renewcommand{\PbankEmitItem}[4]{%
+		\pbank@qlist@open
+		\@problem@item[#1][#2]{#3}[#4]%
+	}
+	\RenewDocumentCommand{\@sec@collect}{s o m}{%
+		\stepcounter{pbank@seccnt}%
+		\IfBooleanTF{#1}
+			{\expandafter\gdef\csname pbank@sec@\arabic{pbank@seccnt}\endcsname{%
+				\pbank@sec@indent
+				\@saved@section*{\hspace*{\pbank@qindent}#3}}}%
+			{\IfValueTF{#2}
+				{\expandafter\gdef\csname pbank@sec@\arabic{pbank@seccnt}\endcsname{%
+					\pbank@sec@indent
+					\@saved@section[#2]{\hspace*{\pbank@qindent}#3}}}%
+				{\expandafter\gdef\csname pbank@sec@\arabic{pbank@seccnt}\endcsname{%
+					\pbank@sec@indent
+					\@saved@section[#3]{\hspace*{\pbank@qindent}#3}}}}%
+		\pbank@lua{pbank_collect_section(\arabic{pbank@seccnt})}%
+	}
+\fi
+
 % \loadbank{path}  — explicitly load a problem bank file.
 %
 % Calls pbank_set_bankfile() so the engine records the bank-file path on
@@ -828,8 +931,16 @@
 	\fi
 	\let\@problems@saved@newpage\newpage
 	% ---- open the question list, carrying the question number across sections -
-	\begin{questions}%
-	\setcounter{question}{\value{@texlib@qcarry}}%
+	%   A tagged build opens it at the first problem instead (\pbank@qlist@open),
+	%   so that a heading ahead of that problem is not inside it.
+	\ifdefined\TeXLibAccessibleMode
+		\global\@pbank@qopenfalse
+		\pbank@outerparskip\parskip
+		\begingroup\@listi\global\pbank@listparsep\parsep\endgroup
+	\else
+		\begin{questions}%
+		\setcounter{question}{\value{@texlib@qcarry}}%
+	\fi
 	% ---- COLLECT MODE: \problem / \newpage / \extracredit record instead of
 	%      typesetting; \@texlib@psection@end emits the section permuted --------
 	\let\@saved@problem\problem
@@ -860,13 +971,26 @@
 	% extra-credit in authored order.
 	\let\newpage\@problems@saved@newpage
 	\pbank@lua{pbank_emit_section(\arabic{texlibpartno})}%
+	% Tagged, the list is open only if a problem has been emitted, and the
+	% deferred extra credit is \question items too.
+	\ifdefined\TeXLibAccessibleMode
+		\ifx\pbank@xc@deferred\@empty\else\pbank@qlist@open\fi
+	\fi
 	\pbank@xc@deferred
 	% Capture the running question count AFTER the emit added its \question items.
-	\setcounter{@texlib@qcarry}{\value{question}}%
+	% Tagged, closing the list captures it, and closes it before the restores
+	% below, which would otherwise be undone with the list's group.
+	\ifdefined\TeXLibAccessibleMode
+		\pbank@qlist@close
+	\else
+		\setcounter{@texlib@qcarry}{\value{question}}%
+	\fi
 	\let\extracredit\@saved@xc
 	\let\section\@saved@section
 	\let\problem\@saved@problem
-	\end{questions}%
+	\ifdefined\TeXLibAccessibleMode\else
+		\end{questions}%
+	\fi
 	\problems@end@hook
 }
 
