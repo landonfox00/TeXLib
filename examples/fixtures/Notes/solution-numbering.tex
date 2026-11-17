@@ -1,0 +1,59 @@
+% Feature fixture: solution and answer labels number themselves within a problem.
+%
+% A lone \solution / \answer / \pf lead-in, or a lone {solution} box, keeps its
+% plain label ("Solution."); two or more of one kind in one worked environment
+% become "Solution 1.", "Solution 2.", ... The kinds are counted apart (\answer
+% and \ans together), and a box after a worked environment is numbered with the
+% other boxes after it, until the next worked environment starts the count
+% again. The boxes are starred so that they show in the default build the smoke
+% suite runs. The lead-ins are asserted by this entry's expect= tokens in
+% examples/manifest.py; the boxes, and the first pass, by
+% test_solution_numbering.py.
+\documentclass{didactic}
+
+\begin{document}
+
+\section{Lead-ins}
+
+\begin{example}
+	One solution.
+	\solution LONESOLMARK
+\end{example}
+
+\begin{example}
+	Two solutions.
+	\solution TWOSOLAMARK
+	\solution TWOSOLBMARK
+\end{example}
+
+\begin{example}
+	One solution, two answers, one proof.
+	\solution MIXSOLMARK
+	\answer MIXANSAMARK
+	\ans MIXANSBMARK
+	\pf MIXPFMARK
+\end{example}
+
+\section{Boxes}
+
+\begin{example}
+	Two solution boxes and an answer box follow.
+\end{example}
+\begin{solution}*[1cm]
+	BOXAMARK
+\end{solution}
+\begin{solution}*[1cm]
+	BOXBMARK
+\end{solution}
+\begin{answer}*[1cm]
+	BOXANSMARK
+\end{answer}
+
+\begin{example}
+	One solution box follows.
+\end{example}
+\begin{solution}*[1cm]
+	BOXRESTARTMARK
+\end{solution}
+
+\end{document}

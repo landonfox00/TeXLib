@@ -258,6 +258,9 @@ jobs:
             # Theorem taxonomy + aliases + shared counter (C1) and solution
             # header (C2) render checks.
             python3 test_class_render.py
+            # "Solution 1." / "Solution 2." for repeated solutions in one
+            # problem: didactic, pset, quiz, autoexam, and the first pass.
+            python3 test_solution_numbering.py
             # MC answer-key marks the correct choice + schedule grid content.
             python3 test_mc_schedule_render.py
             # Schedule .schedmeta sidecar: entry ids stay put when the dates

@@ -237,6 +237,7 @@
 {%
 	\par\medskip
 	\refstepcounter{problem}%
+	\texlibnewproblemscope   % its {solution} boxes are numbered together
 	\noindent\textbf{Problem \theproblem.}%
 	\IfValueT{#1}{%
 		\IfInteger{#1}{%
@@ -354,6 +355,9 @@
 	texlibbase,
 	code={
 		\TeXLibNoteSolution
+		% "Solution 1." / "Solution 2." when a {problem} holds several boxes;
+		% \texlibsolheader reads the number (texlib-build).
+		\texlib@solbox@step{sol}%
 		\ifsolutions
 			\tcbset{
 				colback=\texlibsoltint,

@@ -28,6 +28,7 @@ sibling or use any module's class.
 | `Exams` | `cols-test.tex` | `{cols}` around `{parts}`, the one tagged `{cols}` the accessible gate builds; `test_cols_tagged_layout.py` asserts that the tagged copy keeps the two columns |
 | `Metadata` | `metadata-test.tex` (+ `coursemeta.tex`) | `course-metadata.sty`'s arbitrary-key catch-all + `\Get<Key>` derivation |
 | `Notes` | `theorem-numbering.tex` | didactic's shared-counter, section-based theorem numbering (`Theorem 1.1`, `Definition 1.2`, … resetting per `\section`) |
+| `Notes` | `solution-numbering.tex` | repeated `\solution` / `\answer` / `\pf` lead-ins and `{solution}` / `{answer}` boxes in one problem numbered "Solution 1.", "Solution 2.", …, a lone one left "Solution."; `test_solution_numbering.py` also builds it after one pass |
 | `Notes` | `tasks-tagging.tex` | nine `{tasks}` grids in the accessible build: veraPDF for the nesting, `tagged=` counts for the list structure (one item per task, label before body) |
 | `MathML` | `nth-root-mathml.tex` | two or more `\sqrt[n]{…}` in ONE formula — the shape that aborts a tagged build under `mathml-SE` |
 | `MathML` | `nth-root-toc.tex` | the same abort in a document whose table of contents adds a page (5 pages on a pass with no `.toc`, 6 after), which a tagged build needs a third pass to settle |

@@ -253,7 +253,14 @@ version-specific content.
 ### Solutions, parts, rubrics
 
 `\begin{solution} ... \end{solution}`
-Solution body. Visible only in key/solutions builds.
+Solution body. Visible only in key/solutions builds. Two or more in one
+`\question` are headed "Solution 1.", "Solution 2.", and so on, counted again in
+each copy; a lone one stays "Solution.". A bank problem carries one solution,
+so this comes up in hand-written `\question`s. The totals are read from the
+previous pass's `.aux`, so the numbers appear on the second pass. The number
+reaches the header through `\texlibsolnumber`, empty or " 2"; a document that
+redefines `\texlibsolheader` keeps the numbering only by including it.
+`{partsolution}` is never numbered.
 
 `\begin{partsolution} ... \end{partsolution}`
 Per-part solution paired with `\part`.

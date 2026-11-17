@@ -68,30 +68,47 @@
 % and {soln} / {proof} stay fully usable (as a sibling after the statement, or
 % nested -- neither token is rebound).
 % Worked-solution numbering ---------------------------------------------------
-% A worked environment may carry more than one \solution; when it does they are
-% labelled "Solution 1." / "Solution 2." / ..., but a lone \solution stays a bare
-% "Solution.". Whether to number can only be known from the TOTAL, so it is
-% resolved across runs via the .aux (the builders compile twice): each worked-env
-% instance gets a stable id (globally stepped, in document order), each \solution
-% steps a per-instance counter, and the total is written to the aux at \end and
-% read back at the next \begin. A single-pass build shows every solution
+% A worked environment may carry more than one lead-in of a kind; when it does
+% they are labeled "Solution 1." / "Solution 2." / ..., but a lone one stays a
+% bare "Solution.". The three kinds are counted apart -- \solution, \answer and
+% \ans together, \pf -- so one \solution beside two \answers reads "Solution.",
+% "Answer 1.", "Answer 2.". Whether to number can only be known from the TOTAL,
+% so it is resolved across runs via the .aux (the builders compile twice): each
+% worked-env instance gets a stable id (globally stepped, in document order),
+% each lead-in steps its kind's counter, and the totals are written to the aux at
+% \end and read back on the next run. A single-pass build shows every lead-in
 % unnumbered until the second pass settles the count. (Assumes worked envs are
 % not nested inside one another -- not a pattern the library uses.) Both the def
-% and the lookup go through \csname, so the @-named control sequence works even
-% though the aux is read back with @ at its ordinary (non-letter) catcode.
+% and the lookup go through \csname, so the @-named control sequence works
+% whatever the catcode of @ when the aux is read back.
 \newcount\texlib@worked@id
-\newcount\texlib@soln@ct
-\newcommand{\texlib@soln@total}{0}   % \solutions in this instance (previous run)
+\newcount\texlib@soln@ct   % \solution
+\newcount\texlib@ans@ct    % \answer and \ans
+\newcount\texlib@pf@ct     % \pf
 
 \newcommand{\texlib@worked@begin}{%
 	\global\advance\texlib@worked@id\@ne
 	\global\texlib@soln@ct\z@
-	\ifcsname texlib@solntot@\the\texlib@worked@id\endcsname
-		\edef\texlib@soln@total{\csname texlib@solntot@\the\texlib@worked@id\endcsname}%
-	\else
-		\def\texlib@soln@total{0}%
-	\fi
+	\global\texlib@ans@ct\z@
+	\global\texlib@pf@ct\z@
 }
+% \texlib@worked@total{<kind>} -- the total the previous run recorded for this
+% instance, 0 when there is none. Expandable.
+\newcommand{\texlib@worked@total}[1]{%
+	\ifcsname texlib@#1tot@\the\texlib@worked@id\endcsname
+		\csname texlib@#1tot@\the\texlib@worked@id\endcsname
+	\else 0\fi}
+% \texlib@worked@label{<counter>}{<kind>}{<word>} -- steps the counter and sets
+% the italic label, numbered when this instance holds more than one.
+\newcommand{\texlib@worked@label}[3]{%
+	\global\advance#1\@ne
+	\textit{#3\ifnum\texlib@worked@total{#2}>\@ne\space\the#1\fi.}\space}
+% Writes one kind's count to the aux, when the instance used that kind.
+\newcommand{\texlib@worked@writeone}[2]{%
+	\ifnum#1>\z@
+		\protected@write\@auxout{}{%
+			\string\csgdef{texlib@#2tot@\the\texlib@worked@id}{\the#1}}%
+	\fi}
 \newcommand{\texlib@worked@end}{%
 	% Close a discard box opened by a gated lead-in (see \texlib@worked@discard).
 	% Runs before the environment's own \end code, so the box is balanced inside
@@ -100,10 +117,9 @@
 		\egroup\texlib@acc@tagresume
 		\global\@texlib@discardingfalse
 	\fi
-	\ifnum\texlib@soln@ct>\z@
-		\protected@write\@auxout{}{%
-			\string\csgdef{texlib@solntot@\the\texlib@worked@id}{\the\texlib@soln@ct}}%
-	\fi
+	\texlib@worked@writeone\texlib@soln@ct{soln}%
+	\texlib@worked@writeone\texlib@ans@ct{ans}%
+	\texlib@worked@writeone\texlib@pf@ct{pf}%
 }
 
 % Worked-response gating (challenge) ------------------------------------------
@@ -161,14 +177,15 @@
 \newcommand{\texlib@inline@solution}{%
 	\texlib@worked@ifhidden{\texlib@worked@discard}{%
 		\par\bigskip\noindent
-		\global\advance\texlib@soln@ct\@ne
-		\textit{Solution\ifnum\texlib@soln@total>\@ne\space\the\texlib@soln@ct\fi.}\space}}
+		\texlib@worked@label\texlib@soln@ct{soln}{Solution}}}
 \newcommand{\texlib@inline@answer}  {%
 	\texlib@worked@ifhidden{\texlib@worked@discard}{%
-		\par\bigskip\noindent\textit{Answer.}\space}}
+		\par\bigskip\noindent
+		\texlib@worked@label\texlib@ans@ct{ans}{Answer}}}
 \newcommand{\texlib@inline@proof}   {%
 	\texlib@worked@ifhidden{\texlib@worked@discard}{%
-		\par\bigskip\noindent\textit{Proof.}\space}}
+		\par\bigskip\noindent
+		\texlib@worked@label\texlib@pf@ct{pf}{Proof}}}
 
 % Bound inside each worked env via \AtBeginEnvironment, so the redefinitions are
 % scoped to that environment's group and revert at \end (the class's standalone
@@ -429,6 +446,11 @@
 				{ \exp_not:V \l__texlib_thm_bind_tl } }
 			\AtEndEnvironment{#1}{\texlib@worked@end}
 			\AtEndEnvironment{#1*}{\texlib@worked@end}
+			% Each opens a problem for the class's {solution} box to number
+			% within (texlib-build). Not the exam-class twins below: there the
+			% question is the problem.
+			\AtBeginEnvironment{#1}{\texlibnewproblemscope}
+			\AtBeginEnvironment{#1*}{\texlibnewproblemscope}
 		}
 	}{
 		\msg_error:nnn { texlib-thmenv } { unknown-env } {#1}

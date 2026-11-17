@@ -196,6 +196,23 @@ EXAMPLES = [
                  "counters would renumber Definition to 1.1, a flat scheme "
                  "would drop the '.1', and a missing reset would make the "
                  "section-2 boxes 1.4/1.5."),
+    Example("examples/fixtures/Notes", "solution-numbering.tex", "fixture", _FIXTURE,
+            expect=["Solution. LONESOLMARK",
+                    "Solution 1. TWOSOLAMARK", "Solution 2. TWOSOLBMARK",
+                    "Solution. MIXSOLMARK", "Answer 1. MIXANSAMARK",
+                    "Answer 2. MIXANSBMARK", "Proof. MIXPFMARK"],
+            absent=["Solution 3."],
+            note="Labels number themselves within a problem. A lone lead-in "
+                 "or box keeps 'Solution.'; two of one kind read 'Solution 1.' "
+                 "and 'Solution 2.'. \\answer and \\ans share a count, "
+                 "{answer} boxes count apart from {solution} boxes, and the "
+                 "next worked environment restarts the box count. The totals "
+                 "come from the .aux, so these hold after the second pass. "
+                 "Only the inline lead-ins are asserted here: pdftotext sets a "
+                 "box's header on a line of its own, so a substring cannot "
+                 "tie it to its box. test_solution_numbering.py collapses the "
+                 "whitespace and checks the boxes, the first pass and the "
+                 "other classes."),
     Example("examples/fixtures/Notes", "tasks-tagging.tex", "fixture", _FIXTURE,
             expect=["GRIDMARK", "DISPLAYMARK", "COLUMNMARK", "RUNINMARK",
                     "PARTSMARK", "RICHMARK", "LABELMARK", "GATEDMARK"],

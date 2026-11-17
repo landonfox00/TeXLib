@@ -178,6 +178,11 @@ mode (default 3cm). Visibility:
 | `\StudentMode`            | Blank box of `<height>`, "Show your work here" watermark |
 | `\ShowKey` / `\ShowSolutions` | Body visible, blue-tinted box           |
 
+Two or more `solution` boxes in one `problem` are headed "Solution 1.",
+"Solution 2.", and so on; a lone box stays "Solution.". The totals are read
+from the previous pass's `.aux`, so the numbers appear on the second pass.
+Inline `\solution` lead-ins number the same way within their `example`.
+
 Note: in default mode, `\excludecomment{solution}` (from the `comment` package) overrides the environment so the body is never typeset — no spacing artifacts on the page.
 
 #### `hint` — always-visible nudge

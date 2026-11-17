@@ -105,6 +105,10 @@ Example:
 \end{problem}
 ```
 
+Two or more `{solution}` boxes under one hand-written `\question` are headed
+"Solution 1.", "Solution 2.", and so on, from the second pass; a lone one stays
+"Solution.". See `\begin{solution}` in the Exams README.
+
 `\getproblem{query}` — retrieve a problem and typeset it. The query
 is either a plain id (`linear_eq`) or a key=value filter
 (`topic=algebra, diff=hard`); for the latter, one matching problem
