@@ -479,6 +479,43 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Fixed
 
+- **A tagged pass that crashed was copied out as the accessible PDF, and the
+  luamml sidecar it left truncated broke every later build.** A lualatex fatal
+  leaves the `<jobname>.pdf` of the shipout it died inside: a `%PDF-2.0`
+  header, no `%%EOF`, and no reader can open it. `_copy_back_variant` and
+  `_copy_back_accessible` copied it over the last good
+  `<base>[_<variant>]_accessible.pdf` with a fresh mtime, and on a publishable
+  class the publish step then cloned it to the shareable names that go to
+  WebCampus. Seven tagged lanes in one machine's aux dirs had ended this way
+  (the base, student and solutions twins of two Math 126 units, and a paper
+  whose log stops mid-line), and none of the seven PDFs had a trailer. A
+  lane's PDF is now copied out only when it ends in `%%EOF` and the lane's
+  log, if there is one, has the `Output written on` line that LuaTeX and
+  pdfTeX print once the PDF is written. The log settles a pass that died
+  before its first shipout, which leaves the previous pass's complete PDF in
+  the lane. `log_reports_error` is not the test: 30 of 136 tagged logs there
+  recorded a recoverable error beside a good PDF. A lane that did not finish
+  is skipped like one that produced nothing, so the earlier copy and its
+  report stay, and the build names the reason. The publish step clones the
+  tagged PDF only when this build copied it out (`_tagged_base_copied`), and
+  says when the shareable copies are untagged.
+
+  luamml writes `<jobname>-luamml-mathml.html` as it typesets and reads the
+  previous pass's copy back at `\begin{document}`. A crash leaves it cut
+  inside an element (four were on disk, one at exactly 8192 bytes), and every
+  later build then stops at `\begin{document}` with "File ended while
+  scanning use of `\__math_AF_html_reader_verb:w`" and cascades to the
+  100-error limit, with nothing in the trace pointing at the sidecar. The
+  sidecars were removed only before the mathml-SE retry. Every tagged pass
+  now starts by removing a truncated one (no `</html>` in its last 512 bytes)
+  from the lane, the aux dir and the source dir. A complete one is the
+  previous pass's MathML and stays. A parallel lane runs both its passes
+  inside the host, so it is swept before each wave.
+  `Sublime/test_texlib_builder.py` has 32 new checks (581 to 613), 23 of
+  which fail against the builder as it was. Fixtures that wrote a PDF with no
+  trailer, or a lane log with no `Output written on` line, now write whole
+  ones.
+
 - **A tagged exam with a `\section*` inside `{problems}` logged four TeX
   errors and failed PDF/UA-2.** A review sheet heads its runs of problems with
   its own headings (`\begin{problems}*` then `\section*{Chapter 5: ...}`), and
