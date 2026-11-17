@@ -191,6 +191,14 @@ statement stays a bare prompt for students but carries its worked solution in
 your instructor build. Turn the gating off globally with `\gateworkedfalse`
 (then all four envs are always-visible).
 
+A lone lead-in keeps its plain label. Two or more of one kind in one
+environment are numbered in order: "Solution 1.", "Solution 2.", and so on.
+The kinds are counted apart, and `\answer` and `\ans` count together, so a
+`\solution` beside two `\answer`s reads "Solution.", "Answer 1.", "Answer 2.".
+The totals are read from the previous pass's `.aux`, so the numbers appear on
+the second pass, like a cross-reference; a one-pass build shows every label
+unnumbered.
+
 The always-visible half of the hook is shared (it lives in `texlib-thmenv.sty`, so every class with these environments gets it); `didactic.cls` adds the challenge/exercise gating. Each lead-in is scoped to its environment, so the standalone `\begin{solution}` box keeps `\solution` everywhere else — don't nest a `\begin{solution}` box *inside* one of these environments.
 
 #### `{answer}` — the solution box, relabelled
@@ -200,6 +208,12 @@ header and a shorter default height — use it for a short-answer key that still
 wants student write-space. `{ans}` and `{soln}` are aliases. All accept the
 force-show star (`\begin{answer}*`) and obey `\gatesolutionfalse` (make every
 box always-visible).
+
+Two or more `{solution}` boxes after one worked environment (`example`,
+`exercise`, `question`, `challenge`) are headed "Solution 1.", "Solution 2.",
+and so on, and the next worked environment starts the count again. `{answer}`
+boxes are counted apart from `{solution}` boxes. The numbers appear on the
+second pass, as the lead-ins' do.
 
 The same lead-ins (`\solution`, `\answer`, `\ans`, `\pf`) work in `exercise`,
 `question`, and `challenge`.

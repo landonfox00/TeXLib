@@ -208,7 +208,10 @@
 \providecommand{\texlibsoltint}{green!3!white}          % box fill
 \providecommand{\texlibsolrulecolor}{green!50!black}     % left accent (shown)
 \providecommand{\texlibsolblankrulecolor}{black!40}      % dashed rule (student blank)
-\providecommand{\texlibsolheader}{\textbf{Solution.}}    % bold run-in header
+% \texlibsolnumber is empty, or " 2" in the second of several boxes in one
+% problem (texlib-build, \texlib@solbox@step).
+\providecommand{\texlibsolnumber}{}
+\providecommand{\texlibsolheader}{\textbf{Solution\texlibsolnumber.}}  % bold run-in header
 % {partsolution}'s header, the same one unless a document says otherwise. A key
 % with a dozen one-line part answers on a page spends a dozen lines on the word
 % "Solution."; \renewcommand{\texlibpartsolheader}{} gives them back, and the

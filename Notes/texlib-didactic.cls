@@ -357,7 +357,11 @@
 % The header text is swapped per role via \@sol@label ({answer} sets "Answer.").
 \newif\ifgatesolution  \gatesolutiontrue   % gated (blank for students) by default
 \newif\if@sol@show                         % scratch: does THIS instance show its body?
-\newcommand{\@sol@label}{Solution.}        % header text; {answer} overrides to "Answer."
+% Header text; {answer} overrides it to "Answer.". \texlibsolnumber is empty
+% unless the problem holds several boxes of this kind (\@sol@kind); then it is
+% " 1", " 2", ... (texlib-build, \texlib@solbox@step).
+\newcommand{\@sol@label}{Solution\texlibsolnumber.}
+\newcommand{\@sol@kind}{sol}
 
 % Two inner boxes: the shown (green) solution and the blank (dashed) answer
 % space. Both inherit texlibbase, so both are breakable.
@@ -400,6 +404,9 @@
 \NewDocumentEnvironment{solution}{ s O{3cm} }
 {%
 	\TeXLibNoteSolution
+	% Numbered within the worked environment it follows. Steps in every copy,
+	% shown or not, so the count is the same in all of them.
+	\texlib@solbox@step{\@sol@kind}%
 	\IfBooleanTF{#1}{\@sol@showtrue}{%
 		\ifgatesolution
 			\ifsolutions \@sol@showtrue \else \@sol@showfalse \fi
@@ -465,7 +472,8 @@
   {\IfBooleanTF{#1}{\begin{solution}*[#2]}{\begin{solution}[#2]}}
   {\end{solution}}
 \NewDocumentEnvironment{answer}{ s O{1.5cm} }
-  {\renewcommand{\@sol@label}{Answer.}%
+  {\renewcommand{\@sol@label}{Answer\texlibsolnumber.}%
+   \renewcommand{\@sol@kind}{ans}%
    \IfBooleanTF{#1}{\begin{solution}*[#2]}{\begin{solution}[#2]}}
   {\end{solution}}
 \NewDocumentEnvironment{ans}{ s O{1.5cm} }

@@ -1463,6 +1463,10 @@ local function pbank_catalog_emit(n, id)
 			pbank_texify(table.concat(metaparts, ", ")) .. "}")
 	end
 	tex.print("\\par\\smallskip\\noindent")
+	-- Every cataloged problem is question 0, so the question cannot tell one
+	-- problem's {solution} boxes from the next one's; open a fresh numbering
+	-- scope per entry (texlib-build, \texlibnewproblemscope).
+	tex.print("\\csname texlibnewproblemscope\\endcsname")
 	tex.print("\\csname pbank@lua\\endcsname{pbank_section_mode=" ..
 		pbank_lua_quote(p.is_mc and 'mc' or 'fr') ..
 		" get_problem(" .. pbank_lua_quote(id) .. ")}")

@@ -307,6 +307,30 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
   label, so `shorthand = {HTT}` prints `[HTT]`. Documented in
   `Thesis/README.md`.
 
+- **Repeated solutions and answers in one problem are numbered.** A lone
+  label is unchanged ("Solution.", "Answer.", "Proof."); two or more of one
+  kind in one problem read "Solution 1.", "Solution 2.", and so on, in order.
+  Only `\solution` in a worked environment was numbered before, and every
+  `{solution}` box in a problem was headed "Solution.".
+  - Inline lead-ins (`\solution`, `\answer`/`\ans`, `\pf`) number within
+    their worked environment, each kind on its own count; `\answer` and `\ans`
+    share one.
+  - `{solution}` boxes number within the problem: the worked environment they
+    follow in `didactic` (`{answer}` boxes on their own count), the `{problem}`
+    in `pset`, the `\question` in `autoexam` and `quiz`, counted again in each
+    copy of a versioned exam, and the entry in a `bank` catalogue.
+    `{partsolution}` is not numbered.
+
+  A problem's total is known only after its last box, so it goes to the
+  `.aux` and the numbers appear on the second pass, like a cross-reference.
+  The box header reads the number from `\texlibsolnumber` (empty, or " 2"),
+  which the default `\texlibsolheader` includes. A box steps the count in
+  every copy, shown or not, so a student copy reserves the header the key
+  prints. Ported from `f54ccfe` on `fix/pset-solution-tab-gotcha`, which never
+  reached `main`. Tests: `test_solution_numbering.py` (`didactic`, `pset`,
+  `quiz`, a two-version `autoexam`, and the first pass) and the smoke fixture
+  `examples/fixtures/Notes/solution-numbering.tex`.
+
 ### Changed
 
 - **A build checks every tagged PDF it writes, and reports each one.** A build

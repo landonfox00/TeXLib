@@ -678,6 +678,10 @@
 % as does a solution outside the problems list (\@totalleftmargin zero, as in
 % the MC key's minipage).
 \providecommand{\texlib@sol@problemkey}{\the\c@question}
+% The same key names the problem whose {solution} boxes are numbered together
+% (texlib-build, \texlib@solbox@step). The scope counter in front of it is
+% stepped by \printbankcatalog at each entry, where every problem is question 0.
+\def\texlib@solscope{\the\texlib@solscope@id:\texlib@sol@problemkey}
 \gdef\texlib@sol@partsq{}
 \AddToHook{env/parts/begin}{\xdef\texlib@sol@partsq{\texlib@sol@problemkey}}
 \newcommand{\texlib@sol@partlessinset}{%
@@ -698,6 +702,9 @@
 \let\endsolution\relax
 \newenvironment{solution}{%
 	\TeXLibNoteSolution
+	% Sets \texlibsolnumber, which \texlibsolheader prints: "Solution 2." when the
+	% question holds more than one box. Every copy steps it, shown or not.
+	\texlib@solbox@step{sol}%
 	\@sol@decide
 	\gdef\@award@sum{0}\global\@award@usedfalse
 	\if@sol@shown

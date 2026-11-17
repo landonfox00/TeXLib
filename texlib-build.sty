@@ -241,6 +241,62 @@
 	\endgroup
 }
 
+% Solution-box numbering -------------------------------------------------------
+% A lone {solution} box is headed "Solution."; two or more of the same kind in
+% one problem are headed "Solution 1.", "Solution 2.", ... in document order.
+% The kinds are counted apart: didactic's {answer} box is "Answer." beside a
+% "Solution." in the same problem. The classes give the problem boundary:
+%   * didactic and pset: \texlibnewproblemscope, called at each worked
+%     environment (texlib-thmenv) and at each pset {problem};
+%   * autoexam, quiz and bank: the question, \texlib@sol@problemkey
+%     (texlib-solutions), plus \texlibnewproblemscope at each catalog entry.
+% \texlib@solscope expands to the current problem's key. Each time the key
+% differs from the last box's, a new epoch begins; the epoch, not the key,
+% names the problem, so a key met again later (question 1 of the next copy)
+% starts afresh. Whether to number depends on how many boxes the problem
+% holds, which is known only after its last one, so each box writes its running
+% count to the .aux and reads the total recorded by the previous pass. Like a
+% cross-reference, the numbering settles on the second pass; on the first every
+% box is unnumbered. The write is \immediate because a hidden solution is set
+% into a discarded box, which would take a \write whatsit with it.
+%
+% Every box steps the count whether or not this copy shows it, so the student
+% copy reserves the room the key's header takes. The header reads the number
+% from \texlibsolnumber: empty, or a space and the number. It is set locally,
+% inside the box, so {partsolution}, whose header defaults to the same
+% \texlibsolheader, stays unnumbered.
+\newcount\texlib@solscope@id
+\newcount\texlib@solscope@epoch
+\newcommand{\texlibnewproblemscope}{\global\advance\texlib@solscope@id\@ne}
+\newcommand{\texlib@solscope}{\the\texlib@solscope@id}
+\gdef\texlib@solscope@last{}
+\providecommand{\texlibsolnumber}{}   % also in texlib-corepkg
+% Replayed from the .aux: the running count of box kind #1 ("<epoch>@<kind>").
+\def\texlib@sbtot#1#2{\expandafter\gdef\csname texlib@sbtot@#1\endcsname{#2}}
+% \texlib@solbox@step{<kind>} -- once per box, at its start, inside its group.
+\newcommand{\texlib@solbox@step}[1]{%
+	\edef\texlib@solscope@cur{\texlib@solscope}%
+	\ifx\texlib@solscope@cur\texlib@solscope@last\else
+		\global\advance\texlib@solscope@epoch\@ne
+		\global\let\texlib@solscope@last\texlib@solscope@cur
+	\fi
+	\edef\texlib@sb@name{\the\texlib@solscope@epoch @#1}%
+	\@tempcnta\ifcsname texlib@sbrun@\texlib@sb@name\endcsname
+		\csname texlib@sbrun@\texlib@sb@name\endcsname\else 0\fi\relax
+	\advance\@tempcnta\@ne
+	\expandafter\xdef\csname texlib@sbrun@\texlib@sb@name\endcsname{%
+		\the\@tempcnta}%
+	\if@filesw
+		\immediate\write\@auxout{%
+			\string\texlib@sbtot{\texlib@sb@name}{\the\@tempcnta}}%
+	\fi
+	\edef\texlibsolnumber{%
+		\ifnum\ifcsname texlib@sbtot@\texlib@sb@name\endcsname
+				\csname texlib@sbtot@\texlib@sb@name\endcsname\else 0\fi>\@ne
+			\space\the\@tempcnta
+		\fi}%
+}
+
 % Tag suspension around DISCARDED content --------------------------------------
 % Gating a build mode off does not stop the hidden content being typeset -- the
 % classes capture it into a throwaway \vbox and drop the box. tagpdf still walks
