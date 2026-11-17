@@ -1,0 +1,282 @@
+% profiles/university-of-hawaii-at-manoa.tex — University of Hawaiʻi at Mānoa
+% ============================================================================
+% source: https://manoa.hawaii.edu/graduate/style-policy/
+%         ("Style Policy", Graduate Division — a live page, and the one that
+%          states the two rules the Division actually enforces)
+% source: https://manoa.hawaii.edu/graduate/wp-content/uploads/tdstylepolicy_e.pdf
+%         ("eTD (Electronic Thesis and Dissertation) STYLE & POLICY GUIDE",
+%          Graduate Education, dated October 2018 on its cover; §1.1
+%          Organization of Contents, §1.2 Title Page, §1.3 Signature Page, §2.3
+%          Margins, §2.7 Line Spacing, §2.10 Pagination, and Sample B on p. 20)
+% source: https://manoa.hawaii.edu/graduate/format-language-content/
+% source: https://manoa.hawaii.edu/graduate/proquest-etd-submission-publication/
+% accessed: 2026-09-14
+% checked:  texlib-thesis-profile-round
+%
+% CURRENCY, and it cuts both ways. The manual is dated October 2018 — eight
+% years old on the access date — and it is what the live Style Policy page links
+% under "Style and Policy Manual for Theses and Dissertations". The two figures
+% that matter most do not rest on it alone: the margin rule and the title-page
+% rules are restated on the LIVE page, and that page is where the Division draws
+% the line between what it enforces and what it does not:
+%
+%   "The margin settings and the title page of the thesis or dissertation MUST
+%    conform to requirements of the Graduate Division. Students who submit pages
+%    that do not meet these specific requirements or that contain spelling
+%    errors will be asked to reformat the pages."
+%
+% Everything else is the programme's business — "For the rest of the manuscript,
+% it is at the discretion of the graduate programs to require or suggest their
+% own professionally acceptable style" — and the ProQuest page adds that "The
+% Style and Policy Manual may be used for basic guidance on formatting" and that
+% the manuscript's accuracy "is the responsibility of your respective thesis or
+% doctoral committee chairperson". So Mānoa enforces two things and delegates
+% the rest, which is exactly what this profile encodes.
+%
+% (Note also that the old URL manoa.hawaii.edu/graduate/tdstylepolicy_e/ now
+% 404s; the PDF moved under /wp-content/uploads/. Do not read the 404 as the
+% manual having been withdrawn.)
+%
+% VERIFIED and set here: geometry, spacing, title page, the absence of a
+% signature page, and the accessibility finding (an absence).
+% NOT set: \thesissetchapteropening — no deeper opening margin is stated.
+%
+% THE DIACRITICS ARE A FILING RULE, not a nicety, and they are the rule the
+% Division names first: "Include a Kahakō over the first 'a' in 'Mānoa' and an
+% ʻokina before the last 'i' in 'Hawaiʻi.' The okina is NOT an apostrophe." The
+% title page below therefore hardcodes U+02BB (ʻokina) and U+0101 (ā), rather
+% than leaving them to an author's keyboard. If a build logs a missing character
+% for either, the filed page is wrong even though the build exits 0 — check the
+% log, not just the PDF.
+
+% --- The ʻokina needs a font that has it ---------------------------------------
+% MEASURED, not assumed: U+02BB is absent from Latin Modern, which is this
+% class's default face. A build with a bare ʻ in it logs
+%   Missing character: There is no ʻ (U+02BB) in font [lmroman12-regular]
+% and then EXITS 0 with the character simply gone from the page — the silent
+% failure mode CLAUDE.md warns about, landing on the one rule Mānoa states
+% first. It is missing from TeX Gyre Termes, Pagella and Heros as well, so
+% switching the document face does not fix it.
+%
+% Libertinus Serif, DejaVu Serif, DejaVu Sans and FreeSerif all carry it (probed
+% on the access date). Libertinus Serif is preferred: it ships with TeX Live and
+% is a serif face that sits acceptably beside Latin Modern for a single mark.
+%
+% The remap is document-wide rather than confined to the title page on purpose.
+% §2.6 is about Hawaiian words in the body too — "when writing the 'University
+% of Hawaiʻi at Mānoa,' an ʻokina should be included … and a kahakō is necessary
+% above the first 'a'" — so a Mānoa document needs the character to work
+% everywhere, not only where this profile prints it. The codepoint in the text
+% layer is unchanged; only the glyph comes from elsewhere.
+%
+% If no covering font is installed the profile warns rather than failing: a
+% missing font is a build error, and a warning the author can act on is better
+% than a class that will not load.
+\RequirePackage{newunicodechar}
+\newcommand{\thesis@uhm@okina}{\char"02BB\relax}
+\IfFontExistsTF{Libertinus Serif}
+	{\newfontfamily\thesis@uhm@okinafont{Libertinus Serif}%
+	 \renewcommand{\thesis@uhm@okina}{{\thesis@uhm@okinafont\char"02BB}}}
+	{\IfFontExistsTF{DejaVu Serif}
+		{\newfontfamily\thesis@uhm@okinafont{DejaVu Serif}%
+		 \renewcommand{\thesis@uhm@okina}{{\thesis@uhm@okinafont\char"02BB}}}
+		{\ClassWarningNoLine{texlib-thesis}{No installed font was found that
+			carries U+02BB, the^^J%
+			\string`okina. Mānoa requires it in "Hawai`i" and the document^^J%
+			face does not have it, so it will be DROPPED from the page^^J%
+			without failing the build. Install Libertinus or DejaVu}}}
+\newunicodechar{ʻ}{\thesis@uhm@okina}
+
+% The Division writes its own name with both marks, and requires the author to
+% as well, so the profile does too rather than using the ASCII IPEDS spelling
+% ("University of Hawaii at Manoa"). Michigan's profile sets the same precedent
+% in the other direction, using "University of Michigan" for IPEDS's
+% "University of Michigan-Ann Arbor".
+\thesisinstitution{University of Hawaiʻi at Mānoa}
+
+% Live page: "The Graduate Division requires standardized margins on every page
+% of the manuscript. All margins must be 1 inch from the edge of the page."
+% Manual §2.3: "Standardized margins are required on every page. Margins should
+% at least be 1 inch all around the page (top, right, left, bottom)."
+%
+% THE FOLIO IS INSIDE THE MARGIN, which is the unusual half of this rule: "The
+% entire content on the page, including page numbers, must fall WITHIN the
+% margins specified. The page number must be located at the bottom center of the
+% page." The manual agrees — "Page numbers should remain at the bottom center of
+% the page, above the 1 inch margin." The class's `normal' layout carries
+% includefoot, so the foot sits inside the body area above the 1in margin, which
+% is what Mānoa asks for; this is one of the few schools where includefoot is
+% required rather than merely harmless.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% ONEHALF, not double, and deliberately. Manual §2.7: "Line spacing is a
+% challenge. Single spacing is easiest to read on a monitor, double spacing is
+% best for archival copies and may be preferred by faculty reviewing drafts.
+% Currently we recommend 1.5 spacing except where style calls for single spacing
+% (e.g., footnotes, indented quotations, tables)."
+%
+% That is a recommendation, not a requirement — spacing is not one of the two
+% things the Division says it enforces — so this profile follows the school's
+% own recommendation rather than the class default, the same way Washington
+% State's profile takes double because Washington State recommends double. An
+% author whose committee wants double is in spec too.
+%
+% The abstract is the one place spacing IS fixed: "The abstract included with
+% the thesis or dissertation must be double-spaced and the title should simply
+% be ABSTRACT."
+\thesissetspacing{onehalf}
+
+% --- Accessibility -----------------------------------------------------------
+% NONE PUBLISHED by the Graduate Division for a filed manuscript. This is a
+% searched absence, not an unread section: the 20-page manual contains no
+% occurrence of "accessibility", "alt text", "tagged", "WCAG", "PDF/A", "screen
+% reader", "508" or "Title II", and neither the Style Policy page, the Format
+% page nor the ProQuest ETD submission page carries one. The University of
+% Hawaiʻi system does publish accessibility guidance, and one of Mānoa's
+% COLLEGES publishes an ETD template that speaks of federal standards — but a
+% college page is not the Graduate Division and is not a source under
+% RESEARCHING.md, so neither is used here.
+%
+% None of \thesisrequiretagging, \thesisrequiredocumentlanguage or
+% \thesisrequirepdfstandard is set. The submission instruction is simply
+% "Convert your FINAL APPROVED thesis, doctoral paper, or dissertation to a
+% standard PDF File."
+\thesisaccessibilityrequirement{Not published}
+	{No Graduate Division accessibility requirement for a filed manuscript was
+	 found on 2026-09-14, in the Style \& Policy Guide or on any of the
+	 Division's thesis pages. Treat this as "this graduate school asks for
+	 nothing", not as "nobody looked" — and note that the manual is dated
+	 October 2018 and so predates the federal deadlines entirely.}
+
+% --- Profile-local metadata ---------------------------------------------------
+% Mānoa's title page ends with an optional keyword line: "Optionally, you can
+% list four to six keywords or short key phrases that could be used as search
+% terms to find your thesis or dissertation during a library catalog or web
+% search." Sample B prints it as "Keywords:  Akira Kurosawa, Noh, Shakespeare,
+% films". Genuinely optional, so unset prints nothing and does not warn.
+\newcommand{\thesis@uhm@keywords}{}
+\newcommand{\manoakeywords}[1]{\renewcommand{\thesis@uhm@keywords}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% One of the two things the Division enforces, so this is reproduced from Sample
+% B (manual p. 20), read as a rendered image rather than as extracted text:
+%
+%   ELEMENTS OF NOH AND SHAKESPEAREAN THEATRE
+%   IN THE FILMS OF AKIRA KUROSAWA            (all caps, centred, double spaced)
+%
+%   A DISSERTATION SUBMITTED TO THE GRADUATE DIVISION OF THE
+%   UNIVERSITY OF HAWAIʻI AT MĀNOA IN PARTIAL FULFILLMENT OF THE
+%   REQUIREMENTS FOR THE DEGREE OF            (all caps, wrapped to the measure)
+%
+%   DOCTOR OF PHILOSOPHY
+%   IN
+%   ENGLISH
+%
+%   August 2018                               (NOT capitalised — the one line
+%                                              on the page that is not)
+%   By
+%   Wood B. Dunn
+%
+%   Dissertation Committee:
+%   Mercedes Akamai, Chairperson
+%   Lincoln Ford
+%   Harley Davidson
+%   Kim Chee
+%   Candace Kane                              (single spaced)
+%
+%   Keywords:  Akira Kurosawa, Noh, Shakespeare, films
+%
+% The rules the Division attaches to it, all quoted from the live page:
+%
+%   * "Indicate your degree and graduate program (e.g., Master of Science in
+%     Zoology). Use only the official degree name from the University of
+%     Hawaiʻi at Mānoa catalog. No other titles will be accepted for a
+%     dissertation or thesis title page." Sample B splits that across three
+%     lines as DEGREE / IN / PROGRAMME, which is what this page does:
+%     \graddegree supplies the degree, \gradprogram the programme.
+%   * "Indicate the month and year of graduation (December, May, or August). Do
+%     not separate the month and year of graduation with a comma. Do not use the
+%     date you completed or submitted the thesis/dissertation." So \graddate is
+%     "August 2027", with no comma.
+%   * "List the names of the committee members. Customarily, the name of the
+%     university representative is given last."
+%   * "Do not include titles such as Dr. or PhD for committee members or for
+%     yourself. However, the chair should be designated by the word
+%     'chairperson.'" So pass a bare name to \committeemember and "Chairperson"
+%     as the role for the chair, nothing for the others — which is why the
+%     committee lines here carry no signature rule.
+%   * Specializations are generally not allowed. The five that may appear, with
+%     the programme's permission, go in parentheses after the programme name —
+%     e.g. "Zoology (Marine Biology)" — so put them inside \gradprogram.
+%
+% Page i, unnumbered: §1.1 lists the title page first and "(no page number)",
+% and §2.10.1 adds "The next page should be numbered 'ii'".
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\centering
+		% EVERY SKIP ON THIS PAGE IS SHRINKABLE, and that is not decoration.
+		% Sample B is itself a nearly full page — it runs from 2.1in down to
+		% 9.8in — and it was set in a narrow 11pt face with a one-line title.
+		% Reproduce its gaps rigidly at this class's size and an ordinary Mānoa
+		% title page (two-line title, four or five committee members, a keyword
+		% line) overflows onto a second sheet, which TeX does silently and which
+		% even carries a page number. Two earlier drafts did exactly that. The
+		% `minus' components let the page tighten instead of spilling; the
+		% natural sizes are still Sample B's proportions.
+		%
+		% Sample B puts the title about 2.1in below the paper's top edge. This
+		% layout's own margin supplies 1in of that, and the rest is here — as
+		% glue, for the same reason.
+		\vspace*{0.55in minus 0.35in}
+		\begin{doublespace}
+			\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\end{doublespace}
+		\singlespacing
+		\vspace{3\baselineskip minus 0.6\baselineskip}
+		\MakeUppercase{A \thesis@docnoun{} submitted to the Graduate Division of
+			the University of Hawaiʻi at Mānoa in partial fulfillment of the
+			requirements for the degree of}\par
+		\vspace{2\baselineskip minus 0.6\baselineskip}
+		\MakeUppercase{\thesis@degree}\par
+		\vspace{2\baselineskip minus 0.6\baselineskip}
+		IN\par
+		\vspace{2\baselineskip minus 0.6\baselineskip}
+		\MakeUppercase{\thesis@program}\par
+		\vspace{2\baselineskip minus 0.6\baselineskip}
+		\thesis@date\par
+		\vspace{2\baselineskip minus 0.6\baselineskip}
+		By\par
+		\vspace{2\baselineskip minus 0.6\baselineskip}
+		\@author\par
+		\vspace{2\baselineskip minus 0.6\baselineskip}
+		\thesis@DocNoun{} Committee:\par
+		\vspace{1\baselineskip minus 0.6\baselineskip}
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par
+		}%
+		\thesis@committee
+		\endgroup
+		\ifx\thesis@uhm@keywords\@empty\else
+			\vspace{2\baselineskip minus 0.6\baselineskip}
+			Keywords:\quad\thesis@uhm@keywords\par
+		\fi
+		\vfill
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Signature page ------------------------------------------------------------
+% Mānoa abolished it, and says so twice in as many words.
+%
+%   §1.3: "There no longer is a signature page. Use form IV and do not include
+%          it in the manuscript."
+%   §1.1: "Note: The signature page is not included in the manuscript, rather
+%          Form IV signifying final approval is submitted (on paper) directly to
+%          Graduate Division."
+%
+% The committee is instead named on the title page above. Note that Form IV is
+% still submitted ON PAPER, so physical signatures do exist at Mānoa — they just
+% never touch the filed PDF.
+\thesisnoapprovalpage
