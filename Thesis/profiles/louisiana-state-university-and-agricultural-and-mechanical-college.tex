@@ -1,0 +1,191 @@
+% profiles/louisiana-state-university-and-agricultural-and-mechanical-college.tex
+% Louisiana State University and Agricultural & Mechanical College
+% ============================================================================
+% source: https://www.lsu.edu/graduateschool/current_students/theses_and_dissertations/index.php
+%         (Graduate School, "Theses & Dissertations")
+% source: https://www.lsu.edu/graduateschool/students/files/thesisanddissertationhandbook_feb2026.pdf
+%         ("Thesis & Dissertation Handbook", February 2026 edition; the sample
+%         title page is its page 25)
+% accessed: 2026-09-13
+% checked:  texlib-thesis-profile-round
+%
+% TWO EDITIONS ARE LINKED FROM THE SAME PAGE. Do not swap the source above for
+% thesisanddissertationhandbook_2025.pdf, which is also live on lsu.edu and is
+% reachable from a sidebar card on that page. The February 2026 edition is the
+% one the page's own prose points at — "Early in your writing process, review
+% the Thesis & Dissertation Handbook. It contains the complete formatting
+% guidelines" — and the one its Quick Links label as "With Formatting
+% Guidelines". A third file, thesisanddissertationhandbook_fall2022.pdf, still
+% answers on a older path and turns up in search results.
+%
+% VERIFIED and set here: geometry, spacing, title page, the absence of an
+% approval page, and LSU's published accessibility rule.
+% NOT set: chapter-opening margin (LSU states none, and forbids exceptions to
+% the margin generally) and the typeface (LSU names no face).
+
+\thesisinstitution{Louisiana State University and Agricultural and Mechanical College}
+
+% "Margins must be one-inch wide on all four sides of every page."
+% "Margins must be the same on every page with no exceptions for wide tables
+% and figures in landscape format."
+%
+% That second bullet is why no chapter-opening margin is set: LSU states the
+% margin admits no exceptions at all, so a deeper opening would be out of spec
+% rather than merely unasked-for.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% A CHOICE, and an unusually wide one — LSU permits a single-spaced document:
+% "Your document's narrative text may be either single- or double-spaced
+% throughout."
+%
+% The profile takes double, which is the class default and the more common
+% filing; \thesissetspacing{single} is equally in spec. "Throughout" is the
+% operative word — LSU forbids mixing, and separately forbids anything between:
+% "Documents should contain no spaces larger than a double space, except on the
+% title page. Do not use half-spaces."
+%
+% LSU's per-element exceptions belong to the document rather than the class:
+% the table of contents, lists and footnotes are always single-spaced even in a
+% double-spaced document, and certain elements are always double-spaced even in
+% a single-spaced one.
+\thesissetspacing{double}
+
+% --- Two rules this file cannot express, recorded so they are not lost --------
+%
+% PAGE NUMBERS: "Center all page numbers at the bottom of the page within the
+% bottom one-inch margin, i.e., one-half inch from the bottom of the page" and
+% "Format all page numbers in the same font and 12-point size as your text. Do
+% not use boldface, italic, or ornamentation." The position matches the class's
+% default foot folio; the half-inch placement does not follow from the profile
+% fields, so a filer should check it.
+%
+% JUSTIFICATION: "Margins may be either left- or full-justified. Left
+% justification is more flexible." A choice, so nothing is imposed.
+
+% --- Accessibility -----------------------------------------------------------
+% LSU publishes an accessibility rule and it is a CONDITION OF UPLOAD, so it is
+% recorded — but it is a best-effort standard, not a technical one, and that
+% distinction is the whole point of how it is encoded here.
+%
+% NOT set, deliberately: \thesisrequiretagging, \thesisrequiredocumentlanguage
+% and \thesisrequirepdfstandard. LSU names no tagging, no document language, no
+% WCAG level and no PDF standard. What it asks for is an effort — "to the best
+% of your ability" — and turning that into a build-time conformance requirement
+% would be this profile inventing a technical standard LSU never set. Compare
+% University of Connecticut in the same round, which does name WCAG 2.1 and
+% therefore does get the declarations.
+\thesisaccessibilityrequirement{Accessible to visually impaired readers}
+	{Make your document accessible to visually impaired readers to the best of
+	 your ability. Refer to the LSU Digital Resources \& Content Accessibility
+	 webpage and LaTeX's Guide to Produce Accessible PDF Files.}
+\thesisaccessibilityrequirement{Condition of upload}
+	{Do not upload your document until, to the best of your ability, you have
+	 made the document accessible to the visually impaired. (Item 4 of the five
+	 conditions the Graduate School sets before submission.)}
+
+% --- Profile-local fields -----------------------------------------------------
+% LSU's title page lists the author's prior degrees, one per line, under the
+% name — "B.A., Purdue University, 2001 / M.A., University of Texas, 2004 /
+% M.L.S., University of Virginia, 2010". The class has no slot for them.
+% Defaults to empty, which is a real answer for a master's candidate with no
+% prior graduate degree, so the lines simply do not print.
+\newcommand{\thesis@lsu@priordegrees}{}
+\newcommand{\lsupriordegrees}[1]{\renewcommand{\thesis@lsu@priordegrees}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% "Meticulously follow the format shown on the sample title page, including
+% placement of the three separate blocks of text, the use of double and single
+% spaces, the words contained on each line, and the capitalization or
+% lowercasing of every word."
+%
+% The three blocks, from the sample on handbook page 25:
+%
+%   (1) TITLE — "Format the title in solid capital letters, 16 points,
+%       single-spaced, and centered on the first line below the top margin. The
+%       rest of the text on the title page is 12 points." The sample sets it
+%       bold; the prose does not mention weight, so the sample governs.
+%
+%   (2) A Dissertation
+%       Submitted to the Graduate Faculty of the
+%       Louisiana State University and
+%       Agricultural and Mechanical College
+%       in partial fulfillment of the
+%       requirements for the degree of
+%       Doctor of Philosophy
+%       in
+%       The Department of History
+%
+%   (3) by
+%       Susan Mary Alford
+%       B.A., Purdue University, 2001
+%       M.A., University of Texas, 2004
+%       M.L.S., University of Virginia, 2010
+%       December 2020
+%
+% "Although the title page is page number i, it contains no page number."
+% "On the final line, provide the month and year of graduation, e.g., May 2022."
+% — so set \graddate to a bare "Month Year" for LSU; the class's default
+% "May, 20XX" carries a comma LSU's example does not.
+%
+% \thesis@program supplies the department line, and the sample writes it with
+% the article: "The Department of History". Set \gradprogram that way.
+%
+% "Use the version of your name that appears in official university records,
+% which you will find on your Workday Unofficial Transcript. ... so that it
+% will match on both your approval form and your title page."
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing
+		% "centered on the first line below the top margin": the geometry
+		% already places the text block at 1in, so the title is the first thing
+		% on the page with nothing above it. \topskip is zeroed for the reason
+		% recorded in the Delaware profile — it would otherwise add 10pt before
+		% the page's first box.
+		\topskip=0pt\relax
+		{\centering
+			\thesis@tagtitle{Title}{%
+				{\fontsize{16}{19}\selectfont\bfseries\MakeUppercase{\@title}\par}%
+			}%
+			% Block 2. The class's 12pt body size is the "rest of the text".
+			\vfill
+			A \thesis@DocNoun\par
+			\vspace{\baselineskip}
+			Submitted to the Graduate Faculty of the\par
+			Louisiana State University and\par
+			Agricultural and Mechanical College\par
+			in partial fulfillment of the\par
+			requirements for the degree of\par
+			\thesis@degree\par
+			\vspace{\baselineskip}
+			in\par
+			\vspace{\baselineskip}
+			\thesis@program\par
+			% Block 3.
+			\vfill
+			by\par
+			\@author\par
+			\ifx\thesis@lsu@priordegrees\@empty\else
+				\thesis@lsu@priordegrees\par
+			\fi
+			\thesis@date\par
+		\par}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% LSU prescribes none inside the document. Approval travels on a separate form
+% that never becomes a page of the thesis: "a copy of the committee-signed
+% Thesis/Dissertation Approval Form, which your department prepares and emails
+% to gradsvcs@lsu.edu."
+%
+% That is stronger evidence than a closed list alone, and the closed list agrees
+% with it. LSU's "Order of the Main Sections" runs Title Page, Copyright page,
+% Dedication, Epigraph, Acknowledgments, Table of Contents, List of Tables,
+% List of Figures, Nomenclature/Symbols/Acronyms, Abstract — with no approval,
+% committee or signature page anywhere in the front matter.
+%
+% So the committee does sign at LSU; it signs a form that is emailed to the
+% Graduate School, not a leaf of the filed document.
+\thesisnoapprovalpage
