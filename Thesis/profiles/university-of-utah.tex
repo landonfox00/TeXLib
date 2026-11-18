@@ -1,0 +1,229 @@
+% profiles/university-of-utah.tex — University of Utah
+% ============================================================================
+% source: https://gradschool.utah.edu/thesis/handbook/preparation-printing-manuscript.php
+%         (Graduate School Thesis Office handbook, "Preparation and Printing of
+%         the Manuscript" -- margins, print quality, accessibility in the PDF)
+% source: https://gradschool.utah.edu/thesis/handbook/preliminary-pages.php
+%         ("Formatting Requirements: Preliminary Pages" -- title page, statement
+%         of thesis/dissertation approval)
+% source: https://gradschool.utah.edu/thesis/handbook/spacing-requirements.php
+% source: https://gradschool.utah.edu/thesis/handbook/accessibility.php
+% source: https://gradschool.utah.edu/_resources/documents/sample-preliminary-pages_.pdf
+%         (the Thesis Office's "Sample Preliminary Pages", four sample title
+%         pages)
+% source: https://gradschool.utah.edu/thesis/templates-guides-samples/word_template_version_13.docx
+%         (the Thesis Office's official Word template, v13 -- the only published
+%         layout of the approval statement)
+% accessed: 2026-09-10
+% checked:  texlib-thesis-profile-round
+%
+% The templates/samples index carries "Last Updated: 4/10/26", so the handbook
+% is current.
+%
+% VERIFIED and set here: geometry, the 2in main-heading opening, spacing, the
+% title page, the statement of approval, and four accessibility requirements.
+% NOT set: nothing is left to the neutral fallback.
+
+\thesisinstitution{The University of Utah}
+
+% "All pages of the final manuscript must be within the following limits:
+% left and right margins: 1 1/4 inches / top and bottom margins: 1 inch".
+\thesissetgeometry{left=1.25in, right=1.25in, top=1in, bottom=1in}
+
+% "double space ... between lines of text". Utah's single-spaced items (within
+% entries in lists of figures and tables, within reference entries, between
+% footnote entries, between lines in figure captions and table titles, between
+% subheads in the table of contents) are per-element, not a document rule.
+\thesissetspacing{double}
+
+% THE THIRD LINE OF THE MARGIN RULE, and it is a requirement, not an option:
+% "main headings pages (title in ALL CAPS) top margin: 2 inches". The handbook
+% repeats the figure for each such page in turn -- "The word ABSTRACT is placed
+% 2 inches from the top of the page in all capital letters", and the same
+% sentence for CONTENTS, LIST OF TABLES, ACKNOWLEDGMENTS and PREFACE.
+%
+% Continuation pages go back to 1in ("If the table of contents continues to a
+% second page, it begins 1 inch from the top of the page"), which is what this
+% class already does: the deeper margin is applied at the chapter head, not to
+% every page of the chapter.
+\thesissetchapteropening{2in}
+
+% Typeface: Utah lists ten acceptable faces with sizes (Table 4.1, "Recommended
+% fonts and print sizes") and requires only "A professional font in a size that
+% is clear and easy to read". No face is mandated -- "The official Word template
+% provided by the Thesis Office uses Times New Roman 12 pt. If you want to use a
+% different font you will need to make sure to change the font everywhere" -- so
+% this profile sets none and the class's Latin Modern applies.
+
+% --- Accessibility -----------------------------------------------------------
+% Utah devotes a whole handbook chapter to this, and one item in it is a hard
+% REQUIREMENT while the rest are prescriptions about content the class cannot
+% see. Note what is NOT here: Utah never says "tagged PDF", "PDF/UA" or "PDF/A",
+% and its one sentence about screen readers is a SHOULD. \thesisrequiretagging
+% is therefore not set.
+\thesisaccessibilityrequirement{Alternate text}
+	{"It is required that you add alternate text for each figure, table, or any
+	 object that is not text in your document (e.g., schemes, examples, etc.)."
+	 For a figure, "provide cursory details about the very appearance of the
+	 image itself" rather than repeating the caption; for a table, "provide an
+	 overview of the table's purpose", not the cell contents.}
+\thesisaccessibilityrequirement{Screen readers}
+	{"Manuscripts uploaded to ProQuest for publication should be accessible to
+	 screen readers. Care should be used to preserve the formatting of headings,
+	 figure captions, and table titles within the converted PDF so that they can
+	 be parsed by screen-reading software and utilities."}
+\thesisaccessibilityrequirement{Colour}
+	{"Data within tables and figures may not be distinguished by color only, so
+	 as to make the information within accessible to people who have difficulty
+	 distinguishing colors." Utah gives two checks: convert to greyscale and see
+	 that the shades stay distinguishable, or run a contrast analyser.}
+\thesisaccessibilityrequirement{Table construction}
+	{"Merging or splitting cells confuses screen reading software. Similarly,
+	 nesting a table within another table is not considered accessible." Blank
+	 rows and columns must be deleted rather than left empty.}
+
+% --- Author-facing fields this profile adds ----------------------------------
+% Utah's approval statement carries a per-member APPROVAL DATE, a departmental
+% approver and the Dean of the Graduate School. The class models none of those,
+% so the profile supplies them. All have harmless defaults; a document that sets
+% none still builds, and the page then shows the placeholders rather than
+% silently omitting what Utah requires.
+%
+% \utahcommitteemember is the Utah spelling of \committeemember: same first two
+% arguments, plus the date. Use it INSTEAD of \committeemember when filing here.
+% Members declared with the plain \committeemember still render, with the date
+% column blank.
+\providecommand{\thesisutah@deptname}{Department Name}
+\providecommand{\thesisutah@deptapprover}{Full Official Name}
+\providecommand{\thesisutah@deptrole}{Chair}
+\providecommand{\thesisutah@deptunit}{College}
+\providecommand{\thesisutah@dean}{Darryl P. Butt}
+\newcommand{\utahdepartment}[1]{\renewcommand{\thesisutah@deptname}{#1}}
+\newcommand{\utahdepartmentapproval}[3]{%
+	\renewcommand{\thesisutah@deptapprover}{#1}%
+	\renewcommand{\thesisutah@deptrole}{#2}%
+	\renewcommand{\thesisutah@deptunit}{#3}%
+}
+% The Dean's name is a PERSON and will change. The default is the name carried
+% by Word template v13 as read on the access date; check it before filing.
+\newcommand{\utahgraduatedean}[1]{\renewcommand{\thesisutah@dean}{#1}}
+
+\newcommand{\thesisutah@memberline}[3]{%
+	\thesisutah@row{#1}{#2}{#3}%
+}
+\newcommand{\utahcommitteemember}[3]{%
+	\g@addto@macro\thesis@committee{\thesisutah@memberline{#1}{#2}{#3}}%
+}
+
+% --- Title page --------------------------------------------------------------
+% From the handbook's prose and the four sample title pages, which agree.
+%
+% "The title of the thesis or dissertation is typed in all capital letters."
+% "The word 'by' follows the title. The full legal name of the author as it
+% appears in CIS follows after a double space. The name is not typed in all
+% capital letters."
+% "The statement 'A thesis submitted to the faculty of The University of Utah in
+% partial fulfillment of the requirements for the degree of' appears single
+% spaced in the middle of the title page ... For doctoral candidates, the
+% phrasing reads 'A dissertation submitted. . . '"
+% "Below the degree field, the full name of the department is listed on the
+% title page. 'The University of Utah,' is listed a double space below the
+% department name."
+% "The date appears on the title page a double space below 'The University of
+% Utah.' Only the month and year appear, with no punctuation separating them.
+% The month indicates the last month in the semester the degree is granted: fall
+% semester, December; spring semester, May; summer semester, August."
+% "Again, the spaces below the title, the full legal name, the statement, and
+% the degree should be of equal size." -- measured on the samples at roughly
+% five single-spaced lines, which is what the \vspace values below are.
+%
+% TWO THINGS A DOCUMENT MUST DO, because the profile cannot:
+%   * \graddate{December 2027} -- month and year, NO comma, and the month must
+%     be December, May or August.
+%   * where the degree name and the department name differ, Utah splits the
+%     degree over three lines: "Master of Fine Arts" / "in" / "Creative
+%     Writing". Write that into \graddegree, e.g.
+%     \graddegree{Master of Fine Arts\\in\\Creative Writing}.
+%     Where they are the same, "Doctor of Philosophy" alone is correct.
+% The department line is \utahdepartment, not \gradprogram, because Utah wants
+% the department's full name including the word "Department".
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{1in}%
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{4\baselineskip}
+		by\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{4\baselineskip}
+		A \thesis@docnoun{} submitted to the faculty of\\
+		The University of Utah\\
+		in partial fulfillment of the requirements for the degree of\par
+		\vspace{4\baselineskip}
+		\thesis@degree\par
+		\vspace{4\baselineskip}
+		\thesisutah@deptname\par
+		\vspace{\baselineskip}
+		The University of Utah\par
+		\vspace{\baselineskip}
+		\thesis@date\par
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Statement of Thesis/Dissertation Approval --------------------------------
+% MANDATORY, and it is page ii: Table 2.1 lists it "Mandatory / Counted / [no]
+% Visible Page Number", between the copyright page and the abstract.
+%
+% NO SIGNATURES: "As with the digital signature forms, full legal names of
+% committee members must be listed. Neither degrees nor titles should be listed
+% with the names of faculty members. No signatures are required." Approval is
+% collected electronically -- "The dates entered should match the date when you
+% received notification that the committee member electronically signed the
+% form" -- and the members who did not approve are simply left undated: "The
+% names of any committee members who did not approve or digitally sign the forms
+% for the thesis or dissertation are not dated."
+%
+% The layout is taken from the Thesis Office's own Word template (v13), which is
+% the only place it is published in full; the handbook's Figures 2.4 and 2.5 are
+% not reproduced on the web pages.
+\newcommand{\thesisutah@row}[3]{%
+	\parbox[t]{0.55\textwidth}{\raggedright #1\ifx\relax#2\relax\else, #2\fi}%
+	\hfill
+	\parbox[t]{0.35\textwidth}{%
+		\raggedright #3\par
+		\vspace{-0.2\baselineskip}%
+		\rule{\linewidth}{0.4pt}\par
+		\footnotesize Date Approved
+	}\par
+	\vspace{1.2\baselineskip}%
+}
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\begin{center}
+		The University of Utah Graduate School\par
+		\vspace{2\baselineskip}
+		\thesis@tagtitle{H1}{\MakeUppercase{Statement of \thesis@DocNoun{} Approval}}\par
+		\vspace{2\baselineskip}
+	\end{center}
+	\noindent The \thesis@docnoun{} of\par
+	\begin{center}\@author\end{center}
+	\noindent has been approved by the following supervisory committee members:\par
+	\vspace{1.5\baselineskip}
+	\begingroup
+	% The class's two-argument line is redefined so that a document using the
+	% plain \committeemember still renders here -- with an empty date column,
+	% which is visibly incomplete rather than silently wrong.
+	\renewcommand{\thesis@memberline}[2]{\thesisutah@row{##1}{##2}{}}%
+	\thesis@committee
+	\endgroup
+	\noindent and by \thesisutah@deptapprover, \thesisutah@deptrole{} of\\
+	the \thesisutah@deptunit{} of\\
+	\thesisutah@deptname\par
+	\vspace{\baselineskip}
+	\noindent and by \thesisutah@dean, Dean of The Graduate School.\par
+	\loadgeometry{normal}%
+}
