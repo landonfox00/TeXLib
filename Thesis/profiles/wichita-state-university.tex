@@ -1,0 +1,256 @@
+% profiles/wichita-state-university.tex — Wichita State University
+% ============================================================================
+% source: https://www.wichita.edu/academics/graduate_school/_documents/ThesisDissertationManual.pdf
+%         ("Graduate School Guide to the Preparation of Theses and
+%          Dissertations", title page dated "Fall 2023"; §2.2 Margins, §2.3
+%          Font, §2.4 Spacing, §2.5 Pagination, §3.2.1 Title Page, §3.2.3
+%          Committee Identification Page, and the full-sized samples on
+%          pp. 41-42 and 45-46)
+% source: https://www.wichita.edu/academics/gradschool/DegreeCompletion/ThesisPreparation.php
+%         ("Electronic Thesis and Dissertation" — the live Graduate School page,
+%          which links the manual above and nothing else for format)
+% accessed: 2026-09-14
+% checked:  texlib-thesis-profile-round
+%
+% CURRENCY. The manual is labelled "Fall 2023" and its PDF metadata says it was
+% produced 2023-09-15 — about three years old on the access date. It is
+% nevertheless the current document: the Graduate School's live ETD page links
+% exactly this file for "Format", and no newer edition was found anywhere on
+% wichita.edu. No superseded copy is sitting beside it either.
+%
+% VERIFIED and set here: geometry, spacing, title page, committee
+% identification page, and the accessibility finding (an absence).
+% NOT set: \thesissetchapteropening — Wichita's major headings sit ON the
+% one-inch top margin, not below a deeper one.
+%
+% THREE PIECES OF INFORMATION WICHITA REQUIRES THAT THE CLASS HAS NO FIELD FOR,
+% so this profile adds three setters. They are prefixed \wichita... because they
+% are this profile's, not the class's, and a document that sets them is
+% declaring itself a Wichita document:
+%
+%   \wichitapriordegrees{...}  the prior-degree lines on the title page
+%   \wichitamajor{...}         the major, for the committee page's first
+%                              paragraph ("with a major in ___", if applicable)
+%   \wichitadeans{college}{college dean}{graduate school dean}
+%                              the two "Accepted for…" blocks a DISSERTATION
+%                              must carry, and a thesis must not
+%
+% Each defaults to unset and prints nothing rather than a plausible placeholder.
+% \wichitapriordegrees and \wichitadeans warn when a document needs them and has
+% not set them, because an omitted required line is a filing error and a silent
+% one.
+
+\thesisinstitution{Wichita State University}
+
+% "Use one-inch margins for ALL pages (including preliminary pages, text, pages
+% with tables and figures, references/bibliography, and appendices), and keep
+% all type-written text within the text area of 6[.5] by 9 inches. Insert page
+% numbers in the footer area of the page at the bottom [half]-inch margin."
+%
+% 8.5in - 2in = 6.5in and 11in - 2in = 9in, so the stated text area is exactly
+% what one-inch margins on letter paper produce; the two statements agree and
+% this is the whole rule.
+%
+% NOT IMPLEMENTED, and left for the reviewer, exactly as at Washington State:
+% "Center page numbers in the middle of the 8[.5]-inch width of the page
+% one-half inch from the bottom edge of the paper, thus leaving at least two
+% blank lines between the nearest line of text and the page number." The class
+% centres the folio in the foot but does not pin it to 0.5in from the paper
+% edge. Wichita's hard rule — "do not let the text intrude into the one-inch
+% bottom margin that contains the page number" — is satisfied.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "In the text, double-space throughout the entire document". Not a choice here;
+% §2.4 states double spacing for the body, for the Acknowledgments, Abstract and
+% Preface, and prescribes single spacing only for named items (a title longer
+% than one line, citations longer than one line, definitions longer than one
+% line, and the blocks on the title page).
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% Wichita State publishes NONE for a filed thesis or dissertation. This is a
+% recorded absence, not an unread section: the 96-page manual contains no
+% occurrence of "accessibility", "alt text", "tagged", "WCAG", "PDF/A", "screen
+% reader", "508" or "Title II" — its four matches for "accessible" are all about
+% keeping supplemental files reachable from the manuscript — and the Graduate
+% School's live ETD page carries nothing beyond the sitewide footer link. None
+% of \thesisrequiretagging, \thesisrequiredocumentlanguage or
+% \thesisrequirepdfstandard is set, because Wichita has asked for none of them.
+\thesisaccessibilityrequirement{Not published}
+	{No accessibility requirement for a filed thesis or dissertation was found
+	 in the Graduate School's manual or on its ETD page on 2026-09-14. The
+	 manual was searched and does not mention accessibility at all. Treat this
+	 as "this school asks for nothing", not as "nobody looked" — and note that
+	 it may simply predate the federal deadlines, being dated Fall 2023.}
+
+% --- Profile-local metadata ---------------------------------------------------
+\newcommand{\thesis@wichita@prior}{}
+\newcommand{\wichitapriordegrees}[1]{\renewcommand{\thesis@wichita@prior}{#1}}
+\newcommand{\thesis@wichita@major}{}
+\newcommand{\wichitamajor}[1]{\renewcommand{\thesis@wichita@major}{#1}}
+\newcommand{\thesis@wichita@deans}{}
+% Made with \newcommand, not \def, because the \ifx on the approval page
+% compares it against \thesis@docnoun: \newcommand builds a \long macro and
+% \def does not, so a \def'd twin would never compare equal.
+\newcommand{\thesis@wichita@diss}{dissertation}
+\newcommand{\wichitadeans}[3]{%
+	\renewcommand{\thesis@wichita@deans}{%
+		\vspace{3\baselineskip}
+		\noindent\hspace{0.45\textwidth}%
+		\begin{minipage}{0.5\textwidth}
+			\raggedright
+			Accepted for the College of #1\par
+			\vspace{2\baselineskip}
+			#2, Dean\par
+			\vspace{3\baselineskip}
+			Accepted for the Graduate School\par
+			\vspace{2\baselineskip}
+			#3, Dean\par
+		\end{minipage}\par
+	}%
+}
+
+% --- Title page --------------------------------------------------------------
+% §3.2.1 and the full-sized sample on p. 41. Unusually, the title does NOT float
+% in the middle of the page: "Center and single-space the FULL TITLE OF THE
+% THESIS OR DISSERTATION in full capital letters at the top one-inch margin of
+% this page. Utilize the full width of the page within the prescribed margins.
+% Single-space a title that is longer than one line. Do not bold this heading."
+% So the page starts at the top margin, and everything below it is positioned.
+%
+% "Center all other information on this page, as shown below and in the
+% full-sized samples on pages 41-42. Do not bold any of this information." The
+% manual gives no blank-line counts for this page — the sample IS the
+% specification — so the vertical positions below were measured off the sample
+% page rendered at 110 dpi and are stated as inches from the top of the paper:
+%
+%   title              1.09in   (i.e. on the one-inch margin)
+%   "A Thesis by"      2.63in
+%   student name       3.01in
+%   prior degrees      3.40in and 3.97in
+%   "Submitted to…"    5.50in through 6.46in, single-spaced
+%   month and year     8.57in
+%
+% The first five reproduce to within about a fifth of an inch. The date does
+% not: it is set by the \vfill below and lands nearer 7.9in than 8.57in, which
+% is the one place this page is eyeballed rather than measured. Wichita states
+% no figure for it — the sample is the only specification — so the gap is noted
+% here rather than pinned with a rigid skip that a longer title would break.
+%
+% \thesis@program is the BARE DEPARTMENT NAME for this profile ("Mathematics,
+% Statistics and Physics"), not "Department of …" — the page supplies the words
+% "Submitted to the Department of" itself. Wichita also warns that "the name of
+% a graduate program may differ from the name of the department", and that four
+% programs (Aging Studies, Criminal Justice, Liberal Studies, Nursing) submit to
+% an area named in the manual's Appendix B rather than to a department.
+%
+% The degree carries no major: "Correct degree conferred. Do not include major.
+% For example: Master of Arts (not Master's of Arts; not Master of Arts in
+% ___)". The major belongs on the committee page instead, via \wichitamajor.
+%
+% The date is "Month (December/May/July/August) Year" with no comma, and is the
+% month of DEGREE CONFERRAL — "NOT the date of the oral defense, NOT the date
+% the thesis or dissertation was submitted".
+%
+% Page i, not printed.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{1.4in}
+		A \thesis@DocNoun{} by\par
+		\vspace{\baselineskip}
+		\@author\par
+		\ifx\thesis@wichita@prior\@empty
+			\ClassWarningNoLine{texlib-thesis}{Wichita State requires the prior
+				degree lines on the title page^^J%
+				(the bachelor's degree always, an earlier graduate degree if^^J%
+				there is one). Set \string\wichitapriordegrees{} or the page^^J%
+				will be filed incomplete}%
+		\else
+			\vspace{\baselineskip}
+			\thesis@wichita@prior\par
+		\fi
+		\vspace{1.4in}
+		Submitted to the Department of \thesis@program\\
+		and the faculty of the Graduate School of\\
+		Wichita State University\\
+		in partial fulfillment of\\
+		the requirements for the degree of\\
+		\thesis@degree\par
+		\vfill
+		\thesis@date\par
+		\vspace{1.6in}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee Identification Page ---------------------------------------------
+% Wichita's name for the approval page, and it is required. §3.2.3 and the
+% full-sized sample on p. 45.
+%
+% "Center and single-space the FULL TITLE EXACTLY AS IT APPEARS ON THE TITLE
+% PAGE, in full capital letters at the top one-inch margin of this page."
+%
+% Then, "use the exact wording and format as shown in this section and in the
+% full-sized samples on pages 44-45", which is the paragraph reproduced below —
+% left-aligned to the margins, first line not indented.
+%
+% "Provide sufficient identification lines for all committee members, and follow
+% each name with the words 'Committee Chair' or 'Committee Member.' Do not use
+% professional titles (such as Dr. or Prof.) before their names, or degree
+% titles (such as Ph.D.) after their names." So pass a bare name to
+% \committeemember and the role as the second argument.
+%
+% NO SIGNATURES: "Keep in mind that signatures are not required on this page",
+% and the sample page annotates the same block "NOTE THAT SIGNATURES ARE NO
+% LONGER REQUIRED ON THIS PAGE". The class's signature rule is therefore
+% replaced for this page.
+%
+% "For doctoral dissertations only, include identification lines for the
+% Academic College Dean and the Graduate School Dean, followed by their title,
+% 'Dean.'" — \wichitadeans, warned for if a dissertation has not set it and
+% deliberately ignored for a thesis.
+%
+% PAGE NUMBER: "Assign the Committee Identification Page number lowercase Roman
+% numeral 'iii,' and center and print it one-half inch from the bottom. Page iii
+% is the first page number printed in the document." The two pages before it are
+% the Title Page (i) and the required Copyright Page (ii), neither numbered, so
+% this page sets roman numbering with the counter at 3 — as at Washington State,
+% that assumes Wichita's own prescribed order, which the manual mandates.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage
+	\loadgeometry{normal}%
+	\pagenumbering{roman}\setcounter{page}{3}\thispagestyle{plain}%
+	\singlespacing
+	{\centering
+		\thesis@tagtitle{H1}{\MakeUppercase{\@title}}\par
+	}%
+	\vspace{2\baselineskip}
+	\noindent The following faculty members have examined the final copy of this
+	\thesis@docnoun{} for form and content, and recommend that it be accepted in
+	partial fulfillment of the requirement for the degree of \thesis@degree
+	\ifx\thesis@wichita@major\@empty\else, with a major in \thesis@wichita@major\fi.\par
+	\vspace{2\baselineskip}
+	\begingroup
+	\renewcommand{\thesis@memberline}[2]{%
+		\vspace{2\baselineskip}
+		\noindent ##1\ifx\relax##2\relax\else, ##2\fi\par
+	}%
+	\thesis@committee
+	\endgroup
+	\ifx\thesis@docnoun\thesis@wichita@diss
+		\ifx\thesis@wichita@deans\@empty
+			\ClassWarningNoLine{texlib-thesis}{Wichita State requires the two
+				`Accepted for...' dean blocks^^J%
+				on the Committee Identification Page of a DISSERTATION. Set^^J%
+				\string\wichitadeans{college}{college dean}{graduate dean} or^^J%
+				the page will be filed incomplete}%
+		\else
+			\thesis@wichita@deans
+		\fi
+	\fi
+	\vfill
+	\clearpage\doublespacing
+}
