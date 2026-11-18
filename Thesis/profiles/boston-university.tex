@@ -1,0 +1,211 @@
+% profiles/boston-university.tex — Boston University
+% ============================================================================
+% source: https://library.bu.edu/theses
+%         (Boston University Libraries, "Guide for Writers of Theses &
+%         Dissertations" -- the guide itself, "Last Updated: Aug 26, 2026")
+% source: http://library.bu.edu/ld.php?content_id=30310050
+%         ("BU Guide for Writers of Theses and Dissertations" [PDF], the full
+%         requirements document linked from that guide's Step 2)
+% source: http://library.bu.edu/ld.php?content_id=24728519
+%         ("Samples of the Preliminary Pages" [PDF], linked from Prepare Your
+%         Manuscript)
+% source: https://library.bu.edu/ld.php?content_id=76791968
+%         ("ETD Checklist for Students 2024-2025" [PDF])
+% source: https://library.bu.edu/c.php?g=542544&p=10536519
+%         (Step 2: Prepare -- the preliminary-page table)
+% accessed: 2026-09-10
+% checked:  texlib-thesis-profile-round
+%
+% A NOTE ON THE SOURCE, because RESEARCHING.md rules out library guides.
+% At BU the Libraries ARE the filing authority: "Submitting your thesis or
+% dissertation to Boston University Libraries is the last step to fulfill at the
+% University before you graduate and are awarded your degree", and the guide
+% says of itself "This guide takes precedence should there be any conflict in
+% formatting or standard requirements." It is the institution's own filing
+% requirements document that happens to be hosted on LibGuides, not a librarian's
+% advice about someone else's rules. BU has no central graduate school; the
+% thirteen schools and colleges file through this one guide.
+%
+% VERIFIED and set here: geometry, spacing, title page, readers' approval page,
+% and the (absent) accessibility requirement.
+% NOT set: nothing is left to the neutral fallback.
+
+\thesisinstitution{Boston University}
+
+% "Top margin: 1.5 inches to first line of text or heading / Left margin: 1.5
+% inches / Right margin: 1 inch. You may choose to justify the right margin. /
+% Bottom margin: at least 1 inch from the bottom of the page".
+%
+% "Use these margins at all times. Do not exceed the right hand 1-inch margin.
+% Extra wide margins are not allowed. Only the page number lies outside these
+% margins."
+%
+% Note the TOP margin is 1.5in on every page, not a chapter exception, which is
+% why \thesissetchapteropening is not called: BU states one figure and applies
+% it "at all times".
+\thesissetgeometry{left=1.5in, right=1in, top=1.5in, bottom=1in}
+
+% "Double space all textual material and preliminary pages, including table of
+% contents. Footnotes, figure and table captions, and long quotations may be
+% single spaced. The bibliography may be single-spaced, with one extra space
+% between each citation." The permitted single-spaced items are per-element.
+\thesissetspacing{double}
+
+% Type size: "Use 12-point font for the text, all headings, and subheadings.
+% Titles or major headings may be in all upper case letters, bold, italics, or
+% underlined, but they cannot be larger than 12-point." The class already loads
+% report at 12pt, so nothing is needed here -- but note the second clause: a
+% profile or document must not enlarge headings past 12pt at BU.
+%
+% Typeface: "Use standard font types such as Arial, Cambria, Garamond, Palatino
+% Linotype, Times New Roman, Verdana etc. ... Avoid Calibri". The list is open
+% ("such as ... etc.") and names no requirement, so this profile sets no face.
+% BU also asks that all fonts be embedded, which this class does.
+
+% --- Accessibility -----------------------------------------------------------
+% Read on the access date: the full guide PDF (searched for "accessib", "alt
+% text", "alternative text", "tagged", "WCAG", "PDF/A", "screen reader", "508",
+% "Title II" -- the only hits are about open ACCESS, not accessibility), the ETD
+% checklist, and the guide's Step 2 page. BU asks two things of the PDF file and
+% neither is an accessibility rule:
+\thesisaccessibilityrequirement{Not published}
+	{No BU accessibility requirement for a filed thesis or dissertation was found
+	 on the access date, in the Guide for Writers of Theses \& Dissertations, the
+	 ETD checklist, or the Libraries' submission pages. This is "BU publishes
+	 none", not "nobody looked".}
+\thesisaccessibilityrequirement{PDF settings}
+	{"Your PDF must have all fonts embedded and security settings showing 'No
+	 security.'" and "Your PDF should be set to Document Restrictions Summary ->
+	 Everything allowed." These are reuse and preservation rules rather than
+	 accessibility ones, but they are the only constraints BU places on the file,
+	 and a restricted PDF is one an assistive tool cannot open.}
+
+% --- Author-facing fields this profile adds ----------------------------------
+% BU's title page carries two things the class does not model: the OFFICIAL
+% SCHOOL NAME, which must be taken from a fixed list, and the author's prior
+% degrees. Both default to visible placeholders rather than vanishing, because
+% both are required.
+%
+% The list, verbatim from "LIST OF OFFICIAL SCHOOL NAMES" in the samples:
+%   COLLEGE OF COMMUNICATION
+%   COLLEGE OF ENGINEERING
+%   COLLEGE OF FINE ARTS
+%   GRADUATE SCHOOL OF ARTS AND SCIENCES
+%   HENRY M. GOLDMAN SCHOOL OF DENTAL MEDICINE
+%   METROPOLITAN COLLEGE
+%   QUESTROM SCHOOL OF BUSINESS
+%   SARGENT COLLEGE OF HEALTH AND REHABILITATION SCIENCES
+%   ARAM V. CHOBANIAN & EDWARD AVEDISIAN SCHOOL OF MEDICINE
+%   SCHOOL OF PUBLIC HEALTH
+%   SCHOOL OF THEOLOGY
+%   WHEELOCK COLLEGE OF EDUCATION & HUMAN DEVELOPMENT
+% BU adds a warning for one of them: for Sargent, "Do NOT use 'College of Health
+% and Rehabilitation Sciences - Sargent College'".
+\providecommand{\buschool@name}{SCHOOL OF CANDIDATE}
+\providecommand{\bupriordegrees@list}{}
+\newcommand{\buschool}[1]{\renewcommand{\buschool@name}{#1}}
+% Prior degrees, one per line, in the specimen's form: "B.A., University of
+% Jupiter, 2015". Separate lines with \\.
+\newcommand{\bupriordegrees}[1]{\renewcommand{\bupriordegrees@list}{#1}}
+
+% A reader line. "Place a reader's official title after the name (e.g.,
+% Professor of History...). It is assumed your readers are Boston University
+% faculty. If a reader is not a Boston University faculty member, add the name
+% of the institution after the official title." -- so #3 may be two lines.
+% "Do not put 'Dr.' before any reader's name. The doctoral degree initials after
+% the name already indicate that."
+\newcommand{\bureader}[3]{%
+	\g@addto@macro\thesis@committee{\bu@readerline{#1}{#2}{#3}}%
+}
+\newcommand{\bu@readerline}[3]{%
+	\noindent
+	% \strut is load-bearing: a \parbox whose body is empty produces a vbox with
+	% no lines, and a vbox with no lines is 0pt WIDE, not 0.22\textwidth -- so
+	% the whole row would shift left for any reader declared without a label.
+	\parbox[t]{0.22\textwidth}{\raggedleft\strut #1}%
+	\hspace{0.02\textwidth}%
+	\parbox[t]{0.70\textwidth}{%
+		\rule{\linewidth}{0.4pt}\par
+		\vspace{0.2\baselineskip}%
+		\raggedright #2\par #3
+	}\par
+	\vspace{1.6\baselineskip}%
+}
+
+% --- Title page --------------------------------------------------------------
+% From the samples PDF, whose annotations are prescriptive, plus the guide's
+% prose. The page is double spaced like the rest of the front matter.
+%
+% "THE TITLE OF THE DOCTORAL DISSERTATION IN ALL CAPITAL LETTERS BOLD AND
+% CENTERED"; "YOUR NAME IN ALL CAPITALS BOLD AND CENTERED"; the author's name
+% "should be in order of first middle last"; the year is the "Year degree
+% officially conferred, not when you defended or submitted the dissertation";
+% and "A Roman numeral does not appear at the bottom center of this page,
+% although the page counts as page i".
+%
+% The word between the school name and the title is the document type --
+% "Dissertation" or "Thesis" -- which \thesis@DocNoun already carries.
+%
+% \graddate should hold the YEAR ALONE at BU; the specimen prints "202_".
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\doublespacing\centering
+		BOSTON UNIVERSITY\par
+		\buschool@name\par
+		\vspace{2\baselineskip}
+		\thesis@DocNoun\par
+		\vspace{2\baselineskip}
+		\thesis@tagtitle{Title}{\textbf{\MakeUppercase{\@title}}}\par
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{2\baselineskip}
+		\textbf{\MakeUppercase{\@author}}\par
+		\ifx\bupriordegrees@list\@empty\else
+			{\singlespacing\bupriordegrees@list\par}%
+		\fi
+		\vfill
+		Submitted in partial fulfillment of the\\
+		requirements for the degree of\par
+		\vspace{\baselineskip}
+		\thesis@degree\par
+		\thesis@date\par
+		\vspace{0.5in}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Readers' approval page ---------------------------------------------------
+% REQUIRED, and it is page iii: the guide's preliminary-page table lists
+% "Readers' Approval page (required) -- iii (counted, does not appear on page;
+% unsigned - without signatures)", and the ETD checklist asks "Are the first
+% three pages (in order) Title page, Copyright page, and Reader's Approval
+% page?"
+%
+% SIGNATURES: YES, BUT NOT IN THIS COPY -- and the two halves of that are easy
+% to read as a contradiction, so both are quoted here. Signatures are collected
+% separately: "For COM, ENG, GMS, GRS, QST, WED, SPH, STH, and Sargent
+% dissertations, Readers' Approval pages are now created and signed via
+% DocuSign"; "For all other theses and dissertations: submit a paper copy of the
+% approval page with original signatures ... Photocopied, scanned, faxed, or
+% other methods of reproduced signatures will not be accepted." And then:
+% "Be certain to include a copy of this readers' approval page WITHOUT
+% signatures in the thesis or dissertation submitted electronically."
+%
+% So the filed PDF's page carries rules with typed names beneath them, exactly
+% as the specimen shows, and that is what this renders.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\begin{center}
+		\thesis@tagtitle{H1}{Approved by}\par
+	\end{center}
+	\vspace{3\baselineskip}
+	\begingroup
+	% A document that used the class's plain \committeemember still renders: the
+	% role becomes the left-hand label and the official title is simply absent.
+	\renewcommand{\thesis@memberline}[2]{\bu@readerline{##2}{##1}{}}%
+	\thesis@committee
+	\endgroup
+	\loadgeometry{normal}%
+}
