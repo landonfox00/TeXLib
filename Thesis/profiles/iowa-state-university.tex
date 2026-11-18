@@ -1,0 +1,245 @@
+% profiles/iowa-state-university.tex — Iowa State University
+% ============================================================================
+% source: https://cce.grad-college.iastate.edu/thesisdissertation-format-requirements
+%         (Graduate College, Center for Communication Excellence,
+%         "Thesis/Dissertation Format Requirements")
+% source: https://cce.grad-college.iastate.edu/toolkits-and-resources
+%         (the page that links the Graduate College's annotated samples)
+% source: https://iastate.app.box.com/s/tsrxq7l8hssywxhpm977r0s4xoe2kx4a
+%         → Title Page → PhD_Title_Page.pdf
+%         (the Graduate College's own annotated specimen, folder owner
+%         "Graduate College", file updated 17 November 2025)
+% accessed: 2026-09-13
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, title page, the absence of an
+% approval page, and — unusually — a full set of enforceable accessibility
+% requirements. NOT set: chapter-opening margin (ISU states none; 1in applies
+% throughout) and the typeface (ISU asks for "the same standard proportional
+% font, e.g., those identified by the APA", which is a choice).
+%
+% ISU is the strongest accessibility case in the profile set so far. Its
+% requirements were rewritten for Spring 2024 expressly "to ensure that the
+% Graduate College is in compliance with Iowa State University's Digital
+% Accessibility policy, which will go into full effect in April 2026", ran as
+% recommendations through a 12-month grace period, and — this is the part that
+% licenses \thesisrequiretagging below — "Starting in January 2025, the New
+% Format Requirements will be treated as requirements." That date is past, so
+% the accessibility items are live rules, not aspirations. ISU also enforces
+% them: "The thesis/dissertation will not be accepted until all requirements
+% are met, even if this results in a delay to the student's graduation."
+
+\thesisinstitution{Iowa State University}
+
+% "1" margins all around throughout entire thesis/dissertation". Note the
+% "throughout entire" — ISU states no binding allowance and no exception for
+% tables, figures or appendices, so all four sides are 1in everywhere.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Body text must be double-spaced, left-aligned, not justified."
+%
+% The left-aligned half of that rule is the document's business rather than the
+% class's, but it is worth knowing that it IS a rule at ISU: a justified thesis
+% fails the format check. ISU's narrower exceptions are single-spaced by
+% separate rules — the title, the committee list — and are handled on the page
+% below. References are no longer covered: "Double-spacing is not longer
+% required for references" (ISU's typo, quoted as printed).
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% ISU requires a tagged PDF in substance if not in those words: headings must be
+% "tagged bookmarks", table content "must be tagged", and the file must carry a
+% hierarchical outline and a real document title. All of these are "must" items
+% in the New Format Requirements table, in force since January 2025.
+\thesisrequiretagging
+
+% NOT set, deliberately, and the distinction matters:
+%   * \thesisrequiredocumentlanguage — ISU never states a document-language
+%     rule. Its neighbours in this file all come from an explicit "must".
+%   * \thesisrequirepdfstandard — ISU names no PDF standard. It describes the
+%     properties it wants (tags, outline, title) rather than naming PDF/A or
+%     PDF/UA, and inventing a standard it did not name would be a claim about
+%     what its reviewers check.
+
+\thesisaccessibilityrequirement{Headings}
+	{Headings must be formatted as tagged bookmarks (H1+ in PDF); PDF must
+	 contain a hierarchical outline that provides an overview of the document.
+	 Headings must be formatted using Heading styles. Format attributes (e.g.,
+	 bold, centered) are not sufficient for headings.}
+\thesisaccessibilityrequirement{Heading levels}
+	{Differentiation must be perceivable between heading levels. All
+	 preliminary pages must be identified with a Heading 0, including LIST OF
+	 TABLES and LIST OF FIGURES.}
+\thesisaccessibilityrequirement{Document title}
+	{Title must match what is specified in the Document Information Dictionary.
+	 File properties must include the full title of the thesis/dissertation.}
+\thesisaccessibilityrequirement{Table of contents}
+	{Table of Contents items must be linked to the respective heading location
+	 in the manuscript. Users must be able to locate content using bookmarks in
+	 long documents.}
+\thesisaccessibilityrequirement{Alt text}
+	{Alt-text must be provided for figures.}
+\thesisaccessibilityrequirement{Tables}
+	{Table content must be tagged: column headers (first+ row), first column,
+	 data cells.}
+\thesisaccessibilityrequirement{Legible font size}
+	{Font size must be legible (approximately 12 pt. in Word; 11 pt. in LaTeX)
+	 for page numbers, body text, references and headings, and 8 pt. or larger
+	 for text in tables and figures and for table and figure captions.}
+
+% --- Title page --------------------------------------------------------------
+% Laid out from the Graduate College's annotated specimen (PhD_Title_Page.pdf,
+% updated November 2025), with every element cross-checked against a "must" on
+% the requirements page:
+%
+%   "The title that appears on the title page must be sentence case."
+%   "No period is used at the end of the title."
+%   "The title that appears on the title page must be single-spaced."
+%   "Title and author name must be bold."
+%   "The word 'by' must be lowercase."
+%   "The major must be identified, preceded by 'Major:'."
+%   "List of committee members must be single-spaced."
+%   "Major Professor must be first in the committee member list, designated as
+%    'Major Professor'."
+%   "Committee member names must not include 'Dr.,' 'Professor,' 'Ph.D.'
+%    before/after their names."
+%   "Non-supervisory committee member names must not have any designation,
+%    e.g., 'Committee Member.'"
+%   "No page number appears on the title page."
+%   "Iowa State University must be correctly designated as the institution."
+%   "Ames, Iowa must be identified as the place of publication."
+%   "The graduation year must be identified as the date of publication."
+%   "Copyright statement must state, 'All rights reserved.'"
+%
+% The degree line is uppercased because the specimen annotates it in the margin:
+% "DOCTOR OF PHILOSOPHY. All caps."
+%
+% Sentence case is the AUTHOR's job, not this file's: \MakeUppercase can be
+% applied mechanically but sentence case cannot, so \@title is set as given and
+% a filer must type it in sentence case with no closing period.
+%
+% ---------------------------------------------------------------------------
+% ONE CONFLICT BETWEEN THE TWO SOURCES, RESOLVED IN FAVOUR OF THE SPECIMEN.
+% The requirements page's Responsibility of Content statement reads "...was
+% approved by the program of study committee...", and heads the list "Academic
+% Plan Committee" nowhere. The November 2025 specimen reads "...was approved by
+% the academic plan committee..." and titles the list "Academic Plan
+% Committee:". ISU renamed the body, and the requirements page carries the older
+% name. This profile follows the specimen, because it is the newer artifact from
+% the same office and the rename is visible in both places on it at once.
+%
+% RESEARCHING.md's default is the opposite — prefer the prose where the two
+% disagree — so this is a deliberate departure and a reviewer may reverse it by
+% editing the two strings below. Do not "correct" one against the other without
+% reading both; they are both real, and both are ISU's.
+% ---------------------------------------------------------------------------
+%
+% The year on the page is the graduation year, which ISU wants as a bare year
+% rather than as the term-and-year \graddate holds. Hence its own setter.
+\newcommand{\thesis@isu@year}{\the\year}
+\newcommand{\isugraduationyear}[1]{\renewcommand{\thesis@isu@year}{#1}}
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing
+		% THE WHOLE PAGE HAS TO FIT ONE TEXT BLOCK, and the block is smaller
+		% than the paper suggests: geometry reports \textheight = 620.43pt,
+		% i.e. 8.58in, not the 9in that 1in margins on 11in paper imply. The
+		% spacing on this page is sized against that, because a title page that
+		% spills onto a second page carries a page number there — against ISU's
+		% "No page number appears on the title page".
+		%
+		% Two arrangements were tried first and both spilled:
+		%   * \vspace*{\fill} top and bottom, to centre the block vertically;
+		%   * \vfill before the copyright notice, which is worse rather than
+		%     better — infinitely stretchable glue is a legal page break, and on
+		%     an already-full page TeX takes it.
+		% Hence a small fixed lead and fixed skips throughout. With the
+		% specimen's five committee lines and a one-line title the page uses
+		% about 7.9in, leaving roughly 0.7in of slack for a longer title or an
+		% extra committee member. A much larger committee will need the skips
+		% reduced; it will not fail silently, because the notice moves to a
+		% numbered second page where it is obvious.
+		\vspace*{0.25in}%
+		{\centering
+			% Bold, sentence case (as typed), single-spaced, no closing period.
+			\thesis@tagtitle{Title}{{\bfseries\@title}}\par
+			\vspace{1.5\baselineskip}
+			by\par
+			\vspace{1.5\baselineskip}
+			{\bfseries\@author}\par
+			\vspace{1.5\baselineskip}
+			A \thesis@docnoun{} submitted to the graduate faculty\par
+			\vspace{1.5\baselineskip}
+			in partial fulfillment of the requirements for the degree of\par
+			\vspace{1.5\baselineskip}
+			\MakeUppercase{\thesis@degree}\par
+			\vspace{1.5\baselineskip}
+			Major: \thesis@program\par
+			\vspace{1.5\baselineskip}
+			% Single-spaced block: heading, major professor, then members with
+			% no designation at all. The class default \thesis@memberline draws
+			% a signature rule and appends the role; both are forbidden here.
+			\begingroup
+			\renewcommand{\thesis@memberline}[2]{##1\par}%
+			Academic Plan Committee:\par
+			\thesis@advisor, Major Professor\par
+			\thesis@committee
+			\endgroup
+			\vspace{1.5\baselineskip}
+			% Responsibility of Content statement, required verbatim. The
+			% document noun is substituted in both of its two places, which ISU
+			% calls out as its own check: "The manuscript type must be correctly
+			% designated as either a thesis or dissertation (2 places)".
+			\begin{minipage}{0.88\textwidth}
+				\centering
+				The student author, whose presentation of the scholarship
+				herein was approved by the academic plan committee, is solely
+				responsible for the content of this \thesis@docnoun. The
+				Graduate College will ensure this \thesis@docnoun{} is globally
+				accessible and will not permit alterations after a degree is
+				conferred.\par
+			\end{minipage}\par
+			\vspace{1.5\baselineskip}
+			Iowa State University\par
+			\vspace{1.5\baselineskip}
+			Ames, Iowa\par
+			\vspace{1.5\baselineskip}
+			\thesis@isu@year\par
+			% A FIXED skip, and the spacing on this page is tuned so that the
+			% whole of it fits one text block. Two things were tried first and
+			% both pushed the copyright notice onto a second page — which would
+			% then carry a page number, against ISU's "No page number appears
+			% on the title page":
+			%   * \vspace*{\fill} top and bottom, which centres the block
+			%     vertically and overflows 9in of text area with about 8in of
+			%     content plus two infinite skips;
+			%   * \vfill here, which is worse rather than better — infinitely
+			%     stretchable glue is a legal page break, and on an
+			%     already-full page TeX takes it.
+			% Hence fixed skips throughout, sized against the specimen.
+			\vspace{1.5\baselineskip}
+			Copyright \textcopyright{} \@author, \thesis@isu@year.
+			All rights reserved.\par
+		\par}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% ISU prescribes none, and the committee is named on the title page above.
+%
+% As at Colorado State, this rests on an exhaustive ordered list rather than on
+% an explicit prohibition, so it is stated plainly rather than asserted. ISU
+% publishes: "Pages must appear in the following order, if included: Title page
+% (required); Dedication, Preface, About the Author, etc. (optional); Table of
+% Contents (required); List of Tables (optional); List of Figures (optional);
+% Nomenclature (optional); Acknowledgments (optional); Abstract (required)",
+% followed by "Abstract must be the last preliminary page, located immediately
+% before Chapter 1." No approval, committee or signature page appears in that
+% list, and there is no gap left for one: the list is closed at both ends.
+%
+% A reviewer who wants the stricter standard of an explicit prohibition should
+% downgrade this one line; nothing else in the file depends on it.
+\thesisnoapprovalpage
