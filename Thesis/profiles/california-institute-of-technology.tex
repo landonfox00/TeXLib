@@ -1,0 +1,182 @@
+% profiles/california-institute-of-technology.tex — California Institute of Technology
+% ============================================================================
+% source: https://gradoffice.caltech.edu/documents/28130/phd-thesis_guidelines_rev_04-2024.pdf
+%         (Graduate Studies Office, "Regulations for the Format and
+%         Presentation of a Graduate Thesis"; every page foot reads "GRADUATE
+%         STUDIES OFFICE REVISED 4/2024", and Appendix A is the sample title
+%         page reproduced below)
+% accessed: 2026-09-13
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, title page, the absence of an
+% approval page, and the absence of any published accessibility rule for a
+% filed thesis. NOT set: chapter-opening margin (Caltech states none) and the
+% typeface — see the note on embedded fonts below, which is the one thing in
+% this file a reviewer should read before merging.
+%
+% A SUPERSEDED EDITION IS STILL ON THE SERVER: phd-thesis_guidelines_rev_1-11-16.pdf,
+% at gradoffice.caltech.edu/documents/6332/. Search engines surface it. Use the
+% 04-2024 document above.
+
+\thesisinstitution{California Institute of Technology}
+
+% "Left margin      -  1½ inches
+%  Right margin     -  1 inch
+%  Top and bottom   -  1 inch"
+%
+% READ THAT TABLE FROM THE RENDERED PAGE, NOT FROM EXTRACTED TEXT. pdftotext
+% mangles it into "Margins - 1½ inches / Left margin - 1 inch / Right margin /
+% Top and bottom - 1 inch", which reads as a 1in left margin and a 1½in
+% something-else — the exact inversion of the rule. The figures above were read
+% off page 7 rendered at 110dpi.
+%
+% "The same width margins must also be allowed on pages containing graphs,
+% tables, and other illustrative materials. These regulations must be followed
+% so the Institute Library may bind a final copy for reference use."
+%
+% One OPTION, not taken here: "Although not required, the student may also
+% provide a PDF of the thesis that is meant to be printed double-side. In this
+% case, the right margins should also be 1½ inches." That is a second, optional
+% PDF alongside the filed one, so the filed document keeps the 1in right margin.
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "All text should be double-spaced, but long quotations and footnotes may be
+% single-spaced."
+\thesissetspacing{double}
+
+% --- Two rules this file cannot express, recorded so they are not lost --------
+%
+% PAGE NUMBERS GO AT THE TOP, not the foot: "All pages except the title page
+% must be numbered at least 3/4" from the top of the page. ... Page numbers must
+% be within the margins at the top of each page." A profile owns no page-style
+% hook, so a Caltech filer must set this in the document; the class's default
+% foot folio is wrong here. Caltech also permits per-chapter numbering ("A-1...,
+% I-1...") as an alternative.
+%
+% EMBEDDED FONTS ARE REQUIRED, AND THE CLASS MAY NOT MATCH THE LETTER OF IT:
+% "Embedded fonts, which should be either TrueType of Type 1, are required for
+% the PDF" (Caltech's typo, quoted as printed). This class typesets with
+% lualatex through fontspec, which embeds OpenType faces as Type0/CID fonts
+% rather than as Type 1 or TrueType. Everything IS embedded, which is the
+% substance of the rule, and the named formats are introduced with "should"
+% rather than "must" — but a filer whose thesis is bounced on this point should
+% know where it comes from. It is recorded here rather than encoded because no
+% profile field expresses it and no font choice this file could make would
+% change how lualatex embeds.
+
+% --- Accessibility -----------------------------------------------------------
+% Recorded as an absence, and the absence was looked for. The whole of the
+% April 2024 regulations was read; it contains none of "accessib", "alt text",
+% "WCAG", "tagged", "screen reader", "PDF/A" or "508".
+%
+% Caltech DOES publish an institute-wide digital accessibility standard — a
+% Digital Accessibility site naming WCAG 2.1 Level AA for its digital content
+% and platforms. That is deliberately NOT recorded as a filing requirement
+% here: it is not the Graduate Studies Office, it is about web content and
+% platforms rather than a deposited thesis, and under RESEARCHING.md only the
+% graduate school's own filing requirements are a source for this field.
+% Someone revisiting Caltech should check whether the Grad Office has since
+% adopted it for theses; as of the access date it had not.
+\thesisaccessibilityrequirement{Not published}
+	{The Caltech Graduate Studies Office publishes no accessibility requirement
+	 for a filed thesis. Checked against the whole of the April 2024
+	 Regulations for the Format and Presentation of a Graduate Thesis on
+	 2026-09-13. Caltech does maintain a separate institute-wide digital
+	 accessibility standard, which those regulations do not invoke.}
+
+% --- Profile-local fields -----------------------------------------------------
+% Caltech's title page carries two dates that are deliberately different, and
+% the guide explains why: "The year shown should be the year in which the
+% degree is granted at Commencement. This may be the following calendar year,
+% depending on when the student has completed his degree requirements. The date
+% in parentheses on the next line is the date of the thesis examination."
+%
+% Neither is \graddate, so each gets its own setter rather than being guessed at.
+\newcommand{\thesis@ct@conferred}{\the\year}
+\newcommand{\caltechyearconferred}[1]{\renewcommand{\thesis@ct@conferred}{#1}}
+\newcommand{\thesis@ct@defense}{[SET THE DEFENSE DATE]}
+\newcommand{\caltechdefensedate}[1]{\renewcommand{\thesis@ct@defense}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% Appendix A's specimen, read from the rendered page. Note that the -layout
+% text extraction sets "California Institute of Technology / Pasadena,
+% California" flush left; on the page they are centred like everything else.
+%
+%   FULL THESIS TITLE
+%   Thesis by
+%   Your Full Name
+%   In Partial Fulfillment of the Requirements
+%   for the Degree of
+%   Doctor of Philosophy
+%   California Institute of Technology
+%   Pasadena, California
+%   Year Degree Conferred
+%   (Defense Date)
+%
+% "THESIS BY", NOT "DISSERTATION BY". Caltech calls the document a thesis
+% throughout, for the PhD as well as the Engineer's degree — "The final academic
+% requirement for all students seeking a PhD or Engineer's degree is preparing
+% and 'defending' a document termed a thesis or dissertation". The specimen says
+% "Thesis by", so that string is fixed here rather than taken from
+% \thesis@DocNoun, which \doctype{dissertation} would turn into "Dissertation".
+%
+% The title page is not numbered: the page order lists "1. Title page (not
+% numbered)" and numbering starts at ii on the copyright page.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing
+		% The specimen is NOT vertically centred: the title sits near the top
+		% and the institute block near the foot, with the slack between the
+		% degree and "California Institute of Technology". Centring the whole
+		% block instead put the title 2.62in down, about an inch below where
+		% the specimen has it.
+		\vspace*{0.5in}%
+		{\centering
+			\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+			\vspace{3\baselineskip}
+			Thesis by\par
+			\vspace{\baselineskip}
+			\@author\par
+			\vspace{3\baselineskip}
+			In Partial Fulfillment of the Requirements\par
+			\vspace{\baselineskip}
+			for the Degree of\par
+			\vspace{\baselineskip}
+			\thesis@degree\par
+			% The specimen's deep gap. \vfill is safe here where it was not on
+			% the Iowa State page: this page carries about 4in of content in an
+			% 8.58in block, so the stretchable glue never becomes an attractive
+			% page break.
+			\vfill
+			California Institute of Technology\par
+			\vspace{\baselineskip}
+			Pasadena, California\par
+			\vspace{\baselineskip}
+			\thesis@ct@conferred\par
+			\vspace{\baselineskip}
+			(\thesis@ct@defense)\par
+		\par}
+		\vspace*{0.5in}%
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Caltech prescribes none in the filed document. Approval happens outside it:
+% "The thesis must be approved by the examination committee, the Division
+% Chair, and finally by the Dean of Graduate Studies", on forms rather than on a
+% leaf of the thesis.
+%
+% The page order is exhaustive and carries no approval or signature page:
+% "Paginate the parts of the thesis in the following order: 1. Title page (not
+% numbered); 2. Copyright page ii; 3. Acknowledgment iii; 4. Abstract iv;
+% 5. Published Content v; 6. Table of Contents vi; 7. List of illustrations
+% and/or list of tables, and nomenclature vii; 8. Main text of thesis ... 1;
+% 9. Material to follow text ...". The strings "signature page", "approval
+% page" and "certificate of approval" do not occur anywhere in the regulations.
+%
+% As elsewhere in this round, that is a closed list rather than an explicit
+% prohibition; a reviewer wanting the stricter standard should downgrade this
+% one line.
+\thesisnoapprovalpage
