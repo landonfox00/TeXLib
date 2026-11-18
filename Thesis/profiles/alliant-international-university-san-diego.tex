@@ -1,0 +1,194 @@
+% profiles/alliant-international-university-san-diego.tex — Alliant International University
+% ============================================================================
+% source: https://alliant.libguides.com/ld.php?content_id=75637663
+%         ("Alliant International University Dissertation/Doctoral Project
+%          Style and Format Manual", 37 pp, "Approved April 2014, Revised
+%          September 2020"; PDF created 2020-09-25)
+% source: https://alliant.libguides.com/c.php?g=692750&p=4908033
+%         ("Formatting Manual & Forms", the page that links the manual as
+%          "2020 Dissertation/Doctoral Project Style & Format Manual";
+%          "Last Updated: May 28, 2026")
+% source: https://alliant.libguides.com/LibraryClearance
+%         (the clearance-process home page: signing, ProQuest upload, review)
+% accessed: 2026-09-18
+% checked:  texlib-thesis-profile-round
+%
+% WHY A LIBRARY-HOSTED FILE COUNTS HERE. RESEARCHING.md excludes library guides
+% as sources, and the manual is served from the library's LibGuides site. The
+% manual itself is not a library guide: it is the university's own systemwide
+% rule — "Students in all schools and programs should follow this guide in
+% preparing the final copy of dissertations and doctoral project document(s)" —
+% and at Alliant the LIBRARY is the clearing office: "Library staff are
+% responsible for performing a basic check at the time of submission, to make
+% sure that the document is formatted according to the requirements in this
+% manual". Only the manual's text is used below; the guide's own APA tips and
+% its Word template ("not official or required") are not. A reviewer who reads
+% the rule the other way should block this institution instead.
+%
+% The manual "governs the format and style used in producing dissertations,
+% doctoral projects, and master's theses", so one profile covers every Alliant
+% campus and school. IPEDS files the whole university under the San Diego unit,
+% hence the name below; the title page prints the university's own name.
+%
+% VERIFIED and set here: geometry (all four sides), spacing, the title page, and
+% the absence of a separate approval page (see the note on that block — it is
+% the one call a reviewer should check).
+% NOT SET: every accessibility check-flag. Alliant publishes no accessibility
+% rule for a filed dissertation; recorded as such below.
+%
+% The manual is six years old (September 2020) and still the edition the live
+% page links in 2026. No newer edition was found.
+
+\thesisinstitution{Alliant International University-San Diego}
+
+% --- Margins -----------------------------------------------------------------
+% "Margins. In accord with APA style, all margins for the text should be 1
+% inch." No binding offset and no chapter-opening exception: the filed copy is
+% electronic only ("hard (paper) copies are no longer required"), and binding a
+% personal copy is the student's own business — "Library staff members do not
+% check the format of dissertations submitted for binding."
+%
+% The running head sits INSIDE the top inch: "The header should be placed within
+% the 1" margin, not below it, on the same line as the page number,
+% approximately ½ - ¾" from the top edge of the paper." That is consistent with
+% a 1in top margin measured to the text block.
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% "Spacing. The document must be double-spaced with the exception of: (a) figure
+% captions, titles, and footnotes, (b) charts and tables, (c) materials in
+% appendices, (d) materials reproduced the format in which they were developed,
+% (e) the CV (if included)." The body rule is double; the exceptions are the
+% filer's to apply.
+\thesissetspacing{double}
+
+% --- Rules Alliant states that a profile is not allowed to encode -------------
+% Recorded so a filer knows they exist; NOT implemented.
+%
+%  * RUNNING HEAD ON EVERY PAGE except the title page, "front matter,
+%    references, appendices, etc." included, APA-style, on the same line as the
+%    page number. The class draws no running head.
+%  * PAGE NUMBERS "located in the upper right-hand corner", roman for the front
+%    matter (title page counted as i, unnumbered), arabic from the text on.
+%  * FONT: exactly one of Times New Roman 12, Calibri 11, Georgia 11, Arial 11,
+%    "Computer Modern 10 point", "Lucinda 10 point". Computer Modern at 10pt is
+%    on the list, so the class's Latin Modern qualifies AT 10pt — at the class's
+%    default size a filer should check which one they are using.
+%  * LEFT-JUSTIFIED TEXT: "Do not justify right margins in the text of the
+%    manuscript." This class justifies by default; an Alliant filer needs
+%    \raggedright (with a 1/2in paragraph indent restored) in their preamble.
+%    Of everything in this block this is the rule most likely to be flagged.
+%  * No extra space between paragraphs or around headings; APA heading levels.
+%  * CHAPTERS numbered in roman ("Chapter I"); appendices lettered, each
+%    preceded by a title page.
+
+% --- Accessibility: none published -------------------------------------------
+% The 37-page manual, the Formatting Manual & Forms page, the clearance home page
+% and the Submitting to the Library page contain no occurrence of "accessib",
+% "alt text", "WCAG", "tagged" or "PDF/A". The only disability-related sentence
+% in the manual is about deviating from APA as a "reasonable accommodation" for
+% a student — not a rule about the file.
+\thesisaccessibilityrequirement{Not published}
+	{Alliant International University publishes no accessibility requirement for
+	 a filed dissertation, doctoral project or thesis. Its Style and Format
+	 Manual (revised September 2020) and the library clearance pages were read
+	 on the access date and none names tagging, alt text, WCAG, PDF/A or a
+	 document language.}
+
+% --- Fields the title page needs that the class has no home for ----------------
+% The specimen's annotations call for the school ("Insert school name") and the
+% campus ("Campus location"). Visible placeholders, so a page built without
+% setting them obviously wants editing. A document filing at Alliant sets:
+%
+%   \renewcommand{\thesisschool}{California School of Professional Psychology}
+%   \renewcommand{\thesiscampus}{San Diego}
+%
+% and should also know how the class's existing fields map onto the specimen:
+%   \author   — "Official full name, previous academic degree(s) [e.g., M.A.,
+%               JD]"; the manual: "list only degrees earned prior to submitting
+%               the document", never the one about to be conferred.
+%   \graddate — the YEAR only: "Year dissertation/doctoral project accepted by
+%               library".
+%   \committeemember{Name, Ph.D.}{Chairperson} for the chair ("Chair's/
+%               Supervisor's name, degree, and role"), then
+%               \committeemember{Name, Psy.D.}{} for each member ("names,
+%               academic degree(s)", no role). Members who "participate only in
+%               the defense ... should not be included."
+%   \doctype  — the specimen's "Dissertation" is replaced "Or Doctoral Project,
+%               Thesis, etc. as relevant"; the class prints \thesis@DocNoun.
+\providecommand{\thesisschool}{School Name}
+\providecommand{\thesiscampus}{Campus}
+
+% --- Title page --------------------------------------------------------------
+% From the SAMPLE TITLE PAGE in the manual's appendix (p. 15), rendered and read
+% as an image because its annotations are callouts. Prescriptive annotations:
+% "No running head or page number; title and material centered top-to-bottom on
+% page", "Four lines between title and next section", "Four to six lines between
+% name and approval section". The prose adds: "Chair (or supervisor) and
+% committee member ... names should be included on the title page" and
+% "Signatures should not be included on the title page."
+%
+% Reading of the specimen, stated so a reviewer can disagree with it:
+%  * The title is bold and in capitals in the specimen; the prose does not say
+%    so. Followed the specimen.
+%  * The lines are double-spaced, as the whole document is.
+%  * "Four lines" is read as four SINGLE-spaced lines baseline to baseline, and
+%    the specimen measures that way (about 0.78in from the title's last line to
+%    "Dissertation presented..." at 12pt). The name-to-approval gap is the upper
+%    end of "four to six", six lines, which is what the specimen shows. Lines
+%    are counted in the font's UNSTRETCHED baselineskip (\f@baselineskip,
+%    14.5pt at 12pt): under setspace \normalbaselineskip is already stretched
+%    and gave gaps about 40pt too deep.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\doublespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{{\bfseries\MakeUppercase{\@title}}}\par
+		\vspace{\dimexpr 4\dimexpr\f@baselineskip\relax-\baselineskip\relax}
+		\thesis@DocNoun{} presented to the Faculty of the\par
+		\thesisschool\par
+		Alliant International University\par
+		\thesiscampus\par
+		In partial fulfillment of the requirements for the degree of\par
+		\thesis@degree\par
+		by\par
+		\@author\par
+		\thesis@date\par
+		\vspace{\dimexpr 6\dimexpr\f@baselineskip\relax-\baselineskip\relax}
+		Approved by:\par
+		% Typed names, no signature rules: "Signatures should not be included on
+		% the title page." The class's \thesis@memberline draws a rule, so it is
+		% replaced for this page only.
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par
+		}%
+		\thesis@committee
+		\endgroup
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Approval page: none in the document --------------------------------------
+% THIS IS A JUDGEMENT CALL, and the one to check. Alliant never says in so many
+% words "do not include a signature page". What it does say:
+%
+%  * Table 1, "Sequence of Components of Dissertations/Doctoral Projects", lists
+%    title page, copyright page, dedication, acknowledgements, abstract, table of
+%    contents, lists of tables and figures, text, reference list, appendices,
+%    list of supplemental material and CV — and "Components should be ordered as
+%    listed in the table." There is no approval or signature page in it.
+%  * The approval the document DOES carry is the "Approved by:" block on the
+%    title page itself, with typed names and no signatures.
+%  * The signed approval is a separate document: the "Library
+%    Dissertation/Doctoral Project Clearance Form", which "must be signed by the
+%    dissertation/doctoral project committee and the Program Director after all
+%    final edits have been made and approved", now routed through Adobe Sign.
+%
+% A second, neutral approval page would therefore be a component outside the
+% prescribed sequence that duplicates the title page's approval block. That is
+% the same reasoning as abilene-christian-university.tex. PHYSICAL SIGNATURES
+% ARE NOT COLLECTED in the manuscript; they are collected on the clearance form
+% ("Scanned copies of original signatures are acceptable", or Adobe Sign).
+\thesisnoapprovalpage
