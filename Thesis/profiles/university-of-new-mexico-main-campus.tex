@@ -1,0 +1,183 @@
+% profiles/university-of-new-mexico-main-campus.tex — University of New Mexico
+% ============================================================================
+% source: https://grad.unm.edu/degree-completion/thesis-dissertations/guidelines.html
+%         ("Guidelines for Thesis and Dissertation Formatting", UNM Graduate
+%          Studies — the prose requirements page)
+% source: https://grad.unm.edu/degree-completion/thesis-dissertations/sample-dissertation.pdf
+%         (the Graduate School's annotated specimen; the guidelines page says
+%          front matter "Must exactly match examples")
+% source: https://grad.unm.edu/degree-completion/thesis-dissertations/manuscript-accessibility-check-instructions-6.29.26.pdf
+%         ("Manuscript Accessibility Check Instructions", revised 6/29/26)
+% accessed: 2026-09-15
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the title page (including the
+% committee block it carries), the absence of a separate approval page, and the
+% accessibility requirements.
+% NOT set: \thesissetchapteropening — UNM requires only "Each chapter starts on
+% a new page", not a deeper top margin.
+%
+% THE TWO UNM DOCUMENTS DISAGREE ABOUT THE LEFT MARGIN. Do not "correct" one
+% against the other without reading both:
+%
+%   guidelines.html, twice (Format, and again under Common Problems):
+%     "Margins  Left: 1.25–1.5 in; Top/Right/Bottom: 1 in."
+%   sample-dissertation.pdf, in the red annotation on the title page:
+%     "Margins need to be one inch; however, the left-hand margin may be up to
+%      1.25 This is required throughout the full document."
+%
+% So the guidelines make 1.25in the FLOOR for the left margin and the specimen
+% makes it the CEILING. left=1.25in is the only value in spec under both
+% readings, and is what this profile sets. The other three sides are 1in in both
+% documents. RESEARCHING.md prefers the prose requirements where a template
+% disagrees; here the prose reading is also the stricter one, so nothing is lost.
+%
+% TWO REQUIREMENTS THIS FILE CANNOT ENFORCE, both stated by UNM:
+%   * "TITLE OF DISSERTATION, DOUBLE SPACED AND CENTERED, ALL UPPERCASE,
+%     INVERTED PYRAMID FORM" — the uppercasing is done below, but the inverted
+%     pyramid is line breaking only the author can do. Put explicit \\ breaks in
+%     \title{} so successive lines get shorter.
+%   * "Note that page number is i" — the title page is numbered, unlike most
+%     schools'. The page style below is \plain rather than \empty so the number
+%     prints, which means a UNM document must call \frontmatter BEFORE
+%     \thesistitlepage. Page-number placement itself ("bottom center or top
+%     right") is not a profile field and is left to the document.
+
+\thesisinstitution{University of New Mexico}
+
+% See the note above on the 1.25in left margin. "Pages must be 8.5" x 11"" —
+% the class default, so no paper key is needed.
+\thesissetgeometry{left=1.25in, right=1in, top=1in, bottom=1in}
+
+% "Type & Font: 12 pt, double-spaced, single-sided. Arial, Times, Courier,
+% Helvetica." The specimen is looser — its dedication note says "the same line
+% spacing as your body (1.5 or double space, whichever you use in the body)" —
+% so onehalf appears to be tolerated, but double is what the requirements page
+% states and is what this profile sets. The typeface list is NOT enforced here:
+% the class's Latin Modern is not on it, and a profile cannot silently restyle
+% the whole document. A UNM filer should select one of the four in the preamble.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% UNM incorporates Adobe Acrobat's accessibility checker by reference and makes
+% passing it a hard requirement on a dated schedule:
+%
+%   "Starting for Spring 2027 graduates, all manuscripts must pass accessibility
+%    requirements in Adobe Acrobat."
+%
+% The two checkable declarations below are entailments of that rule rather than
+% items UNM names one by one: Acrobat's Full Check fails an untagged document
+% ("Tagged PDF") and one with no document language ("Primary language"), so a
+% manuscript without either cannot pass the check UNM requires. Flagged in the
+% PR as the one judgement call in this file; strike them if you read the rule
+% more narrowly. No PDF standard is named by UNM, so none is declared.
+\thesisrequiretagging
+\thesisrequiredocumentlanguage
+\thesisaccessibilityrequirement{Acrobat check (required Spring 2027)}
+	{"For Fall 2026 graduates, Graduate Studies highly recommends that students
+	 check that their manuscript passes accessibility requirements in Adobe
+	 Acrobat... Starting for Spring 2027 graduates, all manuscripts are required
+	 to pass the accessibility requirements in Adobe Acrobat."}
+\thesisaccessibilityrequirement{Two rules checked by hand instead}
+	{The instructions tell candidates to uncheck "Document structure provides a
+	 logical reading order" and "Document has appropriate color contrast" before
+	 running the check: "Graduate Studies staff will check these two items
+	 manually during manuscript formatting review." They are still requirements;
+	 they are just not self-checked.}
+\thesisaccessibilityrequirement{Alt text and headings}
+	{The instructions walk candidates through "Figures alternative text" and
+	 "Headers" failures specifically, the latter being "inconsistent level
+	 headers in the document or a heading in your essay that is not tagged as a
+	 heading".}
+\thesisaccessibilityrequirement{Export, do not print, to PDF}
+	{"you should save your document as a PDF or convert to PDF, rather than
+	 printing to PDF. That will help retain the accessibility measures from your
+	 original document."}
+\thesisaccessibilityrequirement{WCAG 2.1}
+	{UNM points candidates to "the WCAG 2.1 web standard" for background. It is
+	 offered as a resource, not stated as the filing standard — the filing test
+	 is the Acrobat check above.}
+
+% UNM requires every previously earned degree under the author's name:
+% "List all previously earned degrees in chronological order / Include the
+% abbreviated degree, degree name, awarding institution, and the year of award
+% (example: M.S., Biology, The University of New Mexico, 2022)". The class has
+% no metadata field for that, so the profile supplies one. Use \\ between
+% degrees; leave it unset and the block is simply absent.
+\newcommand{\thesis@unm@priordegrees}{}
+\newcommand{\priordegrees}[1]{\renewcommand{\thesis@unm@priordegrees}{#1}}
+
+% Scratch counter for the page-number carry described at \end{titlepage} below.
+\newcount\thesis@unm@pg
+
+% --- Title page --------------------------------------------------------------
+% Reproduced from the annotated specimen. Only its BLACK text is prescriptive;
+% the red is explanatory, and none of it is copied into the page.
+%
+% The committee lives at the foot of this page, left-aligned, names only:
+% "APPROVED BY THE COMMITTEE:" / "Name, Chairperson" / "Name" / "Name", under
+% the instruction "Only list names. Do not get signatures. Align to the left."
+% The class's default \thesis@memberline draws a signature rule, so it is
+% replaced for this page.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{normal}%
+	\begin{titlepage}%
+		% \plain, not \empty: UNM numbers this page (see the header note).
+		%
+		% \singlespacing for the page, then double spacing for the title alone.
+		% UNM double-spaces the TITLE ("DOUBLE SPACED AND CENTERED"); leaving the
+		% document's double spacing on for the whole page overflows it onto a
+		% second leaf, which the specimen plainly is not.
+		\thispagestyle{plain}\singlespacing\centering
+		\vspace*{0.5in}
+		% Double spaced and centred, all uppercase. The inverted pyramid is the
+		% author's line breaking.
+		\begingroup\doublespacing
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\endgroup
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\@author}\par
+		\ifx\thesis@unm@priordegrees\@empty\else
+			\thesis@unm@priordegrees\par
+		\fi
+		\vfill
+		\MakeUppercase{\thesis@DocNoun}\par
+		\vspace{2\baselineskip}
+		Submitted in Partial Fulfillment of the\\
+		Requirements for the Degree of\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\thesis@degree}\par
+		\MakeUppercase{\thesis@program}\par
+		\vspace{2\baselineskip}
+		The University of New Mexico\\
+		Albuquerque, New Mexico\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+		\vfill
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par
+		}%
+		\raggedright
+		APPROVED BY THE COMMITTEE:\par
+		\thesis@committee
+		\endgroup
+		% LaTeX's titlepage environment resets the page counter to 1 on the way
+		% out. Harmless for a school whose title page is unnumbered, but here it
+		% made the page AFTER the title page repeat "i". Carry the counter across
+		% the environment and advance it by the one page this page occupies.
+		\global\thesis@unm@pg=\value{page}\relax
+	\end{titlepage}%
+	\setcounter{page}{\numexpr\thesis@unm@pg+1\relax}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% UNM has none. The committee is named on the title page above, and the specimen
+% says in as many words: "Only list names. Do not get signatures." The 17-page
+% specimen's front matter runs title page, dedication, acknowledgements,
+% abstract, table of contents, list of figures, list of tables — there is no
+% approval leaf anywhere in it, and the word "signature" appears nowhere else.
+\thesisnoapprovalpage
