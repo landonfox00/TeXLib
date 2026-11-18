@@ -1,0 +1,163 @@
+% profiles/alabama-a-and-m-university.tex — Alabama A&M University
+% ============================================================================
+% source: https://www.aamu.edu/admissions-aid/graduate-admissions/_documents/aamu-thesis-guidelines.pdf
+%         ("Thesis and Dissertation Guidelines", School of Graduate Studies,
+%          Alabama A&M University, Normal, Alabama; 66 pp)
+% accessed: 2026-09-15
+% checked:  texlib-thesis-profile-round
+%
+% THE SOURCE IS OLD, AND THAT IS THE FIRST THING TO KNOW ABOUT THIS FILE. The
+% title page of the guidelines reads "2012 - 2013" and its copyright line "June
+% 2012"; the PDF was last modified in August 2017. It is nonetheless the current
+% published document: it is the only formatting guide on the Graduate School's
+% site, and the graduate-admissions pages link no newer edition. Every figure
+% below is quoted from it, and every one of them should be re-checked with the
+% School of Graduate Studies before a real filing — some of its rules (25-pound
+% 100% cotton paper, "holes or perforations are not permitted") plainly predate
+% electronic submission.
+%
+% VERIFIED and set here: geometry, spacing, the chapter-opening margin, the
+% title page and the Certificate of Approval.
+% NOT set: the typeface (see below).
+%
+% REQUIREMENTS THIS CLASS CANNOT ENCODE, all stated by the guidelines:
+%   * Pagination. The order table reads: Fly Page (uncounted, unnumbered), Title
+%     Page (counted, unnumbered), Certificate of Approval (counted, small roman
+%     "ii"), Copyright Page ("iii"), and so on, with the text restarting at
+%     Arabic 1. The page number sits "one inch above the bottom edge". Neither
+%     the numbering scheme nor the number's position is a profile field, and the
+%     blank fly pages are the document's business.
+%   * "The text may be either 'justified' or 'left justified' as long as it is
+%     used consistently."
+
+% The ampersand is escaped: this value is typeset, not just stored.
+\thesisinstitution{Alabama A\&M University}
+
+% "The margins for each page of the thesis or dissertation (preliminary pages,
+% text, references) -- must meet the following specifications, measured from the
+% edge of the paper to the text: left 1 1/2 inch, right 1 inch, top 1 inch,
+% bottom 1 inch. This margin is inviolable."
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "Text is double-spaced throughout the thesis or dissertation" -- the annotation
+% on the Graduate School's own sample chapter page (Appendix N). The prose adds
+% that references are "double-spaced between entries, single-spaced within each
+% entry", which is a local choice in the bibliography.
+\thesissetspacing{double}
+
+% "The chapter heading and title start 2 inches below the top of the page", and
+% again in prose: "Each major subdivision of the thesis or dissertation begins on
+% a new page with the heading two inches from the top of the page and centered
+% over the text." The same 2in figure is given separately for TABLE OF CONTENTS,
+% LIST OF TABLES, LIST OF FIGURES, ACKNOWLEDGMENTS and REFERENCES, which is
+% exactly the set this hook covers.
+\thesissetchapteropening{2in}
+
+% The type rule is soft and its examples are dated: "A 12 point book type font
+% such as Helvetica, Palatino, or Times Roman should be used consistently
+% throughout the document." Nothing is forced here; a candidate who wants one of
+% those three selects it in their own preamble.
+
+% --- Accessibility -----------------------------------------------------------
+% Searched all 66 pages for "accessib", "WCAG", "tagged" and "alt text": no
+% match. The document predates every accessibility rule now common at filing.
+\thesisaccessibilityrequirement{Not published}
+	{The School of Graduate Studies publishes no accessibility requirement for a
+	 filed thesis or dissertation. Its guidelines date from 2012 and predate the
+	 practice; treat the silence as its age, not as a considered position.}
+
+% --- Title page --------------------------------------------------------------
+% "The wording and the format of the title page must be exactly as shown in
+% Appendix D" -- so this is reproduced from that specimen, and it is the one page
+% in this file whose wording is mandated word for word.
+%
+% Appendix D writes the programme as "in the Department of Plant and Soil
+% Science". A candidate whose programme is not a department should override this
+% page rather than let \thesis@program be prefixed with "the Department of".
+%
+% "Although the title page is counted, a number is not placed on the title page
+% itself."
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{3\baselineskip}
+		by\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{\@author}\par
+		\vspace{3\baselineskip}
+		A \MakeUppercase{\thesis@DocNoun}\par
+		\vspace{3\baselineskip}
+		Submitted in partial fulfillment of the requirements\\
+		for the degree of \thesis@degree\\
+		in the Department of \thesis@program\\
+		in the School of Graduate Studies\par
+		\vspace{3\baselineskip}
+		Alabama A\&M University\\
+		Normal, Alabama 35762\par
+		\vspace{3\baselineskip}
+		\thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Certificate of Approval --------------------------------------------------
+% Alabama A&M DOES require an approval page inside the document, and it is
+% signed: "a certificate of approval must be signed by each committee member and
+% included in the thesis. (Approval sheets must contain the original signatures
+% of the Advisory Committee.) The number of signature lines is equal to the
+% number of members of the Advisory Committee."
+%
+% Reproduced from the Appendix E specimen: a short justified paragraph, then one
+% blank rule per committee member, then a rule for the Dean of the Graduate
+% School and one for the date. The specimen types NO names -- the rules are
+% blank, to be signed -- and labels only the advisor's line, to the right of the
+% rule.
+%
+% ONE DELIBERATE DEVIATION: this page labels EVERY member's rule with that
+% member's role, not just the advisor's. The specimen shows "Major Advisor"
+% alone, but labelling the rest cannot mislead a signer and the page would
+% otherwise discard information the document already carries. Revert to a bare
+% rule if the Graduate Office objects.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\thesis@tagtitle{H1}{{\color{white}\tiny Certificate of Approval}}\par
+	\vspace*{\fill}
+	\begin{minipage}{\textwidth}
+		\setlength{\parindent}{2em}%
+		Submitted by \MakeUppercase{\@author} in partial fulfillment of the
+		requirements for the degree of \MakeUppercase{\thesis@degree}
+		specializing in \MakeUppercase{\thesis@program}.\par
+		Accepted on behalf of the Faculty of the Graduate School by the
+		\thesis@DocNoun{} Committee:\par
+	\end{minipage}\par
+	\vspace{3\baselineskip}
+	% One blank signature rule per committee member, indented right of centre as
+	% in the specimen, with the role to the right of the rule.
+	% The label sits in its own \parbox: a long role ("Graduate School
+	% Representative") otherwise wraps back to the left margin and lands under
+	% the wrong rule.
+	\begingroup
+	\newcommand{\thesis@aamu@sigline}[2]{%
+		\noindent\hspace*{##1}%
+		\parbox[t]{2.3in}{\rule{2.3in}{0.4pt}}%
+		\hspace{0.5em}%
+		\parbox[t]{\dimexpr\textwidth-##1-2.3in-0.5em\relax}%
+			{\raggedright\small\strut ##2}\par
+		\vspace{2\baselineskip}%
+	}%
+	\renewcommand{\thesis@memberline}[2]{%
+		\thesis@aamu@sigline{1.7in}{##2}%
+	}%
+	\thesis@committee
+	\vspace{\baselineskip}
+	\thesis@aamu@sigline{1in}{Dean of the Graduate School}%
+	\thesis@aamu@sigline{1in}{Date}%
+	\endgroup
+	\vspace*{\fill}
+	\loadgeometry{normal}\doublespacing\clearpage
+}
