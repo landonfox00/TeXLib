@@ -1,0 +1,159 @@
+% profiles/university-of-notre-dame.tex — University of Notre Dame
+% ============================================================================
+% source: https://graduateschool.nd.edu/assets/320084/dt_formatting_guide_updated_6_23_2026.pdf
+%         ("Guide for Formatting and Submitting Doctoral Dissertations and
+%          Master's Theses", The Graduate School; PDF ModDate 2026-06-23, and
+%          the filename carries the same date — the most current source in this
+%          round)
+% source: https://graduateschool.nd.edu/assets/283513/gs_dt_template_example.pdf
+%         (the Graduate School's own "Formatted Example File"; the guide tells
+%          candidates to capitalize the title-page lines "exactly as shown in the
+%          sample title pages", which this file is)
+% source: https://graduateschool.nd.edu/policies-forms/doctoral-dissertations-masters-theses/author-resources/
+%         (Author Resources, which links both of the above)
+% accessed: 2026-09-15
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, the chapter-opening margin, the
+% title page, and the absence of a separate approval page.
+% NOT set: the typeface. Notre Dame ships its Word template in three faces
+% (Calibri, Garamond, Times New Roman), so no single face is required.
+%
+% A SENTENCE NOT TO MISREAD. The guide contains the word "accessible" exactly
+% once: "It is strongly recommended that students flatten their vectors and
+% insert as a PNG or JPG for the PDF. This not only reduces the file size but
+% makes the PDF more accessible in terms of the resources needed to read the
+% file." That is about file size and compute, NOT about disability access, and
+% it is advice about rasterising vectors — which would DESTROY the tagged,
+% selectable content this class emits. It is not an accessibility requirement
+% and must not be recorded as one.
+%
+% REQUIREMENTS THIS CLASS CANNOT ENCODE, all stated by the Graduate School:
+%   * "Every page number is centered horizontally three-quarters of an inch from
+%     the bottom." Page-number placement is not a profile field.
+%   * The abstract's pages are "neither numbered nor counted in the numbering
+%     sequence", and the first page after the abstract is numbered "ii" — a
+%     front-matter numbering scheme the document has to arrange.
+%   * "The entire title should appear in all capitals" for every major division
+%     heading.
+%   * The formal submission "CAN NOT EXCEED 30MB".
+
+\thesisinstitution{University of Notre Dame}
+
+% "The left (binding edge) margin must be at least one and one-half inches. The
+% top, bottom and right margins must be at least one inch. This requirement
+% applies to every page in the document." Minima; the profile takes the minimum.
+% The checklist repeats the same figures for the lists of tables and figures.
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% "Double-space the text of your dissertation or thesis, as well as the abstract,
+% preface and any appendices." Footnotes, bibliography entries and block
+% quotations are single-spaced, which is a local choice in the document.
+\thesissetspacing{double}
+
+% "Always begin a major division at the top of a new page. Center the heading
+% (e.g., "TABLE OF CONTENTS," "CHAPTER 3," "RESULTS," or "APPENDIX")
+% approximately two inches from the top edge of the paper." A TOTAL top margin,
+% which is what this hook takes. Note Notre Dame writes "approximately".
+\thesissetchapteropening{2in}
+
+% --- Accessibility -----------------------------------------------------------
+% The formatting guide, the example file and the Author Resources page were all
+% read. None states an accessibility requirement for a filed dissertation; the
+% only "accessibility" on Author Resources is the university-wide footer link
+% to nd.edu/about/accessibility, which is about the website. See the warning in
+% the header about the guide's one use of the word.
+\thesisaccessibilityrequirement{Not published}
+	{The Graduate School publishes no accessibility requirement for a filed
+	 dissertation or thesis. Its guide's single use of the word "accessible"
+	 concerns file size and the resources needed to open the PDF, not disability
+	 access.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduced from the Graduate School's Formatted Example File, whose wording the
+% guide makes prescriptive. Only the title is uppercased; the degree is not.
+%
+% The director's signature line is ON this page and is the only signature
+% apparatus Notre Dame has -- but it is never signed: "Although we retain the
+% classic signature line, do not include a scanned or digital signature on the
+% official submission." So the rule is drawn and left blank, deliberately.
+%
+% Geometry of that block, from the guide: the line "begins at the center and runs
+% approximately two and three-quarters inches to the right", with the director's
+% name and ", Director" underneath it. (The example file sets that name nearer
+% the right end of the rule than its centre; the prose says centre, and the prose
+% is followed here.)
+%
+% "Do not place a number on the title page" -- hence the class's nopagenumber
+% geometry and an empty page style. "Do not use bold print on the title page."
+%
+% SPACING BETWEEN THE BLOCKS is proportional here (\vfill), not the literal line
+% counts the guide gives, because those counts do not fit a letter page in this
+% class: "four or five vertical spaces between the title and 'A Dissertation'",
+% then "four more lines to 'Submitted to'", the degree "four lines underneath
+% 'for the Degree of'", "four lines to 'by'", "four lines to your name", the
+% signature line "eight vertical spaces below your name", and the program name
+% "four vertical spaces below 'Director'" come to some 53 lines on a 9in text
+% block. The guide itself treats these as adjustable -- for co-directors it says
+% the change "will require some compensation in spacing after your name and
+% possibly around the title" -- and it also requires the page be centred
+% vertically, which is what \vfill does. The three DOUBLE-SPACED blocks it names
+% are reproduced exactly. If a format check asks for the literal counts, replace
+% each \vfill below with \vspace{4\baselineskip}.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		% "If the title is more than one line, double-space between lines in the
+		% title."
+		\begingroup\doublespacing
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\endgroup
+		\vfill
+		A \thesis@DocNoun\par
+		\vfill
+		% "Double-space the next four lines, capitalizing these words exactly as
+		% shown in the sample title pages."
+		\begingroup\doublespacing
+		Submitted to the Graduate School\\
+		of the University of Notre Dame\\
+		in Partial Fulfillment of the Requirements\\
+		for the Degree of\par
+		\endgroup
+		\vfill
+		\thesis@degree\par
+		\vfill
+		by\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vfill
+		% The unsigned director's line: starts at the horizontal centre of the
+		% text block, 2.75in long.
+		\hspace*{0.5\textwidth}%
+		\begin{minipage}{2.75in}
+			\centering\singlespacing
+			\rule{2.75in}{0.4pt}\par
+			\thesis@advisor, Director\par
+		\end{minipage}\par
+		\vfill
+		% "Double-space the last three lines."
+		\begingroup\doublespacing
+		Graduate Program in \thesis@program\\
+		Notre Dame, Indiana\\
+		\thesis@date\par
+		\endgroup
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Notre Dame has none. Its prescribed order of sections is Title Page, Copyright
+% Notice (optional), Abstract, Dedication (optional), Table of Contents, List of
+% Figures, List of Tables, List of Symbols, Preface or Acknowledgments, Text,
+% Appendices, Bibliography -- no approval or committee leaf anywhere in it. The
+% only committee apparatus in the document is the director's line on the title
+% page above, and the Graduate School receives confirmation of the defense from
+% the department rather than from a signed page.
+\thesisnoapprovalpage
