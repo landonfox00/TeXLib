@@ -1,0 +1,180 @@
+% profiles/university-of-colorado-boulder.tex — University of Colorado Boulder
+% ============================================================================
+% source: https://www.colorado.edu/graduateschool/academics/thesis-dissertation-submission/specifications-preparation-masters-theses-doctoral
+%         (Graduate School, "Specifications for Preparation of Master's Theses &
+%         Doctoral Dissertations", headed "Revised 2018, 2023, 2026")
+% source: https://www.colorado.edu/graduateschool/media/387
+%         (the Graduate School's "sample of a formatted thesis/dissertation",
+%         a .docx linked from that page's Example section)
+% source: https://www.colorado.edu/digital-accessibility/thesis-accessibility-guidance
+%         (Digital Accessibility Office, "Thesis Accessibility Guidance" -- the
+%         document the Specifications require adherence to)
+% accessed: 2026-09-10
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, the title page, the absence of an approval
+% page, and six accessibility requirements.
+%
+% NOT SET, because BOULDER STATES NO LINE-SPACING RULE: \thesissetspacing. This
+% is a finding, not an omission. The Specifications cover pagination, type,
+% margins, headings, style, the title page, the abstract, tables and figures,
+% footnotes, citations and the bibliography, and never give a spacing figure for
+% the body; the only mention is hedged and about the bibliography -- "Often the
+% entries in the bibliography are single-spaced with a double space between
+% entries." The submission checklist asks for "Correct spacing of text,
+% bibliography, quotes" without saying what correct is. So the class's neutral
+% double spacing renders and this file makes no claim that it is Boulder's.
+% Anyone filing here should ask the Graduate School or follow the style guide
+% their department names.
+
+\thesisinstitution{University of Colorado Boulder}
+
+% "Thesis margins should be 1 inch from all edges."
+%
+% A CHOICE BOULDER LEAVES OPEN, recorded rather than presented as a rule: "The
+% right edge of the text may be either justified (all lines the same length) or
+% ragged (lines varying in length)." This profile takes justified, which is the
+% class's behaviour and needs no setting; \raggedright after \documentclass is
+% equally in spec.
+%
+% And an exception it allows: "If you are unable to reduce a table, figure, or
+% graphic to fit within the margins, it may extend slightly into the margins."
+\thesissetgeometry{left=1in, right=1in, top=1in, bottom=1in}
+
+% No chapter-opening exception: Boulder's Margins section states one figure and
+% no deeper opening. "Each division listed (1-8) and each chapter begins on a
+% new page" is a page-break rule, not a margin one.
+% \thesissetchapteropening is deliberately not called.
+
+% TYPEFACE, AND A CONTRADICTION LEFT FOR THE READER. Both Boulder documents say
+% the same thing and it is self-contradicting: "Use a sans serif font accessible
+% to screen readers (Times New Roman, Calibri, Aptos, etc.)" (Specifications),
+% and "include readable font, which is a sans serif font (Times New Roman,
+% Calibri, Aptos, etc.)" (Thesis Accessibility Guidance). Times New Roman is not
+% sans serif. The rule cannot be followed as written, so this profile sets no
+% face and the class's Latin Modern -- a serif face in the same family as the
+% named example -- applies. Do not "resolve" this by imposing a sans face: the
+% only named examples are two sans faces and one serif, and Boulder has not said
+% which half of its sentence governs.
+%
+% One typographic rule IS unambiguous and the class already satisfies it:
+% "Underline should be used for links only."
+
+% --- Accessibility -----------------------------------------------------------
+% Boulder is at the strong end of this directory. The Specifications make
+% adherence mandatory and name the document: "It is essential that theses meet
+% accessibility standards. ... The Digital Accessibility Office has created
+% Thesis Accessibility Guidance, to which each student MUST ADHERE in the
+% preparation of their document."
+%
+% Even so, \thesisrequiretagging and \thesisrequiredocumentlanguage are NOT set.
+% Neither document names a tagged PDF, PDF/UA, PDF/A or a document language;
+% the conversion advice is "Go to File and 'Save as.' In the file type menu,
+% select 'PDF (*.pdf).'" Declaring a tagging requirement would be inferring the
+% mechanism from the goal. The rules are recorded verbatim instead.
+\thesisaccessibilityrequirement{Adherence}
+	{"It is essential that theses meet accessibility standards. ... The Digital
+	 Accessibility Office has created Thesis Accessibility Guidance, to which
+	 each student must adhere in the preparation of their document." The items
+	 below are that guidance.}
+\thesisaccessibilityrequirement{Headings}
+	{"Headings should be programmatically applied ... so that they are consistent
+	 and hierarchical." They must run in order and "should only increase by one
+	 level at a time; do not skip over other levels." Boulder accepts more than
+	 one level-1 heading in a long thesis: "due to the length of some thesis or
+	 dissertation documents, it may make readability easier if there is more the
+	 one heading level 1."}
+\thesisaccessibilityrequirement{Document title}
+	{The PDF's title metadata, which is not the same thing as the level-1
+	 heading: "The document title is a part of the metadata. While the text name
+	 may be the same, this is separate from the heading level 1."}
+\thesisaccessibilityrequirement{Alt text}
+	{"To make these elements accessible, include descriptive alt text for all
+	 images and figures." Where an image contains text, "the alternative text
+	 needs to include the text as assistive technology cannot read it off of an
+	 image"; a purely decorative image "should be designated as such".}
+\thesisaccessibilityrequirement{Tables}
+	{"Tables should be used for tabular data with row headers and column headers;
+	 they should not be used for visual layout, and images of tables should not
+	 be used." Also: "avoid empty data cells ... Instead of empty cells, use
+	 'N/A' or 'not provided'", the one exception being cell A1 of a table that
+	 has both column and row headers.}
+\thesisaccessibilityrequirement{Colour contrast}
+	{"For color, ensure that the contrast is sufficient (4.5:1)" -- Boulder names
+	 the WCAG AA ratio explicitly. Visual styling "should not be the only way
+	 that meaningful information is conveyed".}
+
+% --- Author-facing fields this profile adds ----------------------------------
+% Boulder's title page lists the candidate's PREVIOUS degrees with granting
+% institutions and dates, which the class does not model. One per line, in the
+% sample's form: "B.A., University of Illinois, 1999". Separate lines with \\.
+\providecommand{\cubpriordegrees@list}{}
+\newcommand{\cubpriordegrees}[1]{\renewcommand{\cubpriordegrees@list}{#1}}
+
+% --- Title page --------------------------------------------------------------
+% REQUIRED (starred in the Thesis Organization list), and its contents are
+% enumerated: "The title page contains the thesis title; candidate's name;
+% candidate's degrees, granting institutions, and dates received; statement
+% shown on sample page ('A thesis submitted to ...'); name of department or
+% school granting degree; and year the thesis is submitted. It also includes the
+% names of all committee members".
+%
+% The wording of the statement is delegated to the sample, which is therefore
+% the authority for it. Reproduced from the sample verbatim, INCLUDING its
+% singular "of the requirement for the degree of" -- the neighbouring Colorado
+% Denver | Anschutz template reads "requirements". That is Boulder's text and
+% the Graduate School reviews against its own sample, so it is not silently
+% corrected here; see the PR for the flag.
+%
+% \gradprogram must carry the "name of department or school granting degree" in
+% the form the sample prints -- "Department of English" -- so
+% \gradprogram{Department of Mathematics}, not \gradprogram{Mathematics}.
+%
+% "Committee Members:" heads a plain list of names -- no roles, no rules. The
+% Thesis Approval Form is where approval actually happens (see below), so
+% nothing on this page is a signature.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{0.5in}%
+		\thesis@tagtitle{Title}{\MakeUppercase{\@title}}\par
+		\vspace{\baselineskip}
+		by\par
+		\vspace{\baselineskip}
+		\MakeUppercase{\@author}\par
+		\ifx\cubpriordegrees@list\@empty\else\cubpriordegrees@list\par\fi
+		\vspace{4\baselineskip}
+		A \thesis@docnoun{} submitted to the\\
+		Faculty of the Graduate School of the\\
+		University of Colorado in partial fulfillment\\
+		of the requirement for the degree of\\
+		\thesis@degree\\
+		\thesis@program\\
+		\thesis@date\par
+		\vspace{3\baselineskip}
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{##1\par}%
+		Committee Members:\par
+		\thesis@committee
+		\endgroup
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% Boulder's filed document contains none. The Thesis Organization list is
+% explicit about what the document holds -- "The final copy of the thesis
+% submitted to the Graduate School is organized in the following order", eight
+% entries from Title Page to Appendix -- and no approval page appears in it.
+%
+% Approval is a SEPARATE FILE, not a leaf of the manuscript: "Students must also
+% submit a thesis approval form (TAF) as a single-page supplemental file to
+% ensure that the final copy has been accepted by the thesis committee", and
+% "upon completion the student will save the completed TAF and upload it as a
+% single-page supplementary file as part of the electronic thesis submission
+% process."
+%
+% Signatures are collected electronically on that form, which is distributed to
+% the chair and one other committee member; nothing is signed inside the PDF.
+\thesisnoapprovalpage
