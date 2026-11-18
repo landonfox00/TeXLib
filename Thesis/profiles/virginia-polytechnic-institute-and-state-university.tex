@@ -1,0 +1,163 @@
+% profiles/virginia-polytechnic-institute-and-state-university.tex
+% ============================================================================
+% source: https://guides.lib.vt.edu/c.php?g=547528&p=3756998
+%         (ETD Guide, "Formatting" — Last Updated Aug 10, 2026 12:41 PM)
+% source: https://guides.lib.vt.edu/ETDguide/accessibility
+%         (ETD Guide, "Guidelines for Accessibility in ETD Submissions" —
+%          same Last Updated stamp)
+% source: https://graduateschool.vt.edu/content/dam/graduateschool_vt_edu/misc-forms/etd-template-in-word.doc
+%         (the Graduate School's own MS Word front-matter template)
+% accessed: 2026-09-11
+% checked:  texlib-thesis-profile-round
+%
+% ON THE SOURCE HOST, because it matters here. The ETD guide lives on the
+% Libraries' LibGuides server, which RESEARCHING.md would normally exclude. It
+% is used anyway because the GRADUATE SCHOOL'S OWN ETD host redirects to it:
+% https://etd.vt.edu/guidelines/format.html answers 301 Moved Permanently to
+% https://guides.lib.vt.edu/ETDguide. That redirect is the Graduate School
+% designating the guide as its requirements page, and the guide describes the
+% templates as "provided by the graduate school". The title page below comes
+% from the Graduate School's own domain regardless.
+%
+% VERIFIED and set here: the title page, the absence of an approval page, and
+% the accessibility requirements.
+%
+% NOT SET, because VIRGINIA TECH DOES NOT PUBLISH THEM: margins and line
+% spacing. This is the substantive gap in this profile and it is not an
+% oversight -- the Formatting page's only statement about margins is circular,
+% "the manuscript is formatted to fit within the margins acceptable by the
+% Graduate School and satisfies all requirements for ETD submission", and no
+% figure for any side, nor any spacing rule or font rule, appears anywhere on
+% the Formatting, Accessibility or Policies pages. Third-party sites state
+% figures for Virginia Tech; none was read on a vt.edu page, so none is
+% reproduced. The class's neutral geometry and double spacing render instead.
+%
+% TO FINISH THIS PROFILE: open the Graduate School's front-matter templates in
+% VTechWorks (handle 10919/116253 and 10919/73226) or the Overleaf LaTeX
+% template and read the margins the Graduate School itself sets, or ask the ETD
+% desk for the figures its reviewers enforce.
+
+\thesisinstitution{Virginia Polytechnic Institute and State University}
+
+% --- Accessibility -----------------------------------------------------------
+% "All university-distributed documents must be accessible, including your
+% thesis or dissertation. Our accessibility requirements follow the WCAG 2.1
+% standards" -- a must, not an encouragement, which is what justifies the
+% checkable declaration below.
+%
+% Tagging specifically: the Word route is told "use the Export function
+% (Windows) or the Save as >Export format (Mac) to preserve accessibility. Do
+% not print to PDF or 'Save as PDF' on Windows, as these methods strip out the
+% document's underlying structure and accessibility tags", and the LaTeX route
+% is sent to Overleaf's "guidance on Tagged PDFs". The filed PDF is required to
+% carry its tags.
+\thesisrequiretagging
+% \thesisrequiredocumentlanguage is deliberately NOT set: the page lists
+% metadata, headings, alt text, tables, contrast and download permissions, and
+% says nothing about the document's language. Neither is
+% \thesisrequirepdfstandard -- no PDF standard is named anywhere on it.
+\thesisaccessibilityrequirement{Standard}
+	{Accessibility requirements follow the WCAG 2.1 standards. All
+	 university-distributed documents must be accessible, including your thesis
+	 or dissertation.}
+\thesisaccessibilityrequirement{Document metadata}
+	{The document's Title property must be filled in, not left as the filename.}
+\thesisaccessibilityrequirement{Alt text}
+	{All non-text content, like figures, needs alternative text. Avoid static
+	 images for equations and diagrams.}
+\thesisaccessibilityrequirement{Tables}
+	{Avoid merging or splitting cells within tables. Use table headers.}
+\thesisaccessibilityrequirement{Document structure}
+	{Use built-in heading styles to organize the document, and meaningful LaTeX
+	 commands (\string\section, equation environments, \string\label) to create
+	 a logical structure.}
+\thesisaccessibilityrequirement{Colour and contrast}
+	{Ensure that there is a high contrast between colours for better
+	 visibility.}
+\thesisaccessibilityrequirement{Document access}
+	{Do not apply restrictions that prevent users from editing or downloading
+	 the document, which would block assistive technologies.}
+\thesisaccessibilityrequirement{Verification}
+	{Virginia Tech names PAC (Windows) and axesCheck (Mac) as the additional
+	 checkers, and notes that a LaTeX PDF often needs manual remediation before
+	 it passes.}
+
+% --- Title page --------------------------------------------------------------
+% Reproduces the Graduate School's MS Word front-matter template line for line.
+% The template is a fill-in-the-blanks specimen: "(Title)", "(Full Name)",
+% "(Thesis/Dissertation) submitted to the faculty of the Virginia Polytechnic
+% Institute and State University in partial fulfillment of the requirements for
+% the degree of", "(Master of Science/.../Doctor of Philosophy/...)", "In",
+% "(Department)", then the committee, "(Date of Defense)", "(City and State of
+% VT campus where you defended (ex. Blacksburg, VA))" and "Keywords:
+% (keywords)".
+%
+% Two values the class has no field for, so the profile mints them with the
+% template's own defaults. Override either in the document preamble.
+\providecommand{\thesisdefenselocation}{Blacksburg, VA}
+\providecommand{\thesiskeywords}{}
+
+% The committee is printed WITHOUT signature rules -- the template draws none,
+% and Virginia Tech collects committee approval electronically (see the approval
+% note at the foot of this file). The role follows the name on the same line,
+% which is how the template writes the chair: "(First I. Last, Committee Chair
+% or Co-Chair)".
+%
+% The template's date line is the DATE OF DEFENSE, not a graduation date. A
+% document filing at Virginia Tech should pass the defence date to \graddate.
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{2\baselineskip}
+		\@author\par
+		\vspace{2\baselineskip}
+		\begin{minipage}{0.82\textwidth}
+			\centering
+			\thesis@DocNoun{} submitted to the faculty of the Virginia
+			Polytechnic Institute and State University in partial fulfillment
+			of the requirements for the degree of\par
+		\end{minipage}\par
+		\vspace{\baselineskip}
+		\thesis@degree\par
+		In\par
+		\thesis@program\par
+		\vspace{2\baselineskip}
+		\begingroup
+		\renewcommand{\thesis@memberline}[2]{%
+			##1\ifx\relax##2\relax\else, ##2\fi\par
+		}%
+		\thesis@committee
+		\endgroup
+		\vspace{2\baselineskip}
+		\thesis@date\par
+		\thesisdefenselocation\par
+		\ifx\thesiskeywords\@empty\else
+			\vspace{2\baselineskip}
+			Keywords: \thesiskeywords\par
+		\fi
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% There is none, and at Virginia Tech the title page IS the approval instrument.
+% The Formatting page's front-matter list runs Title, Abstract (academic),
+% General Audience Abstract, Dedication, Acknowledgements, Table of contents and
+% the optional lists -- no approval or signature leaf anywhere in it -- and it
+% says "The title page contains the front matter items from title through
+% copyright statement and is followed by the abstract page."
+%
+% The decisive detail is in the Templates box, which offers a "Title page and
+% abstract template for unanimous approval" and then: "If one or more of your
+% committee members do not approve your work, use this title page template for
+% split approval". The committee's verdict is expressed by WHICH TITLE PAGE you
+% file, so a separate signature page would be meaningless.
+%
+% NOTE FOR A SPLIT-APPROVAL FILING: the page above is the UNANIMOUS one. A
+% student whose committee is not unanimous must use the Graduate School's split
+% -approval title page instead, which this profile does not implement.
+\thesisnoapprovalpage
