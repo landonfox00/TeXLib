@@ -1,0 +1,217 @@
+% profiles/university-of-kentucky.tex — University of Kentucky
+% ============================================================================
+% source: https://gradschool.uky.edu/thesis-dissertation-preparation
+%         (The Graduate School, "Thesis & Dissertation Preparation". It carries
+%         separate but near-identical "Electronic Thesis Preparation" and
+%         "Electronic Dissertation Preparation" sections; every figure below is
+%         stated identically in both.)
+% source: https://gradschool.uky.edu/sites/default/files/2024-12/new-etd-checklist-form-002.pdf
+%         ("Electronic Theses & Dissertations (ETDs) Corrections Sheet" — the
+%         form the Graduate School marks up when it sends a document back. It
+%         restates the margin, spacing and font rules, which is as close to an
+%         authoritative confirmation as this gets.)
+% source: https://gradschool.uky.edu/sites/default/files/2025-05/thesisexample06-08.pdf
+%         (the Graduate School's specimen title page, linked from the page order
+%         list as "Title Page for Thesis"; uploaded 2025-05)
+% source: https://gradschool.uky.edu/sites/default/files/2025-05/thesisexample02-03.pdf
+%         (the specimen approval page, linked as "Approval Page")
+% accessed: 2026-09-12
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set: geometry, spacing, the title page, the approval page.
+%
+% NOT set: \thesissetchapteropening — no chapter-opening exception appears in
+% either section or on the corrections sheet.
+%
+% NOT set, because the class has no hook: the font size. "A standard 11 or 12
+% point font is required and should be consistent throughout the thesis. This
+% includes all preliminary pages, table of contents, list pages, table/figure
+% headings and page numbers. The text must be black." Also unenforceable from
+% here: "No bold on Preliminary Pages", and "All fonts used in the document must
+% be embedded" (lualatex embeds everything, so that one is satisfied anyway).
+%
+% TWO DEAD LINKS ON THE GRADUATE SCHOOL'S OWN PAGE, so a later pass does not
+% waste the search: the dissertation specimens under
+% gradschool.uky.edu/sites/gradschool.uky.edu/files/Documents/ThesisDissertationPrep/
+% (Dissertation_Title_Page.pdf, Dissertation_Title_Co-Directors.pdf,
+% DissertationExample05-06.pdf and the rest) all 301-redirect to an HTML page.
+% The THESIS specimens under /sites/default/files/2025-05/ are live. The
+% dissertation prose is word-for-word the thesis prose with the noun swapped, so
+% the pages below are built from the thesis specimens and switch nouns through
+% \doctype.
+
+\thesisinstitution{University of Kentucky}
+
+% "Margins: A 1-inch margin is required on the top, bottom and right sides of
+% all pages of the thesis; a 1.5\" inch margin is required on the left side of
+% all pages to allow for binding." [sic — "1.5\" inch" is the source's]. The
+% corrections sheet: "Check margins: 1.5\" on the left, 1\" on the top, bottom,
+% and right".
+%
+% Note this is the opposite of the UNR reasoning: UK asks for the binding
+% allowance in the FILED electronic document, on every page, so it belongs in
+% the geometry and not at print time. Because it is a left margin rather than an
+% inner one, a twoside build would put it on the wrong side of even pages; UK
+% documents should stay oneside.
+\thesissetgeometry{left=1.5in, right=1in, top=1in, bottom=1in}
+
+% A CHOICE, not a single rule: "Line Spacing: Either single, one and one-half or
+% double spacing should be used in the body of the thesis. Footnotes,
+% bibliographic entries, long quoted passages, etc., should be single-spaced."
+% All three are in spec. This profile takes double because it is the class
+% default and the most common choice; \thesissetspacing{onehalf} and
+% {single} are equally acceptable at UK and a filer may set either.
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% NOT PUBLISHED, as far as the Graduate School's own filing requirements go. The
+% preparation page, the corrections sheet and the technical FAQ were all read on
+% the access date and none of them mentions accessibility, tagging, alt text,
+% WCAG, PDF/A or the ADA. What the page does ask for is adjacent but different —
+% embedded fonts, bookmarks for every major division, no security restrictions —
+% and those are preservation and navigation rules, not accessibility ones.
+%
+% A LEAD, NOT A SOURCE, recorded so a later pass knows where to look: UK
+% Libraries' ETD research guide (libguides.uky.edu) states that effective
+% April 20, 2026 all text submissions must conform to ADA Title II. That is a
+% library guide, which RESEARCHING.md excludes, and no Graduate School page
+% repeats it. If the Graduate School adopts it, this block is where it goes —
+% and note that UK's date, if real, is its own and must not be reconciled
+% against another institution's.
+\thesisaccessibilityrequirement{Not published}
+	{The Graduate School's filing requirements state no accessibility rule. Its
+	 adjacent requirements are about preservation and navigation: all fonts must
+	 be embedded, the title page, abstract, table of contents, tables, figures,
+	 preface, introductions, every chapter and sub-section, appendix,
+	 bibliography and index must be bookmarked with the document set to open
+	 with bookmarks visible, and no security restriction may be applied.}
+
+% --- Title page --------------------------------------------------------------
+% Built from specimen EXAMPLE PAGE 6, whose margin notes are prescriptive and
+% are reproduced as the vertical positions below:
+%   "Position text 2.5 inches from the top of the page; center" + "Title all in
+%   CAPS"; "Position line four Inches from the top Of the page" (the rules that
+%   bracket the word THESIS); "Position text 2.5 inches from the bottom of the
+%   page; center" (the copyright line).
+%
+% The title block is therefore a fixed 1.5in tall box running from 2.5in to 4in
+% down the page. A title longer than that box overflows it rather than pushing
+% the rules down — which is the specimen's own behaviour, since the rules are
+% specified at an absolute position.
+%
+% EXAMPLE PAGE 8 is the same page for a multi-volume work, with "VOLUME TWO"
+% under the title; EXAMPLE PAGE 7 is the co-directors variant. Neither is
+% encoded — a filer with co-directors should add the second Director line by
+% hand.
+%
+% TWO THINGS A FILER MUST SET, because the class has no field for them:
+%   * \ukcollege{...} — the specimen names the COLLEGE ("College of Business and
+%     Economics"), not the department or program. Defaults to \thesis@program,
+%     which is usually the wrong noun; set it.
+%   * \graddate — the specimen's last lines are a bare YEAR and a copyright line
+%     using that same year, so set \graddate{2027}, not \graddate{May, 2027}.
+\newcommand{\thesis@uk@college}{\thesis@program}
+\newcommand{\ukcollege}[1]{\renewcommand{\thesis@uk@college}{#1}}
+
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing
+		% The whole page is one \vbox of exactly \textheight, so the \vfill below
+		% is ordinary glue inside a box rather than infinite stretch on the main
+		% vertical list. Without that, the page builder treats the page as full
+		% at the \vfill and spills the copyright line onto a second page. (No
+		% interline glue is added above it: \prevdepth is -1000pt at the top of a
+		% fresh page, so the box starts exactly at the top margin.)
+		\vbox to \textheight{%
+		\centering
+		% geometry's 1in top + 1.5in = the specimen's 2.5in.
+		\vspace*{1.5in}%
+		\begin{minipage}[t][1.5in][t]{\textwidth}%
+			\centering
+			\thesis@tagtitle{Title}{\MakeUppercase{\@title}}%
+		\end{minipage}\par
+		% The box above ends exactly 4in from the top of the page, which is where
+		% the specimen puts the first rule.
+		\rule{0.75\textwidth}{0.4pt}\par
+		\MakeUppercase{\thesis@docnoun}\par
+		\rule{0.75\textwidth}{0.4pt}\par
+		\vspace{2\baselineskip}
+		A \thesis@docnoun{} submitted in partial fulfillment of the\\
+		requirements for the degree of \thesis@degree{} in the\\
+		\thesis@uk@college\\
+		at the University of Kentucky\par
+		\vspace{2\baselineskip}
+		By\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{\baselineskip}
+		Lexington, Kentucky\par
+		\vspace{\baselineskip}
+		Director: \thesis@advisor\par
+		\vspace{\baselineskip}
+		Lexington, Kentucky\par
+		\vfill
+		\thesis@date\par
+		Copyright \textcopyright\ \@author\ \thesis@date\par
+		% Ends 1.5in above the bottom margin, i.e. the specimen's 2.5in above the
+		% bottom of the page.
+		\vskip 1.5in
+		}%
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Committee approval page --------------------------------------------------
+% UK DOES require one, and calls it both the "Approval Page" (in the page order)
+% and the "Signature Page" (in the signature rule). It sits between the abstract
+% and the dedication.
+%
+% Built from specimen EXAMPLE PAGE 2, positioned by its own note — "Position
+% text 3 inches from the top of the page; center. Title all in CAPS" — and
+% carrying the title, "By", the author, then the director and the Director of
+% Graduate Studies, then the date.
+%
+% NO SIGNATURE RULES, and this is the one place the specimen is deliberately NOT
+% followed. The specimen prints "(Director of Thesis Signature)" above each
+% label, because it predates electronic filing. The prose overrides it, and
+% RESEARCHING.md says prose wins:
+%
+%   "NO signatures are to be reproduced in electronic theses because they will
+%    be available on the Web. TYPE the Author's name (and date) on the Abstract
+%    Page. TYPE the names of the Director (Co-Directors) of the thesis and of
+%    the Director of Graduate Studies on the Signature Page."
+%
+% and the page order entry agrees: "Approval Page — Type names of professors
+% instead of including signatures." So the names are typed and the class's
+% default signature rule is not used here.
+%
+% A FILER MUST SET \ukdgs{...} — the Director of Graduate Studies, who is named
+% on this page and is not any of the class's existing metadata fields. It is
+% empty by default, which leaves the label standing over an empty line rather
+% than inventing a name.
+\newcommand{\thesis@uk@dgs}{}
+\newcommand{\ukdgs}[1]{\renewcommand{\thesis@uk@dgs}{#1}}
+
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\begin{center}
+		% geometry's 1in top + 2in = the specimen's 3in.
+		\vspace*{2in}%
+		\thesis@tagtitle{H1}{\MakeUppercase{\@title}}\par
+		\vspace{3\baselineskip}
+		By\par
+		\vspace{\baselineskip}
+		\@author\par
+		\vspace{3\baselineskip}
+		\thesis@advisor\par
+		Director of \thesis@DocNoun\par
+		\vspace{2\baselineskip}
+		\thesis@uk@dgs\par
+		Director of Graduate Studies\par
+		\vspace{2\baselineskip}
+		\thesis@date\par
+	\end{center}%
+	\loadgeometry{normal}\doublespacing\clearpage
+}
