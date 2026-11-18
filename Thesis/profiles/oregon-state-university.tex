@@ -1,0 +1,285 @@
+% profiles/oregon-state-university.tex — Oregon State University
+% ============================================================================
+% source: https://graduate.oregonstate.edu/current-students/thesis-guide/formatting-thesis-or-dissertation
+%         ("Formatting a Thesis or Dissertation", Office of Graduate Education —
+%          the whole Thesis Guide, including the model pages it calls Figures
+%          1-11; Figure 6 is the title page and Figure 7 the approval page)
+% source: https://accessibility.oregonstate.edu/digital-accessibility
+%         ("Electronic Documents Accessibility", which the Thesis Guide
+%          incorporates by reference as a requirement)
+% accessed: 2026-09-14
+% checked:  texlib-thesis-profile-round
+%
+% VERIFIED and set here: geometry, spacing, title page, approval page, and the
+% accessibility requirements including \thesisrequiretagging.
+% NOT set: \thesissetchapteropening. OSU says "Each level 1 heading begins a new
+% page" and states no deeper top margin for it.
+%
+% ONE REQUIREMENT THIS PROFILE CANNOT MEET, and it is not a small one: OSU puts
+% the page number at the TOP RIGHT and leaves the pretext pages unnumbered.
+%
+%   "Pretext pages: Do not add page numbers to pretext pages."
+%   "Page numbers must appear at the top right corner of pages, approximately 1
+%    inch from the top edge of the page and at least 1 inch from the right edge
+%    of the page. Page numbers must not invade any margins. There should be at
+%    least one space between the page number and the first line of text."
+%   "No headers or footers may be used. Footnotes are acceptable."
+%
+% This class puts the folio in the foot, and a profile owns page layouts, not
+% the document's page style — the class builds its `normal' geometry with
+% `includefoot' and there is no hook to move the number to a head. A document
+% built against this profile is therefore OUT OF SPEC on pagination until
+% either the class grows a hook or the author sets a page style themselves.
+% Recorded here rather than half-done, because a wrong page number position is
+% a reformat request, not a rejection.
+%
+% ALSO NOT ENCODABLE, recorded because each is a formatting rule OSU enforces:
+% "No orphan lines may appear at the top or bottom of a page"; figures and
+% tables must all be either inline or at chapter end, one system used
+% consistently; "Choose high-contrast colors to differentiate lines, bars, or
+% segments or use symbols with or without the color"; and the title "must be
+% worded exactly the same throughout the document as it appears on the Abstract
+% page, Title page and centered on page one".
+
+\thesisinstitution{Oregon State University}
+
+% "The left margin must be 1 inch unless printing and binding a personal or
+% departmental copy then change to 1.5 inch. All other margins must be at least
+% 1 inch, preferably 1.2 for top margin. Nothing may invade a margin. Every page
+% must meet margin requirements."
+%
+% So: 1in on the left for the FILED copy — the 1.5in is for a bound personal
+% copy and must not be in the electronic submission — and the top takes OSU's
+% stated preference of 1.2in. Both 1in and 1.2in satisfy "at least 1 inch", so
+% this profile follows the preference and an author who sets 1in is equally in
+% spec; nothing here rests on the choice.
+\thesissetgeometry{left=1in, right=1in, top=1.2in, bottom=1in}
+
+% "Line spacing must be 1.5 or double, consistent throughout the document and
+% matching which one you choose for the body of the thesis." A two-way choice
+% with no stated preference, so this takes the class default. OSU names the
+% single-spaced exceptions exactly: headings longer than one line, figure and
+% table titles and legends, bibliographical and reference citations, direct
+% quoted material, items listed within the body (optional), and "Where indicated
+% in the pretext section".
+%
+% Type size is the author's within a range: "Use regular, unadorned print, 10-
+% to 12-point size for text (headings may be 14-point only if all headings are
+% 14-point)."
+\thesissetspacing{double}
+
+% --- Accessibility -----------------------------------------------------------
+% OSU makes accessibility a filing requirement in the Thesis Guide itself, in
+% the list of what the student is responsible for and again at the end:
+%
+%   "Ensuring that your document conforms to all requirements in this Thesis
+%    Guide including those for electronic document accessibility."
+%   "Your thesis or dissertation must meet OSU's Electronic Documents
+%    Accessibility requirements."
+%
+% \thesisrequiretagging IS SET, and the reasoning should be visible because OSU
+% never uses the word "tagged". It requires the filed document to be accessible,
+% flatly; it recommends Word and says "Alternatively, PDF will be accepted if
+% your thesis/dissertation contains complex formatting or technical
+% requirements. Work closely with your major professor to ensure the digital
+% accessibility of your PDF." A LaTeX thesis takes that PDF path by definition,
+% and an untagged PDF cannot be an accessible one. If you read that as a
+% requirement on Word documents only, drop the line.
+%
+% \thesisrequiredocumentlanguage and \thesisrequirepdfstandard are NOT set: OSU
+% names neither the document language nor any PDF standard.
+\thesisrequiretagging
+\thesisaccessibilityrequirement{A filing requirement}
+	{"Your thesis or dissertation must meet OSU's Electronic Documents
+	 Accessibility requirements." The student is responsible for "Ensuring that
+	 your document conforms to all requirements in this Thesis Guide including
+	 those for electronic document accessibility."}
+\thesisaccessibilityrequirement{Checked before submission}
+	{"Microsoft Word is the recommended format for ensuring digital
+	 accessibility. Run your document through Microsoft Word's accessibility
+	 checker (Review>Check Accessibility), and resolve any issues identified.
+	 Alternatively, PDF will be accepted if your thesis/dissertation contains
+	 complex formatting or technical requirements. Work closely with your major
+	 professor to ensure the digital accessibility of your PDF."}
+\thesisaccessibilityrequirement{Alt text}
+	{"Use the Alt Text functionality in Microsoft Word to add equivalent
+	 alternative text to all images, figures, charts, and graphs."}
+\thesisaccessibilityrequirement{Headings}
+	{"Utilize Microsoft Word or LaTex Heading styles for effective and
+	 accessible heading structures. Chapter names are Level 1 headings.
+	 Subheadings of a chapter are Level 2 headings … Each level must look
+	 different from the other levels. Headings of the same level must look the
+	 same throughout the document." OSU is one of the few schools to name LaTeX
+	 explicitly here.}
+\thesisaccessibilityrequirement{Colour}
+	{"Choose high-contrast colors to differentiate lines, bars, or segments or
+	 use symbols with or without the color."}
+
+% --- Profile-local metadata ---------------------------------------------------
+% OSU distinguishes three things the class keeps as one or none:
+%
+%   * the DEFENCE date, which appears on the title page after "Presented" and
+%     again in the approval page's opening sentence;
+%   * the COMMENCEMENT date, which is the title page's last line — "Commencement
+%     date is the June following the defense date, so if defense is after the
+%     commencement ceremony it would be for the following year. Only month &
+%     year, no date or it will be rejected." This profile takes it from
+%     \graddate, the class's existing field;
+%   * the DEPARTMENT, which is not the major: "Official major names and
+%     department names can be found in the OSU Catalog. Some majors and
+%     departments have the same name while others differ." \gradprogram carries
+%     the MAJOR, and \oregonstatedepartment the department.
+\newcommand{\thesis@osu@defense}{}
+\newcommand{\oregonstatedefense}[1]{\renewcommand{\thesis@osu@defense}{#1}}
+\newcommand{\thesis@osu@dept}{}
+\newcommand{\oregonstatedepartment}[1]{\renewcommand{\thesis@osu@dept}{#1}}
+\newcommand{\thesis@osu@needdefense}{%
+	\ifx\thesis@osu@defense\@empty
+		\ClassWarningNoLine{texlib-thesis}{OSU's title page and approval page both
+			carry the^^J%
+			DEFENCE date, which is not the commencement date. Set^^J%
+			\string\oregonstatedefense{} (month spelled out, e.g. January 30,^^J%
+			2027) or both pages will be filed incomplete}%
+	\fi
+}
+
+% --- Title page --------------------------------------------------------------
+% Figure 6 of the Thesis Guide, with its annotations, which are prescriptive:
+%
+%   <Title>                       "Title must match Abstract and page one title
+%                                  exactly. Do not boldface the title."
+%   by                            "Add two spaces after the title."
+%   <Author>
+%   A THESIS                      "Doctoral students may use 'A DISSERTATION'
+%                                  instead of 'A THESIS' on Title Page,
+%                                  Abstract, and Approval Pages."
+%   submitted to
+%   Oregon State University
+%   in partial fulfillment of     "Follow division of this sentence (in partial
+%   the requirements for the       fulfillment of...) exactly." — so these three
+%   degree of                      line breaks are the specification, not a wrap
+%   <Degree>                      "Spacing should be the same after your name,
+%                                  'Oregon State University,' and your degree."
+%   Presented <defence date>
+%   Commencement <Month Year>
+%
+% "Titles longer than one line should be single-spaced."
+%
+% No page number: "Pretext pages: Do not add page numbers to pretext pages."
+\renewcommand{\thesistitlepage}{%
+	\loadgeometry{nopagenumber}%
+	\thesis@osu@needdefense
+	\begin{titlepage}%
+		\thispagestyle{empty}\singlespacing\centering
+		\vspace*{\fill}
+		\thesis@tagtitle{Title}{\@title}\par
+		\vspace{2\baselineskip}
+		by\par
+		\vspace{2\baselineskip}
+		\@author\par
+		\vspace{2\baselineskip}
+		\MakeUppercase{A \thesis@DocNoun}\par
+		\vspace{2\baselineskip}
+		submitted to\par
+		\vspace{2\baselineskip}
+		Oregon State University\par
+		\vspace{2\baselineskip}
+		in partial fulfillment of\\
+		the requirements for the\\
+		degree of\par
+		\vspace{2\baselineskip}
+		\thesis@degree\par
+		\vspace{2\baselineskip}
+		Presented \thesis@osu@defense\par
+		Commencement \thesis@date\par
+		\vspace*{\fill}
+	\end{titlepage}%
+	\loadgeometry{normal}%
+}
+
+% --- Approval page ---------------------------------------------------------------
+% Figure 7, "Standard Approval Page". Required, and filed WITHOUT signatures:
+% "Your signature constitutes consent to have your document available for public
+% reference in Valley Library, but the signatures on this page have been
+% replaced with the ETD Submission Approval form", and the submission
+% instruction is "Submit one copy of your thesis/dissertation, without
+% signatures, electronically to ScholarsArchive." So the rules below are drawn
+% empty on purpose, exactly as at Brown.
+%
+%   <Degree> thesis of <Author> presented on <defence date>.
+%
+%   APPROVED
+%
+%   ________________________
+%   Major Professor representing <Major>
+%
+%   ________________________
+%   Head of the Department of <Department>     ["If not part of a department,
+%                                               please list the head/chair/dean
+%                                               of the school or college."]
+%   ________________________
+%   Dean of Graduate Education
+%
+%   I understand that my thesis will become part of the permanent collection of
+%   Oregon State University libraries. My signature below authorizes release of
+%   my thesis to any reader upon request.
+%
+%   ________________________
+%   <Author>, Author
+%
+% NOTE WHAT IS *NOT* ON THIS PAGE: no committee. OSU names four signatories —
+% major professor, department head, Dean of Graduate Education, and the author —
+% and the rest of the committee appears nowhere. \committeemember is therefore
+% unused by this profile, deliberately; adding those lines would be inventing
+% them.
+%
+% ALTERNATE WORDINGS the guide lists for cases this page does not generate, all
+% replacing the first line or two: co-major professors ("Co-Major Professor,
+% representing <Major>" twice), dual majors (one Co-Major Professor line per
+% major), and MAIS ("Major Professor, representing Name of Major Area of
+% Concentration" / "Co-Major Professor, representing Name of 2nd Major" /
+% "Director of the Interdisciplinary Studies Program"). An author in one of
+% those cases must override this page.
+%
+% Unnumbered, like every pretext page.
+\renewcommand{\thesisapprovalpage}{%
+	\clearpage\thispagestyle{empty}%
+	\loadgeometry{nopagenumber}\singlespacing
+	\thesis@osu@needdefense
+	\ifx\thesis@osu@dept\@empty
+		\ClassWarningNoLine{texlib-thesis}{OSU's approval page names the
+			DEPARTMENT as well as^^J%
+			the major, and they are not always the same. Set^^J%
+			\string\oregonstatedepartment{}, or the head's line will read^^J%
+			"Head of the Department of" with nothing after it}%
+	\fi
+	\thesis@tagtitle{H1}{{\color{white}\tiny Approval Page}}\par
+	\vspace*{2\baselineskip}
+	\noindent \thesis@degree{} \thesis@docnoun{} of \@author{} presented on
+	\thesis@osu@defense.\par
+	\vspace{3\baselineskip}
+	{\centering APPROVED\par}%
+	\vspace{2\baselineskip}
+	\thesis@osu@sigline{Major Professor representing \thesis@program}%
+	\thesis@osu@sigline{Head of the Department of \thesis@osu@dept}%
+	\thesis@osu@sigline{Dean of Graduate Education}%
+	\vspace{2\baselineskip}
+	\noindent I understand that my \thesis@docnoun{} will become part of the
+	permanent collection of Oregon State University libraries. My signature below
+	authorizes release of my \thesis@docnoun{} to any reader upon request.\par
+	\vspace{2\baselineskip}
+	\thesis@osu@sigline{\@author, Author}%
+	\vfill
+	\clearpage\doublespacing
+}
+
+% One empty signature rule with its caption beneath, at the width Figure 7 draws
+% it. Defined after the page that uses it; TeX resolves it at use time.
+\newcommand{\thesis@osu@sigline}[1]{%
+	\par\noindent
+	\rule{4.2in}{0.4pt}\par
+	% \noindent, or the caption picks up \parindent and sits a quad to the right
+	% of the rule it belongs to. Figure 7 draws them flush.
+	\noindent #1\par
+	\vspace{2\baselineskip}
+}
