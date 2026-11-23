@@ -503,6 +503,14 @@ All notable changes to TeXLib are recorded here. The format follows [Keep a Chan
 
 ### Fixed
 
+- **A tall one-line part answer covered the question above it.** In an inline
+  key, a `{partsolution}` set on its header's line (`texlib_keyfit.runin`) kept
+  its natural height, so a boxed answer or a fraction rose past the one line of
+  height the overlay assumes, and its tint painted over the lower edge of the
+  question. `\@partsol@stack` now lowers that line as it lowers a body with no
+  header. `test_solution_inline_parity.py` draws a fraction under a question
+  with descenders: the key lost 52 px of the question before this fix.
+
 - **A tagged pass that crashed was copied out as the accessible PDF, and the
   luamml sidecar it left truncated broke every later build.** A lualatex fatal
   leaves the `<jobname>.pdf` of the shipout it died inside: a `%PDF-2.0`
