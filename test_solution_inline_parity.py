@@ -47,6 +47,8 @@ A second exam has answers taller than their weighted blanks (TALL_BANK_TEX).
 The student copy sizes each blank to its answer, so there the key must be the
 student page to the pixel, not merely within the tolerance, with no keyfit
 warning in its log. Its one-line part answers are set on the header's line.
+One is a fraction taller than that line, under a question with descenders: left
+at its natural height it rises into the question, and its tint covers them.
 
 Dependencies are poppler's pdftoppm and lualatex, nothing else -- the raster is
 read as PGM with the standard library so CI needs no image package. The
@@ -322,6 +324,11 @@ TALL_BANK_TEX = r"""
 				RUNIN $9$.
 			\end{partsolution}
 			\workbox{1}
+		\ppart Simplify $\log_{2}(y) + g(p)$ at $y = 1$.
+			\begin{partsolution}
+				RUNIN $\dfrac{x^{2}(x + 1)}{\sqrt{y}}$.
+			\end{partsolution}
+			\workbox{1}
 		\ppart $10 - 4$
 			\begin{partsolution}
 				RUNIN $6$.
@@ -345,7 +352,7 @@ TALL_TEX = r"""\documentclass[exam-number=1, points=20]{autoexam}
 	\problem[5,5][0.1]{topic=split}
 	\problem[5,5][0.1]{topic=colstall}
 	\problem[10][0.2]{topic=wholetail}
-	\problem[2,2,2][3]{topic=oneline}
+	\problem[2,2,2,2][3]{topic=oneline}
 \end{problems}
 \end{document}
 """
@@ -641,11 +648,11 @@ def main() -> int:
                                   timeout=120).stdout
             runin = len(re.findall(r"Solution\.[ \t]+RUNIN", text))
             stacked = len(re.findall(r"^[ \t]*Solution\.[ \t]*$", text, re.M))
-            log(f"  one-line answers run in: {runin} of 3; stacked headers: "
+            log(f"  one-line answers run in: {runin} of 4; stacked headers: "
                 f"{stacked}")
-            if runin != 3:
+            if runin != 4:
                 failures.append(
-                    f"one-line answers: {runin} of 3 set on the header's line")
+                    f"one-line answers: {runin} of 4 set on the header's line")
             if stacked == 0:
                 failures.append(
                     "multi-line answers lost their own header line")

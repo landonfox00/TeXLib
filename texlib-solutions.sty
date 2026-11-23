@@ -1115,7 +1115,11 @@
 	\hsize\dimexpr\linewidth-12pt\relax
 	\if@partsol@runin
 		% The header is already on the answer's line (texlib_keyfit.runin).
-		\noindent#1\@partsol@box
+		% Lowered as in the no-header branch below: a boxed answer or a
+		% fraction is taller than a strut, and at its natural height the
+		% inline overlay draws it and its tint over the question above.
+		\noindent\lower\dimexpr\ht\@partsol@box-\ht\strutbox\relax
+			#1\@partsol@box
 	\else\if\relax\detokenize\expandafter{\texlibpartsolheader}\relax
 		% No header line. The body is lowered until its first line sits
 		% where the header's would have, so the wrap keeps the shape the
